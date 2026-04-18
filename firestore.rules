@@ -1,0 +1,158 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return request.auth.token.role;
+    }
+
+    function isStudent() {
+      return isSignedIn() && role() == 'student';
+    }
+
+    function isTeacher() {
+      return isSignedIn() && role() == 'teacher';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && role() == 'admin';
+    }
+
+    function isTeacherOrAdmin() {
+      return isTeacher() || isAdmin();
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function inCohort(cohortId) {
+      return isSignedIn() && request.auth.token.cohortId == cohortId;
+    }
+
+    // ── Users ─────────────────────────────────────────────────────────────────
+
+    match /users/{userId} {
+      allow read: if isSelf(userId) || isTeacherOrAdmin();
+      // Students can update their own display fields only
+      allow update: if isSelf(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['role', 'totalPoints', 'pointsRedeemed', 'cohortId']);
+      // Creation and privileged field updates go through Cloud Functions
+      allow create, delete: if false;
+    }
+
+    // ── Cohorts ───────────────────────────────────────────────────────────────
+
+    match /cohorts/{cohortId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
+    }
+
+    // ── Subjects ──────────────────────────────────────────────────────────────
+
+    match /subjects/{subjectId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
+    }
+
+    // ── Lessons ───────────────────────────────────────────────────────────────
+
+    match /lessons/{lessonId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
+    }
+
+    // ── Assignments ───────────────────────────────────────────────────────────
+
+    match /assignments/{assignmentId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
+    }
+
+    // ── Tests — students CANNOT read correctAnswer fields directly ────────────
+    // Students get questions through the getTestQuestions Cloud Function which
+    // strips correct answers before returning them.
+
+    match /tests/{testId} {
+      allow read: if isTeacherOrAdmin();
+      allow write: if isTeacherOrAdmin();
+      // Students: no direct read access
+    }
+
+    // ── Submissions ───────────────────────────────────────────────────────────
+
+    match /submissions/{submissionId} {
+      // Students can read their own; teachers/admins can read all
+      allow read: if isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid);
+      // Students can create/update their own draft submissions
+      allow create: if isStudent()
+        && request.resource.data.studentId == request.auth.uid
+        && request.resource.data.status == 'draft';
+      allow update: if isStudent()
+        && resource.data.studentId == request.auth.uid
+        && resource.data.status == 'draft'
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['score', 'passed', 'pointsAwarded', 'gradedBy', 'gradedAt']);
+      // Grading goes through Cloud Functions only
+      allow delete: if false;
+    }
+
+    // ── Points log — append-only, Cloud Functions only ────────────────────────
+
+    match /points_log/{logId} {
+      allow read: if isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow write: if false; // Cloud Functions only
+    }
+
+    // ── Prizes ────────────────────────────────────────────────────────────────
+
+    match /prizes/{prizeId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
+    }
+
+    // ── Prize claims ──────────────────────────────────────────────────────────
+
+    match /prize_claims/{claimId} {
+      allow read: if isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow write: if false; // processRedemption Cloud Function only
+    }
+
+    // ── Progress (denormalized summary per student) ───────────────────────────
+
+    match /progress/{studentId} {
+      allow read: if isSelf(studentId) || isTeacherOrAdmin();
+      allow write: if false; // updateProgress Cloud Function only
+    }
+
+    // ── Invitations ───────────────────────────────────────────────────────────
+
+    match /invitations/{token} {
+      allow read: if true; // token is unguessable; needed during signup
+      allow write: if isTeacherOrAdmin();
+    }
+
+    // ── Equipment (Phase 5 — reserved, locked down until implemented) ─────────
+
+    match /equipment/{itemId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
+    }
+
+    match /equipment_bookings/{bookingId} {
+      allow read: if isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow write: if false; // Cloud Functions only
+    }
+  }
+}

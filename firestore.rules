@@ -17,15 +17,30 @@ service cloud.firestore {
     }
 
     function isTeacher() {
-      return isSignedIn() && role() == 'teacher';
+      return isSignedIn() && (role() == 'teacher' || docRole() == 'teacher');
     }
 
     function isAdmin() {
-      return isSignedIn() && role() == 'admin';
+      return isSignedIn() && (
+        role() == 'admin' ||
+        docRole() == 'admin'
+      );
     }
 
     function isTeacherOrAdmin() {
       return isTeacher() || isAdmin();
+    }
+
+    // Fallback: read role from Firestore user doc (for accounts without custom claims)
+    function docRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isStaff() {
+      return isSignedIn() && (
+        role() in ['teacher', 'admin'] ||
+        docRole() in ['teacher', 'admin']
+      );
     }
 
     function isSelf(uid) {
@@ -39,13 +54,26 @@ service cloud.firestore {
     // ── Users ─────────────────────────────────────────────────────────────────
 
     match /users/{userId} {
-      allow read: if isSelf(userId) || isTeacherOrAdmin();
-      // Students can update their own display fields only
+      allow read: if isSignedIn();
+      // Self can update non-privileged display fields (not points/role)
       allow update: if isSelf(userId)
         && !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['role', 'totalPoints', 'pointsRedeemed', 'cohortId']);
-      // Creation and privileged field updates go through Cloud Functions
-      allow create, delete: if false;
+            .hasAny(['role', 'totalPoints', 'pointsRedeemed']);
+      // Students may update only totalPoints on their own doc (attendance award)
+      allow update: if isSelf(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints']);
+      // Any signed-in user can update their own lastReadAt (cross-device badge clearing)
+      allow update: if isSelf(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastReadAt']);
+      // Teachers/admins may update totalPoints (absence penalty)
+      allow update: if isTeacherOrAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints']);
+      // Admins can update any field (cohortId, isActive, roles, etc.)
+      allow update: if isAdmin();
+      // Users create their own document during invite signup
+      allow create: if isSelf(userId);
+      // Only admins can delete users
+      allow delete: if isAdmin();
     }
 
     // ── Cohorts ───────────────────────────────────────────────────────────────
@@ -110,7 +138,12 @@ service cloud.firestore {
     match /points_log/{logId} {
       allow read: if isTeacherOrAdmin()
         || (isStudent() && resource.data.studentId == request.auth.uid);
-      allow write: if false; // Cloud Functions only
+      // Students may log their own attendance (+5); teachers may log absence penalties (−5)
+      allow create: if isSignedIn()
+        && (request.resource.data.reason == 'attendance'
+            ? (isStudent() && request.resource.data.studentId == request.auth.uid)
+            : isTeacherOrAdmin());
+      allow update, delete: if false;
     }
 
     // ── Prizes ────────────────────────────────────────────────────────────────
@@ -142,6 +175,226 @@ service cloud.firestore {
       allow write: if isTeacherOrAdmin();
     }
 
+    // ── Global settings (school day hours, etc.) ──────────────────────────────
+    // settings/booking is publicly readable for the unauthenticated iPad kiosk display.
+
+    match /settings/{docId} {
+      allow read: if isSignedIn() || docId == 'booking';
+      allow write: if isAdmin();
+    }
+
+    // ── Subject teachers (subcollection) ─────────────────────────────────────
+
+    match /subjects/{subjectId}/teachers/{teacherId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
+    }
+
+    // ── Lesson Blocks ─────────────────────────────────────────────────────────
+
+    match /lessonCategories/{categoryId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
+    }
+
+    match /lessonBlocks/{blockId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── Classrooms ────────────────────────────────────────────────────────────
+
+    match /classrooms/{classroomId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── Attendance sessions ───────────────────────────────────────────────────
+
+    match /attendance_sessions/{sessionId} {
+      allow read: if true; // public — QR display devices need unauthenticated read
+      allow write: if isTeacherOrAdmin();
+    }
+
+    // ── QR Display Devices ────────────────────────────────────────────────────
+
+    match /qr_display_devices/{deviceId} {
+      allow read: if true; // public — display devices are unauthenticated
+      allow create, delete: if isAdmin();
+      allow update: if isTeacherOrAdmin(); // teachers write session state; admins manage device config
+    }
+
+    // ── Lesson attendance (subcollection) ────────────────────────────────────
+
+    match /lessons/{lessonId}/attendance/{studentId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == studentId;
+    }
+
+    // ── Room booking ──────────────────────────────────────────────────────────
+    // rooms and time_blocks are publicly readable for the iPad display page.
+
+    match /rooms/{roomId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /time_blocks/{blockId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /room_bookings/{bookingId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.studentId == request.auth.uid;
+      allow delete: if isStaff()
+        || (isSignedIn() && resource.data.studentId == request.auth.uid);
+      allow update: if false;
+    }
+
+    // ── Chat ─────────────────────────────────────────────────────────────────
+
+    match /chat_settings/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /chat_channels/{channelId} {
+      // All signed-in users can read channel metadata; client-side filters visibility
+      allow read: if isSignedIn();
+      // Any signed-in user can create a channel or DM
+      allow create: if isSignedIn();
+      allow update, delete: if isTeacherOrAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        // Any signed-in user can post (access already gated by client-side channel filter)
+        allow create: if isSignedIn()
+          && request.resource.data.authorId == request.auth.uid;
+        // Author or staff can delete
+        allow delete: if isSignedIn()
+          && (resource.data.authorId == request.auth.uid || isStaff());
+        allow update: if isSignedIn()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']);
+      }
+    }
+
+    // ── Production teams ──────────────────────────────────────────────────────
+
+    match /production_teams/{teamId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
+    }
+
+    // ── Videos ───────────────────────────────────────────────────────────────
+
+    match /videos/{videoId} {
+      allow read: if isSignedIn();
+      // Students create their own; teachers/admins can update (grade/review)
+      allow create: if isStudent()
+        && request.resource.data.uploaderId == request.auth.uid;
+      allow update: if isTeacherOrAdmin()
+        || (isStudent() && resource.data.uploaderId == request.auth.uid
+            && !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['reviewStatus', 'grade', 'gradedBy', 'gradedAt', 'feedback']));
+      allow delete: if isTeacherOrAdmin();
+    }
+
+    match /video_comments/{videoId}/comments/{commentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn()
+        && (resource.data.userId == request.auth.uid || isTeacherOrAdmin());
+      allow update: if false;
+    }
+
+    // ── Absence Reports ───────────────────────────────────────────────────────
+
+    match /absence_reports/{reportId} {
+      allow read: if isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow create: if isStudent()
+        && request.resource.data.studentId == request.auth.uid;
+      allow update: if isTeacherOrAdmin();
+      allow delete: if isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid);
+    }
+
+    // ── Video Lab (Beta) ─────────────────────────────────────────────────────
+
+    match /video_lab/{videoId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isTeacherOrAdmin()
+        || (isStudent() && resource.data.uploaderId == request.auth.uid);
+      allow delete: if isTeacherOrAdmin()
+        || (isStudent() && resource.data.uploaderId == request.auth.uid);
+
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+          && request.resource.data.userId == request.auth.uid;
+        allow delete: if isSignedIn()
+          && (resource.data.userId == request.auth.uid || isTeacherOrAdmin());
+        allow update: if false;
+      }
+    }
+
+    // ── Production Bible / Student Guide ─────────────────────────────────────
+
+    match /guide_sections/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /guide_articles/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /guide_contacts/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── Vehicles ─────────────────────────────────────────────────────────────
+
+    match /vehicles/{vehicleId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
+    }
+
+    // ── Food Box Orders ───────────────────────────────────────────────────────
+
+    match /food_box_orders/{orderId} {
+      allow read: if isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow create: if isStudent()
+        && request.resource.data.studentId == request.auth.uid;
+      allow update: if isTeacherOrAdmin();
+      allow delete: if isTeacherOrAdmin();
+    }
+
+    // ── Minivan Bookings ──────────────────────────────────────────────────────
+
+    match /minivan_bookings/{bookingId} {
+      allow read: if isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow create: if isStudent()
+        && request.resource.data.studentId == request.auth.uid;
+      allow update: if isTeacherOrAdmin();
+      allow delete: if isTeacherOrAdmin();
+    }
+
+    // ── Email Config ──────────────────────────────────────────────────────────
+
+    match /email_config/{docId} {
+      allow read: if isTeacherOrAdmin();
+      allow write: if isAdmin();
+    }
+
     // ── Equipment (Phase 5 — reserved, locked down until implemented) ─────────
 
     match /equipment/{itemId} {
@@ -153,6 +406,57 @@ service cloud.firestore {
       allow read: if isTeacherOrAdmin()
         || (isStudent() && resource.data.studentId == request.auth.uid);
       allow write: if false; // Cloud Functions only
+    }
+
+    // ── Individual Development Plans (NOPRA) ──────────────────────────────────
+
+    match /development_plans/{studentId} {
+      allow read: if isSelf(studentId) || isTeacherOrAdmin();
+      allow write: if isSelf(studentId);
+    }
+
+    // ── Plan comments (teacher → student feedback) ────────────────────────────
+
+    match /plan_comments/{commentId} {
+      allow read: if isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow create: if isTeacherOrAdmin()
+        && request.resource.data.teacherId == request.auth.uid;
+      allow delete: if isTeacherOrAdmin();
+      allow update: if false;
+    }
+
+    // ── Semester Events (Annual Wheel) ────────────────────────────────────────
+
+    match /semester_events/{eventId} {
+      allow read: if isTeacherOrAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /semester_categories/{catId} {
+      allow read: if isTeacherOrAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ── GDPR deletion log — append by admins, read by admins ─────────────
+
+    match /deletion_log/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // ── Student to-do items ───────────────────────────────────────────────────
+
+    match /todos/{todoId} {
+      allow read: if isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow create: if isStudent()
+        && request.resource.data.studentId == request.auth.uid;
+      allow update: if isStudent()
+        && resource.data.studentId == request.auth.uid;
+      allow delete: if isStudent()
+        && resource.data.studentId == request.auth.uid;
     }
   }
 }

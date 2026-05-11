@@ -1,13 +1,97 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      // Force clear all service worker caches on every load
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (var i = 0; i < registrations.length; i++) {
+            registrations[i].unregister();
+          }
+        });
+        if (window.caches) {
+          caches.keys().then(function(names) {
+            for (var i = 0; i < names.length; i++) {
+              caches.delete(names[i]);
+            }
+          });
+        }
+      }
+    </script>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/clapperboard.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CineForge — Filmmaking Education</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="CineForge" />
+    <link rel="icon" type="image/png" href="/fire.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <title>CineForge</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div id="boot-msg" style="min-height:100vh;background:#030712;color:#9ca3af;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:sans-serif;font-size:18px;gap:12px">Starting CineForge…</div></div>
+    <script>
+      // Polyfills for Safari < 15.4
+      if (!Object.hasOwn) {
+        Object.hasOwn = function(o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
+      }
+      if (!Array.prototype.at) {
+        Array.prototype.at = function(n) {
+          n = Math.trunc(n) || 0;
+          if (n < 0) n += this.length;
+          return (n < 0 || n >= this.length) ? undefined : this[n];
+        };
+      }
+      if (!String.prototype.at) {
+        String.prototype.at = function(n) {
+          n = Math.trunc(n) || 0;
+          if (n < 0) n += this.length;
+          return (n < 0 || n >= this.length) ? undefined : this[n];
+        };
+      }
+      if (!Array.prototype.findLast) {
+        Array.prototype.findLast = function(fn) {
+          for (var i = this.length - 1; i >= 0; i--) {
+            if (fn(this[i], i, this)) return this[i];
+          }
+        };
+        Array.prototype.findLastIndex = function(fn) {
+          for (var i = this.length - 1; i >= 0; i--) {
+            if (fn(this[i], i, this)) return i;
+          }
+          return -1;
+        };
+      }
+      if (typeof structuredClone === 'undefined') {
+        window.structuredClone = function(o) { return JSON.parse(JSON.stringify(o)); };
+      }
+      if (typeof BroadcastChannel === 'undefined') {
+        window.BroadcastChannel = function(name) { this.name = name; };
+        window.BroadcastChannel.prototype.postMessage = function() {};
+        window.BroadcastChannel.prototype.close = function() {};
+        window.BroadcastChannel.prototype.addEventListener = function() {};
+        window.BroadcastChannel.prototype.removeEventListener = function() {};
+        window.BroadcastChannel.prototype.dispatchEvent = function() { return true; };
+      }
+    </script>
+    <script>
+      window.addEventListener('error', function(e) {
+        var el = document.getElementById('boot-msg');
+        if (el) {
+          el.innerHTML = '<span style="color:#f87171;font-size:14px;text-align:center;padding:20px">JS Error: ' + (e.message || 'unknown') + '<br><small style="color:#6b7280">' + (e.filename||'') + ':' + (e.lineno||'') + '</small></span>';
+        }
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        var el = document.getElementById('boot-msg');
+        if (el && el.id === 'boot-msg') {
+          el.innerHTML = '<span style="color:#f87171;font-size:14px;text-align:center;padding:20px">Promise Error: ' + (e.reason || 'unknown') + '</span>';
+        }
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

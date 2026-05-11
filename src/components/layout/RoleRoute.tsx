@@ -15,8 +15,11 @@ export default function RoleRoute({ role, children }: Props) {
 
   if (!user) return <Navigate to="/login" replace />
 
+  // User is authenticated but role hasn't been read from the token yet — wait
+  if (!userRole) return <LoadingSpinner fullScreen />
+
   const allowed = Array.isArray(role) ? role : [role]
-  if (!userRole || !allowed.includes(userRole)) {
+  if (!allowed.includes(userRole)) {
     // Redirect each role to its own home
     if (userRole === 'teacher') return <Navigate to="/teacher" replace />
     if (userRole === 'admin')   return <Navigate to="/admin"   replace />

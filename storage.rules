@@ -19,6 +19,14 @@ service firebase.storage {
         && request.resource.size < 100 * 1024 * 1024; // 100 MB max
     }
 
+    // ── Prize images (teacher-uploaded) ──────────────────────────────────
+    match /prizes/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin()
+        && request.resource.size < 10 * 1024 * 1024   // 10 MB max
+        && request.resource.contentType.matches('image/.*');
+    }
+
     // ── Student submission uploads ────────────────────────────────────────
     match /submissions/{studentId}/{allPaths=**} {
       allow read: if isSignedIn()

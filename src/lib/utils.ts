@@ -63,12 +63,13 @@ export function initials(name: string): string {
 }
 
 /** Random hue-based avatar colour (deterministic per uid) */
-export function avatarColor(uid: string): string {
+export function avatarColor(uid: string | null | undefined): string {
   const colors = [
     'bg-indigo-500', 'bg-violet-500', 'bg-pink-500',
     'bg-sky-500',    'bg-teal-500',   'bg-emerald-500',
     'bg-amber-500',  'bg-orange-500', 'bg-rose-500',
   ]
+  if (!uid) return colors[0]
   let hash = 0
   for (let i = 0; i < uid.length; i++) hash = uid.charCodeAt(i) + ((hash << 5) - hash)
   return colors[Math.abs(hash) % colors.length]

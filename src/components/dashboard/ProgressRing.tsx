@@ -51,9 +51,9 @@ export default function ProgressRing({
 
       {/* Centre text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-bold text-slate-900">{percentage}%</span>
-        {label    && <span className="text-xs font-semibold text-slate-600 mt-0.5">{label}</span>}
-        {sublabel && <span className="text-xs text-slate-400">{sublabel}</span>}
+        <span className="text-3xl font-bold text-zinc-100">{percentage}%</span>
+        {label    && <span className="text-xs font-semibold text-zinc-400 mt-0.5">{label}</span>}
+        {sublabel && <span className="text-xs text-zinc-400">{sublabel}</span>}
       </div>
     </div>
   )

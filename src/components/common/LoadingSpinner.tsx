@@ -12,7 +12,7 @@ export default function LoadingSpinner({ fullScreen, size = 'md', className }: P
   const spinner = (
     <div
       className={cn(
-        'rounded-full border-2 border-slate-200 border-t-brand-600 animate-spin',
+        'rounded-full border-2 border-zinc-700 border-t-brand-500 animate-spin',
         sizes[size],
         className,
       )}
@@ -21,7 +21,7 @@ export default function LoadingSpinner({ fullScreen, size = 'md', className }: P
 
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-white z-50">
+      <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'var(--bg-primary)' }}>
         {spinner}
       </div>
     )

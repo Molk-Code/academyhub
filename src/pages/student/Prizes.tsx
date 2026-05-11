@@ -62,13 +62,13 @@ export default function Prizes() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="page-title">Prize Shop</h1>
-          <p className="text-slate-500 text-sm mt-1">Spend your hard-earned points on real rewards.</p>
+          <p className="text-zinc-500 text-sm mt-1">Spend your hard-earned points on real rewards.</p>
         </div>
         <div className="card flex items-center gap-2 py-3 px-4">
           <Sparkles className="w-5 h-5 text-amber-500" />
           <div>
             <p className="text-xl font-bold text-amber-700 tabular-nums">{balance}</p>
-            <p className="text-xs text-slate-400">pts available</p>
+            <p className="text-xs text-zinc-400">pts available</p>
           </div>
         </div>
       </div>
@@ -77,7 +77,7 @@ export default function Prizes() {
       {message && (
         <div className={cn(
           'p-4 rounded-xl text-sm font-medium',
-          message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200',
+          message.type === 'success' ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-200' : 'bg-rose-950/40 text-rose-300 border border-rose-200',
         )}>
           {message.text}
         </div>
@@ -113,8 +113,8 @@ export default function Prizes() {
                   )}
 
                   <div className="flex-1">
-                    <h3 className="font-bold text-slate-900">{prize.title}</h3>
-                    <p className="text-sm text-slate-500 mt-0.5 line-clamp-2">{prize.description}</p>
+                    <h3 className="font-bold text-zinc-100">{prize.title}</h3>
+                    <p className="text-sm text-zinc-500 mt-0.5 line-clamp-2">{prize.description}</p>
                   </div>
 
                   <div className="flex items-center justify-between mt-auto">
@@ -125,7 +125,7 @@ export default function Prizes() {
                     {alreadyClaimed ? (
                       <span className="badge badge-green">Claimed</span>
                     ) : !canAfford ? (
-                      <div className="flex items-center gap-1 text-slate-400 text-xs">
+                      <div className="flex items-center gap-1 text-zinc-400 text-xs">
                         <Lock className="w-3.5 h-3.5" />
                         Need {prize.pointsCost - balance} more pts
                       </div>

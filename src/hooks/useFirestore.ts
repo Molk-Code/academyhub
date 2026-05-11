@@ -19,6 +19,7 @@ export function useCollection<T extends { id: string }>(
   collectionPath: string,
   constraints: QueryConstraint[] = [],
   enabled = true,
+  queryKey = '',
 ) {
   const [data,    setData]    = useState<T[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,7 +47,7 @@ export function useCollection<T extends { id: string }>(
 
     return unsub
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collectionPath, enabled])
+  }, [collectionPath, enabled, queryKey])
 
   return { data, loading, error }
 }

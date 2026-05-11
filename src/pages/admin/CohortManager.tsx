@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { collection, addDoc, updateDoc, doc, Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { useCollection, where } from '@/hooks/useFirestore'
-import type { CohortDoc, UserDoc } from '@/types'
+import { useCollection, useDocument, where } from '@/hooks/useFirestore'
+import type { CohortDoc, UserDoc, SemesterSettingsDoc } from '@/types'
 import { shortDate } from '@/lib/utils'
 import { Users, Plus, GraduationCap } from 'lucide-react'
 
@@ -18,17 +19,24 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export default function CohortManager() {
+  const navigate = useNavigate()
   const [showForm, setShowForm] = useState(false)
   const [saving,   setSaving]   = useState(false)
 
   const { data: cohorts  } = useCollection<CohortDoc>('cohorts')
   const { data: teachers } = useCollection<UserDoc>('users', [where('role', '==', 'teacher')])
   const { data: students } = useCollection<UserDoc>('users', [where('role', '==', 'student')])
+  const { data: semesterDoc } = useDocument<SemesterSettingsDoc>('settings', 'semester')
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { programYear: 1 },
   })
+
+  useEffect(() => {
+    if (semesterDoc?.startDate) setValue('startDate', semesterDoc.startDate)
+    if (semesterDoc?.endDate)   setValue('endDate',   semesterDoc.endDate)
+  }, [semesterDoc, setValue])
 
   async function onSubmit(data: FormData) {
     setSaving(true)
@@ -56,34 +64,34 @@ export default function CohortManager() {
     <div className="space-y-8">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="page-title text-white">Cohort Manager</h1>
-          <p className="text-slate-400 text-sm mt-1">Organise students into year groups and assign teachers.</p>
+          <h1 className="page-title">Class Manager</h1>
+          <p className="text-zinc-400 text-sm mt-1">Organise students into year groups and assign teachers.</p>
         </div>
         <button onClick={() => setShowForm(v => !v)} className="btn-primary py-2.5">
-          <Plus className="w-4 h-4" /> New Cohort
+          <Plus className="w-4 h-4" /> New Class
         </button>
       </div>
 
       {showForm && (
         <form onSubmit={handleSubmit(onSubmit)} className="bg-slate-800 rounded-2xl p-5 space-y-4">
-          <h2 className="text-base font-semibold text-white">Create cohort</h2>
+          <h2 className="text-base font-semibold text-white">Create class</h2>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <label className="label text-slate-300">Cohort name</label>
-              <input {...register('name')} className="input bg-slate-700 border-slate-600 text-white" placeholder="e.g. 2024 Intake A" />
+              <label className="label text-zinc-300">Class name</label>
+              <input {...register('name')} className="input bg-zinc-700 border-slate-600 text-white" placeholder="e.g. 2024 Intake A" />
               {errors.name && <p className="text-xs text-rose-400 mt-1">{errors.name.message}</p>}
             </div>
             <div>
-              <label className="label text-slate-300">Start date</label>
-              <input {...register('startDate')} type="date" className="input bg-slate-700 border-slate-600 text-white" />
+              <label className="label text-zinc-300">Start date</label>
+              <input {...register('startDate')} type="date" className="input bg-zinc-700 border-slate-600 text-white" />
             </div>
             <div>
-              <label className="label text-slate-300">End date</label>
-              <input {...register('endDate')} type="date" className="input bg-slate-700 border-slate-600 text-white" />
+              <label className="label text-zinc-300">End date</label>
+              <input {...register('endDate')} type="date" className="input bg-zinc-700 border-slate-600 text-white" />
             </div>
             <div>
-              <label className="label text-slate-300">Program year</label>
-              <select {...register('programYear')} className="input bg-slate-700 border-slate-600 text-white">
+              <label className="label text-zinc-300">Program year</label>
+              <select {...register('programYear')} className="input-dark">
                 <option value={1}>Year 1</option>
                 <option value={2}>Year 2</option>
               </select>
@@ -91,9 +99,9 @@ export default function CohortManager() {
           </div>
           <div className="flex gap-3">
             <button type="submit" disabled={saving} className="btn-primary py-2">
-              {saving ? 'Creating…' : 'Create cohort'}
+              {saving ? 'Creating…' : 'Create class'}
             </button>
-            <button type="button" onClick={() => setShowForm(false)} className="btn-secondary bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600 py-2">
+            <button type="button" onClick={() => setShowForm(false)} className="btn-secondary bg-zinc-700 border-slate-600 text-zinc-300 hover:bg-slate-600 py-2">
               Cancel
             </button>
           </div>
@@ -108,19 +116,27 @@ export default function CohortManager() {
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-bold text-white text-base">{cohort.name}</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-zinc-400 mt-0.5">
                     Year {cohort.programYear} · {shortDate(cohort.startDate)} → {shortDate(cohort.endDate)}
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 text-sm text-slate-400">
-                  <Users className="w-4 h-4" />
-                  {cohortStudents.length}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5 text-sm text-zinc-400">
+                    <Users className="w-4 h-4" />
+                    {cohortStudents.length}
+                  </div>
+                  <button
+                    onClick={() => navigate(`/admin/cohorts/${cohort.id}`)}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-500 transition-colors font-medium"
+                  >
+                    Manage
+                  </button>
                 </div>
               </div>
 
               {/* Teachers */}
               <div>
-                <p className="text-xs font-medium text-slate-400 mb-2">Teachers</p>
+                <p className="text-xs font-medium text-zinc-400 mb-2">Teachers</p>
                 <div className="flex flex-wrap gap-2">
                   {teachers.map(teacher => (
                     <button
@@ -129,30 +145,30 @@ export default function CohortManager() {
                       className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
                         cohort.teacherIds.includes(teacher.uid)
                           ? 'bg-brand-600 text-white'
-                          : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                          : 'bg-zinc-700 text-zinc-400 hover:bg-slate-600'
                       }`}
                     >
                       {teacher.displayName}
                     </button>
                   ))}
-                  {teachers.length === 0 && <span className="text-xs text-slate-500">No teachers yet.</span>}
+                  {teachers.length === 0 && <span className="text-xs text-zinc-500">No teachers yet.</span>}
                 </div>
               </div>
 
               {/* Students preview */}
               {cohortStudents.length > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1">
+                  <p className="text-xs font-medium text-zinc-400 mb-2 flex items-center gap-1">
                     <GraduationCap className="w-3.5 h-3.5" /> Students
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {cohortStudents.slice(0, 8).map(s => (
-                      <span key={s.uid} className="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full">
+                      <span key={s.uid} className="text-xs bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded-full">
                         {s.displayName}
                       </span>
                     ))}
                     {cohortStudents.length > 8 && (
-                      <span className="text-xs text-slate-500">+{cohortStudents.length - 8} more</span>
+                      <span className="text-xs text-zinc-500">+{cohortStudents.length - 8} more</span>
                     )}
                   </div>
                 </div>
@@ -161,7 +177,7 @@ export default function CohortManager() {
           )
         })}
         {cohorts.length === 0 && (
-          <div className="col-span-2 text-center py-12 text-slate-500 text-sm">No cohorts yet. Create one above.</div>
+          <div className="col-span-2 text-center py-12 text-zinc-500 text-sm">No classes yet. Create one above.</div>
         )}
       </div>
     </div>

@@ -1,43 +1,66 @@
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useMyProgress } from '@/hooks/useProgress'
 import { useCollection, where } from '@/hooks/useFirestore'
-import type { SubjectDoc, AssignmentDoc } from '@/types'
-import { pct } from '@/lib/utils'
-import XPBar from '@/components/dashboard/XPBar'
+import type { SubjectDoc, AssignmentDoc, LessonDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 
 export default function SubjectList() {
-  const { cohortId } = useAuth()
-  const { data: progress } = useMyProgress()
+  const { cohortId, previewCohortId } = useAuth()
+  const effectiveCohortId = previewCohortId ?? cohortId
 
   const { data: subjects, loading } = useCollection<SubjectDoc>('subjects')
 
   const { data: assignments } = useCollection<AssignmentDoc>(
     'assignments',
-    cohortId ? [where('cohortId', '==', cohortId)] : [],
-    !!cohortId,
+    effectiveCohortId ? [where('cohortId', '==', effectiveCohortId)] : [],
+    !!effectiveCohortId,
   )
 
-  if (loading) return <LoadingSpinner />
+  const { data: lessons } = useCollection<LessonDoc>(
+    'lessons',
+    effectiveCohortId ? [where('cohortId', '==', effectiveCohortId)] : [],
+    !!effectiveCohortId,
+    effectiveCohortId ?? '',
+  )
 
-  const assignmentsBySubject = assignments.reduce<Record<string, number>>((acc, a) => {
+  const assignmentsBySubject = useMemo(() => assignments.reduce<Record<string, number>>((acc, a) => {
     acc[a.subjectId] = (acc[a.subjectId] ?? 0) + 1
     return acc
-  }, {})
+  }, {}), [assignments])
+
+  const curriculumProgressBySubject = useMemo(() => {
+    const now = new Date()
+    const result: Record<string, { covered: number; total: number }> = {}
+    for (const subject of subjects) {
+      const total = subject.curriculum?.length ?? 0
+      if (total === 0) continue
+      const coveredIds = new Set<string>()
+      for (const l of lessons) {
+        if (l.subjectId !== subject.id) continue
+        const lessonDate = l.startTime?.toDate?.()
+        if (!lessonDate || lessonDate > now) continue
+        for (const cid of (l.coveredCurriculumIds ?? [])) coveredIds.add(cid)
+      }
+      result[subject.id] = { covered: coveredIds.size, total }
+    }
+    return result
+  }, [subjects, lessons])
+
+  if (loading) return <LoadingSpinner />
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="page-title">Subjects</h1>
-        <p className="text-slate-500 text-sm mt-1">Your filmmaking curriculum.</p>
+        <p className="text-zinc-500 text-sm mt-1">Your filmmaking curriculum.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {subjects.map(subject => {
-          const sp  = progress?.subjectProgress?.[subject.id]
-          const pct_ = sp ? pct(sp.completed, sp.total) : 0
+          const cp = curriculumProgressBySubject[subject.id]
+          const currPct = cp ? Math.round((cp.covered / cp.total) * 100) : null
 
           return (
             <Link
@@ -51,17 +74,30 @@ export default function SubjectList() {
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <span className="text-3xl mb-2 block">{subject.iconEmoji}</span>
-                  <h3 className="font-bold text-slate-900 text-base">{subject.title}</h3>
-                  <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{subject.description}</p>
+                  <h3 className="font-bold text-zinc-100 text-base">{subject.title}</h3>
+                  <p className="text-xs text-zinc-400 mt-0.5 line-clamp-2">{subject.description}</p>
                 </div>
-                <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-brand-500 transition-colors mt-1 flex-shrink-0" />
+                <ChevronRight className="w-5 h-5 text-zinc-300 group-hover:text-brand-500 transition-colors mt-1 flex-shrink-0" />
               </div>
 
-              <div className="mt-4 space-y-2">
-                <XPBar current={sp?.completed ?? 0} max={sp?.total ?? 1} color={subject.color} />
-                <div className="flex justify-between text-xs text-slate-400">
-                  <span>{pct_}% complete</span>
+              <div className="mt-4 space-y-3">
+                {cp && (
+                  <div>
+                    <div className="flex justify-between text-xs text-zinc-400 mb-1">
+                      <span>Curriculum</span>
+                      <span>{currPct}%</span>
+                    </div>
+                    <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${subject.color}`}
+                        style={{ width: `${currPct}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+                <div className="flex justify-between text-xs text-zinc-400">
                   <span>{assignmentsBySubject[subject.id] ?? 0} assignments</span>
+                  {cp && <span>{cp.covered} / {cp.total} topics covered</span>}
                 </div>
               </div>
             </Link>

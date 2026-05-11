@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#030712" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Room Display" />
+  <link rel="manifest" href="/display-manifest.json" />
+  <link rel="icon" type="image/png" href="/fire.png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <title>Room Display</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sat: env(safe-area-inset-top, 0px);
+      --sar: env(safe-area-inset-right, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+      --sal: env(safe-area-inset-left, 0px);
+    }
+
+    html, body {
+      height: 100%;
+      background: #030712;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #outer {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+    }
+    #app {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      padding-top: var(--sat);
+      padding-right: var(--sar);
+      padding-left: var(--sal);
+      overflow: hidden;
+    }
+
+    /* ── Loading / Error ── */
+    .center-screen {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      color: #6b7280;
+    }
+    .center-screen .error { color: #f87171; font-size: 18px; font-weight: 700; }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 32px 40px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
+    .header-left .date-label {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #9ca3af;
+      margin-bottom: 4px;
+    }
+    .header-left .room-name {
+      font-size: 52px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .header-left .room-desc {
+      font-size: 18px;
+      color: #9ca3af;
+      margin-top: 6px;
+    }
+    .header-right { text-align: right; }
+    .header-right .clock {
+      font-size: 48px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, monospace;
+    }
+    .header-right .tz {
+      font-size: 11px;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 4px;
+    }
+
+    /* ── Now-banner ── */
+    .now-banner {
+      margin: 20px 40px 0;
+      border-radius: 16px;
+      padding: 20px 24px;
+      border: 2px solid;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .now-banner.free  { background: #065f46; border-color: #10b981; }
+    .now-banner.taken { background: #881337; border-color: #f43f5e; }
+    .now-banner .now-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 4px;
+    }
+    .now-banner .now-name { font-size: 36px; font-weight: 900; color: #ffffff; }
+    .now-badge {
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+    }
+    .now-banner.free  .now-badge { background: #10b981; color: #ffffff; }
+    .now-banner.taken .now-badge { background: #f43f5e; color: #ffffff; }
+
+    /* ── Slots list ── */
+    .slots {
+      flex: 1;
+      padding: 20px 40px 32px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .slot-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 14px 20px;
+      border-radius: 12px;
+      border: 1px solid;
+    }
+    .slot-row.past   { background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.04); opacity: 0.30; }
+    .slot-row.upcoming-free  { background: #064e3b; border-color: #10b981; }
+    .slot-row.upcoming-taken { background: #7f1d1d; border-color: #f87171; }
+    .slot-time { width: 100px; flex-shrink: 0; }
+    .slot-time .t-start { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; color: #ffffff; }
+    .slot-time .t-end   { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+    .slot-row.past .slot-time .t-start { color: #4b5563; }
+    .slot-who { flex: 1; }
+    .slot-who .name { font-size: 22px; font-weight: 700; }
+    .slot-row.upcoming-taken .slot-who .name { color: #ffffff; }
+    .slot-row.past           .slot-who .name { color: #4b5563; }
+    .slot-who .avail { font-size: 22px; font-weight: 600; }
+    .slot-row.upcoming-free .slot-who .avail { color: #ffffff; }
+    .slot-row.past          .slot-who .avail { color: #4b5563; }
+    .slot-badge {
+      padding: 6px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+    .slot-row.upcoming-taken .slot-badge { background: #f87171; color: #7f1d1d; }
+    .slot-row.upcoming-free  .slot-badge { background: #10b981; color: #064e3b; }
+    .no-slots { color: #374151; font-size: 22px; text-align: center; margin-top: 60px; }
+
+    /* ── All-rooms grid ── */
+    .grid-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 24px 32px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
+    .grid-title { font-size: 32px; font-weight: 900; letter-spacing: -0.01em; }
+    .grid-date  { font-size: 14px; color: #9ca3af; margin-top: 4px; }
+    .grid-clock { font-size: 44px; font-weight: 700; font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+    .grid-body  { flex: 1; padding: 20px 32px 24px; overflow: auto; }
+    .grid-table { width: 100%; border-collapse: collapse; }
+    .grid-table th {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #9ca3af;
+      padding-bottom: 12px;
+      text-align: left;
+    }
+    .grid-table th.room-th { text-align: center; font-size: 16px; font-weight: 900; color: #e2e8f0; letter-spacing: 0; text-transform: none; }
+    .grid-table tr { border-top: 1px solid rgba(255,255,255,0.05); transition: border-color .2s; }
+    .grid-table tr.current-row { border-color: rgba(99,102,241,0.35); }
+    .grid-table tr.past-row { opacity: 0.35; }
+    .grid-table td { padding: 12px 8px; vertical-align: middle; }
+    .grid-table td.time-td { padding-right: 16px; white-space: nowrap; }
+    .time-main { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: #ffffff; line-height: 1; }
+    .time-main.current { font-size: 22px; color: #a5b4fc; }
+    .time-end  { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .now-pill  { display: inline-block; margin-top: 5px; font-size: 9px; font-weight: 700; letter-spacing: 0.1em; background: rgba(99,102,241,0.25); color: #a5b4fc; padding: 2px 7px; border-radius: 9999px; text-transform: uppercase; }
+    .cell-box  { border-radius: 12px; padding: 10px 12px; border: 1px solid; margin: 0 4px; text-align: center; min-height: 52px; display: flex; align-items: center; justify-content: center; }
+    .cell-box.free-cur  { background: #065f46; border-color: #10b981; }
+    .cell-box.free-up   { background: #064e3b; border-color: rgba(16,185,129,0.6); }
+    .cell-box.taken-cur { background: #881337; border-color: #f43f5e; }
+    .cell-box.taken-up  { background: #7f1d1d; border-color: rgba(248,113,113,0.7); }
+    .cell-name { font-weight: 700; font-size: 13px; line-height: 1.2; }
+    .cell-box.taken-cur .cell-name { color: #ffffff; }
+    .cell-box.taken-up  .cell-name { color: #fecaca; }
+    .cell-name-last { display: block; font-size: 11px; opacity: 0.7; font-weight: 400; }
+    .cell-free-text { font-size: 13px; font-weight: 600; }
+    .cell-box.free-cur  .cell-free-text { color: #ffffff; }
+    .cell-box.free-up   .cell-free-text { color: #6ee7b7; }
+    .grid-footer { text-align: center; color: #374151; font-size: 11px; padding-bottom: 12px; letter-spacing: 0.1em; text-transform: uppercase; flex-shrink: 0; }
+
+    /* ── Room switcher nav ── */
+    #room-nav {
+      display: none;
+      flex-shrink: 0;
+      padding: 10px 16px calc(10px + var(--sab));
+      border-top: 1px solid rgba(255,255,255,0.07);
+      background: rgba(3,7,18,0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    #room-nav::-webkit-scrollbar { display: none; }
+    #room-nav.visible { display: flex; }
+    .nav-btn {
+      flex-shrink: 0;
+      padding: 8px 18px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.05);
+      color: rgba(255,255,255,0.55);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .nav-btn:hover  { background: rgba(255,255,255,0.10); color: rgba(255,255,255,0.85); }
+    .nav-btn.active { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.28); color: #ffffff; }
+    .nav-btn.active.free   { background: rgba(16,185,129,0.20); border-color: #10b981; color: #6ee7b7; }
+    .nav-btn.active.taken  { background: rgba(248,113,113,0.20); border-color: #f87171; color: #fca5a5; }
+    .nav-btn.overview-btn  { font-size: 13px; letter-spacing: 0.05em; }
+    .nav-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+      margin-bottom: 1px;
+    }
+    .nav-dot.free  { background: #10b981; }
+    .nav-dot.taken { background: #f87171; }
+
+    /* ── Wake lock indicator ── */
+    #wakelock-dot {
+      position: fixed;
+      bottom: calc(12px + var(--sab));
+      right: calc(12px + var(--sar));
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #1f2937;
+      transition: background .5s;
+    }
+    #wakelock-dot.active { background: #10b981; }
+
+  </style>
+</head>
+<body>
+  <div id="outer">
+    <div id="app"><div class="center-screen"><span>Loading…</span></div></div>
+    <nav id="room-nav"></nav>
+  </div>
+  <div id="wakelock-dot"></div>
+
+  <script type="module">
+    import { initializeApp }                       from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js'
+    import { getFirestore, collection, query,
+             where, onSnapshot, doc }              from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js'
+
+    // ── Firebase ─────────────────────────────────────────────────────────────
+    const app = initializeApp({
+      apiKey:            'AIzaSyDU7rdWOm34fSOxsKxK9xafFw0zGyH4eX4',
+      authDomain:        'academy-hub-c252f.firebaseapp.com',
+      projectId:         'academy-hub-c252f',
+      storageBucket:     'academy-hub-c252f.firebasestorage.app',
+      messagingSenderId: '776953880788',
+      appId:             '1:776953880788:web:03c3e598f9a1b6b39cdb41',
+    })
+    const db = getFirestore(app)
+
+    // ── Screen Wake Lock ─────────────────────────────────────────────────────
+    const dot = document.getElementById('wakelock-dot')
+    let wakeLock = null
+
+    async function acquireWakeLock() {
+      if (!('wakeLock' in navigator)) return
+      try {
+        wakeLock = await navigator.wakeLock.request('screen')
+        dot.classList.add('active')
+        wakeLock.addEventListener('release', () => {
+          dot.classList.remove('active')
+          wakeLock = null
+        })
+      } catch {}
+    }
+
+    acquireWakeLock()
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && !wakeLock) acquireWakeLock()
+    })
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function todayStr()  { return fmtDate(new Date()) }
+    function todayDay()  { return new Date().getDay() }
+
+    function fmtDate(d)  {
+      return d.getFullYear() + '-' +
+        String(d.getMonth()+1).padStart(2,'0') + '-' +
+        String(d.getDate()).padStart(2,'0')
+    }
+
+    function fmtTime(d) {
+      return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0')
+    }
+
+    function fmtDateLong(d) {
+      const days  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+      const months= ['January','February','March','April','May','June','July','August','September','October','November','December']
+      return days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear()
+    }
+
+    function parseMinutes(t) { const [h,m] = t.split(':').map(Number); return h*60+m }
+    function nowMinutes()    { const n = new Date(); return n.getHours()*60+n.getMinutes() }
+
+    function slotStatus(slot) {
+      const n = nowMinutes(), s = parseMinutes(slot.startTime), e = parseMinutes(slot.endTime)
+      if (n >= e) return 'past'
+      if (n >= s) return 'current'
+      return 'upcoming'
+    }
+
+    function bookingKey(slot, date, roomId) {
+      return slot.startTime + '_' + slot.endTime + '_' + date + '_' + roomId
+    }
+
+    function deriveSlots(rooms, todayS, todayDayN) {
+      const seen = new Map()
+      for (const room of rooms) {
+        for (const w of (room.availability ?? [])) {
+          if (w.days.includes(todayDayN) && todayS >= w.startDate && todayS <= w.endDate) {
+            const k = w.startTime + '_' + w.endTime
+            if (!seen.has(k)) seen.set(k, { startTime: w.startTime, endTime: w.endTime })
+          }
+        }
+      }
+      return [...seen.values()].sort((a,b) => a.startTime.localeCompare(b.startTime))
+    }
+
+    function esc(s) {
+      return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    }
+
+    // ── State ────────────────────────────────────────────────────────────────
+    const params    = new URLSearchParams(location.search)
+    const urlRoom   = params.get('room')   // optional URL hint for initial room
+    let activeRoomId = null                // null = overview, otherwise room.id
+    let rooms    = []
+    let bookings = []
+    let now      = new Date()
+
+    // ── Nav bar ───────────────────────────────────────────────────────────────
+    function renderNav() {
+      const nav = document.getElementById('room-nav')
+      const sortedRooms = [...rooms].sort((a,b) => (a.order??0)-(b.order??0))
+      if (sortedRooms.length < 2) { nav.classList.remove('visible'); return }
+
+      const today  = todayStr()
+      const dayNum = todayDay()
+      const slots  = deriveSlots(sortedRooms, today, dayNum)
+      const bmap   = new Map()
+      for (const b of bookings) {
+        if (b.startTime && b.endTime) bmap.set(bookingKey(b, b.date, b.roomId), b)
+      }
+
+      // Determine current status per room (for indicator dot)
+      function roomStatus(room) {
+        const curSlot = slots.find(s => slotStatus(s) === 'current')
+        if (!curSlot) return 'free'
+        return bmap.has(bookingKey(curSlot, today, room.id)) ? 'taken' : 'free'
+      }
+
+      const overviewActive = activeRoomId === null
+      nav.innerHTML = `
+        <button class="nav-btn overview-btn${overviewActive ? ' active' : ''}" data-room-id="">
+          ⊞ Overview
+        </button>
+        ${sortedRooms.map(r => {
+          const st  = roomStatus(r)
+          const act = activeRoomId === r.id
+          return `<button class="nav-btn${act ? ` active ${st}` : ''}" data-room-id="${esc(r.id)}">
+            <span class="nav-dot ${st}"></span>${esc(r.name)}
+          </button>`
+        }).join('')}
+      `
+      nav.classList.add('visible')
+
+      nav.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeRoomId = btn.dataset.roomId || null
+          render()
+        })
+      })
+    }
+
+    // ── Render ───────────────────────────────────────────────────────────────
+    function render() {
+      now = new Date()
+      const app    = document.getElementById('app')
+      const today  = todayStr()
+      const dayNum = todayDay()
+
+      const sortedRooms = [...rooms].sort((a,b) => (a.order??0)-(b.order??0))
+      const slots       = deriveSlots(sortedRooms, today, dayNum)
+
+      const bmap = new Map()
+      for (const b of bookings) {
+        if (b.startTime && b.endTime) bmap.set(bookingKey(b, b.date, b.roomId), b)
+      }
+
+      renderNav()
+
+      if (activeRoomId) {
+        const room = sortedRooms.find(r => r.id === activeRoomId)
+        if (room) { app.innerHTML = renderSingle(room, slots, bmap, today); return }
+      }
+      app.innerHTML = renderAll(sortedRooms, slots, bmap, today)
+    }
+
+    // ── Single-room view ─────────────────────────────────────────────────────
+    function renderSingle(room, slots, bmap, today) {
+      const curSlot  = slots.find(s => slotStatus(s) === 'current')
+      const curBook  = curSlot ? bmap.get(bookingKey(curSlot, today, room.id)) : null
+      const isFree   = !curBook
+
+      let bannerHtml = ''
+      if (curSlot) {
+        bannerHtml = `
+          <div class="now-banner ${isFree ? 'free' : 'taken'}">
+            <div>
+              <div class="now-label">Now · ${esc(curSlot.startTime)}–${esc(curSlot.endTime)}</div>
+              <div class="now-name">${isFree ? 'AVAILABLE' : esc(curBook.studentName)}</div>
+            </div>
+            <div class="now-badge">${isFree ? 'FREE' : 'OCCUPIED'}</div>
+          </div>`
+      }
+
+      const slotsHtml = slots.length === 0
+        ? '<p class="no-slots">No bookings scheduled today.</p>'
+        : slots.filter(s => slotStatus(s) !== 'current').map(slot => {
+            const st  = slotStatus(slot)
+            const bk  = bmap.get(bookingKey(slot, today, room.id))
+            const cls = st === 'past'
+              ? 'past'
+              : bk ? 'upcoming-taken' : 'upcoming-free'
+            return `
+              <div class="slot-row ${cls}">
+                <div class="slot-time">
+                  <div class="t-start">${esc(slot.startTime)}</div>
+                  <div class="t-end">${esc(slot.endTime)}</div>
+                </div>
+                <div class="slot-who">
+                  ${bk
+                    ? `<div class="name">${esc(bk.studentName)}</div>`
+                    : `<div class="avail">Available</div>`}
+                </div>
+                ${st !== 'past' ? `<div class="slot-badge">${bk ? 'TAKEN' : 'FREE'}</div>` : ''}
+              </div>`
+          }).join('')
+
+      return `
+        <div class="header">
+          <div class="header-left">
+            <div class="date-label">${esc(fmtDateLong(now))}</div>
+            <div class="room-name">${esc(room.name.toUpperCase())}</div>
+            ${room.description ? `<div class="room-desc">${esc(room.description)}</div>` : ''}
+          </div>
+          <div class="header-right">
+            <div class="clock">${esc(fmtTime(now))}</div>
+            <div class="tz">Local time</div>
+          </div>
+        </div>
+        ${bannerHtml}
+        <div class="slots">${slotsHtml}</div>`
+    }
+
+    // ── All-rooms grid view ──────────────────────────────────────────────────
+    function renderAll(sortedRooms, slots, bmap, today) {
+      if (slots.length === 0) {
+        return `
+          <div class="grid-header">
+            <div><div class="grid-title">ROOM BOOKINGS</div><div class="grid-date">${esc(fmtDateLong(now))}</div></div>
+            <div class="grid-clock">${esc(fmtTime(now))}</div>
+          </div>
+          <div class="grid-body"><p class="no-slots">No bookings scheduled today.</p></div>
+          <div class="grid-footer">Updates in real time · CineForge</div>`
+      }
+
+      const roomThs = sortedRooms.map(r => `<th class="room-th">${esc(r.name)}</th>`).join('')
+
+      const rowsHtml = slots.map(slot => {
+        const st  = slotStatus(slot)
+        const cls = st === 'current' ? 'current-row' : st === 'past' ? 'past-row' : ''
+        const timeCls = st === 'current' ? 'time-main current' : 'time-main'
+
+        const cells = sortedRooms.map(room => {
+          const bk = bmap.get(bookingKey(slot, today, room.id))
+          let boxCls, inner
+          if (bk) {
+            boxCls = st === 'current' ? 'cell-box taken-cur' : 'cell-box taken-up'
+            const parts = bk.studentName.split(' ')
+            const first = parts[0] ?? ''
+            const rest  = parts.slice(1).join(' ')
+            inner = `<div class="cell-name">${esc(first)}${rest ? `<span class="cell-name-last">${esc(rest)}</span>` : ''}</div>`
+          } else {
+            boxCls = st === 'current' ? 'cell-box free-cur' : 'cell-box free-up'
+            inner = `<span class="cell-free-text">Free</span>`
+          }
+          return `<td><div class="${boxCls}">${inner}</div></td>`
+        }).join('')
+
+        return `
+          <tr class="${cls}">
+            <td class="time-td">
+              <div class="${timeCls}">${esc(slot.startTime)}</div>
+              <div class="time-end">${esc(slot.endTime)}</div>
+              ${st === 'current' ? '<span class="now-pill">NOW</span>' : ''}
+            </td>
+            ${cells}
+          </tr>`
+      }).join('')
+
+      return `
+        <div class="grid-header">
+          <div><div class="grid-title">ROOM BOOKINGS</div><div class="grid-date">${esc(fmtDateLong(now))}</div></div>
+          <div class="grid-clock">${esc(fmtTime(now))}</div>
+        </div>
+        <div class="grid-body">
+          <table class="grid-table">
+            <thead><tr><th>Time</th>${roomThs}</tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+        <div class="grid-footer">Updates in real time · CineForge</div>`
+    }
+
+    // ── Clock tick ───────────────────────────────────────────────────────────
+    setInterval(render, 30_000)
+
+    // ── Firestore listeners ──────────────────────────────────────────────────
+    function subscribe() {
+      const today = todayStr()
+
+      onSnapshot(
+        query(collection(db, 'rooms'), where('isActive', '==', true)),
+        snap => {
+          const prev = rooms.length
+          rooms = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+          // On first load, honour the URL ?room= hint
+          if (prev === 0 && urlRoom) {
+            const match = rooms.find(r =>
+              r.name.split(' ').pop()?.toUpperCase() === urlRoom.toUpperCase() ||
+              r.name.toUpperCase() === urlRoom.toUpperCase()
+            )
+            if (match) activeRoomId = match.id
+          }
+          render()
+        },
+        err => {
+          document.getElementById('app').innerHTML =
+            `<div class="center-screen"><span class="error">Firestore error</span><span style="font-size:13px;font-family:monospace">${esc(err.message)}</span></div>`
+        }
+      )
+
+      onSnapshot(
+        query(collection(db, 'room_bookings'), where('date', '==', today)),
+        snap => { bookings = snap.docs.map(d => ({ id: d.id, ...d.data() })); render() }
+      )
+    }
+
+    subscribe()
+
+    // Re-subscribe at midnight so the date filter updates
+    const msToMidnight = () => {
+      const n = new Date(), m = new Date(n)
+      m.setHours(24, 0, 0, 0)
+      return m - n
+    }
+    setTimeout(function midnight() {
+      subscribe()
+      setTimeout(midnight, 86_400_000)
+    }, msToMidnight())
+  </script>
+</body>
+</html>

@@ -60,8 +60,8 @@ export default function GradeBook() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="page-title text-white">Grade Book</h1>
-        <p className="text-slate-400 text-sm mt-1">
+        <h1 className="page-title">Grade Book</h1>
+        <p className="text-zinc-400 text-sm mt-1">
           {submissions.length} submission{submissions.length !== 1 ? 's' : ''} awaiting grading.
         </p>
       </div>
@@ -93,14 +93,14 @@ export default function GradeBook() {
                         ? 'bg-brand-700 border border-brand-500'
                         : isHighlight
                         ? 'bg-amber-900/40 border border-amber-600'
-                        : 'bg-slate-800 hover:bg-slate-700'
+                        : 'bg-slate-800 hover:bg-zinc-700'
                     }`}
                   >
                     {student && <Avatar uid={student.uid} name={student.displayName} size="sm" />}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-white">{student?.displayName ?? 'Unknown'}</p>
-                      <p className="text-xs text-slate-400 truncate">{assignment?.title ?? 'Assignment'}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">{fullDateTime(sub.submittedAt)}</p>
+                      <p className="text-xs text-zinc-400 truncate">{assignment?.title ?? 'Assignment'}</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">{fullDateTime(sub.submittedAt)}</p>
                     </div>
                     <span className="badge badge-amber flex-shrink-0">Grade</span>
                   </button>
@@ -119,14 +119,14 @@ export default function GradeBook() {
                 {student && <Avatar uid={student.uid} name={student.displayName} size="md" />}
                 <div>
                   <p className="font-semibold text-white">{student?.displayName}</p>
-                  <p className="text-sm text-slate-400">{assignment?.title}</p>
+                  <p className="text-sm text-zinc-400">{assignment?.title}</p>
                 </div>
               </div>
 
               {/* Student uploads */}
               {selected.resources.length > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-slate-400 mb-1">Submitted files</p>
+                  <p className="text-xs font-medium text-zinc-400 mb-1">Submitted files</p>
                   <div className="space-y-1">
                     {selected.resources.map((r, i) => (
                       <a key={i} href={r.url} target="_blank" rel="noreferrer"
@@ -139,7 +139,7 @@ export default function GradeBook() {
               )}
 
               <div>
-                <label className="label text-slate-300">
+                <label className="label text-zinc-300">
                   Score (out of {assignment?.pointsValue ?? 100})
                 </label>
                 <input
@@ -148,18 +148,18 @@ export default function GradeBook() {
                   max={assignment?.pointsValue ?? 100}
                   value={score}
                   onChange={e => setScore(e.target.value)}
-                  className="input bg-slate-700 border-slate-600 text-white"
+                  className="input bg-zinc-700 border-slate-600 text-white"
                   placeholder="0"
                 />
               </div>
 
               <div>
-                <label className="label text-slate-300">Feedback <span className="text-slate-500">(optional)</span></label>
+                <label className="label text-zinc-300">Feedback <span className="text-zinc-500">(optional)</span></label>
                 <textarea
                   value={feedback}
                   onChange={e => setFeedback(e.target.value)}
                   rows={4}
-                  className="input bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 resize-none"
+                  className="input bg-zinc-700 border-slate-600 text-white placeholder:text-zinc-500 resize-none"
                   placeholder="Write feedback for the student…"
                 />
               </div>

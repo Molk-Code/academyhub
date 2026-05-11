@@ -9,6 +9,7 @@ import { doc, getDoc, updateDoc, setDoc, serverTimestamp } from 'firebase/firest
 import { createUserWithEmailAndPassword as createUser, updateProfile as updateFbProfile } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
+import { useSchool } from '@/contexts/SchoolContext'
 
 const schema = z.object({
   displayName: z.string().min(2, 'Enter your full name'),
@@ -29,6 +30,7 @@ interface Invitation {
   email: string
   role: string
   cohortId: string | null
+  displayName: string | null
   used: boolean
 }
 
@@ -37,14 +39,16 @@ export default function AcceptInvite() {
   const token      = params.get('token') ?? ''
   const navigate   = useNavigate()
   const { refreshToken } = useAuth()
+  const { shortName } = useSchool()
 
-  const [invite,  setInvite]  = useState<Invitation | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState('')
-  const [showPw,  setShowPw]  = useState(false)
-  const [done,    setDone]    = useState(false)
+  const [invite,       setInvite]       = useState<Invitation | null>(null)
+  const [loading,      setLoading]      = useState(true)
+  const [error,        setError]        = useState('')
+  const [showPw,       setShowPw]       = useState(false)
+  const [done,         setDone]         = useState(false)
+  const [privacyAccepted, setPrivacyAccepted] = useState(false)
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, formState: { errors, isSubmitting }, setValue } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
 
@@ -54,7 +58,10 @@ export default function AcceptInvite() {
       if (snap.exists()) {
         const data = snap.data() as Invitation
         if (data.used) setError('This invite link has already been used.')
-        else setInvite(data)
+        else {
+          setInvite(data)
+          if (data.displayName) setValue('displayName', data.displayName)
+        }
       } else {
         setError('Invalid or expired invite link.')
       }
@@ -72,16 +79,17 @@ export default function AcceptInvite() {
       await updateFbProfile(cred.user, { displayName: data.displayName })
       // Create Firestore user document (role + cohortId set by onUserCreate Cloud Function)
       await setDoc(doc(db, 'users', cred.user.uid), {
-        uid:            cred.user.uid,
-        email:          invite.email,
-        displayName:    data.displayName,
-        role:           invite.role,
-        avatarUrl:      null,
-        cohortId:       invite.cohortId,
-        enrolledAt:     serverTimestamp(),
-        totalPoints:    0,
-        pointsRedeemed: 0,
-        isActive:       true,
+        uid:                cred.user.uid,
+        email:              invite.email,
+        displayName:        data.displayName,
+        role:               invite.role,
+        avatarUrl:          null,
+        cohortId:           invite.cohortId,
+        enrolledAt:         serverTimestamp(),
+        totalPoints:        0,
+        pointsRedeemed:     0,
+        isActive:           true,
+        privacyAcceptedAt:  serverTimestamp(),
       })
       // Mark invite as used
       await updateDoc(doc(db, 'invitations', token), { used: true })
@@ -112,25 +120,25 @@ export default function AcceptInvite() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-sm"
       >
-        <div className="bg-white rounded-3xl shadow-2xl p-8">
+        <div className="bg-zinc-900 rounded-3xl shadow-2xl p-8">
           <div className="flex flex-col items-center mb-8">
             <div className="w-14 h-14 bg-brand-600 rounded-2xl flex items-center justify-center mb-3">
               <Film className="w-7 h-7 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-slate-900">Join CineForge</h1>
+            <h1 className="text-2xl font-bold text-zinc-100">Join {shortName}</h1>
             {invite && (
-              <p className="text-sm text-slate-500 mt-1">Creating account for <strong>{invite.email}</strong></p>
+              <p className="text-sm text-zinc-500 mt-1">Creating account for <strong>{invite.email}</strong></p>
             )}
           </div>
 
           {done ? (
             <div className="text-center py-4">
               <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-              <p className="font-semibold text-slate-800">Account created!</p>
-              <p className="text-sm text-slate-500 mt-1">Redirecting you now…</p>
+              <p className="font-semibold text-zinc-200">Account created!</p>
+              <p className="text-sm text-zinc-500 mt-1">Redirecting you now…</p>
             </div>
           ) : error && !invite ? (
-            <div className="flex items-center gap-2 p-4 bg-rose-50 border border-rose-100 rounded-xl">
+            <div className="flex items-center gap-2 p-4 bg-rose-950/40 border border-rose-800/50 rounded-xl">
               <AlertCircle className="w-5 h-5 text-rose-500" />
               <p className="text-sm text-rose-600">{error}</p>
             </div>
@@ -152,7 +160,7 @@ export default function AcceptInvite() {
                     placeholder="Min 8 chars, 1 upper, 1 number"
                   />
                   <button type="button" onClick={() => setShowPw(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">
                     {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
@@ -171,13 +179,28 @@ export default function AcceptInvite() {
               </div>
 
               {error && (
-                <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-100 rounded-xl">
+                <div className="flex items-center gap-2 p-3 bg-rose-950/40 border border-rose-800/50 rounded-xl">
                   <AlertCircle className="w-4 h-4 text-rose-500 flex-shrink-0" />
                   <p className="text-sm text-rose-600">{error}</p>
                 </div>
               )}
 
-              <button type="submit" disabled={isSubmitting} className="btn-primary w-full py-3 text-base mt-2">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={privacyAccepted}
+                  onChange={e => setPrivacyAccepted(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-zinc-600 bg-zinc-800 accent-brand-500 flex-shrink-0"
+                />
+                <span className="text-xs text-zinc-400 leading-relaxed">
+                  I have read and accept the{' '}
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:underline">
+                    Privacy Policy
+                  </a>
+                </span>
+              </label>
+
+              <button type="submit" disabled={isSubmitting || !privacyAccepted} className="btn-primary w-full py-3 text-base mt-2 disabled:opacity-50">
                 {isSubmitting ? 'Creating account…' : 'Create account'}
               </button>
             </form>

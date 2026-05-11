@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Clock, MapPin, Video } from 'lucide-react'
 import { cn, shortDate, timeStr } from '@/lib/utils'
 import type { LessonDoc, AssignmentDoc } from '@/types'
@@ -13,12 +14,12 @@ interface LessonCardProps {
 
 export function LessonCard({ lesson, subjectColor = 'bg-brand-500', subjectTitle }: LessonCardProps) {
   return (
-    <div className="flex items-start gap-3 p-4 rounded-xl bg-white border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all">
+    <div className="flex items-start gap-3 p-4 rounded-xl bg-zinc-900 border border-white/8 hover:border-white/10 hover:shadow-sm transition-all">
       <div className={cn('w-1 self-stretch rounded-full flex-shrink-0', subjectColor)} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-slate-800 truncate">{lesson.title}</p>
-        {subjectTitle && <p className="text-xs text-slate-400 mb-1">{subjectTitle}</p>}
-        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+        <p className="text-sm font-semibold text-zinc-200 truncate">{lesson.title}</p>
+        {subjectTitle && <p className="text-xs text-zinc-400 mb-1">{subjectTitle}</p>}
+        <div className="flex items-center gap-3 text-xs text-zinc-500 mt-1">
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
             {shortDate(lesson.startTime)} · {timeStr(lesson.startTime)}–{timeStr(lesson.endTime)}
@@ -46,22 +47,25 @@ interface DeadlineCardProps {
 
 export function DeadlineCard({ assignment, subjectColor = 'bg-rose-500', subjectTitle, isOverdue }: DeadlineCardProps) {
   return (
-    <div className={cn(
-      'flex items-start gap-3 p-4 rounded-xl border transition-all',
-      isOverdue
-        ? 'bg-rose-50 border-rose-200'
-        : 'bg-white border-slate-100 hover:border-slate-200 hover:shadow-sm',
-    )}>
+    <Link
+      to={`/assignments/${assignment.id}`}
+      className={cn(
+        'flex items-start gap-3 p-4 rounded-xl border transition-all',
+        isOverdue
+          ? 'bg-rose-950/40 border-rose-800/50 hover:border-rose-700/50'
+          : 'bg-zinc-900 border-white/8 hover:border-white/10 hover:shadow-sm',
+      )}
+    >
       <div className={cn('w-1 self-stretch rounded-full flex-shrink-0', subjectColor)} />
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-semibold text-slate-800 truncate">{assignment.title}</p>
+          <p className="text-sm font-semibold text-zinc-200 truncate">{assignment.title}</p>
           {isOverdue && (
             <span className="badge badge-rose flex-shrink-0">Overdue</span>
           )}
         </div>
-        {subjectTitle && <p className="text-xs text-slate-400 mb-1">{subjectTitle}</p>}
-        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+        {subjectTitle && <p className="text-xs text-zinc-400 mb-1">{subjectTitle}</p>}
+        <div className="flex items-center gap-3 text-xs text-zinc-500 mt-1">
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
             Due {shortDate(assignment.dueDate)}
@@ -70,6 +74,6 @@ export function DeadlineCard({ assignment, subjectColor = 'bg-rose-500', subject
           <span className="text-amber-600 font-medium">+{assignment.pointsValue} pts</span>
         </div>
       </div>
-    </div>
+    </Link>
   )
 }

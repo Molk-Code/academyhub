@@ -29,3 +29,4 @@ ui-debug.log
 # OS
 .DS_Store
 Thumbs.db
+scripts/serviceAccountKey.json

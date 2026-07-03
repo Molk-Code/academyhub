@@ -4,7 +4,6 @@ import { Mail, Save, CheckCircle2 } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { useDocument } from '@/hooks/useFirestore'
 import type { EmailConfigDoc } from '@/types'
-import LoadingSpinner from '@/components/common/LoadingSpinner'
 
 export default function EmailConfig() {
   const { data: config, loading } = useDocument<EmailConfigDoc>('email_config', 'global')
@@ -41,8 +40,6 @@ export default function EmailConfig() {
       setSaving(false)
     }
   }
-
-  if (loading) return <LoadingSpinner />
 
   return (
     <div className="max-w-lg space-y-6">

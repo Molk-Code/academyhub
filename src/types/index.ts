@@ -10,7 +10,7 @@ export type SubmissionStatus = 'draft' | 'submitted' | 'graded'
 
 export type AssignmentType = 'practical' | 'test'
 
-export type QuestionType = 'multiple_choice' | 'multiple_select' | 'true_false' | 'short_answer'
+export type QuestionType = 'multiple_choice' | 'multiple_select' | 'true_false' | 'short_answer' | 'ordering' | 'rating'
 
 export type PointsReason = 'test_pass' | 'assignment_graded' | 'redemption' | 'bonus' | 'attendance' | 'absence_penalty'
 
@@ -37,9 +37,12 @@ export interface Question {
   id: string
   text: string
   type: QuestionType
-  options: string[]            // for MC / MS / TF
+  options: string[]            // for MC / MS / TF / ordering items
   correctAnswer: string        // for MC, TF, SA: index string or text
   correctAnswers?: string[]    // for multiple_select: array of index strings
+  correctOrder?: string[]      // for ordering: correct sequence of option indices as strings
+  ratingScale?: number         // for rating: max value (default 5)
+  ratingLabels?: [string, string] // for rating: [low label, high label]
   points: number
 }
 
@@ -95,6 +98,9 @@ export interface UserDoc {
   phoneNumber?: string
   schoolEmail?: string
   calendarColor?: string
+  disabled?: boolean
+  hasSeenWelcome?: boolean
+  notifiedLevelIds?: string[]
 }
 
 export interface CohortDoc {
@@ -291,28 +297,87 @@ export interface ProgressDoc {
   updatedAt: Timestamp
 }
 
-// ── Phase 5: Equipment ────────────────────────────────────────────────────────
+// ── Equipment Booking System ──────────────────────────────────────────────────
+
+export type EquipmentCategory = 'CAMERA' | 'GRIP' | 'LIGHTS' | 'SOUND' | 'LOCATION' | 'BOOKS' | 'OTHER'
+export type EquipmentBookingStatus = 'pending' | 'confirmed' | 'checked-out' | 'returned' | 'cancelled'
+export type InventoryProjectStatus = 'active' | 'checked-out' | 'returned' | 'archived'
+export type InventoryItemStatus = 'checked-out' | 'returned' | 'damaged' | 'missing'
 
 export interface EquipmentDoc {
   id: string
   name: string
-  category: string
-  serialNumber: string
-  isAvailable: boolean
-  condition: EquipmentCondition
-  imageUrl: string | null
+  category: EquipmentCategory
+  description: string
   notes: string
+  location: string
+  priceExclVat: number
+  priceInclVat: number
+  available: number
+  totalQuantity: number
+  imageUrl: string
+  qrCode: string
+  included: string[]
+  filmYear2Only: boolean
+  allowedCohortIds?: string[]   // empty / absent = available to all
+  requiresProduction?: boolean  // default true; false = bookable without a production
+  isActive: boolean
+  createdAt?: Timestamp
+  updatedAt?: Timestamp
+}
+
+export interface EquipmentBookingItem {
+  equipmentId: string
+  equipmentName: string
+  quantity: number
 }
 
 export interface EquipmentBookingDoc {
   id: string
-  itemId: string
   studentId: string
-  approvedBy: string | null
-  startTime: Timestamp
-  endTime: Timestamp
-  status: BookingStatus
-  notes: string
+  studentName: string
+  studentEmail: string
+  cohortId: string
+  projectName: string
+  items: EquipmentBookingItem[]
+  checkoutDate: string
+  returnDate: string
+  status: EquipmentBookingStatus
+  teacherNotes: string
+  productionId?: string
+  productionTitle?: string
+  productionReadiness?: { score: number; hasBreakdown: boolean; hasCrew: boolean; hasCast: boolean; hasLocations: boolean; hasSchedule: boolean }
+  createdAt?: Timestamp
+}
+
+export interface InventoryProjectDoc {
+  id: string
+  name: string
+  borrowers: string[]
+  borrowerIds: string[]
+  equipmentManagerId: string
+  equipmentManagerName: string
+  cohortId: string
+  checkoutDate: string
+  returnDate: string
+  status: InventoryProjectStatus
+  createdAt?: Timestamp
+  updatedAt?: Timestamp
+}
+
+export interface InventoryItemDoc {
+  id: string
+  equipmentId: string
+  equipmentName: string
+  checkoutTimestamp: string
+  checkinTimestamp: string
+  status: InventoryItemStatus
+  damageNotes: string
+  assignedTo: string
+  addonSessionId?: string
+  addonDate?: string
+  addonCollectedBy?: string
+  addonManager?: string
 }
 
 // ── Attendance ────────────────────────────────────────────────────────────────
@@ -537,6 +602,8 @@ export interface AbsenceReportDoc {
   type: 'full_day' | 'lesson'
   lessonId?: string
   lessonTitle?: string
+  lessonStartTime?: string  // HH:mm
+  lessonEndTime?: string    // HH:mm
   reason: string
   reportedAt: Timestamp
   status: 'pending' | 'reviewed'
@@ -612,6 +679,16 @@ export interface EmailConfigDoc {
 
 // ── Team Resources ────────────────────────────────────────────────────────────
 
+export interface ResourceFolderDoc {
+  id: string
+  name: string
+  emoji: string
+  cohortId: string | null
+  createdBy: string
+  createdAt: Timestamp
+  order: number
+}
+
 export interface TeamResourceDoc {
   id: string
   title: string
@@ -620,6 +697,7 @@ export interface TeamResourceDoc {
   storagePath: string | null
   cohortId: string | null   // null = visible to all cohorts
   teamIds: string[] | null  // null = all teams / all students; otherwise specific team IDs
+  folderId: string | null
   createdBy: string
   createdAt: Timestamp
   description?: string
@@ -731,6 +809,42 @@ export interface PlanComment {
   createdAt: Timestamp
 }
 
+// ── Schools (multi-tenant registry) ──────────────────────────────────────────
+
+export type SchoolStatus = 'active' | 'trial' | 'suspended'
+export type SchoolTier   = 'studio' | 'academy' | 'campus'
+
+export interface SchoolDoc {
+  id: string              // = schoolId slug
+  schoolId: string
+  name: string
+  status: SchoolStatus
+  tier: SchoolTier
+  isBeta: boolean
+  onboardingDate: Timestamp
+  contactEmail?: string
+  // fields also used by SchoolContext (preserved)
+  shortName?: string
+  logoUrl?: string | null
+  primaryColor?: string
+  features?: Record<string, boolean>
+  maxStudents?: number
+  subscriptionStatus?: string
+  storageQuotaGB?: number
+  storageUsedBytes?: number
+  roomDisplayUrl?: string
+}
+
+export interface TeacherAssessment {
+  id: string              // = studentId
+  studentId: string
+  strengths: string
+  developments: string
+  updatedBy: string
+  updatedByName: string
+  updatedAt: Timestamp
+}
+
 // ── Personal To-Do ────────────────────────────────────────────────────────────
 
 export type TodoCategory = 'urgent' | 'todo'
@@ -757,5 +871,202 @@ export interface PersonalEventDoc {
   allDay: boolean
   location?: string
   notes?: string
+  inviteeIds?: string[]
+  organizerName?: string
   createdAt: Timestamp
+}
+
+// ── Production Planning ───────────────────────────────────────────────────────
+
+export interface ProductionDoc {
+  id: string
+  title: string
+  cohortId: string
+  createdBy: string
+  collaborators: string[]   // can edit
+  viewerIds: string[]       // view-only (populated from team shares)
+  sharedTeams: { teamId: string; teamName: string }[]
+  isPublic: boolean
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  lastEditedBy?: string
+  screenplayUrl?: string
+  screenplayName?: string
+  periodId?: string
+  productionType?: 'period' | 'side'
+  productionPeriodId?: string | null
+  budgetLimit?: number
+}
+
+export interface ProductionLocationDoc {
+  id: string
+  name: string
+  address: string    // street address
+  zipCode?: string   // postal / zip code
+  state?: string     // city / municipality / region
+  notes?: string
+}
+
+export interface ProductionSceneDoc {
+  id: string
+  sceneNumber: number
+  dayNight: 'Day' | 'Night'
+  intExt: 'INT' | 'EXT'
+  location: string
+  locationId?: string   // reference to ProductionLocationDoc.id
+  description: string
+  castIds: number[]
+  pages?: number        // eighths of a script page: 1=1/8, 8=1 page, 9=1 1/8, etc.
+  props: string
+  makeup: string
+  costume: string
+  notes: string
+}
+
+export interface ProductionCastDoc {
+  id: string
+  characterName: string
+  actorName: string
+  castId: number
+  scenes: number[]
+}
+
+export interface ProductionShotDoc {
+  id: string
+  sceneId: string
+  shotNumber: number
+  subject: string
+  size: string
+  angle: string
+  movement: string
+  notes: string
+}
+
+export interface LocationMove {
+  id: string
+  afterSceneId: string  // scene doc id, or '__start__' for before first scene
+  minutes: number
+  note?: string
+}
+
+export interface ProductionShootingDayDoc {
+  id: string
+  dayNumber: number
+  date: string
+  workHours: string   // legacy display string e.g. "08:00–17:00"
+  startTime?: string  // "HH:mm"
+  endTime?: string    // "HH:mm"
+  rtsTime?: string      // "HH:mm" — ready to shoot
+  lunchStart?: string   // "HH:mm" — lunch break start
+  lunchDuration?: number // minutes
+  sceneIds: string[]
+  notes: string
+  locationMoves?: LocationMove[]
+}
+
+export interface CrewRoleDoc {
+  id: string
+  name: string
+  order: number
+  dayRate?: number
+}
+
+export interface ProductionCrewAssignmentDoc {
+  id: string
+  roleId: string
+  roleName: string
+  assignedUid?: string | null
+  assignedName: string
+}
+
+export interface ProductionFeedbackDoc {
+  id: string
+  tab: string
+  comment: string
+  teacherId: string
+  teacherName: string
+  createdAt: Timestamp
+}
+
+// ── Production Period ─────────────────────────────────────────────────────────
+
+export interface ProductionPeriodDoc {
+  id: string
+  title: string
+  cohortId: string
+  startDate: string      // yyyy-MM-dd
+  endDate: string        // yyyy-MM-dd
+  workingDays: string[]  // list of available shooting dates (yyyy-MM-dd)
+  createdBy: string
+  notes: string
+  budgetPerProduction?: number
+  budgetCurrency?: string
+  budgetNotes?: string
+}
+
+export interface PeriodAllocationDoc {
+  id: string
+  productionId: string
+  productionTitle: string  // denormalized
+  date: string             // yyyy-MM-dd
+  startTime: string        // HH:mm
+  endTime: string          // HH:mm
+  location: string
+  crewNeeded: string[]     // user uids
+  notes: string
+  color: string            // hex, auto-assigned per production
+}
+
+
+// ── Meeting Agenda ────────────────────────────────────────────────────────────
+
+export interface MeetingDoc {
+  id: string
+  title: string
+  date: Timestamp
+  cohortId: string
+  status: 'draft' | 'published' | 'in-progress' | 'completed' | 'archived'
+  createdBy: string
+  collaboratorIds: string[]
+  minutesNotes: string
+  isRecurring: boolean
+  recurringDay?: string
+  recurringTime?: string
+  createdAt: Timestamp
+  publishedAt?: Timestamp
+}
+
+export interface MeetingItemDoc {
+  id: string
+  type: 'info' | 'discussion' | 'reminder' | 'decision'
+  title: string
+  body: string
+  addedBy: string
+  addedByName: string
+  order: number
+  isDone: boolean
+  comments: Array<{ uid: string; name: string; text: string; createdAt: any }>
+  decisionOutcome: string
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+
+// ── Notification inbox ───────────────────────────────────────────────────────
+
+export interface NotificationDoc {
+  id: string
+  uid: string
+  title: string
+  body: string
+  url?: string
+  isRead: boolean
+  createdAt: Timestamp
+  type?: string
+  levelName?: string
+}
+
+export interface ExperienceLevel {
+  id: string
+  name: string
+  pointsRequired: number
 }

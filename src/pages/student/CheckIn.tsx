@@ -6,8 +6,9 @@ import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, where as collectionWhere, orderBy } from '@/hooks/useFirestore'
 import type { LessonDoc, AbsenceReportDoc, CohortDoc, PointsLogDoc } from '@/types'
-import { CheckCircle2, AlertCircle, AlertTriangle, Trash2, Check, TrendingUp, Star } from 'lucide-react'
+import { CheckCircle2, AlertCircle, AlertTriangle, Trash2, Check, TrendingUp, Star, QrCode } from 'lucide-react'
 import { format, isAfter, isBefore, startOfDay } from 'date-fns'
+import { useAttendanceStats } from '@/hooks/useAttendanceStats'
 
 type Phase = 'idle' | 'loading' | 'success' | 'error'
 
@@ -19,8 +20,9 @@ export default function CheckIn() {
   const { profile, cohortId, previewCohortId } = useAuth()
   const effectiveCohortId = previewCohortId ?? cohortId
 
-  const [phase, setPhase] = useState<Phase>('idle')
-  const [message, setMessage] = useState('')
+  const [phase,         setPhase]         = useState<Phase>('idle')
+  const [scannerActive, setScannerActive] = useState(false)
+  const [message,       setMessage]       = useState('')
   const profileRef = useRef(profile)
 
   // Absence reporting state
@@ -53,43 +55,7 @@ export default function CheckIn() {
     [cohorts, effectiveCohortId],
   )
 
-  // Actual check-in records from points_log
-  const { data: checkIns } = useCollection<PointsLogDoc>(
-    'points_log',
-    profile ? [collectionWhere('studentId', '==', profile.uid), collectionWhere('reason', '==', 'attendance')] : [],
-    !!profile,
-    profile?.uid ?? '',
-  )
-
-  const absenceStats = useMemo(() => {
-    if (!myCohort?.startDate) return null
-    const today = startOfDay(new Date())
-    const yearStart = myCohort.startDate.toDate()
-    const yearEnd = myCohort.endDate
-      ? myCohort.endDate.toDate()
-      : new Date(yearStart.getFullYear() + 1, yearStart.getMonth(), yearStart.getDate())
-
-    const effectiveStart = yearStart
-    const effectiveEnd   = isAfter(today, yearEnd) ? yearEnd : today
-
-    const scheduledLessons = allLessons.filter(l => {
-      const d = l.startTime?.toDate?.()
-      if (!d) return false
-      return !isBefore(d, effectiveStart) && !isAfter(d, effectiveEnd)
-    })
-
-    const scheduledIds = new Set(scheduledLessons.map(l => l.id))
-
-    // Count check-ins that correspond to scheduled lessons in this period
-    const attendedCount = checkIns.filter(c => scheduledIds.has(c.referenceId)).length
-
-    const total   = scheduledLessons.length
-    const attended = Math.min(attendedCount, total)
-    const absent  = total - attended
-    const attendancePct = total > 0 ? Math.round((attended / total) * 100) : 0
-    const absencePct    = total > 0 ? Math.round((absent  / total) * 100) : 0
-    return { total, attended, absent, attendancePct, absencePct }
-  }, [myCohort, allLessons, checkIns])
+  const absenceStats = useAttendanceStats(profile?.uid ?? null, effectiveCohortId ?? null)
 
   const lessonsOnDate = useMemo(() => {
     return allLessons.filter(l => {
@@ -163,17 +129,19 @@ export default function CheckIn() {
         ])
       }
 
+      setScannerActive(false)
       setPhase('success')
       setMessage(`You're checked in! +${pointsPerCheckIn} pts ⭐`)
 
     } catch (err: any) {
+      setScannerActive(false)
       setPhase('error')
       setMessage(err?.message ?? 'Check-in failed. Try again.')
     }
   }, [])
 
   useEffect(() => {
-    if (phase !== 'idle') return
+    if (phase !== 'idle' || !scannerActive) return
 
     const html5QrCode = new BrowserMultiFormatReader()
     let stopped = false
@@ -210,10 +178,11 @@ export default function CheckIn() {
       stopped = true
       controls?.stop()
     }
-  }, [phase, handleCheckIn])
+  }, [phase, scannerActive, handleCheckIn])
 
   function reset() {
     setPhase('idle')
+    setScannerActive(false)
     setMessage('')
   }
 
@@ -257,7 +226,23 @@ export default function CheckIn() {
 
       {/* QR Scanner */}
       <div className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm overflow-hidden">
-        {phase === 'idle' && (
+        {!scannerActive && phase === 'idle' && (
+          <div className="flex flex-col items-center justify-center py-12 gap-4">
+            <div className="w-24 h-24 rounded-3xl bg-orange-500/20 flex items-center justify-center text-5xl">
+              📷
+            </div>
+            <p className="text-zinc-400 text-sm text-center px-6">
+              Point your camera at the QR code your teacher is showing
+            </p>
+            <button
+              onClick={() => setScannerActive(true)}
+              className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-3 rounded-xl text-lg transition-colors"
+            >
+              Start Scanning
+            </button>
+          </div>
+        )}
+        {scannerActive && phase === 'idle' && (
           <div className="relative w-full aspect-square max-w-sm mx-auto rounded-xl overflow-hidden bg-black">
             <video
               id="qr-video"
@@ -367,6 +352,7 @@ export default function CheckIn() {
             <input
               type="date"
               value={absenceDate}
+              min={todayStr()}
               onChange={e => { setAbsenceDate(e.target.value); setAbsenceLessonId('') }}
               className="input w-full"
             />

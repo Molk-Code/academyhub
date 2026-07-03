@@ -4,7 +4,8 @@ import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
 import type { GuideSectionDoc, GuideArticleDoc, GuideContactDoc } from '@/types'
-import { Search, Phone, Mail, ArrowLeft, AlertTriangle, Info } from 'lucide-react'
+import { Search, Phone, Mail, AlertTriangle, Info } from 'lucide-react'
+import Breadcrumb from '@/components/common/Breadcrumb'
 
 const PALETTE = [
   '#3b82f6', '#f97316', '#22c55e', '#a855f7',
@@ -82,13 +83,20 @@ export default function StudentGuide() {
     window.scrollTo(0, 0)
   }
 
+  function goToGrid() {
+    setView('grid')
+    setSelectedSectionId(null)
+    setSelectedArticleId(null)
+    window.scrollTo(0, 0)
+  }
+
   // ── GRID VIEW ──────────────────────────────────────────────────────────────
   if (view === 'grid') {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>FAQ 🎬</h1>
+          <h1 className="text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>School Guide</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
             Everything you need to know about your filmmaking education
           </p>
@@ -174,13 +182,11 @@ export default function StudentGuide() {
   if (view === 'section' && selectedSectionId === '__contacts__') {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <button
-          onClick={goBack}
-          className="flex items-center gap-1.5 text-sm font-medium mb-6 transition-opacity hover:opacity-70"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          <ArrowLeft className="w-4 h-4" /> Back
-        </button>
+        <Breadcrumb items={[
+          { label: 'Home', href: '/dashboard' },
+          { label: 'School Guide', onClick: goToGrid },
+          { label: 'Contacts' },
+        ]} />
         <div className="flex items-center gap-4 mb-8">
           <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl flex-shrink-0"
             style={{ backgroundColor: CONTACTS_COLOR + '22', border: `2px solid ${CONTACTS_COLOR}44` }}>
@@ -238,13 +244,11 @@ export default function StudentGuide() {
     const c = sectionColors[selectedSection.id] ?? '#f97316'
     return (
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <button
-          onClick={goBack}
-          className="flex items-center gap-1.5 text-sm font-medium mb-6 transition-opacity hover:opacity-70"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          <ArrowLeft className="w-4 h-4" /> Back
-        </button>
+        <Breadcrumb items={[
+          { label: 'Home', href: '/dashboard' },
+          { label: 'School Guide', onClick: goToGrid },
+          { label: selectedSection.title },
+        ]} />
         <div className="flex items-center gap-4 mb-8">
           <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl flex-shrink-0"
             style={{ backgroundColor: c + '22', border: `2px solid ${c}44` }}>
@@ -347,14 +351,12 @@ export default function StudentGuide() {
 
     return (
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <button
-          onClick={goBack}
-          className="flex items-center gap-1.5 text-sm font-medium mb-6 transition-opacity hover:opacity-70"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          <ArrowLeft className="w-4 h-4" />
-          {articleSection?.title ?? 'Back'}
-        </button>
+        <Breadcrumb items={[
+          { label: 'Home', href: '/dashboard' },
+          { label: 'School Guide', onClick: goToGrid },
+          ...(articleSection ? [{ label: articleSection.title, onClick: goBack }] : []),
+          { label: selectedArticle.title },
+        ]} />
         <article>
           {articleSection && (
             <div className="flex items-center gap-2 mb-3">

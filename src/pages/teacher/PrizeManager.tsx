@@ -2,14 +2,14 @@ import { useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { collection, addDoc, updateDoc, doc } from 'firebase/firestore'
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
-import { db, storage, functions } from '@/lib/firebase'
+import { db, functions } from '@/lib/firebase'
+import { uploadWithQuota } from '@/lib/uploadWithQuota'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, where } from '@/hooks/useFirestore'
 import type { PrizeDoc, PrizeClaimDoc, UserDoc } from '@/types'
-import { Gift, Plus, CheckCircle2, XCircle, Sparkles, ImagePlus, X } from 'lucide-react'
+import { Gift, Plus, CheckCircle2, XCircle, Sparkles, ImagePlus, X, Pencil, Trash2 } from 'lucide-react'
 import Avatar from '@/components/common/Avatar'
 
 const schema = z.object({
@@ -21,10 +21,11 @@ type FormData = z.infer<typeof schema>
 
 export default function PrizeManager() {
   const { profile } = useAuth()
-  const [showForm,    setShowForm]    = useState(false)
-  const [saving,      setSaving]      = useState(false)
-  const [imageFile,   setImageFile]   = useState<File | null>(null)
-  const [imagePreview,setImagePreview]= useState<string | null>(null)
+  const [showForm,     setShowForm]    = useState(false)
+  const [editingPrize, setEditingPrize]= useState<PrizeDoc | null>(null)
+  const [saving,       setSaving]      = useState(false)
+  const [imageFile,    setImageFile]   = useState<File | null>(null)
+  const [imagePreview, setImagePreview]= useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { data: prizes } = useCollection<PrizeDoc>('prizes')
@@ -55,25 +56,40 @@ export default function PrizeManager() {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  function startEdit(prize: PrizeDoc) {
+    setEditingPrize(prize)
+    reset({ title: prize.title, description: prize.description, pointsCost: prize.pointsCost })
+    setImagePreview(prize.imageUrl ?? null)
+    setShowForm(true)
+  }
+
+  async function deletePrize(prize: PrizeDoc) {
+    if (!confirm(`Delete "${prize.title}"? This cannot be undone.`)) return
+    await deleteDoc(doc(db, 'prizes', prize.id))
+  }
+
   async function onSubmit(data: FormData) {
     if (!profile) return
     setSaving(true)
     try {
-      let imageUrl: string | null = null
+      let imageUrl: string | null = editingPrize?.imageUrl ?? null
       if (imageFile) {
-        const storageRef = ref(storage, `prizes/${Date.now()}_${imageFile.name}`)
-        const snap = await uploadBytes(storageRef, imageFile)
-        imageUrl = await getDownloadURL(snap.ref)
+        imageUrl = await uploadWithQuota(imageFile, `prizes/${Date.now()}_${imageFile.name}`)
       }
-      await addDoc(collection(db, 'prizes'), {
-        ...data,
-        imageUrl,
-        quantity:        null,
-        quantityClaimed: 0,
-        isActive:        true,
-        createdBy:       profile.uid,
-        cohortIds:       null,
-      })
+      if (editingPrize) {
+        await updateDoc(doc(db, 'prizes', editingPrize.id), { ...data, imageUrl })
+        setEditingPrize(null)
+      } else {
+        await addDoc(collection(db, 'prizes'), {
+          ...data,
+          imageUrl,
+          quantity:        null,
+          quantityClaimed: 0,
+          isActive:        true,
+          createdBy:       profile.uid,
+          cohortIds:       null,
+        })
+      }
       reset()
       clearImage()
       setShowForm(false)
@@ -111,7 +127,7 @@ export default function PrizeManager() {
       {/* New prize form */}
       {showForm && (
         <form onSubmit={handleSubmit(onSubmit)} className="bg-slate-800 rounded-2xl p-5 space-y-4">
-          <h2 className="text-base font-semibold text-white">New prize</h2>
+          <h2 className="text-base font-semibold text-white">{editingPrize ? 'Edit prize' : 'New prize'}</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label text-zinc-300">Title</label>
@@ -163,7 +179,7 @@ export default function PrizeManager() {
             <button type="submit" disabled={saving} className="btn-primary py-2">
               {saving ? 'Saving…' : 'Create prize'}
             </button>
-            <button type="button" onClick={() => setShowForm(false)} className="btn-secondary bg-zinc-700 border-slate-600 text-zinc-300 hover:bg-slate-600 py-2">
+            <button type="button" onClick={() => { setShowForm(false); setEditingPrize(null); reset() }} className="btn-secondary bg-zinc-700 border-slate-600 text-zinc-300 hover:bg-slate-600 py-2">
               Cancel
             </button>
           </div>
@@ -220,7 +236,15 @@ export default function PrizeManager() {
                   </div>
                 </div>
                 <p className="text-xs text-zinc-400 line-clamp-2">{prize.description}</p>
-                <div className="flex items-center justify-end pt-1">
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => startEdit(prize)} className="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-white/5 rounded-lg transition-colors" title="Edit">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => deletePrize(prize)} className="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors" title="Delete">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                   <button
                     onClick={() => toggleActive(prize)}
                     className={`text-xs px-2 py-1 rounded-lg font-medium transition-colors ${

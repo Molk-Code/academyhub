@@ -2,13 +2,15 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
 import { useCollection, where } from '@/hooks/useFirestore'
 import type { UserDoc, CohortDoc } from '@/types'
 import { nanoid } from 'nanoid'
-import { Copy, Check, UserPlus, UserX, UserCheck, Mail, ShieldCheck, Trash2, KeyRound, Eye, EyeOff, X } from 'lucide-react'
+import { sendPasswordResetEmail } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
+import { Copy, Check, UserPlus, UserX, UserCheck, Mail, ShieldCheck, Trash2, KeyRound, X, Users, ClipboardCopy, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react'
 import Avatar from '@/components/common/Avatar'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 
@@ -31,13 +33,21 @@ interface Invitation {
 export default function UserManager() {
   const [copiedToken,       setCopiedToken]       = useState<string | null>(null)
   const [saving,            setSaving]            = useState(false)
-  const [resetUser,         setResetUser]         = useState<UserDoc | null>(null)
-  const [newPassword,       setNewPassword]       = useState('')
-  const [confirmPassword,   setConfirmPassword]   = useState('')
-  const [showPassword,      setShowPassword]      = useState(false)
-  const [resetting,         setResetting]         = useState(false)
-  const [resetError,        setResetError]        = useState('')
-  const [resetSuccess,      setResetSuccess]      = useState(false)
+  const [resetEmailSent,    setResetEmailSent]    = useState<string | null>(null)
+  const [toastMsg,          setToastMsg]          = useState<string | null>(null)
+  const [lastInviteUrl,     setLastInviteUrl]     = useState<string | null>(null)
+  const [copiedLastInvite,  setCopiedLastInvite]  = useState(false)
+  const [bulkOpen,          setBulkOpen]          = useState(false)
+  const [bulkEmails,        setBulkEmails]        = useState('')
+  const [bulkRole,          setBulkRole]          = useState<'student' | 'teacher'>('student')
+  const [bulkCohortId,      setBulkCohortId]      = useState('')
+  const [bulkSaving,        setBulkSaving]        = useState(false)
+  const [bulkResults,       setBulkResults]       = useState<{ email: string; inviteId: string }[]>([])
+  const [copiedBulkAll,     setCopiedBulkAll]     = useState(false)
+  const [selectedIds,       setSelectedIds]       = useState<Set<string>>(new Set())
+  const [assignCohort,      setAssignCohort]      = useState('')
+  const [assigning,         setAssigning]         = useState(false)
+  const [assignedMsg,       setAssignedMsg]       = useState('')
 
   const { data: users,       loading } = useCollection<UserDoc>('users')
   const { data: cohorts }              = useCollection<CohortDoc>('cohorts')
@@ -50,6 +60,11 @@ export default function UserManager() {
 
   const role = watch('role')
 
+  function showToast(msg: string) {
+    setToastMsg(msg)
+    setTimeout(() => setToastMsg(null), 3000)
+  }
+
   async function onSubmit(data: FormData) {
     setSaving(true)
     const token = nanoid(24)
@@ -60,18 +75,85 @@ export default function UserManager() {
       cohortId:  data.cohortId || null,
       used:      false,
       createdAt: serverTimestamp(),
+      expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
     })
+    const url = `${window.location.origin}/accept-invite?token=${token}`
+    setLastInviteUrl(url)
+    try {
+      await navigator.clipboard.writeText(url)
+      showToast('Invite link copied to clipboard!')
+    } catch {
+      const input = document.createElement('input')
+      input.value = url
+      document.body.appendChild(input)
+      input.select()
+      document.execCommand('copy')
+      document.body.removeChild(input)
+      showToast('Invite link copied!')
+    }
     reset()
     setSaving(false)
+  }
+
+  async function onBulkSubmit() {
+    const emails = bulkEmails
+      .split('\n')
+      .map(e => e.trim().toLowerCase())
+      .filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+    if (emails.length === 0) return
+    setBulkSaving(true)
+    setBulkResults([])
+    try {
+      const results: { email: string; inviteId: string }[] = []
+      for (const email of emails) {
+        const token = nanoid(24)
+        const ref = await addDoc(collection(db, 'invitations'), {
+          token,
+          email,
+          role:      bulkRole,
+          cohortId:  bulkCohortId || null,
+          used:      false,
+          createdAt: serverTimestamp(),
+          expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+        })
+        results.push({ email, inviteId: ref.id })
+      }
+      setBulkResults(results)
+      setBulkEmails('')
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  function copyAllBulkLinks() {
+    const text = bulkResults
+      .map(r => `${r.email}: ${window.location.origin}/accept-invite?token=${r.inviteId}`)
+      .join('\n')
+    navigator.clipboard.writeText(text)
+    setCopiedBulkAll(true)
+    setTimeout(() => setCopiedBulkAll(false), 2000)
   }
 
   async function toggleActive(user: UserDoc) {
     await updateDoc(doc(db, 'users', user.id), { isActive: !user.isActive })
   }
 
-  async function deleteUser(user: UserDoc) {
-    if (!confirm(`Delete ${user.displayName}? This cannot be undone.`)) return
-    await deleteDoc(doc(db, 'users', user.id))
+  async function disableUser(user: UserDoc) {
+    if (!confirm(`Disable ${user.displayName}? They won't be able to log in until restored.`)) return
+    try {
+      await httpsCallable(functions, 'disableUser')({ uid: user.uid })
+    } catch {
+      // CF may not exist yet — fall back to Firestore-only
+      await updateDoc(doc(db, 'users', user.id), { disabled: true, isActive: false })
+    }
+  }
+
+  async function restoreUser(user: UserDoc) {
+    try {
+      await httpsCallable(functions, 'restoreUser')({ uid: user.uid })
+    } catch {
+      await updateDoc(doc(db, 'users', user.id), { disabled: false, isActive: true })
+    }
   }
 
   async function deleteInvite(invId: string) {
@@ -84,7 +166,6 @@ export default function UserManager() {
     const next = hasRole
       ? currentRoles.filter(r => r !== secondaryRole)
       : [...currentRoles, secondaryRole]
-    // Always keep the primary role
     if (!next.includes(user.role)) next.unshift(user.role)
     await updateDoc(doc(db, 'users', user.id), { roles: next })
   }
@@ -96,35 +177,33 @@ export default function UserManager() {
     setTimeout(() => setCopiedToken(null), 2000)
   }
 
-  async function handleResetPassword() {
-    if (!resetUser) return
-    setResetError('')
-    if (newPassword.length < 6)             { setResetError('Password must be at least 6 characters.'); return }
-    if (newPassword !== confirmPassword)     { setResetError('Passwords do not match.'); return }
-    setResetting(true)
+  async function sendResetEmail(user: UserDoc) {
     try {
-      await httpsCallable(functions, 'resetPassword')({ uid: resetUser.uid, newPassword })
-      setResetSuccess(true)
-      setTimeout(() => {
-        setResetUser(null)
-        setNewPassword('')
-        setConfirmPassword('')
-        setResetSuccess(false)
-      }, 1500)
-    } catch (e: any) {
-      setResetError(e?.message ?? 'Failed to reset password.')
-    } finally {
-      setResetting(false)
+      await sendPasswordResetEmail(auth, user.email)
+      setResetEmailSent(user.id)
+      setTimeout(() => setResetEmailSent(null), 3000)
+    } catch {
+      alert('Failed to send reset email. Check the email address is valid.')
     }
   }
 
-  function openResetModal(user: UserDoc) {
-    setResetUser(user)
-    setNewPassword('')
-    setConfirmPassword('')
-    setResetError('')
-    setResetSuccess(false)
-    setShowPassword(false)
+  const toggleSelect = (uid: string) =>
+    setSelectedIds(prev => { const n = new Set(prev); n.has(uid) ? n.delete(uid) : n.add(uid); return n })
+  const selectAll = () => setSelectedIds(new Set(users.map(u => u.id)))
+  const clearAll  = () => setSelectedIds(new Set())
+
+  async function handleBulkAssignCohort() {
+    if (!assignCohort || selectedIds.size === 0) return
+    setAssigning(true)
+    await Promise.all([...selectedIds].map(uid =>
+      updateDoc(doc(db, 'users', uid), { cohortId: assignCohort }),
+    ))
+    const cohortName = cohorts.find(c => c.id === assignCohort)?.name ?? 'cohort'
+    setAssignedMsg(`${selectedIds.size} user${selectedIds.size !== 1 ? 's' : ''} assigned to ${cohortName}`)
+    setTimeout(() => setAssignedMsg(''), 3000)
+    clearAll()
+    setAssignCohort('')
+    setAssigning(false)
   }
 
   if (loading) return <LoadingSpinner />
@@ -169,6 +248,116 @@ export default function UserManager() {
             {saving ? 'Creating…' : 'Generate invite'}
           </button>
         </form>
+
+        {lastInviteUrl && (
+          <div className="mt-4 bg-white/5 rounded-xl p-3 flex items-center gap-3">
+            <code className="text-xs text-orange-400 flex-1 min-w-0 truncate">{lastInviteUrl}</code>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(lastInviteUrl)
+                setCopiedLastInvite(true)
+                setTimeout(() => setCopiedLastInvite(false), 2000)
+                showToast('Copied!')
+              }}
+              className="text-xs bg-orange-500 text-white px-3 py-1.5 rounded-lg font-semibold flex-shrink-0 hover:bg-orange-600 transition-colors"
+            >
+              {copiedLastInvite ? '✓ Copied!' : 'Copy'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Bulk invite */}
+      <div className="bg-zinc-900 border border-white/10 rounded-2xl shadow-sm overflow-hidden">
+        <button
+          onClick={() => { setBulkOpen(v => !v); setBulkResults([]) }}
+          className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-white/5 transition-colors"
+        >
+          <h2 className="text-base font-semibold text-zinc-200 flex items-center gap-2">
+            <Users className="w-5 h-5 text-brand-500" /> Bulk Invite
+            <span className="text-xs font-normal text-zinc-500">— paste multiple emails at once</span>
+          </h2>
+          {bulkOpen ? <ChevronUp className="w-4 h-4 text-zinc-400" /> : <ChevronDown className="w-4 h-4 text-zinc-400" />}
+        </button>
+
+        {bulkOpen && (
+          <div className="px-6 pb-6 space-y-4 border-t border-white/10 pt-5">
+            <div>
+              <label className="label">Emails — one per line</label>
+              <textarea
+                value={bulkEmails}
+                onChange={e => setBulkEmails(e.target.value)}
+                rows={6}
+                className="input w-full font-mono text-sm resize-y"
+                placeholder={"student1@school.com\nstudent2@school.com\nstudent3@school.com"}
+              />
+              <p className="text-xs text-zinc-500 mt-1">
+                {bulkEmails.split('\n').map(e => e.trim()).filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)).length} valid email(s) detected
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-4">
+              <div className="flex-1 min-w-[140px]">
+                <label className="label">Role</label>
+                <select value={bulkRole} onChange={e => setBulkRole(e.target.value as any)} className="input w-full">
+                  <option value="student">Student</option>
+                  <option value="teacher">Teacher</option>
+                </select>
+              </div>
+              {bulkRole === 'student' && (
+                <div className="flex-1 min-w-[140px]">
+                  <label className="label">Class</label>
+                  <select value={bulkCohortId} onChange={e => setBulkCohortId(e.target.value)} className="input w-full">
+                    <option value="">Assign later…</option>
+                    {cohorts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={onBulkSubmit}
+              disabled={bulkSaving || !bulkEmails.trim()}
+              className="btn-primary py-2 px-5"
+            >
+              {bulkSaving ? 'Generating…' : 'Generate invite links'}
+            </button>
+
+            {/* Results */}
+            {bulkResults.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-zinc-200">{bulkResults.length} invite link{bulkResults.length !== 1 ? 's' : ''} generated</p>
+                  <button
+                    onClick={copyAllBulkLinks}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
+                  >
+                    {copiedBulkAll
+                      ? <><Check className="w-3.5 h-3.5 text-emerald-500" /> Copied all!</>
+                      : <><ClipboardCopy className="w-3.5 h-3.5" /> Copy all</>
+                    }
+                  </button>
+                </div>
+                <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                  {bulkResults.map(r => (
+                    <div key={r.inviteId} className="flex items-center gap-2 bg-zinc-800/60 rounded-xl px-3 py-2">
+                      <p className="text-sm text-zinc-300 flex-1 min-w-0 truncate">{r.email}</p>
+                      <button
+                        onClick={() => copyInviteLink(r.inviteId)}
+                        className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-zinc-700 text-zinc-300 hover:bg-zinc-600 transition-colors flex-shrink-0"
+                      >
+                        {copiedToken === r.inviteId
+                          ? <><Check className="w-3 h-3 text-emerald-500" /> Copied</>
+                          : <><Copy className="w-3 h-3" /> Copy</>
+                        }
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Pending invites */}
@@ -208,17 +397,65 @@ export default function UserManager() {
 
       {/* User list */}
       <div>
-        <h2 className="text-base font-semibold text-zinc-100 mb-3">All Users ({users.length})</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-semibold text-zinc-100">All Users ({users.length})</h2>
+          <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={selectedIds.size === users.length && users.length > 0}
+              onChange={e => e.target.checked ? selectAll() : clearAll()}
+              className="w-4 h-4 rounded accent-orange-500"
+            />
+            Select all
+          </label>
+        </div>
+
+        {/* Bulk action bar */}
+        {selectedIds.size > 0 && (
+          <div className="sticky top-2 z-20 bg-zinc-900 border border-orange-500/30 rounded-2xl p-4 mb-4 flex items-center gap-4 flex-wrap shadow-lg">
+            <span className="text-sm font-semibold text-orange-400">{selectedIds.size} selected</span>
+            <div className="flex items-center gap-2 flex-1 min-w-[220px]">
+              <select
+                value={assignCohort}
+                onChange={e => setAssignCohort(e.target.value)}
+                className="flex-1 bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none"
+              >
+                <option value="">Assign to cohort…</option>
+                {cohorts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <button
+                onClick={handleBulkAssignCohort}
+                disabled={!assignCohort || assigning}
+                className="bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors whitespace-nowrap"
+              >
+                {assigning ? 'Assigning…' : 'Assign'}
+              </button>
+            </div>
+            {assignedMsg && <span className="text-xs text-emerald-400 font-medium">{assignedMsg}</span>}
+            <button onClick={clearAll} className="text-xs text-zinc-400 hover:text-white transition-colors">
+              Clear
+            </button>
+          </div>
+        )}
+
         <div className="space-y-2">
           {users.map(user => (
-            <div key={user.id} className="bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3">
+            <div key={user.id} className={`bg-zinc-900 border rounded-xl px-4 py-3 flex items-center gap-3 ${selectedIds.has(user.id) ? 'border-orange-500/40 bg-orange-500/5' : user.disabled ? 'border-rose-900/50 opacity-60' : 'border-white/10'}`}>
+              <input
+                type="checkbox"
+                checked={selectedIds.has(user.id)}
+                onChange={() => toggleSelect(user.id)}
+                className="w-4 h-4 rounded accent-orange-500 flex-shrink-0 cursor-pointer"
+              />
               <Avatar uid={user.id} name={user.displayName} avatarUrl={user.avatarUrl} size="sm" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-medium text-zinc-100 truncate">{user.displayName}</p>
-                  {user.isActive
-                    ? <span className="badge badge-green text-[10px] py-0">Active</span>
-                    : <span className="badge badge-slate text-[10px] py-0">Inactive</span>
+                  {user.disabled
+                    ? <span className="badge badge-rose text-[10px] py-0">Disabled</span>
+                    : user.isActive
+                      ? <span className="badge badge-green text-[10px] py-0">Active</span>
+                      : <span className="badge badge-slate text-[10px] py-0">Inactive</span>
                   }
                 </div>
                 <p className="text-xs text-zinc-500 truncate">{user.email}</p>
@@ -242,107 +479,53 @@ export default function UserManager() {
                 </div>
               </div>
               <div className="flex items-center gap-0.5 flex-shrink-0">
-                <button
-                  onClick={() => openResetModal(user)}
-                  className="p-2 text-zinc-400 hover:text-brand-600 transition-colors rounded-lg hover:bg-white/5"
-                  title="Reset password"
-                >
-                  <KeyRound className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => toggleActive(user)}
-                  className="p-2 text-zinc-400 hover:text-zinc-300 transition-colors rounded-lg hover:bg-white/5"
-                  title={user.isActive ? 'Deactivate' : 'Activate'}
-                >
-                  {user.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                </button>
-                <button
-                  onClick={() => deleteUser(user)}
-                  className="p-2 text-zinc-400 hover:text-rose-600 transition-colors rounded-lg hover:bg-white/5"
-                  title="Delete user"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {user.disabled ? (
+                  <button
+                    onClick={() => restoreUser(user)}
+                    className="p-2 text-zinc-400 hover:text-emerald-500 transition-colors rounded-lg hover:bg-white/5"
+                    title="Restore account"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => sendResetEmail(user)}
+                      className="p-2 transition-colors rounded-lg hover:bg-white/5"
+                      title="Send password reset email"
+                    >
+                      {resetEmailSent === user.id
+                        ? <Check className="w-4 h-4 text-emerald-500" />
+                        : <KeyRound className="w-4 h-4 text-zinc-400 hover:text-brand-400" />
+                      }
+                    </button>
+                    <button
+                      onClick={() => toggleActive(user)}
+                      className="p-2 text-zinc-400 hover:text-zinc-300 transition-colors rounded-lg hover:bg-white/5"
+                      title={user.isActive ? 'Deactivate' : 'Activate'}
+                    >
+                      {user.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                    </button>
+                    <button
+                      onClick={() => disableUser(user)}
+                      className="p-2 text-zinc-400 hover:text-rose-500 transition-colors rounded-lg hover:bg-white/5"
+                      title="Disable account"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Reset password modal */}
-      {resetUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-zinc-100">Reset password</h2>
-                <p className="text-sm text-zinc-500 mt-0.5">{resetUser.displayName}</p>
-              </div>
-              <button
-                onClick={() => setResetUser(null)}
-                className="p-1.5 text-zinc-400 hover:text-zinc-300 rounded-lg hover:bg-zinc-800 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="label">New password</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={newPassword}
-                    onChange={e => setNewPassword(e.target.value)}
-                    className="input pr-10"
-                    placeholder="Min. 6 characters"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-400"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label className="label">Confirm password</label>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  className="input"
-                  placeholder="Repeat password"
-                  onKeyDown={e => e.key === 'Enter' && handleResetPassword()}
-                />
-              </div>
-            </div>
-
-            {resetError && (
-              <p className="text-sm text-rose-600 bg-rose-950/40 rounded-lg px-3 py-2">{resetError}</p>
-            )}
-            {resetSuccess && (
-              <p className="text-sm text-emerald-600 bg-emerald-950/40 rounded-lg px-3 py-2 flex items-center gap-2">
-                <Check className="w-4 h-4" /> Password updated successfully.
-              </p>
-            )}
-
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={handleResetPassword}
-                disabled={resetting || resetSuccess || !newPassword || !confirmPassword}
-                className="btn-primary py-2 px-5 flex items-center gap-2 disabled:opacity-50"
-              >
-                <KeyRound className="w-4 h-4" />
-                {resetting ? 'Saving…' : 'Set password'}
-              </button>
-              <button onClick={() => setResetUser(null)} className="btn-secondary py-2 px-4">
-                Cancel
-              </button>
-            </div>
-          </div>
+      {/* Toast */}
+      {toastMsg && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-800 border border-white/10 rounded-2xl px-5 py-3 shadow-2xl flex items-center gap-2 text-sm font-semibold text-emerald-400 pointer-events-none">
+          <Check className="w-4 h-4 flex-shrink-0" />
+          {toastMsg}
         </div>
       )}
     </div>

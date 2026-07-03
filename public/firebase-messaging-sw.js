@@ -1,55 +1,57 @@
-self.addEventListener('install', () => self.skipWaiting())
-self.addEventListener('activate', e => e.waitUntil(
-  caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
-    .then(() => self.clients.claim())
-))
+// CineForge Firebase Messaging Service Worker
+// This SW handles ONLY push notifications — nothing else
 
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js')
 
 firebase.initializeApp({
-  apiKey:            'AIzaSyDU7rdWOm34fSOxsKxK9xafFw0zGyH4eX4',
-  authDomain:        'academy-hub-c252f.firebaseapp.com',
-  projectId:         'academy-hub-c252f',
-  storageBucket:     'academy-hub-c252f.firebasestorage.app',
+  apiKey: 'AIzaSyDU7rdWOm34fSOxsKxK9xafFw0zGyH4eX4',
+  authDomain: 'academy-hub-c252f.firebaseapp.com',
+  projectId: 'academy-hub-c252f',
+  storageBucket: 'academy-hub-c252f.firebasestorage.app',
   messagingSenderId: '776953880788',
-  appId:             '1:776953880788:web:03c3e598f9a1b6b39cdb41',
+  appId: '1:776953880788:web:03c3e598f9a1b6b39cdb41',
 })
 
 const messaging = firebase.messaging()
 
 messaging.onBackgroundMessage((payload) => {
-  const { title, body, icon } = payload.data
+  const { title, body, icon } = payload.data || {}
+  if (!title) return
+  // Set app icon badge when a push arrives while the app is in the background
+  if (self.navigator?.setAppBadge) {
+    self.navigator.setAppBadge().catch(() => {})
+  }
   return self.registration.showNotification(title, {
-    body,
-    icon:  icon || '/icons/icon-192.png',
+    body: body || '',
+    icon: icon || '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
-    tag:   payload.data?.tag ?? 'cineforge',
-    data:  payload.data ?? {},
+    tag: payload.data?.tag || 'cineforge',
+    renotify: false,
+    data: payload.data,
   })
 })
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  if ('clearAppBadge' in self) self.clearAppBadge().catch(() => {})
-  const url = event.notification.data?.url ?? '/'
+  const url = new URL(event.notification.data?.url || '/', self.location.origin).href
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
-      for (const c of cs) {
-        if (c.url.includes(self.location.origin) && 'focus' in c) {
-          c.focus()
-          if (c.navigate) c.navigate(url)
-          return
-        }
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // Re-use an existing tab and navigate it to the target URL
+      const existing = windowClients.find(c => c.url.startsWith(self.location.origin))
+      if (existing) {
+        existing.navigate(url)
+        return existing.focus()
       }
-      if (clients.openWindow) return clients.openWindow(url)
-    }),
+      return clients.openWindow(url)
+    })
   )
 })
 
-self.addEventListener('message', async (event) => {
-  if (event.data?.type !== 'CLEAR_NOTIFICATIONS') return
-  const notifications = await self.registration.getNotifications()
-  notifications.forEach(n => n.close())
-  if ('clearAppBadge' in self) self.clearAppBadge().catch(() => {})
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'CLEAR_NOTIFICATIONS') {
+    self.registration.getNotifications().then(notifications => {
+      notifications.forEach(n => n.close())
+    })
+  }
 })

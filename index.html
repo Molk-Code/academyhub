@@ -1,23 +1,6 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <script>
-      // Force clear all service worker caches on every load
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for (var i = 0; i < registrations.length; i++) {
-            registrations[i].unregister();
-          }
-        });
-        if (window.caches) {
-          caches.keys().then(function(names) {
-            for (var i = 0; i < names.length; i++) {
-              caches.delete(names[i]);
-            }
-          });
-        }
-      }
-    </script>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -30,6 +13,7 @@
     <meta name="apple-mobile-web-app-title" content="CineForge" />
     <link rel="icon" type="image/png" href="/fire.png" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
     <title>CineForge</title>
   </head>
   <body>

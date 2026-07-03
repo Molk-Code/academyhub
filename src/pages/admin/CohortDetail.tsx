@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { collection, addDoc, serverTimestamp, deleteDoc, updateDoc, doc } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, deleteDoc, updateDoc, doc, Timestamp } from 'firebase/firestore'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/firebase'
 import { useDocument, useCollection, where } from '@/hooks/useFirestore'
@@ -242,6 +242,7 @@ export default function CohortDetail() {
       displayName: data.name,
       used:        false,
       createdAt:   serverTimestamp(),
+      expiresAt:   Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
     })
     reset()
     setSaving(false)

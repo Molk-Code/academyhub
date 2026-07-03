@@ -239,6 +239,7 @@ export default function RoomManager() {
             <p className="text-zinc-400 text-sm">No rooms yet. Add one to get started.</p>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-white/10">
@@ -311,6 +312,7 @@ export default function RoomManager() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

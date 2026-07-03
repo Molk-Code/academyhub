@@ -32,6 +32,7 @@ interface Invitation {
   cohortId: string | null
   displayName: string | null
   used: boolean
+  expiresAt?: { toDate: () => Date }
 }
 
 export default function AcceptInvite() {
@@ -57,14 +58,20 @@ export default function AcceptInvite() {
     getDoc(doc(db, 'invitations', token)).then(snap => {
       if (snap.exists()) {
         const data = snap.data() as Invitation
-        if (data.used) setError('This invite link has already been used.')
-        else {
+        if (data.used) {
+          setError('This invite link has already been used.')
+        } else if (data.expiresAt && data.expiresAt.toDate() < new Date()) {
+          setError('This invite link has expired.')
+        } else {
           setInvite(data)
           if (data.displayName) setValue('displayName', data.displayName)
         }
       } else {
         setError('Invalid or expired invite link.')
       }
+      setLoading(false)
+    }).catch(() => {
+      setError('Failed to load invite. Check your connection and try again.')
       setLoading(false)
     })
   }, [token])
@@ -90,6 +97,13 @@ export default function AcceptInvite() {
         pointsRedeemed:     0,
         isActive:           true,
         privacyAcceptedAt:  serverTimestamp(),
+        gdprConsent: {
+          given:     true,
+          timestamp: serverTimestamp(),
+          version:   '1.0',
+          method:    'invite-acceptance-checkbox',
+          ipHash:    null,
+        },
       })
       // Mark invite as used
       await updateDoc(doc(db, 'invitations', token), { used: true })

@@ -2,31 +2,22 @@ import { useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { doc, updateDoc, collectionGroup, query, where, getDocs, writeBatch } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { db, storage, functions } from '@/lib/firebase'
+import { db, functions } from '@/lib/firebase'
+import { uploadWithQuota } from '@/lib/uploadWithQuota'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn, initials, avatarColor, toDate } from '@/lib/utils'
-import { Camera, Loader2, CheckCircle2, Star, CalendarCheck, ClipboardList, ChevronRight, Download, Trash2, Shield } from 'lucide-react'
-import { useCollection, where as fsWhere, orderBy } from '@/hooks/useFirestore'
-import type { PointsLogDoc, AbsenceReportDoc, LessonDoc } from '@/types'
-
-const LEVEL_THRESHOLDS = [0, 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000]
+import { Camera, Loader2, CheckCircle2, Star, CalendarCheck, ClipboardList, ChevronRight, Download, Trash2, Shield, TrendingUp, Lightbulb } from 'lucide-react'
+import { useCollection, useDocument, where as fsWhere, orderBy } from '@/hooks/useFirestore'
+import type { PointsLogDoc, AbsenceReportDoc, CohortDoc, TeacherAssessment } from '@/types'
+import { format } from 'date-fns'
+import { useAttendanceStats } from '@/hooks/useAttendanceStats'
 
 function getLevel(points: number) {
-  let level = 1
-  for (let i = 1; i < LEVEL_THRESHOLDS.length; i++) {
-    if (points >= LEVEL_THRESHOLDS[i]) level = i + 1
-    else break
-  }
-  return level
+  return Math.floor(points / 100) + 1
 }
 
 function getLevelProgress(points: number) {
-  const level = getLevel(points)
-  const current = LEVEL_THRESHOLDS[level - 1] ?? 0
-  const next = LEVEL_THRESHOLDS[level] ?? LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1]
-  if (next === current) return 100
-  return Math.min(100, Math.round(((points - current) / (next - current)) * 100))
+  return points % 100
 }
 
 const REASON_LABELS: Record<string, string> = {
@@ -37,6 +28,16 @@ const REASON_LABELS: Record<string, string> = {
   attendance: 'Attendance',
   absence_penalty: 'Absence penalty',
   redemption_refund: 'Prize refund',
+}
+
+const REASON_ICONS: Record<string, string> = {
+  attendance: '⭐',
+  assignment_graded: '📝',
+  test_pass: '🏆',
+  bonus: '🎁',
+  redemption: '🛒',
+  redemption_refund: '↩️',
+  absence_penalty: '❌',
 }
 
 function PointsHistorySection({ uid }: { uid: string }) {
@@ -56,13 +57,25 @@ function PointsHistorySection({ uid }: { uid: string }) {
       {visible.map(entry => {
         const date = toDate(entry.createdAt)
         const isPositive = entry.points >= 0
+        const icon = REASON_ICONS[entry.reason] ?? '•'
+        const relativeDate = date
+          ? (() => {
+              const diff = Math.floor((Date.now() - date.getTime()) / 86400000)
+              if (diff === 0) return 'Today'
+              if (diff === 1) return 'Yesterday'
+              if (diff < 7) return `${diff}d ago`
+              if (diff < 30) return `${Math.floor(diff / 7)}w ago`
+              return date.toLocaleDateString('sv-SE')
+            })()
+          : ''
         return (
-          <div key={entry.id} className="flex items-center justify-between py-2 border-b border-white/8 last:border-0">
-            <div>
+          <div key={entry.id} className="flex items-center gap-3 py-2 border-b border-white/8 last:border-0">
+            <span className="text-lg flex-shrink-0 w-7 text-center">{icon}</span>
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-zinc-300">{REASON_LABELS[entry.reason] ?? entry.reason}</p>
-              {date && <p className="text-xs text-zinc-400">{date.toLocaleDateString('sv-SE')}</p>}
+              <p className="text-xs text-zinc-500">{relativeDate}</p>
             </div>
-            <span className={cn('text-sm font-bold', isPositive ? 'text-emerald-600' : 'text-rose-600')}>
+            <span className={cn('text-sm font-bold flex-shrink-0', isPositive ? 'text-orange-400' : 'text-rose-500')}>
               {isPositive ? '+' : ''}{entry.points}
             </span>
           </div>
@@ -91,41 +104,72 @@ function PointsHistorySection({ uid }: { uid: string }) {
   )
 }
 
+
 function AttendanceSection({ uid, cohortId }: { uid: string; cohortId: string | null }) {
-  const { data: absences } = useCollection<AbsenceReportDoc>(
+  const stats = useAttendanceStats(uid, cohortId)
+  const { data: absenceReports } = useCollection<AbsenceReportDoc>(
     'absence_reports',
-    [fsWhere('studentId', '==', uid)],
-  )
-  const { data: lessons } = useCollection<LessonDoc>(
-    'lessons',
-    cohortId ? [fsWhere('cohortId', '==', cohortId)] : [],
-    !!cohortId,
+    uid ? [fsWhere('studentId', '==', uid)] : [],
+    !!uid,
   )
 
-  const now = new Date()
-  const pastLessons = lessons.filter(l => {
-    const d = toDate(l.startTime)
-    return d && d < now
-  })
-  const absenceCount = absences.length
-  const attended = Math.max(0, pastLessons.length - absenceCount)
-  const rate = pastLessons.length > 0 ? Math.round((attended / pastLessons.length) * 100) : null
+  const attended = stats?.attended ?? 0
+  const absent   = stats?.absent ?? 0
+  const rate     = stats !== null ? stats.attendancePct : null
+
+  // Build lookup sets from absence reports for fast "excused" detection
+  const excusedLessonIds  = new Set(absenceReports.map(r => r.lessonId).filter(Boolean) as string[])
+  const excusedDates      = new Set(absenceReports.map(r => r.date))
+
+  // Reverse-chronological, last 20 past lessons
+  const historyRows = [...(stats?.lessons ?? [])].reverse().slice(0, 20)
 
   return (
-    <div className="grid grid-cols-3 gap-3">
-      <div className="bg-zinc-900/50 rounded-xl p-3 text-center">
-        <p className="text-xl font-bold text-zinc-200">{rate !== null ? `${rate}%` : '—'}</p>
-        <p className="text-xs text-zinc-500 mt-0.5">Rate</p>
+    <>
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { value: rate !== null ? `${rate}%` : '—', label: 'Rate',     cls: 'bg-zinc-900/50 text-zinc-200'    },
+          { value: attended,                          label: 'Attended', cls: 'bg-emerald-950/40 text-emerald-700' },
+          { value: absent,                            label: 'Absences', cls: 'bg-rose-950/40 text-rose-700'    },
+        ].map(({ value, label, cls }) => (
+          <div key={label} className={cn('rounded-xl p-3 text-center', cls.split(' ')[0])}>
+            <p className={cn('text-xl font-bold', cls.split(' ')[1])}>{value}</p>
+            <p className="text-xs text-zinc-500 mt-0.5">{label}</p>
+          </div>
+        ))}
       </div>
-      <div className="bg-emerald-950/40 rounded-xl p-3 text-center">
-        <p className="text-xl font-bold text-emerald-700">{attended}</p>
-        <p className="text-xs text-zinc-500 mt-0.5">Attended</p>
-      </div>
-      <div className="bg-rose-950/40 rounded-xl p-3 text-center">
-        <p className="text-xl font-bold text-rose-700">{absenceCount}</p>
-        <p className="text-xs text-zinc-500 mt-0.5">Absences</p>
-      </div>
-    </div>
+
+      {historyRows.length > 0 && (
+        <div className="mt-2">
+          <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Attendance History</h3>
+          <div className="space-y-0">
+            {historyRows.map(lesson => {
+              const isExcused = !lesson.attended && (excusedLessonIds.has(lesson.id) || excusedDates.has(lesson.date))
+              const state = lesson.attended ? 'present' : isExcused ? 'excused' : 'absent'
+              const styles = {
+                present: { dot: 'bg-emerald-500/20 text-emerald-400', badge: 'bg-emerald-900/40 text-emerald-400', symbol: '✓', label: 'Present' },
+                excused: { dot: 'bg-amber-500/20 text-amber-400',   badge: 'bg-amber-900/40 text-amber-400',   symbol: '~', label: 'Excused' },
+                absent:  { dot: 'bg-red-500/20 text-red-400',       badge: 'bg-red-900/40 text-red-400',       symbol: '✗', label: 'Absent'  },
+              }[state]
+              return (
+                <div key={lesson.id} className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${styles.dot}`}>
+                    {styles.symbol}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white font-medium truncate">{lesson.title}</p>
+                    <p className="text-xs text-gray-500">{lesson.date}</p>
+                  </div>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${styles.badge}`}>
+                    {styles.label}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -135,6 +179,9 @@ export default function Profile() {
 
   const isStudent = profile?.role === 'student'
   const isTeacherOrAdmin = profile?.role === 'teacher' || profile?.role === 'admin'
+
+  const { data: cohort }      = useDocument<CohortDoc>('cohorts', profile?.cohortId ?? '')
+  const { data: assessment }  = useDocument<TeacherAssessment>('teacher_assessments', isStudent ? (profile?.uid ?? '') : '')
 
   const [name,       setName]       = useState(profile?.displayName ?? '')
   const [phone,      setPhone]      = useState(profile?.phoneNumber ?? '')
@@ -152,10 +199,8 @@ export default function Profile() {
     setAvatarPreview(URL.createObjectURL(file))
     setUploading(true)
     try {
-      const path    = `avatars/${profile.uid}`
-      const fileRef = storageRef(storage, path)
-      await uploadBytes(fileRef, file)
-      const url = await getDownloadURL(fileRef)
+      const path = `avatars/${profile.uid}`
+      const url  = await uploadWithQuota(file, path)
       await updateDoc(doc(db, 'users', profile.uid), { avatarUrl: url })
       setAvatarPreview(url)
       await refreshProfile()
@@ -213,7 +258,7 @@ export default function Profile() {
   const available   = totalPoints - (profile.pointsRedeemed ?? 0)
   const level       = getLevel(totalPoints)
   const levelPct    = getLevelProgress(totalPoints)
-  const nextThreshold = LEVEL_THRESHOLDS[level] ?? null
+  const pointsToNext = 100 - (totalPoints % 100)
 
   return (
     <div className="max-w-lg space-y-8">
@@ -239,8 +284,12 @@ export default function Profile() {
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-zinc-200">{profile.displayName}</h1>
-          <span className="inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 capitalize">{profile.role}</span>
+          <h1 className="text-2xl font-bold text-zinc-100">{profile.displayName}</h1>
+          {isStudent && cohort ? (
+            <p className="text-sm text-zinc-500 mt-0.5">{cohort.name} · Year {cohort.programYear}</p>
+          ) : (
+            <span className="inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 capitalize">{profile.role}</span>
+          )}
           <button
             type="button"
             disabled={uploading}
@@ -259,30 +308,30 @@ export default function Profile() {
             <Star className="w-5 h-5 text-amber-500" />
             <h2 className="font-semibold text-zinc-200">Points & Level</h2>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-amber-950/40 rounded-xl p-4 text-center">
-              <p className="text-3xl font-bold text-amber-600">{available}</p>
-              <p className="text-xs text-zinc-500 mt-0.5">Available</p>
+          <div className="flex items-center gap-4">
+            <div>
+              <p className="text-5xl font-extrabold text-orange-400 leading-none">{totalPoints}</p>
+              <p className="text-xs text-zinc-500 mt-1">Total points</p>
             </div>
-            <div className="bg-zinc-900/50 rounded-xl p-4 text-center">
-              <p className="text-3xl font-bold text-zinc-300">{totalPoints}</p>
-              <p className="text-xs text-zinc-500 mt-0.5">Total earned</p>
-            </div>
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-sm font-semibold text-brand-700">Level {level}</span>
-              {nextThreshold && (
-                <span className="text-xs text-zinc-400">{totalPoints} / {nextThreshold} pts</span>
-              )}
-            </div>
-            <div className="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full transition-all duration-500"
-                style={{ width: `${levelPct}%` }}
-              />
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-zinc-200">Level {level}</span>
+                <span className="text-xs text-zinc-500">{pointsToNext} pts to Level {level + 1}</span>
+              </div>
+              <div className="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full transition-all duration-500"
+                  style={{ width: `${levelPct}%` }}
+                />
+              </div>
             </div>
           </div>
+          {available !== totalPoints && (
+            <div className="flex items-center justify-between text-sm text-zinc-400 pt-1">
+              <span>Available to spend</span>
+              <span className="font-semibold text-amber-400">{available} pts</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -299,27 +348,50 @@ export default function Profile() {
 
       {/* ── Quick Links (students only) ── */}
       {isStudent && (
-        <div className="grid grid-cols-2 gap-3">
-          <Link
-            to="/my-plan"
-            className="card flex items-center justify-between gap-3 hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-xl">📋</span>
-              <span className="text-sm font-semibold text-zinc-300">My Plan</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-zinc-400" />
-          </Link>
-          <Link
-            to="/tasks"
-            className="card flex items-center justify-between gap-3 hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-xl">✅</span>
-              <span className="text-sm font-semibold text-zinc-300">My Tasks</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-zinc-400" />
-          </Link>
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { to: '/my-plan',     icon: '📋', label: 'My Plan'     },
+            { to: '/prizes',      icon: '🏆', label: 'Prizes'      },
+            { to: '/assignments', icon: '📝', label: 'Assignments' },
+          ].map(({ to, icon, label }) => (
+            <Link
+              key={to}
+              to={to}
+              className="card flex flex-col items-center gap-2 py-4 hover:shadow-md transition-shadow text-center"
+            >
+              <span className="text-2xl">{icon}</span>
+              <span className="text-xs font-semibold text-zinc-300">{label}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* ── Teacher Assessment (students only) ── */}
+      {isStudent && (assessment?.strengths || assessment?.developments) && (
+        <div className="card space-y-4">
+          <h2 className="font-semibold text-zinc-200">Teacher Assessment</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {assessment.strengths && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5" /> Strengths
+                </p>
+                <p className="text-sm text-zinc-300 whitespace-pre-wrap bg-zinc-800/50 rounded-xl p-4 leading-relaxed">
+                  {assessment.strengths}
+                </p>
+              </div>
+            )}
+            {assessment.developments && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Lightbulb className="w-3.5 h-3.5" /> Areas for Development
+                </p>
+                <p className="text-sm text-zinc-300 whitespace-pre-wrap bg-zinc-800/50 rounded-xl p-4 leading-relaxed">
+                  {assessment.developments}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -86,7 +86,7 @@ export default function StudentAssignments() {
                   {sub.percentageScore !== null ? `${sub.percentageScore}%` : 'Graded'}
                 </span>
               ) : (
-                <span className="badge badge-amber flex-shrink-0">Submitted</span>
+                <span className="badge badge-indigo flex-shrink-0">Awaiting review</span>
               )
             ) : isOverdue ? (
               <span className="badge badge-rose flex-shrink-0">Overdue</span>

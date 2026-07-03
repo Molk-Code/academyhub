@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Search, Pencil, Trash2, Eye, EyeOff } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, Eye, EyeOff, ClipboardList } from 'lucide-react'
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, where } from '@/hooks/useFirestore'
@@ -45,9 +45,14 @@ export default function Assignments() {
           <h1 className="page-title">Assignments</h1>
           <p className="text-zinc-400 text-sm mt-1">{assignments.length} total</p>
         </div>
-        <Link to="/teacher/assignments/new" className="btn bg-brand-600 text-white hover:bg-brand-500 py-2.5">
-          <Plus className="w-4 h-4" /> New Assignment
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to="/teacher/tests/new" className="btn bg-zinc-700 text-zinc-100 hover:bg-zinc-600 py-2.5">
+            <ClipboardList className="w-4 h-4" /> New Form/Test
+          </Link>
+          <Link to="/teacher/assignments/new" className="btn bg-brand-600 text-white hover:bg-brand-500 py-2.5">
+            <Plus className="w-4 h-4" /> New Assignment
+          </Link>
+        </div>
       </div>
 
       {/* Search */}

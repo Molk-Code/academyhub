@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { SCHOOL_ID } from '@/lib/school'
+import type { SchoolTier } from '@/types'
 
 interface SchoolConfig {
   name: string
@@ -12,6 +13,9 @@ interface SchoolConfig {
   maxStudents: number
   subscriptionStatus: string
   isBeta: boolean
+  tier: SchoolTier | null
+  storageQuotaGB: number | undefined
+  storageUsedBytes: number | undefined
 }
 
 const defaultConfig: SchoolConfig = {
@@ -23,6 +27,9 @@ const defaultConfig: SchoolConfig = {
   maxStudents: 100,
   subscriptionStatus: 'active',
   isBeta: true,
+  tier: null,
+  storageQuotaGB: undefined,
+  storageUsedBytes: undefined,
 }
 
 const SchoolContext = createContext<SchoolConfig>(defaultConfig)
@@ -31,9 +38,11 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<SchoolConfig>(defaultConfig)
 
   useEffect(() => {
-    return onSnapshot(doc(db, 'schools', SCHOOL_ID), snap => {
-      if (snap.exists()) setConfig(snap.data() as SchoolConfig)
-    })
+    return onSnapshot(
+      doc(db, 'schools', SCHOOL_ID),
+      snap => { if (snap.exists()) setConfig({ ...defaultConfig, ...snap.data() } as SchoolConfig) },
+      err  => { console.warn('School config listener error:', err) },
+    )
   }, [])
 
   useEffect(() => {

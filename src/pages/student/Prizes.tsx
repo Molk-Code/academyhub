@@ -4,7 +4,7 @@ import { Sparkles, Gift, Lock } from 'lucide-react'
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
-import { useCollection } from '@/hooks/useFirestore'
+import { useCollection, where } from '@/hooks/useFirestore'
 import type { PrizeDoc, PrizeClaimDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
@@ -19,7 +19,7 @@ export default function Prizes() {
 
   const { data: claims } = useCollection<PrizeClaimDoc>(
     'prize_claims',
-    profile ? [{ fieldPath: 'studentId', opStr: '==', value: profile.uid } as never] : [],
+    profile ? [where('studentId', '==', profile.uid)] : [],
     !!profile,
   )
 
@@ -67,7 +67,7 @@ export default function Prizes() {
         <div className="card flex items-center gap-2 py-3 px-4">
           <Sparkles className="w-5 h-5 text-amber-500" />
           <div>
-            <p className="text-xl font-bold text-amber-700 tabular-nums">{balance}</p>
+            <p className="text-xl font-bold text-amber-400 tabular-nums">{balance}</p>
             <p className="text-xs text-zinc-400">pts available</p>
           </div>
         </div>

@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase'
 import { useCollection, useDocument, where } from '@/hooks/useFirestore'
 import type { CohortDoc, UserDoc, SemesterSettingsDoc } from '@/types'
 import { shortDate } from '@/lib/utils'
-import { Users, Plus, GraduationCap } from 'lucide-react'
+import { Users, Plus, GraduationCap, Sparkles } from 'lucide-react'
 
 const schema = z.object({
   name:        z.string().min(2, 'Name required'),
@@ -111,6 +111,7 @@ export default function CohortManager() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {cohorts.map(cohort => {
           const cohortStudents = students.filter(s => s.cohortId === cohort.id)
+          const classPoints = cohortStudents.reduce((sum, s) => sum + (s.totalPoints ?? 0), 0)
           return (
             <div key={cohort.id} className="bg-slate-800 rounded-2xl p-5 space-y-4">
               <div className="flex items-start justify-between">
@@ -121,6 +122,10 @@ export default function CohortManager() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5 text-sm text-amber-400 font-semibold" title="Total class points">
+                    <Sparkles className="w-4 h-4" />
+                    {classPoints}
+                  </div>
                   <div className="flex items-center gap-1.5 text-sm text-zinc-400">
                     <Users className="w-4 h-4" />
                     {cohortStudents.length}

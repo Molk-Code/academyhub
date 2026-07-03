@@ -2,15 +2,17 @@ import type { LucideIcon } from 'lucide-react'
 
 interface Props {
   icon?: LucideIcon
+  emoji?: string
   title: string
   description?: string
   action?: React.ReactNode
 }
 
-export default function EmptyState({ icon: Icon, title, description, action }: Props) {
+export default function EmptyState({ icon: Icon, emoji, title, description, action }: Props) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      {Icon && (
+      {emoji && <span className="text-4xl block mb-3">{emoji}</span>}
+      {Icon && !emoji && (
         <div className="w-14 h-14 bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
           <Icon className="w-7 h-7 text-zinc-400" />
         </div>

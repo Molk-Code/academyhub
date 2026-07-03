@@ -272,27 +272,27 @@ export default function AnnualPlanWheel({ lessons, subjects, categories, sem1Sta
         style={{ overflow: 'visible' }}
       >
         {/* ── Background circle ─────────────────────────────────────────── */}
-        <circle cx={CX} cy={CY} r={R_OUTER} fill="#f8fafc" stroke="#e2e8f0" strokeWidth={1} />
+        <circle cx={CX} cy={CY} r={R_OUTER} fill="#18181b" stroke="#3f3f46" strokeWidth={1} />
 
         {/* ── Semester background arcs ─────────────────────────────────── */}
         <path
           d={annulusPath(CX, CY, R_SEM, R_MONTH, fa(sem1StartFrac), fa(sem1EndFrac))}
-          fill="#eff6ff"
+          fill="#172554"
         />
         {/* ── Winter/mid-year break arc ─────────────────────────────────── */}
         {hasSem2 && sem2StartFrac !== null && (
           <path
             d={annulusPath(CX, CY, R_SEM, R_MONTH, fa(sem1EndFrac), fa(sem2StartFrac))}
-            fill="#fef3c7"
+            fill="#1c1106"
           />
         )}
 
         {/* ── Category ring background ──────────────────────────────────── */}
-        <circle cx={CX} cy={CY} r={R_CATEGORY} fill="#f8fafc" />
+        <circle cx={CX} cy={CY} r={R_CATEGORY} fill="#18181b" />
         {hasSem2 && sem2StartFrac !== null && sem2EndFrac !== null && (
           <path
             d={annulusPath(CX, CY, R_SEM, R_MONTH, fa(sem2StartFrac), fa(sem2EndFrac))}
-            fill="#f0fdf4"
+            fill="#052e16"
           />
         )}
 
@@ -305,7 +305,7 @@ export default function AnnualPlanWheel({ lessons, subjects, categories, sem1Sta
             <text
               x={lx} y={ly}
               textAnchor="middle" dominantBaseline="middle"
-              fontSize={13} fontWeight={600} fill="#3b82f6" letterSpacing={0.5}
+              fontSize={13} fontWeight={600} fill="#93c5fd" letterSpacing={0.5}
               transform={`rotate(${(midFrac1 - jan1Frac) * 360}, ${lx}, ${ly})`}
             >
               SEM 1
@@ -320,7 +320,7 @@ export default function AnnualPlanWheel({ lessons, subjects, categories, sem1Sta
             <text
               x={lx} y={ly}
               textAnchor="middle" dominantBaseline="middle"
-              fontSize={13} fontWeight={600} fill="#16a34a" letterSpacing={0.5}
+              fontSize={13} fontWeight={600} fill="#86efac" letterSpacing={0.5}
               transform={`rotate(${(midFrac2 - jan1Frac) * 360}, ${lx}, ${ly})`}
             >
               SEM 2
@@ -340,7 +340,7 @@ export default function AnnualPlanWheel({ lessons, subjects, categories, sem1Sta
                 <text
                   x={lx} y={ly}
                   textAnchor="middle" dominantBaseline="middle"
-                  fontSize={12} fontWeight={600} fill="#92400e" letterSpacing={0.5}
+                  fontSize={12} fontWeight={600} fill="#fcd34d" letterSpacing={0.5}
                   transform={`rotate(${(midFrac - jan1Frac) * 360}, ${lx}, ${ly})`}
                 >
                   Break
@@ -361,12 +361,12 @@ export default function AnnualPlanWheel({ lessons, subjects, categories, sem1Sta
             <>
               <path
                 d={annulusPath(CX, CY, R_SEM, R_MONTH, fa(endFrac), fa(1))}
-                fill="#fef3c7"
+                fill="#1c1106"
               />
               <text
                 x={lx} y={ly}
                 textAnchor="middle" dominantBaseline="middle"
-                fontSize={12} fontWeight={600} fill="#92400e" letterSpacing={0.5}
+                fontSize={12} fontWeight={600} fill="#fcd34d" letterSpacing={0.5}
                 transform={`rotate(${(midFrac - jan1Frac) * 360}, ${lx}, ${ly})`}
               >
                 Summer
@@ -383,11 +383,11 @@ export default function AnnualPlanWheel({ lessons, subjects, categories, sem1Sta
           const rotDeg   = (m.midAngle + Math.PI / 2) * (180 / Math.PI)
           return (
             <g key={i}>
-              <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#cbd5e1" strokeWidth={1.2} />
+              <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#3f3f46" strokeWidth={1.2} />
               <text
                 x={lx} y={ly}
                 textAnchor="middle" dominantBaseline="middle"
-                fontSize={14} fontWeight={500} fill="#64748b"
+                fontSize={14} fontWeight={500} fill="#94a3b8"
                 transform={`rotate(${rotDeg}, ${lx}, ${ly})`}
               >
                 {m.label}
@@ -405,7 +405,7 @@ export default function AnnualPlanWheel({ lessons, subjects, categories, sem1Sta
               d={annulusPath(CX, CY, R_MONTH, R_WEEK, seg.a1, seg.a2)}
               fill={seg.color}
               opacity={isHovered ? 1 : 0.85}
-              stroke={isHovered ? '#1e293b' : 'white'}
+              stroke={isHovered ? '#f1f5f9' : '#18181b'}
               strokeWidth={isHovered ? 1.2 : 0.5}
               style={{ cursor: 'pointer', transition: 'opacity 0.1s' }}
               onMouseEnter={() => setHoveredWeek(seg.key)}
@@ -427,14 +427,14 @@ export default function AnnualPlanWheel({ lessons, subjects, categories, sem1Sta
         ))}
 
         {/* ── Ring borders ──────────────────────────────────────────────── */}
-        <circle cx={CX} cy={CY} r={R_WEEK}     fill="none" stroke="#e2e8f0" strokeWidth={0.5} />
-        <circle cx={CX} cy={CY} r={R_MONTH}    fill="none" stroke="#e2e8f0" strokeWidth={0.5} />
-        <circle cx={CX} cy={CY} r={R_CATEGORY} fill="none" stroke="#e2e8f0" strokeWidth={0.5} />
-        <circle cx={CX} cy={CY} r={R_SEM}      fill="none" stroke="#e2e8f0" strokeWidth={0.5} />
+        <circle cx={CX} cy={CY} r={R_WEEK}     fill="none" stroke="#3f3f46" strokeWidth={0.5} />
+        <circle cx={CX} cy={CY} r={R_MONTH}    fill="none" stroke="#3f3f46" strokeWidth={0.5} />
+        <circle cx={CX} cy={CY} r={R_CATEGORY} fill="none" stroke="#3f3f46" strokeWidth={0.5} />
+        <circle cx={CX} cy={CY} r={R_SEM}      fill="none" stroke="#3f3f46" strokeWidth={0.5} />
 
         {/* ── Center ────────────────────────────────────────────────────── */}
-        <circle cx={CX} cy={CY} r={R_CORE} fill="white" stroke="#e2e8f0" strokeWidth={1} />
-        <text x={CX} y={CY - 10} textAnchor="middle" dominantBaseline="middle" fontSize={20} fontWeight={700} fill="#0f172a">
+        <circle cx={CX} cy={CY} r={R_CORE} fill="#18181b" stroke="#3f3f46" strokeWidth={1} />
+        <text x={CX} y={CY - 10} textAnchor="middle" dominantBaseline="middle" fontSize={20} fontWeight={700} fill="#f1f5f9">
           {yearLabel}
         </text>
         <text x={CX} y={CY + 14} textAnchor="middle" dominantBaseline="middle" fontSize={13} fill="#94a3b8">

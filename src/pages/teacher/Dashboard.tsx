@@ -1,34 +1,35 @@
 import { useMemo, useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Users, ClipboardCheck, CalendarDays, TrendingUp, ChevronRight, Plus, Clock, AlertTriangle, ClipboardList } from 'lucide-react'
+import { CalendarDays, ChevronRight, Plus, Clock, AlertTriangle, ClipboardList, Package } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, where, orderBy } from '@/hooks/useFirestore'
 import { toDate, shortDate, timeStr } from '@/lib/utils'
-import { format, isToday, formatDistanceToNow } from 'date-fns'
-import type { UserDoc, SubmissionDoc, LessonDoc, CohortDoc, AssignmentDoc, SubjectDoc, AbsenceReportDoc, DevelopmentPlan, SemesterEventDoc, SemesterCategoryDoc } from '@/types'
+import { format, isToday, formatDistanceToNow, startOfDay, differenceInDays } from 'date-fns'
+import type { UserDoc, SubmissionDoc, LessonDoc, CohortDoc, AssignmentDoc, SubjectDoc, AbsenceReportDoc, DevelopmentPlan, SemesterEventDoc, SemesterCategoryDoc, EquipmentBookingDoc, InventoryProjectDoc } from '@/types'
 import Avatar from '@/components/common/Avatar'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
-function StatCard({ icon: Icon, label, value, color, to }: {
-  icon: React.ElementType; label: string; value: string | number; color: string; to?: string
+function StatCard({ label, value, icon, color, to, alert }: {
+  label: string; value: number; icon: string; color: 'blue' | 'orange' | 'purple' | 'red'; to: string; alert?: boolean
 }) {
-  const inner = (
-    <>
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
-        <Icon className="w-6 h-6 text-white" />
-      </div>
-      <div>
-        <p className="text-2xl font-bold text-zinc-100">{value}</p>
-        <p className="text-sm text-zinc-500">{label}</p>
-      </div>
-    </>
-  )
-  if (to) {
-    return <Link to={to} className="card flex items-center gap-4 hover:shadow-md transition-shadow">{inner}</Link>
+  const colors = {
+    blue:   'bg-blue-500/10 border-blue-500/20 text-blue-400',
+    orange: 'bg-orange-500/10 border-orange-500/20 text-orange-400',
+    purple: 'bg-purple-500/10 border-purple-500/20 text-purple-400',
+    red:    'bg-red-500/10 border-red-500/20 text-red-400',
   }
-  return <div className="card flex items-center gap-4">{inner}</div>
+  return (
+    <Link to={to} className={`rounded-2xl border p-4 flex flex-col gap-1 hover:opacity-80 transition-opacity ${colors[color]}`}>
+      <div className="flex items-center justify-between">
+        <span className="text-2xl">{icon}</span>
+        {alert && value > 0 && <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />}
+      </div>
+      <p className="text-3xl font-bold text-white">{value}</p>
+      <p className="text-xs">{label}</p>
+    </Link>
+  )
 }
 
 function AttendanceCount({ lessonId }: { lessonId: string }) {
@@ -43,6 +44,59 @@ function AttendanceCount({ lessonId }: { lessonId: string }) {
   return <span className="text-sm font-bold text-emerald-600">{count} checked in</span>
 }
 
+function EquipmentWidget() {
+  const today = new Date().toISOString().slice(0, 10)
+  const { data: pendingBookings } = useCollection<EquipmentBookingDoc>(
+    'equipment_bookings',
+    [where('status', '==', 'pending')],
+  )
+  const { data: activeProjects } = useCollection<InventoryProjectDoc>(
+    'inventory_projects',
+    [where('status', 'in', ['active', 'checked-out'])],
+  )
+  const overdueProjects = activeProjects.filter(p => p.returnDate < today)
+
+  if (pendingBookings.length === 0 && overdueProjects.length === 0) return null
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
+          <Package className="w-4 h-4 text-brand-400" /> Equipment
+        </h2>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {pendingBookings.length > 0 && (
+          <Link
+            to="/teacher/equipment-requests"
+            className="flex items-center gap-3 p-4 bg-amber-900/20 border border-amber-700/40 rounded-2xl hover:bg-amber-900/30 transition-colors"
+          >
+            <Package className="w-5 h-5 text-amber-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-200">{pendingBookings.length} pending request{pendingBookings.length !== 1 ? 's' : ''}</p>
+              <p className="text-xs text-amber-400/70">Tap to review</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          </Link>
+        )}
+        {overdueProjects.length > 0 && (
+          <Link
+            to="/teacher/inventory"
+            className="flex items-center gap-3 p-4 bg-rose-900/20 border border-rose-700/40 rounded-2xl hover:bg-rose-900/30 transition-colors"
+          >
+            <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-rose-200">{overdueProjects.length} overdue project{overdueProjects.length !== 1 ? 's' : ''}</p>
+              <p className="text-xs text-rose-400/70">Past return date</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-rose-400 flex-shrink-0" />
+          </Link>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function TeacherDashboard() {
   const { profile } = useAuth()
   const now = new Date()
@@ -54,16 +108,14 @@ export default function TeacherDashboard() {
     !!profile,
   )
 
-  const cohortIds = cohorts.map(c => c.id)
-
   // Students in those cohorts
   const { data: students } = useCollection<UserDoc>(
     'users',
     [where('role', '==', 'student')],
   )
 
-  // Submissions pending grading
-  const { data: pendingSubmissions } = useCollection<SubmissionDoc>(
+  // Submissions pending grading — filtered to teacher's students after load
+  const { data: allPendingSubmissions } = useCollection<SubmissionDoc>(
     'submissions',
     [where('status', '==', 'submitted'), orderBy('submittedAt', 'asc')],
   )
@@ -91,6 +143,13 @@ export default function TeacherDashboard() {
 
   const lessons = rawLessons
 
+  // Include cohorts from both cohort.teacherIds and lesson.cohortId to cover all associations
+  const cohortIds = useMemo(() => {
+    const fromCohorts = cohorts.map(c => c.id)
+    const fromLessons = lessons.map(l => l.cohortId).filter(Boolean) as string[]
+    return [...new Set([...fromCohorts, ...fromLessons])]
+  }, [cohorts, lessons])
+
   const upcomingLessons = useMemo(() => {
     const sorted = [...lessons].sort((a, b) => (a.startTime?.toMillis?.() ?? 0) - (b.startTime?.toMillis?.() ?? 0))
     return sorted.filter(l => (toDate(l.startTime) ?? now) >= now).slice(0, 4)
@@ -101,9 +160,21 @@ export default function TeacherDashboard() {
     [students, cohortIds],
   )
 
+  const cohortStudentUids = useMemo(() => new Set(cohortStudents.map(s => s.uid)), [cohortStudents])
+
+  const pendingSubmissions = useMemo(
+    () => allPendingSubmissions.filter(s => cohortStudentUids.has(s.studentId)),
+    [allPendingSubmissions, cohortStudentUids],
+  )
+
   const { data: allAbsences } = useCollection<AbsenceReportDoc>(
     'absence_reports',
     [orderBy('reportedAt', 'desc')],
+  )
+
+  const { data: pendingEquipment } = useCollection<EquipmentBookingDoc>(
+    'equipment_bookings',
+    [where('status', '==', 'pending')],
   )
 
   const { data: allPlans } = useCollection<DevelopmentPlan>('development_plans')
@@ -120,9 +191,10 @@ export default function TeacherDashboard() {
     }
     function daysUntil(startDate: string): number {
       const [m, d] = startDate.split('-').map(Number)
-      const target = new Date(now.getFullYear(), m - 1, d)
-      if (target < now) target.setFullYear(now.getFullYear() + 1)
-      return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      const target = startOfDay(new Date(now.getFullYear(), m - 1, d))
+      const todayStart = startOfDay(now)
+      if (target < todayStart) target.setFullYear(now.getFullYear() + 1)
+      return differenceInDays(target, todayStart)
     }
     return [...semesterEvents]
       .filter(e => e.isActive)
@@ -151,6 +223,21 @@ export default function TeacherDashboard() {
     [allAbsences, todayStr],
   )
 
+  const todayLessons = useMemo(
+    () => [...lessons]
+      .filter(l => toDate(l.startTime)?.toISOString().slice(0, 10) === todayStr)
+      .sort((a, b) => (a.startTime?.toMillis?.() ?? 0) - (b.startTime?.toMillis?.() ?? 0)),
+    [lessons, todayStr],
+  )
+
+  const pendingAbsence = useMemo(
+    () => allAbsences.filter(r => r.status === 'pending'),
+    [allAbsences],
+  )
+
+  const h = now.getHours()
+  const timeOfDay = h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening'
+
   if (cohortsLoading) return <LoadingSpinner />
 
   return (
@@ -158,10 +245,8 @@ export default function TeacherDashboard() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-zinc-100">
-            Welcome back, {profile?.displayName?.split(' ')[0]}
-          </h1>
-          <p className="text-zinc-500 mt-1">Here's what needs your attention today.</p>
+          <h1 className="text-2xl font-bold text-zinc-100">Good {timeOfDay} 👋</h1>
+          <p className="text-zinc-500 mt-1 text-sm">{format(now, 'EEEE d MMMM yyyy')}</p>
         </div>
         <div className="flex gap-2">
           <Link to="/teacher/lessons/new" className="btn-primary py-2.5">
@@ -170,47 +255,40 @@ export default function TeacherDashboard() {
         </div>
       </div>
 
-      {/* ── Today's lessons ────────────────────────────────────────────── */}
-      {(() => {
-        const todayStr = format(now, 'yyyy-MM-dd')
-        const todayLessons = [...lessons]
-          .filter(l => toDate(l.startTime)?.toISOString().slice(0, 10) === todayStr)
-          .sort((a, b) => (a.startTime?.toMillis?.() ?? 0) - (b.startTime?.toMillis?.() ?? 0))
-        if (todayLessons.length === 0) return null
-        return (
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-100 mb-3 flex items-center gap-2">
-              <CalendarDays className="w-5 h-5 text-brand-500" /> Today's Lessons
-            </h2>
-            <div className="space-y-2">
-              {todayLessons.map(lesson => (
-                <div key={lesson.id} className="flex items-center gap-4 p-4 bg-zinc-900 border border-white/10 rounded-xl">
-                  <div className="text-center min-w-[52px]">
-                    <p className="text-xs text-zinc-400">{timeStr(lesson.startTime)}</p>
-                    <p className="text-xs text-zinc-400">{timeStr(lesson.endTime)}</p>
-                  </div>
-                  <div className="w-px h-8 bg-zinc-700 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-zinc-100 truncate">{lesson.title}</p>
-                    {lesson.classroom && (
-                      <p className="text-xs text-zinc-500">{lesson.isOnline ? '🌐' : '📍'} {lesson.classroom}</p>
-                    )}
-                  </div>
-                  <AttendanceCount lessonId={lesson.id} />
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Users}          label="Students"         value={cohortStudents.length}       color="bg-brand-600"   />
-        <StatCard icon={ClipboardCheck} label="Pending Grading"  value={pendingSubmissions.length}   color="bg-amber-500"   to="/teacher/assignments" />
-        <StatCard icon={CalendarDays}   label="Upcoming Lessons" value={upcomingLessons.length}      color="bg-sky-500"     to="/teacher/lessons" />
-        <StatCard icon={TrendingUp}     label="Classes"          value={cohorts.length}              color="bg-emerald-500" />
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard label="Today's lessons"      value={todayLessons.length}        icon="📚" color="blue"   to="/teacher/lessons" />
+        <StatCard label="Pending submissions"  value={pendingSubmissions.length}  icon="📝" color="orange" to="/teacher/assignments"       alert={pendingSubmissions.length > 0} />
+        <StatCard label="Equipment requests"   value={pendingEquipment.length}    icon="📦" color="purple" to="/teacher/equipment-requests" alert={pendingEquipment.length > 0} />
+        <StatCard label="Absence reports"      value={pendingAbsence.length}      icon="⚠️" color="red"    to="/teacher/students"          alert={pendingAbsence.length > 0} />
       </div>
+
+      {/* ── Today's lessons ────────────────────────────────────────────── */}
+      {todayLessons.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold text-zinc-100 mb-3 flex items-center gap-2">
+            <CalendarDays className="w-5 h-5 text-brand-500" /> Today's Lessons
+          </h2>
+          <div className="space-y-2">
+            {todayLessons.map(lesson => (
+              <div key={lesson.id} className="flex items-center gap-4 p-4 bg-zinc-900 border border-white/10 rounded-xl">
+                <div className="text-center min-w-[52px]">
+                  <p className="text-xs text-zinc-400">{timeStr(lesson.startTime)}</p>
+                  <p className="text-xs text-zinc-400">{timeStr(lesson.endTime)}</p>
+                </div>
+                <div className="w-px h-8 bg-zinc-700 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-zinc-100 truncate">{lesson.title}</p>
+                  {lesson.classroom && (
+                    <p className="text-xs text-zinc-500">{lesson.isOnline ? '🌐' : '📍'} {lesson.classroom}</p>
+                  )}
+                </div>
+                <AttendanceCount lessonId={lesson.id} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Upcoming Reminders */}
       {upcomingReminders.length > 0 && (
@@ -312,7 +390,7 @@ export default function TeacherDashboard() {
                   to={`/teacher/gradebook?submission=${sub.id}`}
                   className="flex items-center gap-3 p-3 bg-zinc-900 border border-white/10 rounded-xl hover:bg-white/5 transition-colors"
                 >
-                  {student && <Avatar uid={student.uid} name={student.displayName} size="sm" />}
+                  {student && <Avatar uid={student.uid} name={student.displayName} avatarUrl={student.avatarUrl} size="sm" enlargeable />}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-zinc-100 truncate">
                       {student?.displayName ?? 'Student'}
@@ -412,7 +490,7 @@ export default function TeacherDashboard() {
                 to={`/teacher/students/${student.uid}/plan`}
                 className="flex items-center gap-3 p-3 bg-zinc-900 border border-white/10 rounded-xl hover:border-brand-300 transition-colors"
               >
-                <Avatar uid={student.uid} name={student.displayName} avatarUrl={student.avatarUrl} size="sm" />
+                <Avatar uid={student.uid} name={student.displayName} avatarUrl={student.avatarUrl} size="sm" enlargeable />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-zinc-100 truncate">{student.displayName}</p>
                   <p className="text-xs text-zinc-400">
@@ -425,6 +503,9 @@ export default function TeacherDashboard() {
           </div>
         </div>
       )}
+
+      {/* Equipment widget */}
+      <EquipmentWidget />
 
       {/* Student list preview */}
       <div>
@@ -441,7 +522,7 @@ export default function TeacherDashboard() {
               to={`/teacher/students/${student.uid}`}
               className="flex items-center gap-3 p-3 bg-zinc-900 border border-white/10 rounded-xl hover:bg-white/5 transition-colors"
             >
-              <Avatar uid={student.uid} name={student.displayName} size="sm" />
+              <Avatar uid={student.uid} name={student.displayName} avatarUrl={student.avatarUrl} size="sm" enlargeable />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-zinc-100 truncate">{student.displayName}</p>
                 <p className="text-xs text-zinc-500 tabular-nums">{student.totalPoints} pts</p>

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { collection, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, increment, deleteDoc, writeBatch } from 'firebase/firestore'
 import { isToday, format } from 'date-fns'
-import { Search, ChevronRight, UserCheck, UserX, AlertTriangle, Check, CalendarPlus, X, Trash2, BookOpen } from 'lucide-react'
+import { Search, ChevronRight, UserCheck, UserX, AlertTriangle, Check, CalendarPlus, X, Trash2, BookOpen, Download } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
@@ -104,6 +104,8 @@ export default function Students() {
         ? modalLessonsOnDate.find(l => l.id === addAbsence.lessonId)
         : undefined
       const studentUid = addAbsence.student.uid
+      const lessonStartTime = lesson?.startTime?.toDate ? format(lesson.startTime.toDate(), 'HH:mm') : undefined
+      const lessonEndTime   = lesson?.endTime?.toDate   ? format(lesson.endTime.toDate(),   'HH:mm') : undefined
       await addDoc(collection(db, 'absence_reports'), {
         studentId: studentUid,
         studentName: addAbsence.student.displayName,
@@ -112,6 +114,8 @@ export default function Students() {
         type: addAbsence.type,
         lessonId: lesson?.id ?? null,
         lessonTitle: lesson?.title ?? null,
+        ...(lessonStartTime ? { lessonStartTime } : {}),
+        ...(lessonEndTime   ? { lessonEndTime }   : {}),
         reason: addAbsence.reason.trim(),
         reportedAt: serverTimestamp(),
         status: 'reviewed',
@@ -142,11 +146,11 @@ export default function Students() {
       ? absenceReports.filter(r => r.cohortId === selectedCohort)
       : absenceReports
     const withLesson = cohortFiltered.filter(r => r.lessonId)
-    const groups: Record<string, { lessonId: string; lessonTitle: string; date: string; reports: AbsenceReportDoc[] }> = {}
+    const groups: Record<string, { lessonId: string; lessonTitle: string; date: string; startTime?: string; endTime?: string; reports: AbsenceReportDoc[] }> = {}
     for (const r of withLesson) {
       const key = r.lessonId!
       if (!groups[key]) {
-        groups[key] = { lessonId: key, lessonTitle: r.lessonTitle ?? key, date: r.date, reports: [] }
+        groups[key] = { lessonId: key, lessonTitle: r.lessonTitle ?? key, date: r.date, startTime: r.lessonStartTime, endTime: r.lessonEndTime, reports: [] }
       }
       groups[key].reports.push(r)
     }
@@ -164,7 +168,17 @@ export default function Students() {
 
   const filteredAbsences = (selectedCohort ? absenceReports.filter(r => r.cohortId === selectedCohort) : absenceReports)
 
+  // Derive teacher's cohort scope from lessons (same pattern as Dashboard)
+  const teacherCohortIds = useMemo(() => {
+    const fromCohorts = cohorts.filter(c => c.teacherIds?.includes(teacherProfile?.uid ?? '')).map(c => c.id)
+    const fromLessons = allLessons
+      .filter(l => l.teacherIds?.includes(teacherProfile?.uid ?? ''))
+      .map(l => l.cohortId).filter(Boolean) as string[]
+    return new Set([...fromCohorts, ...fromLessons])
+  }, [cohorts, allLessons, teacherProfile?.uid])
+
   const filtered = students
+    .filter(s => s.cohortId && (teacherCohortIds.size === 0 || teacherCohortIds.has(s.cohortId)))
     .filter(s => !selectedCohort || s.cohortId === selectedCohort)
     .filter(s =>
       s.displayName.toLowerCase().includes(search.toLowerCase()) ||
@@ -173,6 +187,83 @@ export default function Students() {
     .sort((a, b) => a.displayName.localeCompare(b.displayName))
 
   const hasAnyLessonToday = Object.keys(latestLessonByCohort).length > 0
+
+  async function exportLessonAbsencesPdf() {
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+    const doc = new jsPDF()
+    doc.setFontSize(14)
+    doc.text('Absence by Lesson', 14, 18)
+    doc.setFontSize(10)
+    doc.setTextColor(120)
+    doc.text(`Exported ${format(new Date(), 'yyyy-MM-dd HH:mm')}`, 14, 25)
+    let y = 32
+    for (const group of lessonAbsenceGroups) {
+      const timeStr = group.startTime ? ` · ${group.startTime}${group.endTime ? `–${group.endTime}` : ''}` : ''
+      doc.setFontSize(11)
+      doc.setTextColor(30)
+      doc.text(`${group.lessonTitle} — ${group.date}${timeStr}`, 14, y)
+      y += 4
+      autoTable(doc, {
+        startY: y,
+        head: [['Student', 'Reason', 'Status']],
+        body: group.reports.map(r => [r.studentName, r.reason, r.status === 'reviewed' ? 'Reviewed' : 'Pending']),
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [60, 60, 80] },
+        margin: { left: 14, right: 14 },
+      })
+      y = (doc as any).lastAutoTable.finalY + 8
+      if (y > 260) { doc.addPage(); y = 18 }
+    }
+    doc.save(`absence-by-lesson-${format(new Date(), 'yyyy-MM-dd')}.pdf`)
+  }
+
+  async function exportAbsenceReportsPdf() {
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+    const doc = new jsPDF()
+    doc.setFontSize(14)
+    doc.text('Absence Report Overview', 14, 18)
+    doc.setFontSize(10)
+    doc.setTextColor(120)
+    doc.text(`Exported ${format(new Date(), 'yyyy-MM-dd HH:mm')}`, 14, 25)
+    const source = selectedCohort ? filteredAbsences : absenceReports
+    const byCohort: Record<string, { name: string; rows: AbsenceReportDoc[] }> = {}
+    for (const r of source) {
+      if (!byCohort[r.cohortId]) {
+        const cohortName = cohorts.find(c => c.id === r.cohortId)?.name ?? r.cohortId
+        byCohort[r.cohortId] = { name: cohortName, rows: [] }
+      }
+      byCohort[r.cohortId].rows.push(r)
+    }
+    let y = 32
+    for (const cohortId of Object.keys(byCohort)) {
+      const { name, rows } = byCohort[cohortId]
+      doc.setFontSize(11)
+      doc.setTextColor(30)
+      doc.text(`${name} (${rows.length} absences)`, 14, y)
+      y += 4
+      autoTable(doc, {
+        startY: y,
+        head: [['Student', 'Date', 'Time', 'Type', 'Lesson', 'Reason']],
+        body: rows.map(r => [
+          r.studentName,
+          r.date,
+          r.lessonStartTime ? `${r.lessonStartTime}${r.lessonEndTime ? `–${r.lessonEndTime}` : ''}` : '—',
+          r.type === 'full_day' ? 'Full day' : 'Lesson',
+          r.lessonTitle ?? '—',
+          r.reason,
+        ]),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [60, 60, 80] },
+        columnStyles: { 5: { cellWidth: 50 } },
+        margin: { left: 14, right: 14 },
+      })
+      y = (doc as any).lastAutoTable.finalY + 8
+      if (y > 260) { doc.addPage(); y = 18 }
+    }
+    doc.save(`absence-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`)
+  }
 
   if (loading) return <LoadingSpinner />
 
@@ -252,7 +343,7 @@ export default function Students() {
                   className="bg-zinc-900 border border-white/10 rounded-2xl p-4 flex flex-col gap-3 active:bg-zinc-900/50"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <Avatar uid={student.uid} name={student.displayName} avatarUrl={student.avatarUrl} size="sm" />
+                    <Avatar uid={student.uid} name={student.displayName} avatarUrl={student.avatarUrl} size="sm" enlargeable />
                     <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
                       student.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-600'
                     }`}>
@@ -317,7 +408,7 @@ export default function Students() {
                     <tr key={student.uid} className="hover:bg-white/5 transition-colors">
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3">
-                          <Avatar uid={student.uid} name={student.displayName} avatarUrl={student.avatarUrl} size="sm" />
+                          <Avatar uid={student.uid} name={student.displayName} avatarUrl={student.avatarUrl} size="sm" enlargeable />
                           <div>
                             <p className="text-sm font-medium text-zinc-100">{student.displayName}</p>
                             <p className="text-xs text-zinc-500">{student.email}</p>
@@ -385,6 +476,16 @@ export default function Students() {
       {/* ── Absence by Lesson tab ─────────────────────────────────────────────── */}
       {activeTab === 'lesson-absences' && (
         <div className="space-y-4">
+          {lessonAbsenceGroups.length > 0 && (
+            <div className="flex justify-end">
+              <button
+                onClick={exportLessonAbsencesPdf}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-zinc-300 hover:text-zinc-100 border border-white/15 hover:bg-zinc-800 transition-colors"
+              >
+                <Download className="w-4 h-4" /> Export PDF
+              </button>
+            </div>
+          )}
           {lessonAbsenceGroups.length === 0 ? (
             <div className="bg-zinc-900 border border-white/10 rounded-2xl p-10 text-center">
               <BookOpen className="w-10 h-10 text-slate-200 mx-auto mb-3" />
@@ -398,7 +499,11 @@ export default function Students() {
                     <BookOpen className="w-4 h-4 text-brand-500 flex-shrink-0" />
                     <div>
                       <p className="text-sm font-semibold text-zinc-200">{group.lessonTitle}</p>
-                      <p className="text-xs text-zinc-400">{group.date} · {group.reports.length} absent</p>
+                      <p className="text-xs text-zinc-400">
+                        {group.date}
+                        {group.startTime && ` · ${group.startTime}${group.endTime ? `–${group.endTime}` : ''}`}
+                        {` · ${group.reports.length} absent`}
+                      </p>
                     </div>
                   </div>
                   <button
@@ -440,6 +545,16 @@ export default function Students() {
       {/* ── Absence Reports tab ───────────────────────────────────────────────── */}
       {activeTab === 'student-absences' && (
         <div>
+          {filteredAbsences.length > 0 && (
+            <div className="flex justify-end mb-3">
+              <button
+                onClick={exportAbsenceReportsPdf}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-zinc-300 hover:text-zinc-100 border border-white/15 hover:bg-zinc-800 transition-colors"
+              >
+                <Download className="w-4 h-4" /> Export PDF
+              </button>
+            </div>
+          )}
           {filteredAbsences.length === 0 ? (
             <div className="bg-zinc-900 border border-white/10 rounded-2xl p-10 text-center">
               <AlertTriangle className="w-10 h-10 text-slate-200 mx-auto mb-3" />
@@ -452,6 +567,7 @@ export default function Students() {
                   <tr className="border-b border-white/8 bg-zinc-900/50/50">
                     <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-5 py-3">Student</th>
                     <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-3">Date</th>
+                    <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-3 hidden sm:table-cell">Time</th>
                     <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-3">Type</th>
                     <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Lesson</th>
                     <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-3 hidden lg:table-cell">Reason</th>
@@ -464,6 +580,11 @@ export default function Students() {
                     <tr key={r.id} className={`hover:bg-white/5 transition-colors ${r.status === 'pending' ? 'bg-amber-50/30' : ''}`}>
                       <td className="px-5 py-3 text-sm font-medium text-zinc-100 whitespace-nowrap">{r.studentName}</td>
                       <td className="px-4 py-3 text-sm text-zinc-400 whitespace-nowrap font-mono">{r.date}</td>
+                      <td className="px-4 py-3 text-sm text-zinc-400 whitespace-nowrap font-mono hidden sm:table-cell">
+                        {r.lessonStartTime
+                          ? `${r.lessonStartTime}${r.lessonEndTime ? `–${r.lessonEndTime}` : ''}`
+                          : '—'}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                           r.type === 'full_day' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'

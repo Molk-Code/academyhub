@@ -299,7 +299,8 @@ function AllRoomsDisplay({
                 display: 'grid',
                 gridTemplateColumns: gridCols,
                 borderTop: '1px solid rgba(255,255,255,0.05)',
-                opacity: isPast ? 0.35 : 1,
+                opacity: isPast ? 0.45 : 1,
+                filter: isPast ? 'grayscale(1) brightness(0.5)' : 'none',
               }}
             >
               {/* Time cell — orange left border on current row instead of a horizontal line */}

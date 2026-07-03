@@ -6,12 +6,13 @@ import LoadingSpinner from '@/components/common/LoadingSpinner'
 interface Props {
   role: UserRole | UserRole[]
   children: React.ReactNode
+  skeleton?: React.ReactNode
 }
 
-export default function RoleRoute({ role, children }: Props) {
+export default function RoleRoute({ role, children, skeleton }: Props) {
   const { user, role: userRole, loading } = useAuth()
 
-  if (loading) return <LoadingSpinner fullScreen />
+  if (loading) return skeleton ? <>{skeleton}</> : <LoadingSpinner fullScreen />
 
   if (!user) return <Navigate to="/login" replace />
 

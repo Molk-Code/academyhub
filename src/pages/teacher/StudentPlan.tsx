@@ -1,14 +1,14 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, setDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatDistanceToNow } from 'date-fns'
-import { ArrowLeft, MessageSquare, ChevronRight, Send } from 'lucide-react'
+import { ArrowLeft, MessageSquare, ChevronRight, Send, Pencil, TrendingUp, Lightbulb } from 'lucide-react'
 import Avatar from '@/components/common/Avatar'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { useDocument, useCollection, where, orderBy } from '@/hooks/useFirestore'
-import type { UserDoc, DevelopmentPlan, PlanComment, NopraStepKey } from '@/types'
+import type { UserDoc, DevelopmentPlan, PlanComment, NopraStepKey, TeacherAssessment } from '@/types'
 
 interface StepDef {
   key: NopraStepKey
@@ -32,9 +32,14 @@ export default function StudentPlan() {
   const [activeStep, setActiveStep] = useState<NopraStepKey>('situation')
   const [commentText, setCommentText] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [editingAssessment, setEditingAssessment] = useState(false)
+  const [strengthsDraft, setStrengthsDraft] = useState('')
+  const [developmentsDraft, setDevelopmentsDraft] = useState('')
+  const [assessmentSaving, setAssessmentSaving] = useState(false)
 
   const { data: student, loading: studentLoading } = useDocument<UserDoc>('users', uid)
   const { data: plan, loading: planLoading } = useDocument<DevelopmentPlan>('development_plans', uid)
+  const { data: assessment } = useDocument<TeacherAssessment>('teacher_assessments', uid)
   const { data: comments } = useCollection<PlanComment>(
     'plan_comments',
     uid ? [where('studentId', '==', uid), orderBy('createdAt', 'asc')] : [],
@@ -53,6 +58,31 @@ export default function StudentPlan() {
     }
     return map
   }, [comments])
+
+  useEffect(() => {
+    if (assessment && !editingAssessment) {
+      setStrengthsDraft(assessment.strengths ?? '')
+      setDevelopmentsDraft(assessment.developments ?? '')
+    }
+  }, [assessment?.strengths, assessment?.developments]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function saveAssessment() {
+    if (!profile || !uid) return
+    setAssessmentSaving(true)
+    try {
+      await setDoc(doc(db, 'teacher_assessments', uid), {
+        studentId: uid,
+        strengths: strengthsDraft.trim(),
+        developments: developmentsDraft.trim(),
+        updatedBy: profile.uid,
+        updatedByName: profile.displayName,
+        updatedAt: serverTimestamp(),
+      }, { merge: true })
+      setEditingAssessment(false)
+    } finally {
+      setAssessmentSaving(false)
+    }
+  }
 
   async function submitComment(e: React.FormEvent) {
     e.preventDefault()
@@ -155,6 +185,83 @@ export default function StudentPlan() {
         ) : (
           <p className="text-sm text-zinc-400 italic py-4 text-center">
             The student hasn't written anything for this step yet.
+          </p>
+        )}
+      </div>
+
+      {/* Strengths & Areas for Development */}
+      <div className="bg-zinc-900 border border-white/10 rounded-2xl p-5 space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h3 className="text-sm font-semibold text-zinc-100">Strengths &amp; Areas for Development</h3>
+          {!editingAssessment ? (
+            <button
+              onClick={() => {
+                setStrengthsDraft(assessment?.strengths ?? '')
+                setDevelopmentsDraft(assessment?.developments ?? '')
+                setEditingAssessment(true)
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Edit
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button onClick={saveAssessment} disabled={assessmentSaving} className="btn-primary py-1.5 px-3 text-sm disabled:opacity-50">
+                {assessmentSaving ? 'Saving…' : 'Save'}
+              </button>
+              <button onClick={() => setEditingAssessment(false)} className="btn-secondary py-1.5 px-3 text-sm">Cancel</button>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5" /> Strengths
+            </p>
+            {editingAssessment ? (
+              <textarea
+                value={strengthsDraft}
+                onChange={e => setStrengthsDraft(e.target.value)}
+                rows={5}
+                className="input w-full resize-none text-sm"
+                placeholder="What does this student do well?"
+                autoFocus
+              />
+            ) : assessment?.strengths ? (
+              <p className="text-sm text-zinc-300 whitespace-pre-wrap bg-zinc-800/50 rounded-xl p-4 leading-relaxed min-h-[80px]">
+                {assessment.strengths}
+              </p>
+            ) : (
+              <p className="text-sm text-zinc-500 italic text-center bg-zinc-800/30 rounded-xl py-6">Not yet filled in.</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Lightbulb className="w-3.5 h-3.5" /> Areas for Development
+            </p>
+            {editingAssessment ? (
+              <textarea
+                value={developmentsDraft}
+                onChange={e => setDevelopmentsDraft(e.target.value)}
+                rows={5}
+                className="input w-full resize-none text-sm"
+                placeholder="What should this student focus on improving?"
+              />
+            ) : assessment?.developments ? (
+              <p className="text-sm text-zinc-300 whitespace-pre-wrap bg-zinc-800/50 rounded-xl p-4 leading-relaxed min-h-[80px]">
+                {assessment.developments}
+              </p>
+            ) : (
+              <p className="text-sm text-zinc-500 italic text-center bg-zinc-800/30 rounded-xl py-6">Not yet filled in.</p>
+            )}
+          </div>
+        </div>
+
+        {assessment?.updatedAt && !editingAssessment && (
+          <p className="text-xs text-zinc-500">
+            Last updated by {assessment.updatedByName} · {formatDistanceToNow(assessment.updatedAt.toDate(), { addSuffix: true })}
           </p>
         )}
       </div>

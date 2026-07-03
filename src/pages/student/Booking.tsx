@@ -2,19 +2,20 @@ import { useState, useMemo, useEffect } from 'react'
 import { DoorOpen, UtensilsCrossed, Car, Clock, CheckCircle2, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
-import { useCollection, where } from '@/hooks/useFirestore'
+import { useCollection, useDocument, where } from '@/hooks/useFirestore'
 import { markFoodBoxSeen, markMinivanSeen, useStudentBookingTabBadges } from '@/hooks/useBookingBadge'
 import type { FoodBoxOrderDoc, MinivanBookingDoc } from '@/types'
+import { useLocation } from 'react-router-dom'
 import RoomBooking    from './RoomBooking'
 import FoodBoxOrder   from './FoodBoxOrder'
 import MinivanBooking from './MinivanBooking'
 
 type Tab = 'room' | 'food' | 'minivan'
 
-const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'room',    label: 'Room Booking', icon: DoorOpen        },
-  { id: 'food',    label: 'Food Box',     icon: UtensilsCrossed },
-  { id: 'minivan', label: 'Vehicles',     icon: Car             },
+const ALL_TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }>; featureId: string }[] = [
+  { id: 'room',    label: 'Room Booking', icon: DoorOpen,        featureId: 'roomBooking' },
+  { id: 'food',    label: 'Food Box',     icon: UtensilsCrossed, featureId: 'foodBox'     },
+  { id: 'minivan', label: 'Vehicles',     icon: Car,             featureId: 'vehicle'     },
 ]
 
 // ── Status badge ──────────────────────────────────────────────────────────────
@@ -48,7 +49,7 @@ function StatusBadge({ status }: { status: AnyStatus }) {
 
 // ── Food box order history ────────────────────────────────────────────────────
 
-function FoodBoxHistory() {
+function FoodBoxHistory({ initialOpenId }: { initialOpenId?: string }) {
   const { profile } = useAuth()
   const { data: raw } = useCollection<FoodBoxOrderDoc>(
     'food_box_orders',
@@ -59,7 +60,7 @@ function FoodBoxHistory() {
     () => [...raw].sort((a, b) => ((b.createdAt as any)?.toMillis?.() ?? 0) - ((a.createdAt as any)?.toMillis?.() ?? 0)),
     [raw],
   )
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(initialOpenId ?? null)
 
   if (!orders.length) return null
 
@@ -137,7 +138,7 @@ function FoodBoxHistory() {
 
 // ── Minivan booking history ───────────────────────────────────────────────────
 
-function MinivanHistory() {
+function MinivanHistory({ initialOpenId }: { initialOpenId?: string }) {
   const { profile } = useAuth()
   const { data: raw } = useCollection<MinivanBookingDoc>(
     'minivan_bookings',
@@ -148,7 +149,7 @@ function MinivanHistory() {
     () => [...raw].sort((a, b) => ((b.createdAt as any)?.toMillis?.() ?? 0) - ((a.createdAt as any)?.toMillis?.() ?? 0)),
     [raw],
   )
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(initialOpenId ?? null)
 
   if (!bookings.length) return null
 
@@ -206,15 +207,22 @@ function MinivanHistory() {
 
 export default function Booking() {
   const { profile } = useAuth()
-  const [tab, setTab] = useState<Tab>('room')
+  const { state } = useLocation()
+  const initialOpenId: string | undefined = (state as any)?.openId
   const tabBadges = useStudentBookingTabBadges()
+  const { data: navVis } = useDocument<{ id: string; student: Record<string, boolean> }>('settings', 'nav_visibility')
+
+  const TABS = ALL_TABS.filter(t => navVis?.student?.[t.featureId] !== false)
+
+  const [tab, setTab] = useState<Tab>((state as any)?.tab ?? 'room')
+  const activeTab = TABS.find(t => t.id === tab)?.id ?? TABS[0]?.id ?? 'room'
 
   // Clear the badge only when the relevant tab is viewed
   useEffect(() => {
     if (!profile?.uid) return
-    if (tab === 'food')    markFoodBoxSeen(profile.uid)
-    if (tab === 'minivan') markMinivanSeen(profile.uid)
-  }, [tab, profile?.uid])
+    if (activeTab === 'food')    markFoodBoxSeen(profile.uid)
+    if (activeTab === 'minivan') markMinivanSeen(profile.uid)
+  }, [activeTab, profile?.uid])
 
   return (
     <div className="space-y-5">
@@ -233,14 +241,14 @@ export default function Booking() {
             onClick={() => setTab(id)}
             className={cn(
               'relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-              tab === id
+              activeTab === id
                 ? 'bg-zinc-900 text-zinc-100 shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-300',
             )}
           >
             <Icon className="w-4 h-4" />
             {label}
-            {badge > 0 && tab !== id && (
+            {badge > 0 && activeTab !== id && (
               <span className="absolute -top-1 -right-1 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold px-1 leading-none">
                 {badge}
               </span>
@@ -250,19 +258,19 @@ export default function Booking() {
         })}
       </div>
 
-      {tab === 'room' && <RoomBooking />}
+      {activeTab === 'room' && <RoomBooking />}
 
-      {tab === 'food' && (
+      {activeTab === 'food' && (
         <div className="space-y-8">
           <FoodBoxOrder />
-          <FoodBoxHistory />
+          <FoodBoxHistory initialOpenId={initialOpenId} />
         </div>
       )}
 
-      {tab === 'minivan' && (
+      {activeTab === 'minivan' && (
         <div className="space-y-8">
           <MinivanBooking />
-          <MinivanHistory />
+          <MinivanHistory initialOpenId={initialOpenId} />
         </div>
       )}
     </div>

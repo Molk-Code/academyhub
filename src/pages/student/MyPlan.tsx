@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { useLocation } from 'react-router-dom'
 import { doc, setDoc, serverTimestamp, collection, addDoc, deleteDoc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatDistanceToNow } from 'date-fns'
-import { ClipboardList, ListTodo, MessageSquare, Plus, Trash2, GripVertical, Check, ChevronRight } from 'lucide-react'
+import { ClipboardList, ListTodo, MessageSquare, Plus, Trash2, GripVertical, Check, ChevronRight, TrendingUp, Lightbulb } from 'lucide-react'
 import Avatar from '@/components/common/Avatar'
 import { useDocument, useCollection, where, orderBy } from '@/hooks/useFirestore'
-import type { DevelopmentPlan, PlanComment, TodoDoc, NopraStepKey, TodoCategory } from '@/types'
+import type { DevelopmentPlan, PlanComment, TodoDoc, NopraStepKey, TodoCategory, TeacherAssessment } from '@/types'
 import {
   DndContext,
   DragOverlay,
@@ -38,32 +39,32 @@ interface StepDef {
 const STEPS: StepDef[] = [
   {
     key: 'situation', abbrev: 'N', label: 'Now',
-    prompt: 'Describe your current situation, strengths, and starting point.',
-    colors: { bg: 'bg-sky-500', light: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', activeBg: 'bg-sky-500' },
+    prompt: "Describe your current situation — what's working, what's not?",
+    colors: { bg: 'bg-sky-500', light: 'bg-sky-950/40', text: 'text-sky-300', border: 'border-sky-800/50', activeBg: 'bg-sky-500' },
   },
   {
     key: 'goal', abbrev: 'O', label: 'Objective',
-    prompt: 'What is your desired outcome? Be specific and concrete.',
-    colors: { bg: 'bg-violet-500', light: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200', activeBg: 'bg-violet-500' },
+    prompt: 'What does success look like for you? Be specific.',
+    colors: { bg: 'bg-violet-500', light: 'bg-violet-950/40', text: 'text-violet-300', border: 'border-violet-800/50', activeBg: 'bg-violet-500' },
   },
   {
     key: 'obstacles', abbrev: 'P', label: 'Problems',
-    prompt: 'What challenges or obstacles might get in the way?',
+    prompt: 'What obstacles are getting in the way?',
     colors: { bg: 'bg-amber-500', light: 'bg-amber-950/40', text: 'text-amber-300', border: 'border-amber-800/50', activeBg: 'bg-amber-500' },
   },
   {
     key: 'resources', abbrev: 'R', label: 'Resources',
-    prompt: 'What resources, skills, or people can help you?',
+    prompt: 'What strengths, people, or tools do you have available?',
     colors: { bg: 'bg-emerald-500', light: 'bg-emerald-950/40', text: 'text-emerald-300', border: 'border-emerald-800/50', activeBg: 'bg-emerald-500' },
   },
   {
     key: 'action', abbrev: 'A', label: 'Actions',
-    prompt: 'What concrete actions will you take? Set specific timelines.',
-    colors: { bg: 'bg-orange-500', light: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', activeBg: 'bg-orange-500' },
+    prompt: 'List 3 concrete steps you will take this week.',
+    colors: { bg: 'bg-orange-500', light: 'bg-orange-950/40', text: 'text-orange-300', border: 'border-orange-800/50', activeBg: 'bg-orange-500' },
   },
   {
-    key: 'evaluation', abbrev: 'E', label: 'Evaluation',
-    prompt: 'How will you know you have succeeded? How will you measure progress?',
+    key: 'evaluation', abbrev: 'E', label: 'Follow Up',
+    prompt: "How will you know you're making progress? When will you check in?",
     colors: { bg: 'bg-rose-500', light: 'bg-rose-950/40', text: 'text-rose-300', border: 'border-rose-800/50', activeBg: 'bg-rose-500' },
   },
 ]
@@ -132,6 +133,7 @@ function NopraTab() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { data: plan } = useDocument<DevelopmentPlan>('development_plans', profile?.uid)
+  const { data: assessment } = useDocument<TeacherAssessment>('teacher_assessments', profile?.uid)
   const { data: comments } = useCollection<PlanComment>(
     'plan_comments',
     profile ? [where('studentId', '==', profile.uid), orderBy('createdAt', 'asc')] : [],
@@ -192,21 +194,26 @@ function NopraTab() {
 
   const stepDef = STEPS.find(s => s.key === activeStep)!
 
+  useEffect(() => {
+    const activeEl = document.querySelector('.step-active')
+    if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+  }, [activeStep])
+
   return (
     <div className="space-y-6">
       {/* Flow diagram */}
-      <div className="bg-zinc-900 border border-white/10 rounded-2xl p-4 overflow-x-auto">
+      <div className="steps-nav bg-zinc-900 border border-white/10 rounded-2xl p-4 overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
         <div className="flex items-center gap-1 min-w-max mx-auto w-fit">
           {STEPS.map((step, i) => {
             const isActive = step.key === activeStep
             const commentCount = commentsByStep[step.key] ?? 0
             return (
-              <div key={step.key} className="flex items-center">
+              <div key={step.key} className="flex items-center flex-shrink-0">
                 <button
                   onClick={() => handleStepChange(step.key)}
                   className={`relative flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${
                     isActive
-                      ? `${step.colors.light} ${step.colors.border} border-2 shadow-sm`
+                      ? `${step.colors.light} ${step.colors.border} border-2 shadow-sm step-active`
                       : 'hover:bg-white/5 border-2 border-transparent'
                   }`}
                 >
@@ -278,6 +285,35 @@ function NopraTab() {
           </div>
         </div>
       )}
+
+      {/* Teacher assessment — strengths & developments */}
+      {(assessment?.strengths || assessment?.developments) && (
+        <div className="bg-zinc-900 border border-white/10 rounded-2xl p-5 space-y-4">
+          <h3 className="text-sm font-semibold text-zinc-100">Teacher Assessment</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {assessment.strengths && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5" /> Strengths
+                </p>
+                <p className="text-sm text-zinc-300 whitespace-pre-wrap bg-zinc-800/50 rounded-xl p-4 leading-relaxed">
+                  {assessment.strengths}
+                </p>
+              </div>
+            )}
+            {assessment.developments && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Lightbulb className="w-3.5 h-3.5" /> Areas for Development
+                </p>
+                <p className="text-sm text-zinc-300 whitespace-pre-wrap bg-zinc-800/50 rounded-xl p-4 leading-relaxed">
+                  {assessment.developments}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -300,11 +336,11 @@ function TodoTab() {
   const [addingIn, setAddingIn] = useState<TodoCategory | null>(null)
   const [newTitle, setNewTitle] = useState('')
 
-  // Sync from Firestore when items are added/deleted (by ID change)
-  const rawIds = useMemo(() => rawTodos.map(t => t.id).sort().join(','), [rawTodos])
+  // Sync from Firestore whenever data changes, but not during an active drag
   useEffect(() => {
+    if (activeId) return
     setLocalTodos(rawTodos)
-  }, [rawIds]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rawTodos, activeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const urgentItems = useMemo(
     () => localTodos.filter(t => t.category === 'urgent' && !t.isCompleted).sort((a, b) => a.order - b.order),
@@ -498,7 +534,7 @@ function TodoTab() {
           category="todo"
           items={todoItems}
           label="🔵 To-Do"
-          color={{ bg: 'bg-blue-500', light: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' }}
+          color={{ bg: 'bg-blue-500', light: 'bg-blue-950/40', text: 'text-blue-300', border: 'border-blue-800/50' }}
         />
       </div>
       <DragOverlay>
@@ -516,7 +552,8 @@ function TodoTab() {
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 export default function MyPlan() {
-  const [tab, setTab] = useState<'plan' | 'todos'>('todos')
+  const { state: locState } = useLocation()
+  const [tab, setTab] = useState<'plan' | 'todos'>((locState as any)?.tab ?? 'todos')
 
   return (
     <div className="space-y-6">

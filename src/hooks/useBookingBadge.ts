@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useCollection, where } from '@/hooks/useFirestore'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSeenRevision, emitSeenUpdate } from '@/lib/seenSignal'
-import type { FoodBoxOrderDoc, MinivanBookingDoc } from '@/types'
+import type { FoodBoxOrderDoc, MinivanBookingDoc, EquipmentBookingDoc } from '@/types'
 
 const FOOD_SEEN_KEY = (uid: string) => `foodBoxSeenAt:${uid}`
 const VAN_SEEN_KEY  = (uid: string) => `minivanSeenAt:${uid}`
@@ -33,6 +33,11 @@ function useBookingData() {
     [where('status', '==', 'pending')],
     isStaff,
   )
+  const { data: pendingEquipment } = useCollection<EquipmentBookingDoc>(
+    'equipment_bookings',
+    [where('status', '==', 'pending')],
+    isStaff,
+  )
   const { data: myFood } = useCollection<FoodBoxOrderDoc>(
     'food_box_orders',
     uid && !isStaff ? [where('studentId', '==', uid)] : [],
@@ -44,15 +49,15 @@ function useBookingData() {
     !!uid && !isStaff,
   )
 
-  return { uid, isStaff, seenRev, pendingFood, pendingVan, myFood, myVan }
+  return { uid, isStaff, seenRev, pendingFood, pendingVan, pendingEquipment, myFood, myVan }
 }
 
 export function useBookingBadge(): number {
-  const { uid, isStaff, seenRev, pendingFood, pendingVan, myFood, myVan } = useBookingData()
+  const { uid, isStaff, seenRev, pendingFood, pendingVan, pendingEquipment, myFood, myVan } = useBookingData()
 
   return useMemo(() => {
     if (!uid) return 0
-    if (isStaff) return pendingFood.length + pendingVan.length
+    if (isStaff) return pendingFood.length + pendingVan.length + pendingEquipment.length
     const foodSeenAt = parseInt(localStorage.getItem(FOOD_SEEN_KEY(uid)) ?? '0', 10)
     const vanSeenAt  = parseInt(localStorage.getItem(VAN_SEEN_KEY(uid))  ?? '0', 10)
     const latestTs = (o: any) => Math.max(
@@ -66,13 +71,13 @@ export function useBookingBadge(): number {
 }
 
 /** For admin sidebar: separate pending counts per type */
-export function useBookingBadgeDetail(): { food: number; van: number } {
-  const { uid, isStaff, seenRev, pendingFood, pendingVan } = useBookingData()
+export function useBookingBadgeDetail(): { food: number; van: number; equipment: number } {
+  const { uid, isStaff, seenRev, pendingFood, pendingVan, pendingEquipment } = useBookingData()
 
   return useMemo(() => {
-    if (!uid || !isStaff) return { food: 0, van: 0 }
-    return { food: pendingFood.length, van: pendingVan.length }
-  }, [uid, isStaff, pendingFood, pendingVan, seenRev])
+    if (!uid || !isStaff) return { food: 0, van: 0, equipment: 0 }
+    return { food: pendingFood.length, van: pendingVan.length, equipment: pendingEquipment.length }
+  }, [uid, isStaff, pendingFood, pendingVan, pendingEquipment, seenRev])
 }
 
 /** For student Booking tabs: per-tab unseen counts */

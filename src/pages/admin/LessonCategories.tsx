@@ -64,8 +64,12 @@ export default function LessonCategories() {
         <div>
           <h1 className="page-title">Lesson Categories</h1>
           <p className="text-zinc-500 text-sm mt-1">
-            Categories appear when teachers create lessons and as a layer on the annual plan wheel.
+            Define the lesson categories available when teachers schedule lessons.
+            Teachers create individual lessons from their Calendar view.
           </p>
+          <a href="/teacher/lessons" className="text-xs text-orange-400 hover:text-orange-300 underline mt-1 inline-block">
+            → Go to lesson calendar
+          </a>
         </div>
         <button onClick={openNew} className="btn-primary py-2 flex items-center gap-2">
           <Plus className="w-4 h-4" /> Add category

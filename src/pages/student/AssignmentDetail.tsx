@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Clock, Trophy, Link2, Video, FileText, Youtube, PlayCircle, Upload, CheckCircle2, Loader2, X, Paperclip } from 'lucide-react'
+import { Clock, Trophy, Link2, Video, FileText, Youtube, PlayCircle, Upload, CheckCircle2, Loader2, X, Paperclip } from 'lucide-react'
+import Breadcrumb from '@/components/common/Breadcrumb'
 import { useDocument } from '@/hooks/useFirestore'
 import { useCollection, where } from '@/hooks/useFirestore'
 import { shortDate, toDate } from '@/lib/utils'
@@ -39,6 +40,7 @@ export default function AssignmentDetail() {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [submitting, setSubmitting]     = useState(false)
   const [submitError, setSubmitError]   = useState<string | null>(null)
+  const [justSubmitted, setJustSubmitted] = useState(false)
 
   if (loading) return <LoadingSpinner />
   if (!assignment) return (
@@ -102,20 +104,22 @@ export default function AssignmentDetail() {
       return
     }
     setSubmitting(false)
+    setJustSubmitted(true)
   }
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="flex items-center gap-3">
-        <Link to="/dashboard" className="p-2 rounded-xl text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <div>
-          <h1 className="page-title">{assignment.title}</h1>
-          {subject && (
-            <p className="text-sm text-zinc-500 mt-0.5">{subject.iconEmoji} {subject.title}</p>
-          )}
-        </div>
+      <Breadcrumb items={[
+        { label: 'Home', href: '/dashboard' },
+        { label: 'Assignments', href: '/assignments' },
+        { label: assignment.title },
+      ]} />
+
+      <div>
+        <h1 className="page-title">{assignment.title}</h1>
+        {subject && (
+          <p className="text-sm text-zinc-500 mt-0.5">{subject.iconEmoji} {subject.title}</p>
+        )}
       </div>
 
       {/* Meta row */}
@@ -209,7 +213,25 @@ export default function AssignmentDetail() {
 
       {/* Practical submission */}
       {!isTest && (
-        <div className="card space-y-4">
+        <div className="space-y-4">
+
+          {justSubmitted ? (
+            <div className="text-center py-12 bg-emerald-900/20 border border-emerald-500/30 rounded-2xl">
+              <div className="text-5xl mb-4">✅</div>
+              <h2 className="text-xl font-bold text-white mb-2">Submitted!</h2>
+              <p className="text-gray-400 text-sm mb-1">Your work has been sent to your teacher.</p>
+              <p className="text-gray-500 text-xs mb-6">You'll get a notification when it's been reviewed and feedback is available.</p>
+              <div className="flex gap-3 justify-center">
+                <a href="/assignments" className="bg-white/10 hover:bg-white/15 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-colors">
+                  Back to assignments
+                </a>
+                <a href="/dashboard" className="bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-colors">
+                  Go to dashboard
+                </a>
+              </div>
+            </div>
+          ) : (
+          <div className="card space-y-4">
           <h2 className="section-title">Your Submission</h2>
 
           {alreadySubmitted ? (
@@ -324,6 +346,8 @@ export default function AssignmentDetail() {
                 }
               </button>
             </div>
+          )}
+          </div>
           )}
         </div>
       )}

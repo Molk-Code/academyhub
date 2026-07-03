@@ -73,8 +73,8 @@ export default function GuideEditor() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="page-title flex items-center gap-2"><BookOpen className="w-5 h-5" /> FAQ</h1>
-          <p className="text-zinc-500 text-sm mt-1">Manage the FAQ content.</p>
+          <h1 className="page-title flex items-center gap-2"><BookOpen className="w-5 h-5" /> School Guide</h1>
+          <p className="text-zinc-500 text-sm mt-1">Manage the School Guide content.</p>
         </div>
         {!seedDone && sections.length === 0 && (
           <button onClick={seedData} disabled={seeding} className="btn-primary gap-2">

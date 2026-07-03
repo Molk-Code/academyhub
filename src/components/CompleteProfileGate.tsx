@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { doc, updateDoc } from 'firebase/firestore'
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { db, storage } from '@/lib/firebase'
+import { db } from '@/lib/firebase'
+import { uploadWithQuota } from '@/lib/uploadWithQuota'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn, initials, avatarColor } from '@/lib/utils'
 import { Camera, Loader2, CheckCircle2, User, Phone, Mail } from 'lucide-react'
@@ -53,10 +53,8 @@ function ProfileCompleteOverlay() {
 
       if (avatarFile) {
         setUploading(true)
-        const path    = `avatars/${profile.uid}`
-        const fileRef = storageRef(storage, path)
-        await uploadBytes(fileRef, avatarFile)
-        avatarUrl = await getDownloadURL(fileRef)
+        const path = `avatars/${profile.uid}`
+        avatarUrl  = await uploadWithQuota(avatarFile, path)
         setUploading(false)
       }
 

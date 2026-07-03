@@ -122,6 +122,7 @@ export default function TimeBlockManager() {
             <p className="text-zinc-400 text-sm">No time blocks yet. Add one to enable room booking.</p>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-white/10">
@@ -177,6 +178,7 @@ export default function TimeBlockManager() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

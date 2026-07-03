@@ -39,6 +39,10 @@
   }
 }
 
+/* Hide scrollbar on NOPRA step nav while keeping scroll */
+.steps-nav::-webkit-scrollbar { display: none; }
+.steps-nav { -ms-overflow-style: none; scrollbar-width: none; }
+
 @layer utilities {
   .mobile-header {
     padding-top: max(env(safe-area-inset-top, 0px), 12px);

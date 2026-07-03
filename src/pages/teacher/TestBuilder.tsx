@@ -23,14 +23,14 @@ import { useCollection, where } from '@/hooks/useFirestore'
 import type { SubjectDoc, CohortDoc, TestDoc, Question } from '@/types'
 import {
   Plus, Trash2, GripVertical, CheckCircle2, Check,
-  AlignLeft, ListChecks, ToggleLeft, Square,
+  AlignLeft, ListChecks, ToggleLeft, Square, ArrowUpDown, Star,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useEffect } from 'react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type QType = 'multiple_choice' | 'multiple_select' | 'true_false' | 'short_answer'
+type QType = 'multiple_choice' | 'multiple_select' | 'true_false' | 'short_answer' | 'ordering' | 'rating'
 
 interface QuestionState {
   id: string
@@ -39,6 +39,9 @@ interface QuestionState {
   options: string[]
   correctAnswer: string    // MC/TF/SA
   correctAnswers: string[] // multiple_select
+  correctOrder: string[]   // ordering: option indices in correct order
+  ratingScale: number      // rating: max value (default 5)
+  ratingLabels: [string, string] // rating: [low, high]
   points: number
 }
 
@@ -94,6 +97,8 @@ function QuestionCard({
     multiple_select:  'Multiple select',
     true_false:       'True / False',
     short_answer:     'Short answer',
+    ordering:         'Ordering',
+    rating:           'Rating scale',
   }[q.type]
 
   const typeColor = {
@@ -101,6 +106,8 @@ function QuestionCard({
     multiple_select:  'badge-blue',
     true_false:       'bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5 text-xs font-medium',
     short_answer:     'badge-amber',
+    ordering:         'bg-orange-100 text-orange-700 rounded-full px-2 py-0.5 text-xs font-medium',
+    rating:           'bg-pink-100 text-pink-700 rounded-full px-2 py-0.5 text-xs font-medium',
   }[q.type]
 
   function setOption(oi: number, val: string) {
@@ -300,6 +307,77 @@ function QuestionCard({
             <p className="text-xs text-zinc-400">This question requires manual grading.</p>
           </div>
         )}
+
+        {/* Ordering */}
+        {q.type === 'ordering' && (
+          <div className="space-y-2">
+            <p className="text-xs text-zinc-400 font-medium">List items in the correct order (top = first)</p>
+            {q.options.map((opt, oi) => (
+              <div key={oi} className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-brand-900/60 text-brand-300 text-xs flex items-center justify-center flex-shrink-0 font-bold">{oi + 1}</span>
+                <input
+                  value={opt}
+                  onChange={e => setOption(oi, e.target.value)}
+                  placeholder={`Item ${oi + 1}`}
+                  className="flex-1 text-sm border-0 border-b border-transparent hover:border-white/10 focus:border-brand-400 focus:outline-none py-1 text-zinc-300 placeholder:text-zinc-300 bg-transparent transition-colors"
+                />
+                {q.options.length > 2 && (
+                  <button type="button" onClick={() => removeOption(oi)} className="p-1 text-zinc-300 hover:text-rose-400">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button type="button" onClick={addOption} className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-brand-600 mt-1 transition-colors">
+              <Plus className="w-3.5 h-3.5" /> Add item
+            </button>
+            <p className="text-xs text-zinc-500">Students will see items in shuffled order and drag them into the correct sequence.</p>
+          </div>
+        )}
+
+        {/* Rating */}
+        {q.type === 'rating' && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div>
+                <p className="text-xs text-zinc-400 font-medium mb-1">Scale (1 to…)</p>
+                <select
+                  value={q.ratingScale}
+                  onChange={e => onChange(q.id, { ratingScale: Number(e.target.value) })}
+                  className="bg-zinc-800 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  {[3, 4, 5, 6, 7, 10].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-zinc-400 font-medium mb-1">Low label</p>
+                <input
+                  value={q.ratingLabels[0]}
+                  onChange={e => onChange(q.id, { ratingLabels: [e.target.value, q.ratingLabels[1]] })}
+                  placeholder="e.g. Not at all"
+                  className="w-full text-sm border border-white/10 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 text-zinc-300 bg-transparent"
+                />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-zinc-400 font-medium mb-1">High label</p>
+                <input
+                  value={q.ratingLabels[1]}
+                  onChange={e => onChange(q.id, { ratingLabels: [q.ratingLabels[0], e.target.value] })}
+                  placeholder="e.g. Absolutely"
+                  className="w-full text-sm border border-white/10 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 text-zinc-300 bg-transparent"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              {Array.from({ length: q.ratingScale }, (_, i) => (
+                <div key={i} className="flex flex-col items-center gap-1">
+                  <div className="w-8 h-8 rounded-lg border border-white/15 flex items-center justify-center text-zinc-400 text-sm">{i + 1}</div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-zinc-400">Rating questions are not auto-graded — they collect student responses for review.</p>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -368,6 +446,9 @@ export default function TestBuilder() {
         options: q.options ?? [],
         correctAnswer: q.correctAnswer ?? '',
         correctAnswers: q.correctAnswers ?? [],
+        correctOrder: q.correctOrder ?? [],
+        ratingScale: q.ratingScale ?? 5,
+        ratingLabels: q.ratingLabels ?? ['', ''],
         points: q.points ?? 1,
       })))
     })
@@ -400,6 +481,9 @@ export default function TestBuilder() {
           : ['', '', '', ''],
       correctAnswer: '',
       correctAnswers: [],
+      correctOrder: [],
+      ratingScale: 5,
+      ratingLabels: ['', ''],
       points: 1,
     }])
     setQError('')
@@ -427,6 +511,8 @@ export default function TestBuilder() {
         options: q.options,
         correctAnswer: q.correctAnswer,
         ...(q.type === 'multiple_select' ? { correctAnswers: q.correctAnswers } : {}),
+        ...(q.type === 'ordering' ? { correctOrder: q.options.map((_, i) => String(i)) } : {}),
+        ...(q.type === 'rating' ? { ratingScale: q.ratingScale, ratingLabels: q.ratingLabels } : {}),
         points: q.points,
       }))
 
@@ -481,10 +567,12 @@ export default function TestBuilder() {
   }
 
   const addButtons: { type: QType; icon: React.ElementType; label: string }[] = [
-    { type: 'multiple_choice',  icon: CheckCircle2, label: 'Multiple choice'  },
-    { type: 'multiple_select',  icon: ListChecks,   label: 'Multiple select'  },
-    { type: 'true_false',       icon: ToggleLeft,   label: 'True / False'     },
-    { type: 'short_answer',     icon: AlignLeft,    label: 'Short answer'     },
+    { type: 'multiple_choice',  icon: CheckCircle2,  label: 'Multiple choice'  },
+    { type: 'multiple_select',  icon: ListChecks,    label: 'Multiple select'  },
+    { type: 'true_false',       icon: ToggleLeft,    label: 'True / False'     },
+    { type: 'short_answer',     icon: AlignLeft,     label: 'Short answer'     },
+    { type: 'ordering',         icon: ArrowUpDown,   label: 'Ordering'         },
+    { type: 'rating',           icon: Star,          label: 'Rating scale'     },
   ]
 
   return (

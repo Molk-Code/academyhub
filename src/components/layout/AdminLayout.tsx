@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Users, GraduationCap, Eye, LogOut, ArrowLeftRight, Clock,
   CalendarCheck, MessageSquare, BookOpen, Share2, BookMarked, Film, Menu, X,
-  UtensilsCrossed, Car, Mail, SlidersHorizontal, ChevronDown, CircleDot, Tv, Shield,
+  UtensilsCrossed, Car, Mail, SlidersHorizontal, ChevronDown, CircleDot, Tv, Shield, Package, ArchiveRestore, ClipboardList, BarChart2,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
-import { useFeature } from '@/hooks/useFeature'
+import { useFeature, useTier } from '@/hooks/useFeature'
 import { cn } from '@/lib/utils'
 import Avatar from '@/components/common/Avatar'
 import firePng from '@/assets/fire.png'
@@ -16,6 +16,8 @@ import { useBookingBadge, useBookingBadgeDetail } from '@/hooks/useBookingBadge'
 import { useChatUnreadCount } from '@/hooks/useChatUnread'
 import { useAppBadge } from '@/hooks/useAppBadge'
 import NotificationPermissionBanner from '@/components/NotificationPermissionBanner'
+import OfflineBanner from '@/components/OfflineBanner'
+import NotificationInbox from '@/components/NotificationInbox'
 
 interface NavItem { to: string; icon: React.ComponentType<{ className?: string }>; label: string; showBadge?: boolean; showUnread?: boolean }
 interface NavGroup { id: string; label: string; icon: string; items: NavItem[]; defaultOpen?: boolean }
@@ -31,20 +33,29 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'academic', label: 'Academic', icon: '📚', defaultOpen: true,
     items: [
-      { to: '/admin/lessons',          icon: BookOpen,   label: 'Lessons'          },
-      { to: '/admin/guide',            icon: BookMarked, label: 'FAQ'              },
-      { to: '/admin/semester-events',  icon: CircleDot,  label: 'Semester Events'  },
-      { to: '/admin/qr-devices',       icon: Tv,         label: 'Check-in Devices' },
+      { to: '/admin/lessons',           icon: BookOpen,    label: 'Lessons'          },
+      { to: '/admin/guide',             icon: BookMarked,  label: 'School Guide'     },
+      { to: '/admin/semester-events',   icon: CircleDot,   label: 'Semester Wheel'   },
+      { to: '/admin/qr-devices',        icon: Tv,          label: 'Check-in Devices' },
+      { to: '/admin/production-roles',   icon: Film,        label: 'Production'        },
+      { to: '/admin/experience-levels',  icon: BarChart2,   label: 'Experience Levels' },
+    ],
+  },
+  {
+    id: 'booking', label: 'Booking', icon: '📦', defaultOpen: false,
+    items: [
+      { to: '/admin/bookings',    icon: CalendarCheck,   label: 'Room Booking'                        },
+      { to: '/admin/minivan',     icon: Car,             label: 'Vehicles',        showBadge: true   },
+      { to: '/admin/food-box-orders', icon: UtensilsCrossed, label: 'Food Box Orders', showBadge: true   },
+      { to: '/admin/equipment',   icon: Package,         label: 'Equipment',       showBadge: true   },
+      { to: '/admin/inventory',   icon: ArchiveRestore,  label: 'Inventory'                          },
     ],
   },
   {
     id: 'school', label: 'School', icon: '🏫', defaultOpen: false,
     items: [
-      { to: '/admin/bookings',    icon: CalendarCheck,   label: 'Booking'          },
-      { to: '/admin/minivan',     icon: Car,             label: 'Vehicles',          showBadge: true },
-      { to: '/admin/food-orders', icon: UtensilsCrossed, label: 'Food Box Orders',   showBadge: true },
-      { to: '/admin/school-info', icon: Clock,           label: 'School Info'      },
-      { to: '/admin/chat',        icon: MessageSquare,   label: 'Chat',             showUnread: true },
+      { to: '/admin/school-info', icon: Clock,        label: 'School Info'               },
+      { to: '/admin/chat',        icon: MessageSquare, label: 'Chat', showUnread: true   },
     ],
   },
   {
@@ -58,14 +69,67 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ]
 
+export function AdminLayoutSkeleton() {
+  return (
+    <div className="flex h-screen bg-zinc-950">
+      <div className="hidden lg:flex w-64 bg-zinc-900 border-r border-white/8 flex-col p-4 flex-shrink-0">
+        <div className="flex items-center gap-2 mb-8 px-2">
+          <div className="w-8 h-8 rounded-lg bg-orange-500/20 animate-pulse" />
+          <div className="h-4 w-24 bg-white/10 rounded animate-pulse" />
+        </div>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-9 bg-white/5 rounded-xl mb-1 animate-pulse" style={{ opacity: 1 - i * 0.1 }} />
+        ))}
+      </div>
+      <div className="flex-1 p-8">
+        <div className="h-8 w-48 bg-white/10 rounded-xl animate-pulse mb-2" />
+        <div className="h-4 w-64 bg-white/5 rounded animate-pulse mb-8" />
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-24 bg-white/5 rounded-2xl animate-pulse" />
+          ))}
+        </div>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-16 bg-white/5 rounded-xl mb-3 animate-pulse" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function AdminContentSkeleton() {
+  return (
+    <div className="p-8">
+      <div className="h-8 w-48 bg-white/10 rounded-xl animate-pulse mb-2" />
+      <div className="h-4 w-64 bg-white/5 rounded animate-pulse mb-8" />
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-24 bg-white/5 rounded-2xl animate-pulse" />
+        ))}
+      </div>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="h-16 bg-white/5 rounded-xl mb-3 animate-pulse" />
+      ))}
+    </div>
+  )
+}
+
 export default function AdminLayout() {
   const { profile, roles, signOut, setPreviewCohortId } = useAuth()
   const { shortName } = useSchool()
-  const videoLabEnabled = useFeature('videoLab')
+  const videoLabEnabled     = useFeature('video_lab')
+  const canCheckinDevices   = useFeature('checkin_devices')
+  const canEquipment        = useFeature('equipment')
+  const canInventory        = useFeature('inventory')
+  const canBooking          = useFeature('booking')
+  const canVehicles         = useFeature('vehicles')
+  const canFoodBox          = useFeature('food_box')
+  const { tier }            = useTier()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const isChatPage          = pathname.endsWith('/chat')
+  const isFullPage          = pathname === '/admin/equipment' || pathname === '/admin/inventory'
   const canSwitchToTeacher  = roles.includes('teacher')
 
   const chatUnread    = useChatUnreadCount()
@@ -98,9 +162,21 @@ export default function AdminLayout() {
       })
     }
 
+    const ROUTE_FEATURE_GATE: Record<string, boolean> = {
+      '/admin/qr-devices':        canCheckinDevices,
+      '/admin/equipment':         canEquipment,
+      '/admin/inventory':         canInventory,
+      '/admin/bookings':          canBooking,
+      '/admin/minivan':           canVehicles,
+      '/admin/food-box-orders':   canFoodBox,
+    }
+
     return (
       <div className="space-y-1">
-        {NAV_GROUPS.map(group => (
+        {NAV_GROUPS.map(group => {
+          const visibleItems = group.items.filter(item => ROUTE_FEATURE_GATE[item.to] !== false)
+          if (visibleItems.length === 0) return null
+          return (
           <div key={group.id}>
             <button
               onClick={() => toggle(group.id)}
@@ -112,9 +188,9 @@ export default function AdminLayout() {
             </button>
             {openGroups[group.id] && (
               <div className="space-y-0.5 mb-1">
-                {group.items.map(({ to, icon: Icon, label, showBadge, showUnread }) => {
+                {visibleItems.map(({ to, icon: Icon, label, showBadge, showUnread }) => {
                   const badgeCount = showBadge
-                    ? (to === '/admin/food-orders' ? bookingDetail.food : bookingDetail.van)
+                    ? (to === '/admin/food-box-orders' ? bookingDetail.food : to === '/admin/equipment' ? bookingDetail.equipment : bookingDetail.van)
                     : showUnread ? chatUnread : 0
                   return (
                     <NavLink
@@ -141,7 +217,8 @@ export default function AdminLayout() {
               </div>
             )}
           </div>
-        ))}
+        )
+        })}
 
         {/* Video Lab — standalone amber item */}
         {videoLabEnabled && <NavLink
@@ -181,35 +258,68 @@ export default function AdminLayout() {
     )
   }
 
-  const SidebarFooter = () => (
-    <div className="p-3 border-t border-[var(--border)] space-y-1">
-      {canSwitchToTeacher && (
-        <button
-          onClick={() => navigate('/teacher')}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-zinc-400 hover:bg-[var(--bg-elevated)] hover:text-white transition-all"
-        >
-          <ArrowLeftRight className="w-4 h-4" />
-          Switch to Teacher view
-        </button>
-      )}
-      <div className="flex items-center gap-3 px-3 py-2">
-        <Avatar uid={profile?.uid ?? 'x'} name={profile?.displayName ?? '?'} avatarUrl={profile?.avatarUrl} size="sm" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-white truncate">{profile?.displayName}</p>
-          <p className="text-xs text-rose-400 truncate">Admin</p>
+  const TIER_PILL_COLORS: Record<string, string> = {
+    studio:  'bg-orange-500/20 text-orange-400',
+    academy: 'bg-purple-500/20 text-purple-400',
+    campus:  'bg-blue-500/20   text-blue-400',
+  }
+
+  const SidebarFooter = () => {
+    const { storageUsedBytes = 0, storageQuotaGB } = useSchool()
+    const storageQuotaPct = storageQuotaGB
+      ? Math.min(100, Math.round((storageUsedBytes / (storageQuotaGB * 1024 * 1024 * 1024)) * 100))
+      : 0
+    const storageBarColor = storageQuotaPct > 90 ? 'bg-rose-500' : storageQuotaPct > 70 ? 'bg-amber-500' : 'bg-emerald-500'
+    function fmtB(b: number) {
+      return b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(0)} MB` : `${Math.round(b / 1024)} KB`
+    }
+    return (
+      <div className="p-3 border-t border-[var(--border)] space-y-1">
+        {tier && (
+          <div className={`mx-0 mb-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-center ${TIER_PILL_COLORS[tier] ?? 'bg-white/10 text-zinc-400'}`}>
+            {tier.charAt(0).toUpperCase() + tier.slice(1)} Plan
+          </div>
+        )}
+        {storageQuotaGB && (
+          <div className="mx-0 mb-1 px-3 py-2 rounded-xl bg-white/5">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] text-zinc-400 font-medium">Storage</span>
+              <span className="text-[10px] text-zinc-500">{fmtB(storageUsedBytes)} / {storageQuotaGB} GB</span>
+            </div>
+            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${storageBarColor}`} style={{ width: `${storageQuotaPct}%` }} />
+            </div>
+          </div>
+        )}
+        {canSwitchToTeacher && (
+          <button
+            onClick={() => navigate('/teacher')}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-zinc-400 hover:bg-[var(--bg-elevated)] hover:text-white transition-all"
+          >
+            <ArrowLeftRight className="w-4 h-4" />
+            Switch to Teacher view
+          </button>
+        )}
+        <div className="flex items-center gap-3 px-3 py-2">
+          <Avatar uid={profile?.uid ?? 'x'} name={profile?.displayName ?? '?'} avatarUrl={profile?.avatarUrl} size="sm" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-white truncate">{profile?.displayName}</p>
+            <p className="text-xs text-rose-400 truncate">Admin</p>
+          </div>
+          <button
+            onClick={handleSignOut}
+            className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-[var(--bg-hover)] transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
-        <button
-          onClick={handleSignOut}
-          className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-[var(--bg-hover)] transition-colors"
-        >
-          <LogOut className="w-4 h-4" />
-        </button>
       </div>
-    </div>
-  )
+    )
+  }
 
   return (
     <div className="flex overflow-hidden" style={{ height: '100dvh', background: 'var(--bg-primary)' }}>
+      <OfflineBanner />
 
       {/* ── Mobile top header ──────────────────────────────────────────────── */}
       <header className="mobile-header lg:hidden fixed top-0 left-0 right-0 z-40 bg-[var(--bg-surface)] border-b border-[var(--border)] shadow-lg">
@@ -221,17 +331,20 @@ export default function AdminLayout() {
               <span className="text-[10px] text-rose-400 leading-none">Admin Portal</span>
             </div>
           </Link>
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="relative p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-[var(--bg-elevated)] transition-colors"
-          >
-            <Menu className="w-5 h-5" />
-            {totalBadge > 0 && (
-              <span className="absolute top-1 right-1 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold px-1 leading-none">
-                {totalBadge > 99 ? '99+' : totalBadge}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationInbox />
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="relative p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-[var(--bg-elevated)] transition-colors"
+            >
+              <Menu className="w-5 h-5" />
+              {totalBadge > 0 && (
+                <span className="absolute top-1 right-1 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold px-1 leading-none">
+                  {totalBadge > 99 ? '99+' : totalBadge}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -269,13 +382,14 @@ export default function AdminLayout() {
       {/* ── Desktop sidebar ────────────────────────────────────────────────── */}
       <aside className="hidden lg:flex w-64 bg-[var(--bg-surface)] flex-col shadow-xl flex-shrink-0">
         <div className="h-16 flex items-center gap-3 px-5 border-b border-[var(--border)]">
-          <Link to="/admin/users" className="flex items-center gap-3">
-            <img src={firePng} alt="CineForge" className="w-8 h-8 object-contain" />
-            <div>
+          <Link to="/admin/users" className="flex items-center gap-3 flex-1 min-w-0">
+            <img src={firePng} alt="CineForge" className="w-8 h-8 object-contain flex-shrink-0" />
+            <div className="min-w-0">
               <span className="text-base font-bold text-white tracking-tight">{shortName}</span>
               <span className="block text-xs text-rose-400 -mt-0.5">Admin Portal</span>
             </div>
           </Link>
+          <NotificationInbox />
         </div>
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           <NavLinks />
@@ -291,19 +405,23 @@ export default function AdminLayout() {
         )}
       >
         <NotificationPermissionBanner />
-        {isChatPage ? (
-          <Outlet />
-        ) : (
-          <motion.div
-            key={pathname}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-            className="max-w-6xl mx-auto px-4 py-5 pb-[max(20px,env(safe-area-inset-bottom))] sm:px-6 lg:px-8 lg:py-8"
-          >
+        <Suspense fallback={<AdminContentSkeleton />}>
+          {isChatPage ? (
             <Outlet />
-          </motion.div>
-        )}
+          ) : isFullPage ? (
+            <Outlet />
+          ) : (
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="max-w-6xl mx-auto px-4 py-5 pb-[max(20px,env(safe-area-inset-bottom))] sm:px-6 lg:px-8 lg:py-8"
+            >
+              <Outlet />
+            </motion.div>
+          )}
+        </Suspense>
       </main>
     </div>
   )

@@ -1,17 +1,17 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import {
   collection, addDoc, deleteDoc, doc, updateDoc, setDoc,
   serverTimestamp, arrayUnion, arrayRemove, getDocs, writeBatch,
 } from 'firebase/firestore'
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { uploadWithQuota } from '@/lib/uploadWithQuota'
 import {
   Hash, Plus, Trash2, Send, Paperclip, Smile,
   X, FileText, Download, Settings, Lock, Globe,
-  UserPlus, ChevronDown, ChevronUp, SlidersHorizontal, ArrowLeft, MessageSquare,
+  UserPlus, ChevronDown, ChevronUp, SlidersHorizontal, ArrowLeft, MessageSquare, Search,
 } from 'lucide-react'
 import { format, isToday, isYesterday, differenceInMinutes } from 'date-fns'
-import { db, storage } from '@/lib/firebase'
+import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, orderBy, useDocument, where } from '@/hooks/useFirestore'
 import type { ChatChannelDoc, ChatMessageDoc, ChatSettingsDoc, CohortDoc, UserDoc, UserRole, ProductionTeamDoc } from '@/types'
@@ -509,6 +509,7 @@ function ChannelSettingsModal({
 export default function ChatPage() {
   const { profile, roles, cohortId } = useAuth()
   const { pathname } = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
   const isAdmin  = roles.includes('admin') && pathname.startsWith('/admin')
   const isStudentPath = !pathname.startsWith('/teacher') && !pathname.startsWith('/admin')
   const seenRev  = useSeenRevision()
@@ -526,6 +527,8 @@ export default function ChatPage() {
 
   const [activeChannelId,    setActiveChannelId]    = useState<string | null>(null)
   const [mobileChatView,     setMobileChatView]     = useState<'channels' | 'messages'>('channels')
+  const [searchQuery,        setSearchQuery]        = useState('')
+  const [isSearching,        setIsSearching]        = useState(false)
   const [inputText,          setInputText]          = useState('')
   const [pendingFiles,       setPendingFiles]       = useState<File[]>([])
   const [sending,            setSending]            = useState(false)
@@ -591,10 +594,35 @@ export default function ChatPage() {
     activeChannelId ?? '',
   )
 
+  const displayedMessages = useMemo(() => {
+    if (!searchQuery.trim()) return messages
+    const q = searchQuery.toLowerCase()
+    return messages.filter(m =>
+      m.content?.toLowerCase().includes(q) ||
+      m.authorName?.toLowerCase().includes(q),
+    )
+  }, [messages, searchQuery])
+
+  function highlightText(text: string, query: string): React.ReactNode {
+    if (!query.trim()) return text
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
+    return parts.map((part, i) =>
+      part.toLowerCase() === query.toLowerCase()
+        ? <mark key={i} className="bg-orange-500/30 text-orange-200 rounded px-0.5">{part}</mark>
+        : part,
+    )
+  }
+
   // Mark read when switching channels OR when new messages arrive on the active channel
   useEffect(() => {
     if (profile && activeChannelId) markChannelRead(profile.uid, activeChannelId)
   }, [activeChannelId, messages.length, profile?.uid]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    setIsSearching(false)
+    setSearchQuery('')
+  }, [activeChannelId])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -618,10 +646,8 @@ export default function ChatPage() {
     try {
       const attachments = await Promise.all(
         pendingFiles.map(async file => {
-          const path       = `chat/${activeChannelId}/${Date.now()}_${file.name}`
-          const storageRef = ref(storage, path)
-          await uploadBytes(storageRef, file)
-          const url = await getDownloadURL(storageRef)
+          const path = `chat/${activeChannelId}/${Date.now()}_${file.name}`
+          const url  = await uploadWithQuota(file, path)
           return { url, name: file.name, type: file.type, size: file.size }
         }),
       )
@@ -706,6 +732,16 @@ export default function ChatPage() {
     setActiveChannelId(newRef.id)
     setMobileChatView('messages')
   }
+
+  // Open DM from ?dm=UID URL param (e.g. teacher navigating from student detail)
+  useEffect(() => {
+    const targetUid = searchParams.get('dm')
+    if (!targetUid || !profile || allUsers.length === 0) return
+    const targetUser = allUsers.find(u => u.uid === targetUid)
+    if (!targetUser) return
+    setSearchParams({}, { replace: true })
+    startDM(targetUser)
+  }, [searchParams.get('dm'), profile?.uid, allUsers.length])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -964,16 +1000,52 @@ export default function ChatPage() {
                     )}
                   </>
                 )}
-                {isAdmin && (
+                <div className="ml-auto flex items-center gap-1 flex-shrink-0">
                   <button
-                    onClick={() => setSettingsChannelId(activeChannel.id)}
-                    className="ml-auto p-1.5 text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors flex-shrink-0"
-                    title="Channel settings"
+                    onClick={() => { setIsSearching(s => !s); if (isSearching) setSearchQuery('') }}
+                    className={cn(
+                      'p-1.5 rounded-lg transition-colors',
+                      isSearching ? 'bg-orange-500/20 text-orange-400' : 'text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800',
+                    )}
+                    title="Search messages"
                   >
-                    <Settings className="w-4 h-4" />
+                    <Search className="w-4 h-4" />
                   </button>
-                )}
+                  {isAdmin && (
+                    <button
+                      onClick={() => setSettingsChannelId(activeChannel.id)}
+                      className="p-1.5 text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors"
+                      title="Channel settings"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {/* Search bar */}
+              {isSearching && (
+                <div className="px-4 py-2 border-b border-white/8 flex-shrink-0">
+                  <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2">
+                    <Search className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+                    <input
+                      autoFocus
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      placeholder="Search messages…"
+                      className="flex-1 bg-transparent text-sm text-white placeholder-zinc-600 outline-none"
+                    />
+                    {searchQuery && (
+                      <button onClick={() => setSearchQuery('')} className="text-zinc-600 hover:text-zinc-400 text-xs transition-colors">✕</button>
+                    )}
+                  </div>
+                  {searchQuery && (
+                    <p className="text-xs text-zinc-500 mt-1 px-1">
+                      {displayedMessages.length} result{displayedMessages.length !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -987,13 +1059,13 @@ export default function ChatPage() {
                       <Hash className="w-8 h-8 text-zinc-300" />
                     </div>
                     <p className="text-zinc-300 font-semibold">Welcome to #{activeChannel.name}!</p>
-                    <p className="text-zinc-400 text-sm mt-1">This is the beginning of the channel.</p>
+                    <p className="text-zinc-400 text-sm mt-1">👋 Be the first to say something</p>
                   </div>
                 ) : (
                   <div className="space-y-px">
-                    {messages.map((msg, index) => {
-                      const grouped   = isGrouped(index)
-                      const divider   = getDivider(index)
+                    {displayedMessages.map((msg, index) => {
+                      const grouped   = searchQuery ? false : isGrouped(index)
+                      const divider   = searchQuery ? null  : getDivider(index)
                       const msgTime   = msg.createdAt?.toDate?.()
                       const isOwn     = msg.authorId === profile?.uid
                       const canDelete = isOwn || isAdmin
@@ -1037,7 +1109,7 @@ export default function ChatPage() {
                               )}
 
                               {msg.content && (
-                                <p className="text-sm text-zinc-200 leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                                <p className="text-sm text-zinc-200 leading-relaxed whitespace-pre-wrap break-words">{highlightText(msg.content, searchQuery)}</p>
                               )}
 
                               {/* Attachments */}

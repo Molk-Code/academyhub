@@ -1,9 +1,7 @@
 import { useState, useMemo, useRef } from 'react'
-import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
 import type { SemesterEventDoc, SemesterCategoryDoc } from '@/types'
-import { ExternalLink } from 'lucide-react'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants & math helpers
@@ -75,11 +73,28 @@ function isEventActiveNow(ev: SemesterEventDoc, todayMmdd: string): boolean {
 }
 
 function daysUntilStart(startDate: string): number {
-  const today = new Date()
+  const today = new Date(); today.setHours(0,0,0,0)
   const [m, d] = startDate.split('-').map(Number)
   const target = new Date(today.getFullYear(), m - 1, d)
   if (target < today) target.setFullYear(today.getFullYear() + 1)
-  return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+function daysSinceEnd(endDate: string): number {
+  const today = new Date(); today.setHours(0,0,0,0)
+  const [m, d] = endDate.split('-').map(Number)
+  let target = new Date(today.getFullYear(), m - 1, d)
+  if (target > today) target.setFullYear(today.getFullYear() - 1)
+  return Math.round((today.getTime() - target.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+function isEventPast(ev: SemesterEventDoc, todayMmdd: string): boolean {
+  if (isEventActiveNow(ev, todayMmdd)) return false
+  const { startDate: s, endDate: e } = ev
+  // non-wrapping: past if end is before today
+  if (s <= e) return e < todayMmdd
+  // wrapping (e.g. Dec→Jan): past if we're in the gap between end and start
+  return e < todayMmdd && s > todayMmdd
 }
 
 function getSchoolYear(): string {
@@ -284,24 +299,20 @@ export default function SemesterWheel() {
 
   const todayMmdd = format(new Date(), 'MM-dd')
 
-  const activeEvents  = useMemo(() => events.filter(e => e.isActive), [events])
+  const activeEvents = useMemo(() => events.filter(e => e.isActive), [events])
 
-  const { upcoming, past } = useMemo(() => {
-    const up: SemesterEventDoc[] = []
+  const { activeNow, upcoming, past } = useMemo(() => {
+    const activeNow: SemesterEventDoc[] = []
+    const upcoming: SemesterEventDoc[] = []
     const past: SemesterEventDoc[] = []
     for (const ev of activeEvents) {
-      const active = isEventActiveNow(ev, todayMmdd)
-      const days   = daysUntilStart(ev.startDate)
-      if (active || days >= 0) up.push(ev)
-      else past.push(ev)
+      if (isEventActiveNow(ev, todayMmdd))   activeNow.push(ev)
+      else if (isEventPast(ev, todayMmdd))   past.push(ev)
+      else                                   upcoming.push(ev)
     }
-    up.sort((a, b) => {
-      const aActive = isEventActiveNow(a, todayMmdd)
-      const bActive = isEventActiveNow(b, todayMmdd)
-      if (aActive !== bActive) return aActive ? -1 : 1
-      return daysUntilStart(a.startDate) - daysUntilStart(b.startDate)
-    })
-    return { upcoming: up, past }
+    upcoming.sort((a, b) => daysUntilStart(a.startDate) - daysUntilStart(b.startDate))
+    past.sort((a, b) => daysSinceEnd(a.endDate) - daysSinceEnd(b.endDate))
+    return { activeNow, upcoming, past }
   }, [activeEvents, todayMmdd])
 
   function toggleSelect(id: string) {
@@ -369,24 +380,34 @@ export default function SemesterWheel() {
 
         {/* Sidebar */}
         <div className="flex-1 min-w-0 space-y-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Semester Reminders
-            </h2>
-            <Link
-              to="/admin/semester-events"
-              className="flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors"
-            >
-              Manage <ExternalLink className="w-3 h-3" />
-            </Link>
-          </div>
+          <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Semester Reminders
+          </h2>
 
-          {/* Active & Upcoming */}
+          {/* Active Now */}
+          {activeNow.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-500 flex items-center gap-1.5">
+                <span className="animate-pulse w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                Active Now
+              </p>
+              {activeNow.map(ev => (
+                <EventCard
+                  key={ev.id}
+                  ev={ev}
+                  todayMmdd={todayMmdd}
+                  categoryDocs={categoryDocs}
+                  isSelected={selectedId === ev.id}
+                  onClick={() => toggleSelect(ev.id)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Coming Up */}
           {upcoming.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                Active & Upcoming
-              </p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Coming Up</p>
               {upcoming.map(ev => (
                 <EventCard
                   key={ev.id}
@@ -403,9 +424,7 @@ export default function SemesterWheel() {
           {/* Past */}
           {past.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                Past
-              </p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-600">Past</p>
               {past.map(ev => (
                 <EventCard
                   key={ev.id}
@@ -456,7 +475,9 @@ function EventCard({
   dimmed?: boolean
 }) {
   const active   = isEventActiveNow(ev, todayMmdd)
+  const past     = !active && isEventPast(ev, todayMmdd)
   const days     = daysUntilStart(ev.startDate)
+  const ago      = daysSinceEnd(ev.endDate)
   const color = catColor(ev.category, categoryDocs)
 
   return (
@@ -504,7 +525,12 @@ function EventCard({
             >
               {ev.category}
             </span>
-            {!active && (
+            {!active && past && (
+              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                {ago === 0 ? 'Ended today' : ago === 1 ? 'Ended yesterday' : `Ended ${ago} days ago`}
+              </span>
+            )}
+            {!active && !past && (
               <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                 {days === 0 ? 'Starts today' : days === 1 ? 'Tomorrow' : `In ${days} days`}
               </span>

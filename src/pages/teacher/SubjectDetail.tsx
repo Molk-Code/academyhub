@@ -1,8 +1,8 @@
 import { useState, useMemo, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { doc, updateDoc, addDoc, deleteDoc, collection } from 'firebase/firestore'
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
-import { db, storage } from '@/lib/firebase'
+import { db } from '@/lib/firebase'
+import { uploadWithQuota, deleteWithTracking } from '@/lib/uploadWithQuota'
 import { useDocument, useCollection, orderBy, where } from '@/hooks/useFirestore'
 import type { SubjectDoc, CurriculumItem, SubjectResource, SubjectTeacherDoc, UserDoc, LessonDoc, VideoLabDoc, AbsenceReportDoc } from '@/types'
 import { thumbnailUrl } from '@/lib/cloudinary'
@@ -218,10 +218,8 @@ export default function SubjectDetail() {
     setSaving(true)
     setResError(null)
     const storagePath = `resources/subjects/${id}/${Date.now()}_${resFile.name}`
-    const storageRef = ref(storage, storagePath)
     try {
-      const snap = await uploadBytes(storageRef, resFile)
-      const url = await getDownloadURL(snap.ref)
+      const url = await uploadWithQuota(resFile, storagePath)
       const resource: SubjectResource = { id: nanoid(), type: 'file', title: resTitle.trim(), url, storagePath }
       await saveResources([...resources, resource])
       setAddingRes(null)
@@ -236,7 +234,7 @@ export default function SubjectDetail() {
     if (!confirm('Remove this resource?')) return
     setDeletingRes(res.id)
     if (res.storagePath) {
-      try { await deleteObject(ref(storage, res.storagePath)) } catch {}
+      try { await deleteWithTracking(res.storagePath) } catch {}
     }
     await saveResources(resources.filter(r => r.id !== res.id))
     setDeletingRes(null)
@@ -311,8 +309,7 @@ export default function SubjectDetail() {
 
       if (teacherImg) {
         storagePath = `resources/subjects/${id}/teachers/${Date.now()}_${teacherImg.name}`
-        const snap = await uploadBytes(ref(storage, storagePath), teacherImg)
-        imageUrl = await getDownloadURL(snap.ref)
+        imageUrl = await uploadWithQuota(teacherImg, storagePath)
       }
 
       const isEditing = teacherPanel !== 'add' && teacherPanel !== null
@@ -334,7 +331,7 @@ export default function SubjectDetail() {
       } else {
         const existing = teachers.find(t => t.id === (teacherPanel as { id: string }).id)
         if (teacherImg && existing?.storagePath) {
-          try { await deleteObject(ref(storage, existing.storagePath)) } catch {}
+          try { await deleteWithTracking(existing.storagePath) } catch {}
         }
         const user = teacherMode === 'existing' ? teacherUsers.find(u => u.id === selectedUserId) : null
         const update: Partial<SubjectTeacherDoc> = {
@@ -364,7 +361,7 @@ export default function SubjectDetail() {
   async function deleteTeacher(t: SubjectTeacherDoc) {
     if (!id || !confirm('Remove this teacher?')) return
     if (t.storagePath) {
-      try { await deleteObject(ref(storage, t.storagePath)) } catch {}
+      try { await deleteWithTracking(t.storagePath) } catch {}
     }
     await deleteDoc(doc(db, `subjects/${id}/teachers`, t.id))
   }

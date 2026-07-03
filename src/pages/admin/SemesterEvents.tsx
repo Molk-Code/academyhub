@@ -291,11 +291,11 @@ function EventModal({
             </div>
           </div>
 
-          {/* Active toggle */}
+          {/* Show on wheel toggle */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Active</p>
-              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Show on the semester wheel</p>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Show on wheel</p>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>This event repeats every year — no need to recreate it</p>
             </div>
             <button type="button" onClick={() => set('isActive', !form.isActive)} className="transition-colors">
               {form.isActive
@@ -487,6 +487,27 @@ export default function SemesterEvents() {
     [events],
   )
 
+  function mmddToDayOfYear(mmdd: string): number {
+    const [m, d] = mmdd.split('-').map(Number)
+    if (!m || !d) return 0
+    return MONTH_CUMUL[m - 1] + d
+  }
+
+  const overlappingIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (let i = 0; i < sorted.length; i++) {
+      for (let j = i + 1; j < sorted.length; j++) {
+        const a = sorted[i], b = sorted[j]
+        const aStart = mmddToDayOfYear(a.startDate)
+        const aEnd   = mmddToDayOfYear(a.endDate || a.startDate)
+        const bStart = mmddToDayOfYear(b.startDate)
+        const bEnd   = mmddToDayOfYear(b.endDate || b.startDate)
+        if (aStart <= bEnd && aEnd >= bStart) { ids.add(a.id); ids.add(b.id) }
+      }
+    }
+    return ids
+  }, [sorted])
+
   const [modal, setModal] = useState<'add' | SemesterEventDoc | null>(null)
 
   async function handleSave(data: ReturnType<typeof formToPayload>) {
@@ -516,9 +537,9 @@ export default function SemesterEvents() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="page-title">Semester Events</h1>
+          <h1 className="page-title">Semester Wheel</h1>
           <p className="text-zinc-500 text-sm mt-1">
-            Recurring annual events shown on the teacher semester wheel.
+            Annual recurring events on the semester wheel. Dates are <strong className="text-zinc-300">month/day only</strong> — they repeat automatically every school year. Do not delete events at year-end; just leave them as-is.
           </p>
         </div>
         <button onClick={() => setModal('add')} className="btn-primary">
@@ -542,7 +563,7 @@ export default function SemesterEvents() {
                 <th className="text-left px-5 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wider">Event</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wider hidden sm:table-cell">Dates</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wider hidden md:table-cell">Category</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wider">Active</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wider">Show on wheel</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -555,7 +576,12 @@ export default function SemesterEvents() {
                       <div className="flex items-center gap-3">
                         <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: ev.color }} />
                         <div>
-                          <p className="text-sm font-medium text-zinc-200">{ev.title}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-zinc-200">{ev.title}</p>
+                            {overlappingIds.has(ev.id) && (
+                              <span title="Overlaps with another event" className="text-xs text-amber-400 font-bold">⚠</span>
+                            )}
+                          </div>
                           {ev.description && (
                             <p className="text-xs text-zinc-500 mt-0.5 line-clamp-1">{ev.description}</p>
                           )}

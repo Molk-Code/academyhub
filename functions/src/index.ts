@@ -12,6 +12,24 @@ function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
 }
 
+// Escape user-supplied content before inserting into HTML strings
+function escapeHtml(s: unknown): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function requireTeacherOrAdmin(context: functions.https.CallableContext): void {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  const r = context.auth.token.role
+  if (r !== 'teacher' && r !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Only teachers and admins can perform this action.')
+  }
+}
+
 async function getEmailConfig() {
   const snap = await db.collection('email_config').doc('global').get()
   return snap.exists
@@ -39,6 +57,12 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
 
   const inviteDoc = snap.docs[0]
   const invite    = inviteDoc.data()
+
+  // Reject expired invitations
+  if (invite.expiresAt && invite.expiresAt.toDate() < new Date()) {
+    await admin.auth().setCustomUserClaims(user.uid, { role: 'student', cohortId: null })
+    return
+  }
 
   // Set custom claims so Firestore rules work immediately
   await admin.auth().setCustomUserClaims(user.uid, {
@@ -108,21 +132,14 @@ export const getTestQuestions = functions.https.onCall(async (data, context) => 
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const checkInAttendance = functions.https.onCall(async (data, context) => {
-  console.log('checkInAttendance called', { data, uid: context.auth?.uid })
-
-  if (!context.auth) {
-    console.log('ERROR: not authenticated')
-    throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
-  }
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
 
   const { token } = data as { token: string }
-  if (!token) {
-    console.log('ERROR: no token provided')
+  if (!token || typeof token !== 'string') {
     throw new functions.https.HttpsError('invalid-argument', 'token is required.')
   }
 
   const uid = context.auth.uid
-  console.log('Step 1: querying attendance_sessions for token', token.slice(0, 8) + '...')
 
   try {
     const sessionSnap = await db.collection('attendance_sessions')
@@ -130,15 +147,12 @@ export const checkInAttendance = functions.https.onCall(async (data, context) =>
       .limit(1)
       .get()
 
-    console.log('Step 2: session query done, empty:', sessionSnap.empty)
-
     if (sessionSnap.empty) {
       throw new functions.https.HttpsError('not-found', 'Invalid QR code. Ask your teacher to refresh it.')
     }
 
     const sessionDoc = sessionSnap.docs[0]
     const session    = sessionDoc.data()
-    console.log('Step 3: session found', { isActive: session.isActive, lessonId: session.lessonId })
 
     if (!session.isActive) {
       throw new functions.https.HttpsError('failed-precondition', 'This attendance session is no longer active.')
@@ -146,7 +160,6 @@ export const checkInAttendance = functions.https.onCall(async (data, context) =>
 
     const now     = admin.firestore.Timestamp.now()
     const expired = session.expiresAt.toMillis() < now.toMillis()
-    console.log('Step 4: expiry check', { expired, expiresAt: session.expiresAt.toMillis(), now: now.toMillis() })
 
     if (expired) {
       throw new functions.https.HttpsError('deadline-exceeded', 'QR code expired. Ask your teacher to refresh it.')
@@ -156,13 +169,11 @@ export const checkInAttendance = functions.https.onCall(async (data, context) =>
     const attendanceRef = db.collection('lessons').doc(lessonId).collection('attendance').doc(uid)
 
     const existing = await attendanceRef.get()
-    console.log('Step 5: existing check-in:', existing.exists)
 
     if (existing.exists) {
       throw new functions.https.HttpsError('already-exists', 'You have already checked in to this lesson.')
     }
 
-    console.log('Step 6: fetching user and settings...')
     const [userSnap, settingsSnap] = await Promise.all([
       db.collection('users').doc(uid).get(),
       db.collection('settings').doc('attendance').get(),
@@ -170,7 +181,6 @@ export const checkInAttendance = functions.https.onCall(async (data, context) =>
 
     const displayName     = userSnap.exists ? (userSnap.data()?.displayName ?? 'Student') : 'Student'
     const pointsPerCheckIn: number = settingsSnap.exists ? (settingsSnap.data()?.pointsPerCheckIn ?? 0) : 0
-    console.log('Step 7: displayName:', displayName, 'points:', pointsPerCheckIn)
 
     await attendanceRef.set({
       studentId:     uid,
@@ -179,7 +189,6 @@ export const checkInAttendance = functions.https.onCall(async (data, context) =>
       sessionId:     sessionDoc.id,
       pointsAwarded: pointsPerCheckIn,
     })
-    console.log('Step 8: attendance recorded successfully')
 
     if (pointsPerCheckIn > 0) {
       await db.runTransaction(async (tx) => {
@@ -196,14 +205,14 @@ export const checkInAttendance = functions.https.onCall(async (data, context) =>
           totalPoints: admin.firestore.FieldValue.increment(pointsPerCheckIn),
         })
       })
-      console.log('Step 9: points awarded')
+      const newTotal = ((await db.collection('users').doc(uid).get()).data()?.totalPoints ?? 0) as number
+      await checkLevelUp(uid, newTotal)
     }
 
-    console.log('SUCCESS: check-in complete')
     return { success: true, lessonId, pointsAwarded: pointsPerCheckIn }
 
   } catch (err: any) {
-    console.error('CAUGHT ERROR in checkInAttendance:', err?.code, err?.message, err?.stack)
+    console.error('checkInAttendance error:', err?.code, err?.message)
     if (err instanceof functions.https.HttpsError) throw err
     throw new functions.https.HttpsError('internal', err?.message ?? 'Unknown error')
   }
@@ -214,10 +223,16 @@ export const checkInAttendance = functions.https.onCall(async (data, context) =>
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const gradeSubmission = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  requireTeacherOrAdmin(context)
 
   const { submissionId, score, feedback } = data as {
     submissionId: string; score: number; feedback?: string
+  }
+  if (!submissionId || typeof submissionId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'submissionId is required.')
+  }
+  if (typeof score !== 'number' || score < 0 || !isFinite(score)) {
+    throw new functions.https.HttpsError('invalid-argument', 'score must be a non-negative number.')
   }
 
   const subRef  = db.collection('submissions').doc(submissionId)
@@ -269,6 +284,11 @@ export const gradeSubmission = functions.https.onCall(async (data, context) => {
 
   // Update progress document (outside transaction for simplicity)
   await updateProgress(sub.studentId, sub.cohortId)
+
+  if (pointsAwarded > 0) {
+    const newTotal = ((await db.collection('users').doc(sub.studentId).get()).data()?.totalPoints ?? 0) as number
+    await checkLevelUp(sub.studentId as string, newTotal)
+  }
 
   return { success: true, pointsAwarded }
 })
@@ -399,8 +419,11 @@ async function updateProgress(studentId: string, cohortId: string) {
 }
 
 export const recalculateProgress = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  requireTeacherOrAdmin(context)
   const { studentId, cohortId } = data as { studentId: string; cohortId: string }
+  if (!studentId || typeof studentId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'studentId is required.')
+  }
   await updateProgress(studentId, cohortId)
   return { success: true }
 })
@@ -540,6 +563,8 @@ export const submitTestAnswers = functions.https.onCall(async (data, context) =>
       tx.update(subRef, { pointsAwarded: pointsToAward })
     })
     await updateProgress(uid, assignment.cohortId as string)
+    const newTotal = ((await db.collection('users').doc(uid).get()).data()?.totalPoints ?? 0) as number
+    await checkLevelUp(uid, newTotal)
   }
 
   return { submissionId: subRef.id, percentageScore, passed }
@@ -606,11 +631,14 @@ export const purgeChatMessages = functions.pubsub.schedule('every 24 hours').onR
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const gradeShortAnswers = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  requireTeacherOrAdmin(context)
 
   const { submissionId, answers } = data as {
     submissionId: string
     answers: Array<{ questionId: string; isCorrect: boolean }>
+  }
+  if (!submissionId || typeof submissionId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'submissionId is required.')
   }
 
   const subRef  = db.collection('submissions').doc(submissionId)
@@ -680,17 +708,23 @@ export const gradeShortAnswers = functions.https.onCall(async (data, context) =>
 
   await updateProgress(sub.studentId as string, sub.cohortId as string)
 
+  if (pointsToAward > 0) {
+    const newTotal = ((await db.collection('users').doc(sub.studentId as string).get()).data()?.totalPoints ?? 0) as number
+    await checkLevelUp(sub.studentId as string, newTotal)
+  }
+
   // Push notification to student — test result available
   const studentSnap = await db.collection('users').doc(sub.studentId as string).get()
   const tokens: string[] = studentSnap.data()?.fcmTokens ?? []
-  if (tokens.length > 0) {
-    await sendPush(tokens, {
-      title: passed ? '✅ Test passed!' : '📝 Test result available',
-      body:  `You scored ${percentageScore}% on your test.`,
-      url:   '/assignments',
-      tag:   'test-result',
-    })
+  const testOpts = {
+    title: passed ? '✅ Test passed!' : '📝 Test result available',
+    body:  `You scored ${percentageScore}% on your test.`,
+    url:   '/assignments',
   }
+  await Promise.all([
+    tokens.length > 0 ? sendPush(tokens, { ...testOpts, tag: 'test-result' }) : Promise.resolve(),
+    saveNotifications([sub.studentId as string], testOpts),
+  ])
 
   return { success: true, percentageScore, passed }
 })
@@ -719,7 +753,7 @@ async function sendPush(
           tag:   opts.tag ?? 'cineforge',
         },
         webpush: {
-          fcmOptions: { link: opts.url ?? '/' },
+          headers: { Urgency: 'high' },
         },
       })
       const successCount = res.responses.filter(r => r.success).length
@@ -749,6 +783,84 @@ async function sendPush(
   }
 }
 
+async function saveNotifications(
+  uids: string[],
+  opts: { title: string; body: string; url?: string },
+) {
+  if (uids.length === 0) return
+  const batch = db.batch()
+  for (const uid of uids) {
+    const ref = db.collection('notifications').doc()
+    batch.set(ref, {
+      uid,
+      title:     opts.title,
+      body:      opts.body,
+      url:       opts.url ?? '/',
+      isRead:    false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    })
+  }
+  await batch.commit()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// checkLevelUp — detect and notify when a student reaches a new experience level
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function checkLevelUp(uid: string, newTotal: number) {
+  try {
+    const levelsSnap = await db.collection('settings').doc('experience_levels').get()
+    const allLevels = (levelsSnap.data()?.levels ?? []) as { id: string; name: string; pointsRequired: number }[]
+    // Only levels with pointsRequired > 0 trigger notifications
+    const reachable = allLevels
+      .filter(l => l.pointsRequired > 0)
+      .sort((a, b) => a.pointsRequired - b.pointsRequired)
+    if (reachable.length === 0) return
+
+    const levelName = await db.runTransaction(async tx => {
+      const userRef  = db.collection('users').doc(uid)
+      const userSnap = await tx.get(userRef)
+      if (!userSnap.exists) return null
+
+      const notifiedIds: string[] = userSnap.data()?.notifiedLevelIds ?? []
+      const newlyReached = reachable.filter(l => newTotal >= l.pointsRequired && !notifiedIds.includes(l.id))
+      if (newlyReached.length === 0) return null
+
+      const highest = newlyReached[newlyReached.length - 1]
+      tx.update(userRef, {
+        notifiedLevelIds: admin.firestore.FieldValue.arrayUnion(...newlyReached.map(l => l.id)),
+      })
+
+      const notifRef = db.collection('notifications').doc()
+      tx.set(notifRef, {
+        uid,
+        title:     `🎉 New level: ${highest.name}`,
+        body:      `You've reached the "${highest.name}" level with ${newTotal} points. Keep it up!`,
+        url:       '/dashboard',
+        isRead:    false,
+        type:      'level_up',
+        levelName: highest.name,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      })
+
+      return highest.name
+    })
+
+    if (levelName) {
+      const userSnap = await db.collection('users').doc(uid).get()
+      const tokens: string[] = userSnap.data()?.fcmTokens ?? []
+      await sendPush(tokens, {
+        title: `🎉 New level: ${levelName}`,
+        body:  `You've reached the "${levelName}" level with ${newTotal} points!`,
+        url:   '/dashboard',
+        tag:   'level-up',
+      })
+    }
+  } catch (err: any) {
+    console.error('checkLevelUp error', err?.message)
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // onAssignmentPublished — push to all students in the cohort
 // ─────────────────────────────────────────────────────────────────────────────
@@ -772,12 +884,15 @@ export const onAssignmentPublished = functions.firestore
     const tokens: string[] = []
     studentsSnap.docs.forEach(d => tokens.push(...(d.data().fcmTokens ?? [])))
 
-    await sendPush(tokens, {
+    const opts = {
       title: '📋 New assignment posted',
       body:  after.title ?? 'A new assignment has been published.',
       url:   '/assignments',
-      tag:   'assignment',
-    })
+    }
+    await Promise.all([
+      sendPush(tokens, { ...opts, tag: 'assignment' }),
+      saveNotifications(studentsSnap.docs.map(d => d.id), opts),
+    ])
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -810,21 +925,13 @@ export const onBookingConfirmed = functions.firestore
     const userSnap = await db.collection('users').doc(uid).get()
     const tokens: string[] = userSnap.data()?.fcmTokens ?? []
 
-    if (after.status === 'confirmed') {
-      await sendPush(tokens, {
-        title: '✅ Room booking confirmed',
-        body:  `Your booking for ${after.roomName ?? 'the room'} has been confirmed.`,
-        url:   '/booking',
-        tag:   'booking-update',
-      })
-    } else {
-      await sendPush(tokens, {
-        title: '❌ Room booking denied',
-        body:  `Your booking for ${after.roomName ?? 'the room'} was not approved.`,
-        url:   '/booking',
-        tag:   'booking-update',
-      })
-    }
+    const bookingOpts = after.status === 'confirmed'
+      ? { title: '✅ Room booking confirmed', body: `Your booking for ${after.roomName ?? 'the room'} has been confirmed.`, url: '/booking' }
+      : { title: '❌ Room booking denied',    body: `Your booking for ${after.roomName ?? 'the room'} was not approved.`,  url: '/booking' }
+    await Promise.all([
+      sendPush(tokens, { ...bookingOpts, tag: 'booking-update' }),
+      saveNotifications([uid], bookingOpts),
+    ])
     return null
   })
 
@@ -907,7 +1014,7 @@ export const onChatMessage = functions.firestore
           tag:       `chat-${channelId}`,
         },
         webpush: {
-          fcmOptions: { link: '/chat' },
+          headers: { Urgency: 'high' },
         },
       })
     }
@@ -1228,12 +1335,15 @@ export const onPlanComment = functions.firestore
     const tokens: string[] = userSnap.data()?.fcmTokens ?? []
     if (!tokens.length) return null
 
-    await sendPush(tokens, {
+    const planOpts = {
       title: teacherName,
       body:  `New feedback on ${stepLabel} in your development plan.`,
       url:   '/my-plan',
-      tag:   'plan-comment',
-    })
+    }
+    await Promise.all([
+      sendPush(tokens, { ...planOpts, tag: 'plan-comment' }),
+      saveNotifications([studentId], planOpts),
+    ])
     return null
   })
 
@@ -1252,14 +1362,14 @@ export const sendMinivanEmail = functions.runWith({ secrets: ['RESEND_API_KEY'] 
   const fromEmail = emailCfg?.fromEmail || 'onboarding@resend.dev'
 
   const html = [
-    `<b>Contact:</b> ${d.contactPerson} — ${d.phoneNumber}`,
-    `<b>Student:</b> ${d.studentName}`,
-    `<b>Departure:</b> ${d.dateFrom} at ${d.timeFrom}`,
-    `<b>Return:</b> ${d.dateTo} at ${d.timeTo}`,
-    `<b>Destination:</b> ${d.destination}`,
-    `<b>Purpose:</b> ${d.purpose}`,
-    `<b>Passengers:</b> ${d.passengers}`,
-    d.notes ? `<b>Notes:</b> ${d.notes}` : '',
+    `<b>Contact:</b> ${escapeHtml(d.contactPerson)} — ${escapeHtml(d.phoneNumber)}`,
+    `<b>Student:</b> ${escapeHtml(d.studentName)}`,
+    `<b>Departure:</b> ${escapeHtml(d.dateFrom)} at ${escapeHtml(d.timeFrom)}`,
+    `<b>Return:</b> ${escapeHtml(d.dateTo)} at ${escapeHtml(d.timeTo)}`,
+    `<b>Destination:</b> ${escapeHtml(d.destination)}`,
+    `<b>Purpose:</b> ${escapeHtml(d.purpose)}`,
+    `<b>Passengers:</b> ${escapeHtml(d.passengers)}`,
+    d.notes ? `<b>Notes:</b> ${escapeHtml(d.notes)}` : '',
   ].filter(Boolean).join('<br>')
 
   await getResend().emails.send({
@@ -1322,8 +1432,15 @@ async function pushToTeachersAndAdmins(title: string, body: string, url: string)
     .where('role', 'in', ['teacher', 'admin'])
     .get()
   const tokens: string[] = []
-  snap.docs.forEach(d => tokens.push(...(d.data().fcmTokens ?? [])))
-  await sendPush(tokens, { title, body, url, tag: 'booking' })
+  const uids: string[] = []
+  snap.docs.forEach(d => {
+    tokens.push(...(d.data().fcmTokens ?? []))
+    uids.push(d.id)
+  })
+  await Promise.all([
+    sendPush(tokens, { title, body, url, tag: 'booking' }),
+    saveNotifications(uids, { title, body, url }),
+  ])
 }
 
 async function pushToStudent(studentId: string, title: string, body: string) {
@@ -1355,7 +1472,7 @@ export const onFoodBoxOrderCreated = functions.firestore
     await pushToTeachersAndAdmins(
       '🍱 New food box order',
       `${d.studentName} — date ${d.date}`,
-      '/admin/food-orders',
+      '/admin/food-box-orders',
     )
   })
 
@@ -1488,6 +1605,89 @@ export const onMinivanBookingUpdated = functions.firestore
     } else if (after.status === 'rejected') {
       await pushToStudent(after.studentId, '❌ Minivan request rejected', `Your trip to ${after.destination} on ${after.dateFrom} was not approved.`)
     }
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// onEquipmentBookingCreated — notify teachers/admins of new equipment requests
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const onEquipmentBookingCreated = functions.firestore
+  .document('equipment_bookings/{bookingId}')
+  .onCreate(async (snap) => {
+    const booking = snap.data()
+
+    // Rate limit: max 5 pending bookings per student
+    const pendingSnap = await db.collection('equipment_bookings')
+      .where('studentId', '==', booking.studentId)
+      .where('status', '==', 'pending')
+      .get()
+    if (pendingSnap.size >= 5) {
+      await snap.ref.delete()
+      return null
+    }
+
+    await pushToTeachersAndAdmins(
+      '📦 Equipment booking request',
+      `${booking.studentName} requested equipment for "${booking.projectName}"`,
+      '/teacher/equipment-requests',
+    )
+    return null
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// onEquipmentBookingUpdated — notify student when booking status changes
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const onEquipmentBookingUpdated = functions.firestore
+  .document('equipment_bookings/{bookingId}')
+  .onUpdate(async (change) => {
+    const before = change.before.data()
+    const after  = change.after.data()
+    if (before.status === after.status) return null
+    const studentSnap = await db.collection('users').doc(after.studentId as string).get()
+    const tokens: string[] = studentSnap.data()?.fcmTokens ?? []
+    if (after.status === 'confirmed') {
+      await sendPush(tokens, {
+        title: '✅ Equipment booking confirmed',
+        body:  `Your equipment for "${after.projectName}" has been confirmed`,
+        url:   '/booking/equipment',
+        tag:   'equipment-booking',
+      })
+    } else if (after.status === 'cancelled') {
+      await sendPush(tokens, {
+        title: '❌ Equipment booking cancelled',
+        body:  `Your equipment request for "${after.projectName}" was not approved`,
+        url:   '/booking/equipment',
+        tag:   'equipment-booking',
+      })
+    }
+    return null
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// onInventoryProjectUpdated — notify borrowers when project status changes
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const onInventoryProjectUpdated = functions.firestore
+  .document('inventory_projects/{projectId}')
+  .onUpdate(async (change) => {
+    const before = change.before.data()
+    const after  = change.after.data()
+    if (before.status === after.status) return null
+    if (after.status !== 'returned') return null
+    const borrowerIds: string[] = after.borrowerIds ?? []
+    for (const uid of borrowerIds) {
+      const userSnap = await db.collection('users').doc(uid).get()
+      const tokens: string[] = userSnap.data()?.fcmTokens ?? []
+      if (tokens.length === 0) continue
+      await sendPush(tokens, {
+        title: '✅ Equipment returned',
+        body:  `Project "${after.name}" has been marked as returned`,
+        url:   '/booking/equipment',
+        tag:   'inventory',
+      })
+    }
+    return null
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1772,6 +1972,54 @@ export const exportMinivanPdf = functions.https.onCall(async (data, context) => 
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// sendEventInviteNotifications — callable: send invite push to invitees
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const sendEventInviteNotifications = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be signed in')
+
+  const inviteeIds: string[] = data.inviteeIds ?? []
+  if (!inviteeIds.length) return { sent: 0 }
+
+  const organizerName: string = data.organizerName ?? 'Someone'
+  const title: string         = data.title ?? 'Meeting'
+  const dateStr: string       = data.dateStr ?? ''
+  const timeStr: string       = data.timeStr ?? ''
+  const location: string      = data.location ?? ''
+  const canceled: boolean     = data.canceled === true
+  const locationPart          = location ? ` · ${location}` : ''
+
+  const tokens: string[] = (await Promise.all(
+    inviteeIds.map(async uid => {
+      // Primary: look up by document ID (inviteeIds now stores the Firestore doc ID = auth UID)
+      const byId = await db.collection('users').doc(uid).get()
+      if (byId.exists) {
+        const tokens = (byId.data()?.fcmTokens ?? []) as string[]
+        if (tokens.length) return tokens
+      }
+      // Fallback: query by uid field (for any legacy stored values)
+      const byField = await db.collection('users').where('uid', '==', uid).get()
+      return byField.docs.flatMap(d => (d.data().fcmTokens ?? []) as string[])
+    })
+  )).flat()
+  if (!tokens.length) return { sent: 0 }
+
+  const pushTitle = canceled
+    ? `❌ ${organizerName} canceled: "${title}"`
+    : `📅 ${organizerName} invited you: "${title}"`
+  const pushBody = canceled ? '' : `${dateStr} at ${timeStr}${locationPart}`
+
+  await sendPush(tokens, {
+    title: pushTitle,
+    body:  pushBody,
+    url:   '/calendar',
+    tag:   `event-invite-${context.auth.uid}-${Date.now()}`,
+  })
+
+  return { sent: tokens.length }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 // sendEventReminders — push notification 15 min before calendar events
 // Runs every 5 minutes; sends to events starting in 13–18 min window
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1862,8 +2110,16 @@ export const sendEventReminders = functions.pubsub
       const notifBody  = `Starts at ${timeStr}${ev.location ? ` · ${ev.location}` : ''}`
 
       const uSnap  = await db.collection('users').doc(ev.userId).get()
-      const tokens: string[] = (uSnap.data()?.fcmTokens ?? []) as string[]
-      await sendFcmToTokens(tokens, notifTitle, notifBody)
+      const ownerTokens: string[] = (uSnap.data()?.fcmTokens ?? []) as string[]
+
+      const inviteeIds: string[] = ev.inviteeIds ?? []
+      const inviteeTokens: string[] = []
+      if (inviteeIds.length > 0) {
+        const inviteeSnaps = await Promise.all(inviteeIds.map(uid => db.collection('users').doc(uid).get()))
+        inviteeSnaps.forEach(s => inviteeTokens.push(...((s.data()?.fcmTokens ?? []) as string[])))
+      }
+
+      await sendFcmToTokens([...ownerTokens, ...inviteeTokens], notifTitle, notifBody)
     }
   })
 
@@ -2146,3 +2402,483 @@ export const deleteUserData = functions.https.onCall(async (data, context) => {
   console.log(`deleteUserData: deleted data for uid=${uid}`)
   return { success: true }
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// disableUser — disable Firebase Auth account + mark Firestore doc disabled
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const disableUser = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  const callerDoc = await db.collection('users').doc(context.auth.uid).get()
+  const callerRole = callerDoc.data()?.role ?? context.auth.token.role
+  if (!['admin', 'teacher'].includes(callerRole)) {
+    throw new functions.https.HttpsError('permission-denied', 'Admin only.')
+  }
+  const { uid } = data as { uid: string }
+  await admin.auth().updateUser(uid, { disabled: true })
+  await db.collection('users').doc(uid).update({ disabled: true, isActive: false })
+  return { success: true }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// restoreUser — re-enable Firebase Auth account + clear disabled flag
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const restoreUser = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  const callerDoc = await db.collection('users').doc(context.auth.uid).get()
+  const callerRole = callerDoc.data()?.role ?? context.auth.token.role
+  if (!['admin', 'teacher'].includes(callerRole)) {
+    throw new functions.https.HttpsError('permission-denied', 'Admin only.')
+  }
+  const { uid } = data as { uid: string }
+  await admin.auth().updateUser(uid, { disabled: false })
+  await db.collection('users').doc(uid).update({ disabled: false, isActive: true })
+  return { success: true }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// exportProductionPdf — callable: generate production breakdown PDF
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const exportProductionPdf = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+
+  const { productionId } = data as { productionId: string }
+  if (!productionId) throw new functions.https.HttpsError('invalid-argument', 'productionId required.')
+
+  const prodSnap = await db.collection('productions').doc(productionId).get()
+  if (!prodSnap.exists) throw new functions.https.HttpsError('not-found', 'Production not found.')
+  const prod = prodSnap.data()!
+
+  const uid    = context.auth.uid
+  const claims = context.auth.token as any
+  const isStaff = claims.role === 'teacher' || claims.role === 'admin'
+  const canAccess =
+    isStaff ||
+    prod.createdBy === uid ||
+    (prod.collaborators ?? []).includes(uid) ||
+    (prod.viewerIds    ?? []).includes(uid) ||
+    prod.isPublic === true
+  if (!canAccess) throw new functions.https.HttpsError('permission-denied', 'Access denied.')
+
+  const [scenesSnap, castSnap, daysSnap, crewSnap, locSnap] = await Promise.all([
+    db.collection(`productions/${productionId}/scenes`).orderBy('sceneNumber').get(),
+    db.collection(`productions/${productionId}/cast`).orderBy('castId').get(),
+    db.collection(`productions/${productionId}/shootingDays`).orderBy('dayNumber').get(),
+    db.collection(`productions/${productionId}/crew`).get(),
+    db.collection(`productions/${productionId}/locations`).get(),
+  ])
+
+  const scenes    = scenesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+  const cast      = castSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+  const days      = daysSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+  const crew      = crewSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+  const locations = locSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+  const locById: Record<string, any> = Object.fromEntries(locations.map((l: any) => [l.id, l]))
+
+  const castMap: Record<number, string> = {}
+  cast.forEach((c: any) => { castMap[c.castId] = c.characterName })
+
+  const pdfBuffer: Buffer = await new Promise((resolve, reject) => {
+    const doc  = new PDFDocument({ margin: 0, size: 'A4' })
+    const bufs: Buffer[] = []
+    doc.on('data',  (c: Buffer) => bufs.push(c))
+    doc.on('end',   () => resolve(Buffer.concat(bufs)))
+    doc.on('error', reject)
+
+    const PW = 595, PH = 842, M = 48, CW = PW - M * 2
+    const logoPath = path.join(__dirname, '../assets/fire.png')
+
+    // ── Header band ──────────────────────────────────────────────────────────
+    doc.rect(0, 0, PW, 110).fill('#0f172a')
+    const logoY = 22, logoH = 48
+    doc.image(logoPath, M, logoY, { width: logoH, height: logoH })
+    doc.fillColor('#ffffff').fontSize(22).font('Helvetica-Bold')
+       .text('CineForge', M + logoH + 8, logoY + (logoH / 2) - 13)
+    doc.fillColor('rgba(255,255,255,0.50)').fontSize(10).font('Helvetica')
+       .text('Production Plan', M + logoH + 8, logoY + logoH - 13)
+
+    // ── Accent stripe ────────────────────────────────────────────────────────
+    doc.rect(0, 110, PW, 3).fill('#f97316')
+
+    let y = 126
+
+    // ── Production title ─────────────────────────────────────────────────────
+    doc.fillColor('#0f172a').fontSize(20).font('Helvetica-Bold')
+       .text(prod.title || 'Untitled Production', M, y, { width: CW })
+    y = doc.y + 4
+    doc.fillColor('#64748b').fontSize(9).font('Helvetica')
+       .text(`Script Breakdown · ${new Date().toLocaleDateString('en-SE')}`, M, y, { width: CW })
+    y = doc.y + 20
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function sectionHead(title: string): void {
+      doc.fillColor('#0f172a').fontSize(9).font('Helvetica-Bold')
+         .text(title.toUpperCase(), M, y, { characterSpacing: 1.2 })
+      y = doc.y + 3
+      doc.rect(M, y, CW, 1).fill('#e2e8f0')
+      y += 10
+    }
+
+    function addPageIfNeeded(needed = 40): void {
+      if (y > PH - 56 - needed) {
+        doc.rect(0, PH - 36, PW, 36).fill('#0f172a')
+        doc.fillColor('rgba(255,255,255,0.4)').fontSize(8).font('Helvetica')
+           .text(`Generated by CineForge · ${new Date().toLocaleDateString('en-SE')}`, M, PH - 22, { width: CW })
+        doc.addPage()
+        y = 40
+      }
+    }
+
+    // Shrink font until text fits in maxW (single-line), then draw it
+    function fitCell(
+      text: string, cx: number, cy: number, w: number, h: number,
+      font: string, startSz: number, color: string,
+    ): void {
+      const padX = 3
+      const t    = (text ?? '').trim() || '–'
+      let sz     = startSz
+      doc.font(font).fontSize(sz)
+      while (sz > 5 && doc.widthOfString(t) > w - padX * 2) {
+        sz -= 0.3
+        doc.fontSize(sz)
+      }
+      const padY = Math.max(1, (h - sz) / 2)
+      doc.fillColor(color).text(t, cx + padX, cy + padY, { width: w - padX * 2, lineBreak: false })
+    }
+
+    // Multi-line cell: returns actual height used (>= minH)
+    function wrapCell(
+      text: string, cx: number, cy: number, w: number, minH: number,
+      font: string, sz: number, color: string,
+    ): number {
+      const padX = 3, padY = 3
+      const t    = (text ?? '').trim()
+      if (!t) return minH
+      doc.font(font).fontSize(sz)
+      const textH = doc.heightOfString(t, { width: w - padX * 2 })
+      const h     = Math.max(minH, textH + padY * 2)
+      doc.fillColor(color).text(t, cx + padX, cy + padY, { width: w - padX * 2 })
+      return h
+    }
+
+    // ── Scenes table ─────────────────────────────────────────────────────────
+    if (scenes.length > 0) {
+      sectionHead('Script Breakdown')
+
+      // 9 columns: #, I/E, D/N, Location, Description, Cast, Props, Make-up, Costume
+      // Total CW = 499
+      const HCOLS   = ['#', 'I/E', 'D/N', 'LOCATION', 'DESCRIPTION', 'CAST', 'PROPS', 'MAKE-UP', 'COSTUME']
+      const HWIDTHS = [20,   24,    22,    68,          100,           64,     52,      74,         75]
+      // Sum: 20+24+22+68+100+64+52+74+75 = 499 ✓
+      const WRAP_COLS = new Set([3, 4, 5, 6, 7, 8]) // location, description, cast, props, makeup, costume
+
+      function drawSceneTableHead(): void {
+        const rh = 18
+        let cx = M
+        doc.rect(M, y, CW, rh).fill('#1e293b')
+        HCOLS.forEach((col, i) => {
+          doc.fillColor('#94a3b8').fontSize(6.5).font('Helvetica-Bold')
+             .text(col, cx + 3, y + 5, { width: HWIDTHS[i] - 6, lineBreak: false })
+          cx += HWIDTHS[i]
+        })
+        y += rh
+      }
+
+      drawSceneTableHead()
+
+      scenes.forEach((scene, idx) => {
+        const castNames  = ((scene.castIds ?? []) as number[]).map(id => castMap[id] ?? String(id)).join(', ')
+        const linkedLoc  = scene.locationId ? locById[scene.locationId] : null
+        const locationDisplay = linkedLoc?.address
+          ? `${scene.location ?? ''} — ${linkedLoc.address}`
+          : (scene.location ?? '')
+        const cells = [
+          String(scene.sceneNumber ?? ''),
+          scene.intExt ?? '',
+          scene.dayNight === 'Night' ? 'N' : 'D',
+          locationDisplay,
+          scene.description ?? '',
+          castNames,
+          scene.props ?? '',
+          scene.makeup ?? '',
+          scene.costume ?? '',
+        ]
+
+        // Auto-size row height based on wrapping columns
+        const sz = 7, padY = 4, minH = 15
+        doc.font('Helvetica').fontSize(sz)
+        let rh = minH
+        WRAP_COLS.forEach(i => {
+          const t = (cells[i] ?? '').trim()
+          if (t) rh = Math.max(rh, doc.heightOfString(t, { width: HWIDTHS[i] - 6 }) + padY * 2)
+        })
+
+        addPageIfNeeded(rh)
+        if (idx > 0 && y === 40) drawSceneTableHead()
+        let cx = M
+        if (idx % 2 === 0) doc.rect(M, y, CW, rh).fill('#f8fafc')
+        cells.forEach((cell, i) => {
+          doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(cx, y, HWIDTHS[i], rh).stroke()
+          if (WRAP_COLS.has(i)) {
+            const t = (cell ?? '').trim() || '–'
+            doc.font('Helvetica').fontSize(sz).fillColor('#1e293b')
+               .text(t, cx + 3, y + padY, { width: HWIDTHS[i] - 6 })
+          } else {
+            fitCell(cell, cx, y, HWIDTHS[i], rh, 'Helvetica', sz, '#1e293b')
+          }
+          cx += HWIDTHS[i]
+        })
+        y += rh
+      })
+      y += 20
+    }
+
+    // ── Cast table ────────────────────────────────────────────────────────────
+    if (cast.length > 0) {
+      addPageIfNeeded(60)
+      sectionHead('Cast')
+
+      const CC = ['ID', 'CHARACTER', 'ACTOR / ACTRESS', 'SCENES']
+      const CW2 = [28, 160, 160, CW - 28 - 160 - 160]
+      const rh = 18
+      let cx = M
+      doc.rect(M, y, CW, rh).fill('#1e293b')
+      CC.forEach((h, i) => {
+        doc.fillColor('#94a3b8').fontSize(7).font('Helvetica-Bold')
+           .text(h, cx + 3, y + 5, { width: CW2[i] - 6, lineBreak: false })
+        cx += CW2[i]
+      })
+      y += rh
+
+      cast.forEach((member: any, idx: number) => {
+        addPageIfNeeded(rh)
+        const memberScenes = scenes
+          .filter((s: any) => ((s.castIds ?? []) as number[]).includes(member.castId))
+          .map((s: any) => String(s.sceneNumber))
+          .join(', ')
+        const cells = [
+          String(member.castId),
+          member.characterName || '–',
+          member.actorName || '–',
+          memberScenes || '–',
+        ]
+        cx = M
+        if (idx % 2 === 0) doc.rect(M, y, CW, rh).fill('#f8fafc')
+        cells.forEach((cell, i) => {
+          doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(cx, y, CW2[i], rh).stroke()
+          fitCell(cell, cx, y, CW2[i], rh, 'Helvetica', 8, '#1e293b')
+          cx += CW2[i]
+        })
+        y += rh
+      })
+      y += 20
+    }
+
+    // ── Crew ──────────────────────────────────────────────────────────────────
+    if (crew.length > 0) {
+      addPageIfNeeded(60)
+      sectionHead('Crew')
+
+      const CC2 = ['ROLE', 'ASSIGNED NAME']
+      const CW3 = [180, CW - 180]
+      const rh = 18
+      let cx = M
+      doc.rect(M, y, CW, rh).fill('#1e293b')
+      CC2.forEach((h, i) => {
+        doc.fillColor('#94a3b8').fontSize(7).font('Helvetica-Bold')
+           .text(h, cx + 3, y + 5, { width: CW3[i] - 6, lineBreak: false })
+        cx += CW3[i]
+      })
+      y += rh
+
+      crew.forEach((member: any, idx: number) => {
+        addPageIfNeeded(rh)
+        const cells = [
+          member.roleName || '–',
+          member.assignedName || '–',
+        ]
+        cx = M
+        if (idx % 2 === 0) doc.rect(M, y, CW, rh).fill('#f8fafc')
+        cells.forEach((cell: string, i: number) => {
+          doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(cx, y, CW3[i], rh).stroke()
+          fitCell(cell, cx, y, CW3[i], rh, 'Helvetica', 8, '#1e293b')
+          cx += CW3[i]
+        })
+        y += rh
+      })
+      y += 20
+    }
+
+    // ── Schedule — 2-row per scene (call-sheet format) ───────────────────────
+    if (days.length > 0) {
+      addPageIfNeeded(60)
+      sectionHead('Shooting Schedule')
+
+      // Column x-positions
+      const SNW  = 38   // scene number
+      const IEW  = 32   // INT/EXT  /  D/N in row 2
+      const LOCW = 210  // location  /  description in row 2
+      const CASTW = 115 // cast
+      const FLAGW = CW - SNW - IEW - LOCW - CASTW  // remaining ~104
+      const cx0 = M
+      const cx1 = cx0 + SNW
+      const cx2 = cx1 + IEW
+      const cx3 = cx2 + LOCW
+      const cx4 = cx3 + CASTW
+      const rowH1 = 18, rowH2 = 14
+
+      days.forEach((day: any) => {
+        addPageIfNeeded(80)
+
+        // Day header — centered, large
+        const rawDate = day.date
+          ? new Date(day.date + 'T12:00:00').toLocaleDateString('en-SE', {
+              weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+            }).toUpperCase()
+          : ''
+        const dayHeader = `DAY ${day.dayNumber}${rawDate ? `   ·   ${rawDate}` : ''}`
+        doc.fillColor('#1e3a5f').fontSize(13).font('Helvetica-Bold')
+           .text(dayHeader, M, y, { width: CW, align: 'center' })
+        y = doc.y + 3
+
+        const workLine = day.startTime && day.endTime
+          ? `${day.startTime} – ${day.endTime}`
+          : (day.workHours ?? '')
+        if (workLine) {
+          doc.fillColor('#64748b').fontSize(9).font('Helvetica')
+             .text(workLine, M, y, { width: CW, align: 'center' })
+          y = doc.y + 3
+        }
+        y += 8
+
+        const dayScenes = ((day.sceneIds ?? []) as string[])
+          .map((sid: string) => scenes.find((sc: any) => sc.id === sid))
+          .filter(Boolean)
+          .sort((a: any, b: any) => (a.sceneNumber ?? 0) - (b.sceneNumber ?? 0))
+
+        dayScenes.forEach((scene: any) => {
+          const castStr    = ((scene.castIds ?? []) as number[])
+            .map((id: number) => castMap[id] ?? String(id)).join(', ')
+          const scLinkedLoc  = scene.locationId ? locById[scene.locationId] : null
+          const scLocDisplay = scLinkedLoc?.address
+            ? `${(scene.location ?? '').toUpperCase()}  ·  ${scLinkedLoc.address}`
+            : (scene.location ?? '').toUpperCase()
+          const descText = scene.description ?? ''
+
+          // Pre-calculate row 2 height based on wrapped description
+          doc.font('Helvetica').fontSize(7.5)
+          const descW   = LOCW + CASTW + FLAGW - 6
+          const descH   = descText ? doc.heightOfString(descText, { width: descW }) : 0
+          const dynRowH2 = Math.max(rowH2, descH + 6)
+          const totalH   = rowH1 + dynRowH2
+
+          addPageIfNeeded(totalH + 4)
+
+          // ── Fill cell backgrounds ────────────────────────────────────────────
+          doc.rect(cx0, y, SNW, totalH).fill('#2E75B6')
+          doc.rect(cx1, y, IEW,  rowH1).fill('#EEF4FB')
+          doc.rect(cx2, y, LOCW, rowH1).fill('#EEF4FB')
+          doc.rect(cx3, y, CASTW, rowH1).fill('#EEF4FB')
+          doc.rect(cx4, y, FLAGW, rowH1).fill('#EEF4FB')
+          doc.rect(cx1, y + rowH1, IEW + LOCW + CASTW + FLAGW, dynRowH2).fill('#FFFFFF')
+
+          // ── Scene number (vertically centred) ───────────────────────────────
+          doc.fillColor('#FFFFFF').fontSize(11).font('Helvetica-Bold')
+             .text(String(scene.sceneNumber ?? ''), cx0, y + totalH / 2 - 6, {
+               width: SNW, align: 'center', lineBreak: false,
+             })
+
+          // ── Row 1: INT/EXT | Location (auto-fit) | Cast (auto-fit) ──────────
+          fitCell(scene.intExt ?? '',  cx1, y, IEW,   rowH1, 'Helvetica-Bold', 8,   '#1e3a5f')
+          fitCell(scLocDisplay,        cx2, y, LOCW,  rowH1, 'Helvetica-Bold', 8,   '#1e3a5f')
+          fitCell(castStr,             cx3, y, CASTW, rowH1, 'Helvetica',      7.5, '#374151')
+
+          // ── Row 2: D/N | Description (wrapped) ──────────────────────────────
+          fitCell(scene.dayNight ?? '', cx1, y + rowH1, IEW, dynRowH2, 'Helvetica-Oblique', 8, '#64748b')
+          if (descText) {
+            doc.font('Helvetica').fontSize(7.5).fillColor('#374151')
+               .text(descText, cx2 + 3, y + rowH1 + 3, { width: descW })
+          }
+
+          // ── Borders ──────────────────────────────────────────────────────────
+          doc.strokeColor('#CBD5E1').lineWidth(0.4)
+          doc.rect(M, y, CW, totalH).stroke()
+          doc.moveTo(cx1, y).lineTo(cx1, y + totalH).stroke()
+          doc.moveTo(cx1, y + rowH1).lineTo(M + CW, y + rowH1).stroke()
+          doc.moveTo(cx2, y).lineTo(cx2, y + rowH1).stroke()
+          doc.moveTo(cx3, y).lineTo(cx3, y + rowH1).stroke()
+
+          y += totalH + 2
+        })
+
+        if (dayScenes.length === 0) {
+          doc.fillColor('#94a3b8').fontSize(8).font('Helvetica-Oblique')
+             .text('No scenes scheduled.', M + 10, y)
+          y = doc.y + 4
+        }
+
+        // End of day line
+        const cnt = dayScenes.length
+        doc.fillColor('#94a3b8').fontSize(8).font('Helvetica-Oblique')
+           .text(
+             `End of Day ${day.dayNumber}  ·  ${cnt} scene${cnt !== 1 ? 's' : ''}`,
+             M, y + 5, { width: CW, align: 'center' },
+           )
+        y = doc.y + 16
+      })
+    }
+
+    // ── Footer ────────────────────────────────────────────────────────────────
+    doc.rect(0, PH - 36, PW, 36).fill('#0f172a')
+    doc.fillColor('rgba(255,255,255,0.4)').fontSize(8).font('Helvetica')
+       .text(`Generated by CineForge · ${new Date().toLocaleDateString('en-SE')}`, M, PH - 22, { width: CW })
+    doc.fillColor('rgba(255,255,255,0.4)').fontSize(8)
+       .text(prod.title || '', M, PH - 22, { width: CW, align: 'right' })
+
+    doc.end()
+  })
+
+  return { pdf: pdfBuffer.toString('base64') }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// dailyTeacherSummary — Mon–Fri 08:00 morning briefing push to teachers/admins
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const dailyTeacherSummary = functions.pubsub
+  .schedule('0 8 * * 1-5')
+  .timeZone('Europe/Stockholm')
+  .onRun(async () => {
+    const today    = new Date()
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const todayStr = today.toISOString().slice(0, 10)
+
+    const [lessonsSnap, equipmentSnap, absenceSnap, overdueSnap] = await Promise.all([
+      db.collection('lessons')
+        .where('startTime', '>=', admin.firestore.Timestamp.fromDate(today))
+        .where('startTime', '<',  admin.firestore.Timestamp.fromDate(tomorrow))
+        .get(),
+      db.collection('equipment_bookings').where('status', '==', 'pending').get(),
+      db.collection('absence_reports').where('status', '==', 'pending').get(),
+      db.collection('inventory_projects').where('status', '==', 'checked-out').where('returnDate', '<', todayStr).get(),
+    ])
+
+    const parts: string[] = []
+    if (lessonsSnap.size    > 0) parts.push(`${lessonsSnap.size} lesson${lessonsSnap.size > 1 ? 's' : ''} today`)
+    if (equipmentSnap.size  > 0) parts.push(`${equipmentSnap.size} equipment request${equipmentSnap.size > 1 ? 's' : ''}`)
+    if (absenceSnap.size    > 0) parts.push(`${absenceSnap.size} absence report${absenceSnap.size > 1 ? 's' : ''}`)
+    if (overdueSnap.size    > 0) parts.push(`${overdueSnap.size} overdue return${overdueSnap.size > 1 ? 's' : ''}`)
+
+    if (parts.length === 0) return null
+
+    const dateLabel = new Intl.DateTimeFormat('en-SE', { weekday: 'long', day: 'numeric', month: 'short' }).format(today)
+    await pushToTeachersAndAdmins(
+      `☀️ Good morning — ${dateLabel}`,
+      parts.join(' · '),
+      '/teacher',
+    )
+    return null
+  })

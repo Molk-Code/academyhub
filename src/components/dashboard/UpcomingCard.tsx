@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Clock, MapPin, Video } from 'lucide-react'
+import { Clock, MapPin, Video, AlertTriangle } from 'lucide-react'
 import { cn, shortDate, timeStr } from '@/lib/utils'
 import type { LessonDoc, AssignmentDoc } from '@/types'
 import type { Timestamp } from 'firebase/firestore'
@@ -19,12 +19,12 @@ export function LessonCard({ lesson, subjectColor = 'bg-brand-500', subjectTitle
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-zinc-200 truncate">{lesson.title}</p>
         {subjectTitle && <p className="text-xs text-zinc-400 mb-1">{subjectTitle}</p>}
-        <div className="flex items-center gap-3 text-xs text-zinc-500 mt-1">
-          <span className="flex items-center gap-1">
+        <div className="flex items-center gap-3 text-xs mt-1">
+          <span className="flex items-center gap-1 text-orange-400 font-medium">
             <Clock className="w-3 h-3" />
             {shortDate(lesson.startTime)} · {timeStr(lesson.startTime)}–{timeStr(lesson.endTime)}
           </span>
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1 text-zinc-500">
             {lesson.isOnline
               ? <><Video className="w-3 h-3" /> Online</>
               : <><MapPin className="w-3 h-3" /> {lesson.classroom}</>
@@ -43,9 +43,10 @@ interface DeadlineCardProps {
   subjectColor?: string
   subjectTitle?: string
   isOverdue?: boolean
+  isDueToday?: boolean
 }
 
-export function DeadlineCard({ assignment, subjectColor = 'bg-rose-500', subjectTitle, isOverdue }: DeadlineCardProps) {
+export function DeadlineCard({ assignment, subjectColor = 'bg-rose-500', subjectTitle, isOverdue, isDueToday }: DeadlineCardProps) {
   return (
     <Link
       to={`/assignments/${assignment.id}`}
@@ -53,6 +54,8 @@ export function DeadlineCard({ assignment, subjectColor = 'bg-rose-500', subject
         'flex items-start gap-3 p-4 rounded-xl border transition-all',
         isOverdue
           ? 'bg-rose-950/40 border-rose-800/50 hover:border-rose-700/50'
+          : isDueToday
+          ? 'bg-amber-950/30 border-amber-800/40 hover:border-amber-700/50'
           : 'bg-zinc-900 border-white/8 hover:border-white/10 hover:shadow-sm',
       )}
     >
@@ -61,7 +64,14 @@ export function DeadlineCard({ assignment, subjectColor = 'bg-rose-500', subject
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-semibold text-zinc-200 truncate">{assignment.title}</p>
           {isOverdue && (
-            <span className="badge badge-rose flex-shrink-0">Overdue</span>
+            <span className="flex items-center gap-1 text-xs font-semibold text-rose-400 bg-rose-950/60 border border-rose-700/50 px-2 py-0.5 rounded-lg flex-shrink-0">
+              <AlertTriangle className="w-3 h-3" /> Overdue
+            </span>
+          )}
+          {isDueToday && !isOverdue && (
+            <span className="flex items-center gap-1 text-xs font-semibold text-amber-400 bg-amber-950/50 border border-amber-700/40 px-2 py-0.5 rounded-lg flex-shrink-0">
+              ⏰ Due today
+            </span>
           )}
         </div>
         {subjectTitle && <p className="text-xs text-zinc-400 mb-1">{subjectTitle}</p>}

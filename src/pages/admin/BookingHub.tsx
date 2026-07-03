@@ -217,7 +217,7 @@ export default function BookingHub() {
   const [weekOffset, setWeekOffset]         = useState(0)
   const [selectedDayIdx, setSelectedDayIdx] = useState<number>(() => {
     const d = getDay(new Date())
-    return d >= 1 && d <= 5 ? d - 1 : 0
+    return d === 0 ? 6 : d - 1
   })
   const [filterRoom, setFilterRoom] = useState('')
   const [cancelling, setCancelling] = useState(false)
@@ -228,7 +228,7 @@ export default function BookingHub() {
   }, [weekOffset])
 
   const weekDays = useMemo(
-    () => Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)),
+    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
     [weekStart],
   )
 
@@ -237,7 +237,16 @@ export default function BookingHub() {
   const selectedDayNum  = getDay(selectedDay)
 
   const weekStartStr = format(weekStart, 'yyyy-MM-dd')
-  const weekEndStr   = format(addDays(weekStart, 4), 'yyyy-MM-dd')
+  const weekEndStr   = format(addDays(weekStart, 6), 'yyyy-MM-dd')
+
+  const todayStr   = format(new Date(), 'yyyy-MM-dd')
+  const nowTimeStr = format(new Date(), 'HH:mm')
+
+  function isSlotPast(slot: { startTime: string; endTime: string }): boolean {
+    if (selectedDateStr < todayStr) return true
+    if (selectedDateStr === todayStr) return slot.endTime <= nowTimeStr
+    return false
+  }
 
   const { data: rooms,    loading: roomsLoading }    = useCollection<RoomDoc>('rooms')
   const { data: bookings, loading: bookingsLoading } = useCollection<RoomBookingDoc>(
@@ -293,7 +302,7 @@ export default function BookingHub() {
   function goToday() {
     setWeekOffset(0)
     const d = getDay(new Date())
-    setSelectedDayIdx(d >= 1 && d <= 5 ? d - 1 : 0)
+    setSelectedDayIdx(d === 0 ? 6 : d - 1)
   }
 
   // ── Rooms state ───────────────────────────────────────────────────────────
@@ -349,6 +358,31 @@ export default function BookingHub() {
 
   if (roomsLoading || bookingsLoading) return <LoadingSpinner />
 
+  function printDayView() {
+    const dateLabel = format(selectedDay, 'EEEE d MMMM yyyy')
+    const rows = timeSlots.map(slot => {
+      const cells = sortedRooms.map(room => {
+        const booking = bookingMap.get(slotKey(slot, selectedDateStr, room.id))
+        const unavailable = !isRoomAvailableForSlot(room, selectedDateStr, selectedDayNum, slot)
+        if (unavailable) return '<td style="color:#999;text-align:center">—</td>'
+        if (booking) return `<td style="background:#ef4444;color:#fff;text-align:center;font-weight:600">${booking.studentName}</td>`
+        return '<td style="background:#10b981;color:#fff;text-align:center;font-weight:600">Free</td>'
+      }).join('')
+      return `<tr><td style="font-weight:600;white-space:nowrap">${slot.startTime}–${slot.endTime}</td>${cells}</tr>`
+    }).join('')
+    const headers = sortedRooms.map(r => `<th style="padding:8px 12px">${r.name}</th>`).join('')
+    const html = `<!DOCTYPE html><html><head><title>Room Bookings – ${dateLabel}</title>
+<style>body{font-family:sans-serif;padding:24px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px 12px}th{background:#f5f5f5}h2{margin-bottom:16px}</style>
+</head><body><h2>Room Bookings – ${dateLabel}</h2>
+<table><thead><tr><th>Time</th>${headers}</tr></thead><tbody>${rows}</tbody></table></body></html>`
+    const win = window.open('', '_blank')
+    if (!win) return
+    win.document.write(html)
+    win.document.close()
+    win.focus()
+    win.print()
+  }
+
   return (
     <div className="space-y-10">
       <div>
@@ -387,14 +421,42 @@ export default function BookingHub() {
 
       {/* ── Bookings section ─────────────────────────────────────────────── */}
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-zinc-200">Bookings</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-zinc-200">Bookings</h2>
+          <button
+            onClick={printDayView}
+            disabled={timeSlots.length === 0 || sortedRooms.length === 0}
+            className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-200 px-3 py-1.5 rounded-lg hover:bg-zinc-800 border border-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Print day
+          </button>
+        </div>
 
         {/* Week + day navigation */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => setWeekOffset(w => w - 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
-            <ChevronLeft className="w-4 h-4 text-zinc-500" />
-          </button>
+        <div className="space-y-2">
+          {/* Row 1: arrows + week label + room filter */}
+          <div className="flex items-center gap-2">
+            <button onClick={() => setWeekOffset(w => w - 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
+              <ChevronLeft className="w-4 h-4 text-zinc-500" />
+            </button>
+            <span className="flex-1 text-sm text-zinc-400 text-center">
+              {format(weekStart, 'd MMM')} – {format(addDays(weekStart, 6), 'd MMM yyyy')}
+            </span>
+            <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
+              <ChevronRight className="w-4 h-4 text-zinc-500" />
+            </button>
+            {weekOffset !== 0 && (
+              <button onClick={goToday} className="flex items-center gap-1.5 text-sm text-rose-400 hover:text-rose-300 px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors">
+                <CalendarDays className="w-4 h-4" /> Today
+              </button>
+            )}
+            <select value={filterRoom} onChange={e => setFilterRoom(e.target.value)} className="input max-w-[160px]">
+              <option value="">All rooms</option>
+              {allSortedRooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+          </div>
 
+          {/* Row 2: day pills */}
           <div className="flex gap-1">
             {weekDays.map((day, idx) => {
               const isSelected = idx === selectedDayIdx
@@ -404,11 +466,11 @@ export default function BookingHub() {
                   key={idx}
                   onClick={() => setSelectedDayIdx(idx)}
                   className={cn(
-                    'flex flex-col items-center w-14 py-2 rounded-xl text-sm transition-all',
+                    'flex flex-col items-center flex-1 py-2 rounded-xl text-sm transition-all',
                     isSelected
                       ? 'bg-rose-700 text-white font-semibold shadow-sm'
                       : today
-                        ? 'bg-rose-950/40 text-rose-300 border border-rose-200 font-medium'
+                        ? 'bg-rose-950/40 text-rose-300 border border-rose-800/50 font-medium'
                         : 'text-zinc-400 hover:bg-zinc-800',
                   )}
                 >
@@ -418,25 +480,6 @@ export default function BookingHub() {
               )
             })}
           </div>
-
-          <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
-            <ChevronRight className="w-4 h-4 text-zinc-500" />
-          </button>
-
-          {weekOffset !== 0 && (
-            <button onClick={goToday} className="flex items-center gap-1.5 text-sm text-rose-600 hover:text-rose-800 px-3 py-2 rounded-lg hover:bg-rose-50 transition-colors">
-              <CalendarDays className="w-4 h-4" /> Today
-            </button>
-          )}
-
-          <span className="text-sm text-zinc-400 hidden sm:block">
-            {format(weekStart, 'd MMM')} – {format(addDays(weekStart, 4), 'd MMM yyyy')}
-          </span>
-
-          <select value={filterRoom} onChange={e => setFilterRoom(e.target.value)} className="input max-w-[160px] ml-auto">
-            <option value="">All rooms</option>
-            {allSortedRooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-          </select>
         </div>
 
         {/* Calendar grid */}
@@ -450,6 +493,7 @@ export default function BookingHub() {
           </div>
         ) : (
           <div className="bg-zinc-900 rounded-2xl border border-white/10 overflow-x-auto">
+            <div style={{ minWidth: `${sortedRooms.length * 120 + 144}px` }}>
             <table className="w-full">
               <thead>
                 <tr className="border-b border-white/10 bg-zinc-900/50">
@@ -467,13 +511,19 @@ export default function BookingHub() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {timeSlots.map(slot => (
-                  <tr key={`${slot.startTime}_${slot.endTime}`} className="hover:bg-white/5/50 transition-colors">
+                {timeSlots.map(slot => {
+                  const isPast = isSlotPast(slot)
+                  return (
+                  <tr
+                    key={`${slot.startTime}_${slot.endTime}`}
+                    className="hover:bg-white/5/50 transition-colors"
+                    style={isPast ? { opacity: 0.45, filter: 'grayscale(1) brightness(0.5)' } : undefined}
+                  >
                     <td className="px-5 py-3">
                       <p className="text-sm font-semibold text-zinc-200">{slot.startTime}–{slot.endTime}</p>
                     </td>
                     {sortedRooms.map(room => {
-                      const booking      = bookingMap.get(slotKey(slot, selectedDateStr, room.id))
+                      const booking       = bookingMap.get(slotKey(slot, selectedDateStr, room.id))
                       const isUnavailable = !isRoomAvailableForSlot(room, selectedDateStr, selectedDayNum, slot)
 
                       return (
@@ -484,10 +534,10 @@ export default function BookingHub() {
                             </div>
                           ) : booking ? (
                             <button
-                              disabled={cancelling}
-                              onClick={() => cancelBooking(booking)}
-                              title="Click to cancel this booking"
-                              className="w-full rounded-xl px-2 py-3.5 text-xs font-medium transition-all border bg-rose-500 border-rose-600 text-white hover:bg-rose-600 active:bg-rose-700"
+                              disabled={cancelling || isPast}
+                              onClick={() => !isPast && cancelBooking(booking)}
+                              title={isPast ? undefined : 'Click to cancel this booking'}
+                              className="w-full rounded-xl px-2 py-3.5 text-xs font-medium transition-all border bg-rose-500 border-rose-600 text-white hover:bg-rose-600 active:bg-rose-700 disabled:cursor-default"
                             >
                               <div className="font-semibold truncate">{booking.studentName.split(' ')[0]}</div>
                               <div className="opacity-75 text-[10px] mt-0.5 truncate">{booking.studentName.split(' ').slice(1).join(' ')}</div>
@@ -501,9 +551,11 @@ export default function BookingHub() {
                       )
                     })}
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 
@@ -537,79 +589,71 @@ export default function BookingHub() {
               <p className="text-zinc-400 text-sm">No rooms yet. Add one to enable booking.</p>
             </div>
           ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="text-left text-xs font-medium text-zinc-500 px-5 py-3">Room</th>
-                  <th className="text-left text-xs font-medium text-zinc-500 px-4 py-3">Description</th>
-                  <th className="text-left text-xs font-medium text-zinc-500 px-4 py-3">Availability</th>
-                  <th className="text-center text-xs font-medium text-zinc-500 px-4 py-3">Status</th>
-                  <th className="w-20 px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {allSortedRooms.map(room => {
-                  const windows = room.availability ?? []
-                  return (
-                    <tr key={room.id} className="hover:bg-white/5 transition-colors">
-                      <td className="px-5 py-3 text-sm font-semibold text-zinc-100">{room.name}</td>
-                      <td className="px-4 py-3 text-sm text-zinc-500">{room.description || '—'}</td>
-                      <td className="px-4 py-3">
-                        {windows.length === 0 ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-medium text-zinc-400 bg-zinc-900/50 border border-white/10 rounded-full px-2.5 py-1">
-                            Always available
-                          </span>
-                        ) : (
-                          <div className="space-y-2">
-                            {windows.map(w => {
-                              const sortedDays = [...w.days].sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
-                              return (
-                                <div key={w.id} className="space-y-1.5">
-                                  <div className="flex items-center gap-1 flex-wrap">
-                                    {DAYS_ORDER.filter(d => sortedDays.includes(d)).map(d => (
-                                      <span key={d} className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-brand-100 text-brand-700">
-                                        {DAY_LABELS[d]}
-                                      </span>
-                                    ))}
-                                    <span className="text-xs font-medium text-zinc-300 ml-1">
-                                      {w.startTime}–{w.endTime}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-1 text-[11px] text-zinc-400">
-                                    <span className="bg-zinc-800 rounded px-1.5 py-0.5">{format(parseISO(w.startDate), 'd MMM yyyy')}</span>
-                                    <span>→</span>
-                                    <span className="bg-zinc-800 rounded px-1.5 py-0.5">{format(parseISO(w.endDate), 'd MMM yyyy')}</span>
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
+            <div className="divide-y divide-white/10">
+              {allSortedRooms.map(room => {
+                const windows = room.availability ?? []
+                return (
+                  <div key={room.id} className="px-5 py-4 space-y-3">
+                    {/* Header row: name + actions */}
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-zinc-100">{room.name}</p>
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         <button onClick={() => toggleActive(room)}
                           className={cn(
-                            'inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full transition-colors',
+                            'inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full transition-colors',
                             room.isActive ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700',
                           )}>
                           {room.isActive ? <><ToggleRight className="w-3.5 h-3.5" />Active</> : <><ToggleLeft className="w-3.5 h-3.5" />Inactive</>}
                         </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => setRoomModal({ room })} className="p-1.5 text-zinc-400 hover:text-zinc-300 rounded-lg hover:bg-zinc-800 transition-colors">
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button onClick={() => setDeleteRoomId(room.id)} className="p-1.5 text-zinc-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                        <button onClick={() => setRoomModal({ room })} className="p-1.5 text-zinc-400 hover:text-zinc-300 rounded-lg hover:bg-zinc-800 transition-colors">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => setDeleteRoomId(room.id)} className="p-1.5 text-zinc-400 hover:text-rose-600 rounded-lg hover:bg-rose-50/10 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    {room.description && (
+                      <p className="text-xs text-zinc-500">{room.description}</p>
+                    )}
+
+                    {/* Availability windows */}
+                    {windows.length === 0 ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-zinc-400 bg-zinc-800 rounded-full px-2.5 py-1">
+                        Always available
+                      </span>
+                    ) : (
+                      <div className="space-y-2">
+                        {windows.map(w => {
+                          const sortedDays = [...w.days].sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
+                          return (
+                            <div key={w.id} className="space-y-1.5">
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {DAYS_ORDER.filter(d => sortedDays.includes(d)).map(d => (
+                                  <span key={d} className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-brand-100 text-brand-700">
+                                    {DAY_LABELS[d]}
+                                  </span>
+                                ))}
+                                <span className="text-xs font-medium text-zinc-300 ml-1">
+                                  {w.startTime}–{w.endTime}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 text-[11px] text-zinc-400">
+                                <span className="bg-zinc-800 rounded px-1.5 py-0.5">{format(parseISO(w.startDate), 'd MMM yyyy')}</span>
+                                <span>→</span>
+                                <span className="bg-zinc-800 rounded px-1.5 py-0.5">{format(parseISO(w.endDate), 'd MMM yyyy')}</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
       </section>

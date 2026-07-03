@@ -9,6 +9,10 @@ import { doc, getDoc, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import type { UserDoc, UserRole } from '@/types'
 
+class DisabledAccountError extends Error {
+  constructor() { super('Your account has been deactivated. Contact your teacher.') }
+}
+
 interface AuthState {
   user:               User | null
   profile:            UserDoc | null
@@ -54,6 +58,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(u)
 
+      // Safety net: on mobile, getDoc/getIdTokenResult can hang indefinitely when
+      // the network is slow or the app was backgrounded. Force-clear loading after 8s.
+      const loadingTimeout = setTimeout(() => setLoading(false), 8000)
+
       try {
         const tokenResult = await u.getIdTokenResult()
         const primaryRole = (tokenResult.claims.role as UserRole) ?? null
@@ -64,6 +72,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const claimCohortId = (tokenResult.claims.cohortId as string) ?? null
         if (snap.exists()) {
           const data = snap.data() as UserDoc
+          if (data.disabled === true) {
+            await firebaseSignOut(auth)
+            return
+          }
           const profileDoc = { ...data, uid: snap.id }
           setProfile(profileDoc)
           setRoles(profileDoc.roles?.length ? profileDoc.roles : (primaryRole ? [primaryRole] : []))
@@ -73,20 +85,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Live listener so totalPoints and other fields stay current
-        profileUnsub = onSnapshot(doc(db, 'users', u.uid), (s) => {
-          if (s.exists()) {
-            setProfile(prev => {
-              const updated = { ...s.data() as UserDoc, uid: s.id }
-              if (!prev) return updated
-              return updated
-            })
-          }
-        })
+        profileUnsub = onSnapshot(
+          doc(db, 'users', u.uid),
+          (s) => {
+            if (s.exists()) {
+              setProfile(prev => {
+                const updated = { ...s.data() as UserDoc, uid: s.id }
+                if (!prev) return updated
+                return updated
+              })
+            }
+          },
+          (err) => { console.warn('Profile listener error:', err) },
+        )
       } catch (err) {
         console.error('Failed to hydrate auth state:', err)
+      } finally {
+        clearTimeout(loadingTimeout)
+        setLoading(false)
       }
-
-      setLoading(false)
     })
 
     return () => {
@@ -96,8 +113,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   async function signIn(email: string, password: string) {
-    // Just authenticate — onIdTokenChanged handles all state updates
     await signInWithEmailAndPassword(auth, email, password)
+    // Check disabled flag immediately after sign-in (before onIdTokenChanged fires)
+    const snap = await getDoc(doc(db, 'users', auth.currentUser!.uid))
+    if (snap.exists() && (snap.data() as UserDoc).disabled === true) {
+      await firebaseSignOut(auth)
+      throw new DisabledAccountError()
+    }
   }
 
   async function signOut() {

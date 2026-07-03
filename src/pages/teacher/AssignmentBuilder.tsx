@@ -7,8 +7,8 @@ import {
   collection, addDoc, updateDoc, doc,
   serverTimestamp, Timestamp, getDoc,
 } from 'firebase/firestore'
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { db, storage } from '@/lib/firebase'
+import { db } from '@/lib/firebase'
+import { uploadWithQuota } from '@/lib/uploadWithQuota'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection } from '@/hooks/useFirestore'
 import type { SubjectDoc, CohortDoc, AssignmentDoc } from '@/types'
@@ -86,9 +86,7 @@ export default function AssignmentBuilder() {
     setUploading(true)
     try {
       const path = `resources/${Date.now()}_${file.name}`
-      const fileRef = storageRef(storage, path)
-      await uploadBytes(fileRef, file)
-      const url = await getDownloadURL(fileRef)
+      const url  = await uploadWithQuota(file, path)
       append({ type: 'file', label: file.name, url, storagePath: path })
     } catch (err) {
       console.error('Upload failed', err)

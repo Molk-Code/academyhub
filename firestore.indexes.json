@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "production_periods",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "cohortId", "order": "ASCENDING" },
+        { "fieldPath": "startDate", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "lessons",
       "queryScope": "COLLECTION",
       "fields": [

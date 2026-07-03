@@ -1,12 +1,14 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { deleteDoc, updateDoc, doc, Timestamp, collection, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { httpsCallable } from 'firebase/functions'
+import { db, functions } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
 import { shortDate, timeStr, toDate } from '@/lib/utils'
 import type { LessonDoc, SubjectDoc, CohortDoc, LessonBlockDoc, SemesterSettingsDoc, LessonCategoryDoc, UserDoc, PersonalEventDoc } from '@/types'
-import { Plus, Pencil, Trash2, CalendarDays, List, X, QrCode, Circle, SlidersHorizontal, ChevronDown, Check } from 'lucide-react'
+import { Plus, Pencil, Trash2, CalendarDays, List, X, QrCode, Circle, SlidersHorizontal, ChevronDown, Check, MapPin } from 'lucide-react'
+import { markCalendarInvitesSeen } from '@/hooks/useCalendarInviteBadge'
 import AnnualPlanWheel from '@/components/calendar/AnnualPlanWheel'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import EmptyState     from '@/components/common/EmptyState'
@@ -168,8 +170,25 @@ export default function Lessons() {
   const [newEventTitle,    setNewEventTitle]    = useState('')
   const [newEventLocation, setNewEventLocation] = useState('')
   const [newEventNotes,    setNewEventNotes]    = useState('')
+  const [newEventInvitees, setNewEventInvitees] = useState<Record<string, string[]>>({})
+  const [inviteeSearch,    setInviteeSearch]    = useState('')
   const [savingPersonal,   setSavingPersonal]   = useState(false)
+  const [editingEvent,     setEditingEvent]     = useState<PersonalEventDoc | null>(null)
+  const [editTitle,        setEditTitle]        = useState('')
+  const [editLocation,     setEditLocation]     = useState('')
+  const [editNotes,        setEditNotes]        = useState('')
+  const [editDate,         setEditDate]         = useState('')
+  const [editStart,        setEditStart]        = useState('')
+  const [editEnd,          setEditEnd]          = useState('')
+  const [savingEdit,       setSavingEdit]       = useState(false)
+  const [editInviteeIds,   setEditInviteeIds]   = useState<string[]>([])
+  const [editInviteeSearch, setEditInviteeSearch] = useState('')
+  const [viewingInvitedEvent, setViewingInvitedEvent] = useState<PersonalEventDoc | null>(null)
   const calendarRef = useRef<FullCalendar>(null)
+
+  useEffect(() => {
+    if (profile?.uid) markCalendarInvitesSeen(profile.uid)
+  }, [profile?.uid])
 
   const { data: rawLessons, loading } = useCollection<LessonDoc>(
     'lessons',
@@ -205,6 +224,51 @@ export default function Lessons() {
   const { data: otherTeachersEvents } = useCollection<PersonalEventDoc>(
     'personal_events',
     [where('role', '==', 'teacher')],
+  )
+
+  // Events I've been invited to
+  const { data: invitedPersonalEvents } = useCollection<PersonalEventDoc>(
+    'personal_events',
+    profile ? [where('inviteeIds', 'array-contains', profile.uid)] : [],
+    !!profile,
+  )
+
+  // All users for invitee picker
+  const { data: allUsers } = useCollection<UserDoc>('users')
+  const invitableGroups = useMemo(() => {
+    type Group = { repId: string; allIds: string[]; displayName: string; roles: string[] }
+    const groups: Group[] = []
+    const byName = new Map<string, Group>()
+    for (const u of allUsers) {
+      if (u.id === profile?.uid || u.uid === profile?.uid) continue
+      if (u.isActive === false) continue
+      const allRoles = u.roles ?? [u.role]
+      if (!allRoles.some(r => r === 'student' || r === 'teacher')) continue
+      const name = u.displayName?.trim()
+      if (!name) continue
+      const key = name.toLowerCase()
+      const existing = byName.get(key)
+      if (existing) {
+        if (!existing.allIds.includes(u.id)) existing.allIds.push(u.id)
+      } else {
+        const g: Group = { repId: u.id, allIds: [u.id], displayName: name, roles: allRoles }
+        groups.push(g)
+        byName.set(key, g)
+      }
+    }
+    return groups
+  }, [allUsers, profile?.uid])
+  const filteredGroups = useMemo(
+    () => inviteeSearch.trim()
+      ? invitableGroups.filter(g => g.displayName.toLowerCase().includes(inviteeSearch.toLowerCase()))
+      : invitableGroups,
+    [invitableGroups, inviteeSearch],
+  )
+  const filteredEditGroups = useMemo(
+    () => editInviteeSearch.trim()
+      ? invitableGroups.filter(g => g.displayName.toLowerCase().includes(editInviteeSearch.toLowerCase()))
+      : invitableGroups,
+    [invitableGroups, editInviteeSearch],
   )
 
   const slotMin    = schoolDay?.startTime ? `${schoolDay.startTime}:00` : '07:00:00'
@@ -341,7 +405,7 @@ export default function Lessons() {
       allDay: e.allDay,
       backgroundColor: myColor,
       borderColor:     myColor,
-      extendedProps: { isPersonal: true, isOwn: true, userId: e.userId },
+      extendedProps: { isPersonal: true, isOwn: true, userId: e.userId, docId: e.id },
     }))
 
     const others: EventInput[] = otherTeachersEvents
@@ -364,6 +428,19 @@ export default function Lessons() {
     return [...mine, ...others]
   }, [myPersonalEvents, otherTeachersEvents, profile, teacherFilter, allTeacherUsers])
 
+  const invitedEventInputs: EventInput[] = useMemo(() => {
+    return invitedPersonalEvents.map(e => ({
+      id:    `personal-invited-${e.id}`,
+      title: `${e.organizerName ?? 'Someone'}: ${e.title}`,
+      start: toDate(e.startTime) ?? undefined,
+      end:   e.endTime ? toDate(e.endTime) ?? undefined : undefined,
+      allDay: e.allDay,
+      backgroundColor: '#64748b',
+      borderColor:     '#475569',
+      extendedProps: { isPersonal: true, isInvited: true, docId: e.id },
+    }))
+  }, [invitedPersonalEvents])
+
   // Filtered lesson events (by cohort toggle)
   const filteredLessonEvents = useMemo(
     () => lessonEvents.filter(e => activeCohortIds[e.extendedProps?.cohortId] !== false),
@@ -371,8 +448,8 @@ export default function Lessons() {
   )
 
   const allEvents = useMemo(
-    () => [...ghostEvents, ...filteredLessonEvents, ...semesterEvents, ...personalEventInputs],
-    [ghostEvents, filteredLessonEvents, semesterEvents, personalEventInputs],
+    () => [...ghostEvents, ...filteredLessonEvents, ...semesterEvents, ...personalEventInputs, ...invitedEventInputs],
+    [ghostEvents, filteredLessonEvents, semesterEvents, personalEventInputs, invitedEventInputs],
   )
 
   const dayDetailLessons = useMemo(() => {
@@ -425,12 +502,98 @@ export default function Lessons() {
     setDeleting(null)
   }
 
+  function openEditEvent(event: PersonalEventDoc) {
+    const startDate = event.startTime?.toDate?.()
+    const endDate   = event.endTime?.toDate?.()
+    setEditingEvent(event)
+    setEditTitle(event.title)
+    setEditLocation(event.location ?? '')
+    setEditNotes(event.notes ?? '')
+    setEditDate(startDate ? startDate.toISOString().slice(0, 10) : '')
+    setEditStart(startDate && !event.allDay ? startDate.toISOString().slice(11, 16) : '')
+    setEditEnd(endDate && !event.allDay ? endDate.toISOString().slice(11, 16) : '')
+    setEditInviteeIds(event.inviteeIds ?? [])
+  }
+
+  function closeEditEvent() {
+    setEditingEvent(null)
+    setEditTitle(''); setEditLocation(''); setEditNotes('')
+    setEditDate(''); setEditStart(''); setEditEnd('')
+    setEditInviteeIds([]); setEditInviteeSearch('')
+  }
+
+  function toggleEditInvitee(allIds: string[]) {
+    setEditInviteeIds(prev => {
+      const hasAny = allIds.some(id => prev.includes(id))
+      if (hasAny) return prev.filter(id => !allIds.includes(id))
+      return [...prev, ...allIds]
+    })
+  }
+
+  async function saveEditEvent() {
+    if (!editingEvent || !editTitle.trim()) return
+    setSavingEdit(true)
+    try {
+      const startTime = editingEvent.allDay
+        ? Timestamp.fromDate(new Date(`${editDate}T00:00:00`))
+        : Timestamp.fromDate(new Date(`${editDate}T${editStart}:00`))
+      const endTime = editingEvent.allDay ? null : Timestamp.fromDate(new Date(`${editDate}T${editEnd}:00`))
+      const newIds = editInviteeIds
+      const oldIds = editingEvent.inviteeIds ?? []
+      const removedIds = oldIds.filter(id => !newIds.includes(id))
+      const addedIds   = newIds.filter(id => !oldIds.includes(id))
+      await updateDoc(doc(db, 'personal_events', editingEvent.id), {
+        title: editTitle.trim(),
+        location: editLocation.trim() || null,
+        notes: editNotes.trim() || null,
+        startTime, endTime,
+        inviteeIds: newIds,
+      })
+      const fn = httpsCallable(functions, 'sendEventInviteNotifications')
+      if (removedIds.length > 0) {
+        fn({ inviteeIds: removedIds, organizerName: profile?.displayName, title: editTitle.trim(), canceled: true })
+          .catch(e => console.error('cancel notify failed', e))
+      }
+      if (addedIds.length > 0) {
+        fn({ inviteeIds: addedIds, organizerName: profile?.displayName, title: editTitle.trim(),
+          dateStr: editDate, timeStr: editingEvent.allDay ? 'All day' : editStart,
+          location: editLocation.trim(),
+        }).catch(e => console.error('invite notify failed', e))
+      }
+      closeEditEvent()
+    } finally { setSavingEdit(false) }
+  }
+
+  async function deletePersonalEvent() {
+    if (!editingEvent || !confirm('Delete this event?')) return
+    setSavingEdit(true)
+    try {
+      const allInvitees = editingEvent.inviteeIds ?? []
+      await deleteDoc(doc(db, 'personal_events', editingEvent.id))
+      if (allInvitees.length > 0) {
+        const fn = httpsCallable(functions, 'sendEventInviteNotifications')
+        fn({ inviteeIds: allInvitees, organizerName: profile?.displayName, title: editingEvent.title, canceled: true })
+          .catch(e => console.error('cancel notify failed', e))
+      }
+      closeEditEvent()
+    } finally { setSavingEdit(false) }
+  }
+
   function closeAddEventModal() {
     setAddEventModal(null)
     setAddEventMode('choose')
     setNewEventTitle('')
     setNewEventLocation('')
     setNewEventNotes('')
+    setNewEventInvitees({})
+    setInviteeSearch('')
+  }
+
+  function toggleInvitee(repId: string, allIds: string[]) {
+    setNewEventInvitees(prev => {
+      if (prev[repId]) { const next = { ...prev }; delete next[repId]; return next }
+      return { ...prev, [repId]: allIds }
+    })
   }
 
   async function savePersonalEvent() {
@@ -442,18 +605,34 @@ export default function Lessons() {
         ? Timestamp.fromDate(new Date(`${date}T00:00:00`))
         : Timestamp.fromDate(new Date(`${date}T${start}:00`))
       const endTime = allDay ? null : Timestamp.fromDate(new Date(`${date}T${end}:00`))
+      const title    = newEventTitle.trim()
+      const location = newEventLocation.trim()
+      const invitees = Object.values(newEventInvitees).flat()
       await addDoc(collection(db, 'personal_events'), {
-        userId:    profile.uid,
-        role:      'teacher',
-        title:     newEventTitle.trim(),
+        userId:        profile.uid,
+        organizerName: profile.displayName,
+        role:          'teacher',
+        title,
         startTime,
         endTime,
         allDay,
-        location:  newEventLocation.trim() || null,
-        notes:     newEventNotes.trim()    || null,
-        createdAt: serverTimestamp(),
+        location:      location || null,
+        notes:         newEventNotes.trim() || null,
+        inviteeIds:    invitees,
+        createdAt:     serverTimestamp(),
       })
       closeAddEventModal()
+      if (invitees.length > 0) {
+        const fn = httpsCallable(functions, 'sendEventInviteNotifications')
+        fn({
+          inviteeIds:    invitees,
+          organizerName: profile.displayName,
+          title,
+          dateStr:  allDay ? date : `${date}`,
+          timeStr:  allDay ? 'All day' : start,
+          location,
+        }).catch(e => console.error('invite notify failed', e))
+      }
     } finally {
       setSavingPersonal(false)
     }
@@ -732,6 +911,16 @@ export default function Lessons() {
             }}
             eventClick={(info) => {
               if (info.event.extendedProps.isSemesterMarker) return
+              if (info.event.extendedProps.isPersonal) {
+                const docId: string = info.event.extendedProps.docId
+                if (info.event.extendedProps.isInvited) {
+                  setViewingInvitedEvent(invitedPersonalEvents.find(e => e.id === docId) ?? null)
+                } else if (info.event.extendedProps.isOwn) {
+                  const ev = myPersonalEvents.find(e => e.id === docId)
+                  if (ev) openEditEvent(ev)
+                }
+                return
+              }
               const { isBlock, blockDate, blockStart, blockEnd } = info.event.extendedProps
               if (isBlock) {
                 setAddEventMode('choose')
@@ -1035,7 +1224,7 @@ export default function Lessons() {
       {/* ── Add event modal ──────────────────────────────────────────────── */}
       {addEventModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={closeAddEventModal}>
-          <div className="relative rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" style={{ background: 'var(--bg-surface)' }} onClick={e => e.stopPropagation()}>
+          <div className="relative rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden" style={{ background: 'var(--bg-surface)' }} onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
               <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -1079,7 +1268,7 @@ export default function Lessons() {
               </div>
             ) : (
               /* Step 2 — personal event form */
-              <div className="p-4 space-y-3">
+              <div className="p-4 space-y-3 overflow-y-auto">
                 <input
                   autoFocus
                   value={newEventTitle}
@@ -1135,6 +1324,43 @@ export default function Lessons() {
                   className="input text-sm resize-none"
                   placeholder="Notes (optional)"
                 />
+
+                {/* Invite people */}
+                <div>
+                  <label className="label text-xs flex items-center justify-between">
+                    <span>Invite people</span>
+                    {Object.keys(newEventInvitees).length > 0 && (
+                      <span className="text-brand-500 font-normal">{Object.keys(newEventInvitees).length} invited</span>
+                    )}
+                  </label>
+                  <input
+                    value={inviteeSearch}
+                    onChange={e => setInviteeSearch(e.target.value)}
+                    className="input text-sm mb-1.5"
+                    placeholder="Search by name…"
+                  />
+                  <div className="max-h-36 overflow-y-auto rounded-xl border space-y-0.5 p-1" style={{ borderColor: 'var(--border)' }}>
+                    {filteredGroups.length === 0 ? (
+                      <p className="text-xs text-center py-3" style={{ color: 'var(--text-muted)' }}>No users found</p>
+                    ) : filteredGroups.map(g => {
+                      const selected = !!newEventInvitees[g.repId]
+                      const roleLabel = g.roles.includes('teacher') ? 'teacher' : 'student'
+                      return (
+                        <button
+                          key={g.repId}
+                          type="button"
+                          onClick={() => toggleInvitee(g.repId, g.allIds)}
+                          className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-colors text-left ${selected ? 'bg-brand-600/20' : 'hover:bg-white/5'}`}
+                        >
+                          <span className="flex-1" style={{ color: selected ? 'var(--brand)' : 'var(--text-primary)' }}>{g.displayName}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${roleLabel === 'teacher' ? 'bg-amber-900/50 text-amber-400' : 'bg-zinc-800 text-zinc-500'}`}>{roleLabel}</span>
+                          {selected && <Check className="w-3.5 h-3.5 text-brand-400 flex-shrink-0" />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
                 <div className="flex gap-2 pt-1">
                   <button
                     onClick={() => setAddEventMode('choose')}
@@ -1147,11 +1373,132 @@ export default function Lessons() {
                     className="flex-1 btn-primary py-2 text-sm disabled:opacity-50"
                     onClick={savePersonalEvent}
                   >
-                    {savingPersonal ? 'Saving…' : 'Add to My Calendar'}
+                    {savingPersonal ? 'Saving…' : Object.keys(newEventInvitees).length > 0 ? `Save & Invite ${Object.keys(newEventInvitees).length}` : 'Add to My Calendar'}
                   </button>
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit personal event modal ─────────────────────────────────────── */}
+      {editingEvent && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={closeEditEvent}>
+          <div className="relative rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden" style={{ background: 'var(--bg-surface)' }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Edit Personal Event</p>
+              <div className="flex items-center gap-1">
+                <button onClick={deletePersonalEvent} disabled={savingEdit} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-500 transition-colors disabled:opacity-40">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+                <button onClick={closeEditEvent} className="p-1.5 rounded-lg hover:bg-white/5" style={{ color: 'var(--text-muted)' }}>
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="p-4 space-y-3 overflow-y-auto">
+              <input autoFocus value={editTitle} onChange={e => setEditTitle(e.target.value)} className="input text-sm" placeholder="Title *" />
+              <div>
+                <label className="label text-xs">Date</label>
+                <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} className="input text-sm" />
+              </div>
+              {!editingEvent.allDay && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="label text-xs">Start</label>
+                    <input type="time" value={editStart} onChange={e => setEditStart(e.target.value)} className="input text-sm" />
+                  </div>
+                  <div>
+                    <label className="label text-xs">End</label>
+                    <input type="time" value={editEnd} onChange={e => setEditEnd(e.target.value)} className="input text-sm" />
+                  </div>
+                </div>
+              )}
+              <input value={editLocation} onChange={e => setEditLocation(e.target.value)} className="input text-sm" placeholder="Location (optional)" />
+              <textarea rows={2} value={editNotes} onChange={e => setEditNotes(e.target.value)} className="input text-sm resize-none" placeholder="Notes (optional)" />
+
+              {/* Invite / manage people */}
+              <div>
+                <label className="label text-xs flex items-center justify-between">
+                  <span>Invite people</span>
+                  {editInviteeIds.length > 0 && (
+                    <span className="text-brand-500 font-normal">{invitableGroups.filter(g => g.allIds.some(id => editInviteeIds.includes(id))).length} invited</span>
+                  )}
+                </label>
+                <input
+                  value={editInviteeSearch}
+                  onChange={e => setEditInviteeSearch(e.target.value)}
+                  className="input text-sm mb-1.5"
+                  placeholder="Search by name…"
+                />
+                <div className="max-h-36 overflow-y-auto rounded-xl border space-y-0.5 p-1" style={{ borderColor: 'var(--border)' }}>
+                  {filteredEditGroups.length === 0 ? (
+                    <p className="text-xs text-center py-3" style={{ color: 'var(--text-muted)' }}>No users found</p>
+                  ) : filteredEditGroups.map(g => {
+                    const isSelected = g.allIds.some(id => editInviteeIds.includes(id))
+                    const roleLabel = g.roles.includes('teacher') ? 'teacher' : 'student'
+                    return (
+                      <button
+                        key={g.repId}
+                        type="button"
+                        onClick={() => toggleEditInvitee(g.allIds)}
+                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-colors text-left ${isSelected ? 'bg-brand-600/20' : 'hover:bg-white/5'}`}
+                      >
+                        <span className="flex-1" style={{ color: isSelected ? 'var(--brand)' : 'var(--text-primary)' }}>{g.displayName}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${roleLabel === 'teacher' ? 'bg-amber-900/50 text-amber-400' : 'bg-zinc-800 text-zinc-500'}`}>{roleLabel}</span>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-brand-400 flex-shrink-0" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <button disabled={!editTitle.trim() || savingEdit} className="w-full btn-primary py-2.5 text-sm disabled:opacity-50" onClick={saveEditEvent}>
+                {savingEdit ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Invited event detail modal ────────────────────────────────────── */}
+      {viewingInvitedEvent && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setViewingInvitedEvent(null)}>
+          <div className="bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-slate-400" />
+                <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Invited Event</span>
+              </div>
+              <button onClick={() => setViewingInvitedEvent(null)} className="p-1.5 text-zinc-400 hover:text-zinc-300 rounded-lg hover:bg-zinc-800">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <h2 className="text-lg font-bold text-zinc-100">{viewingInvitedEvent.title}</h2>
+              {viewingInvitedEvent.organizerName && (
+                <p className="text-sm text-zinc-400">Invited by <span className="text-zinc-200 font-medium">{viewingInvitedEvent.organizerName}</span></p>
+              )}
+              {viewingInvitedEvent.startTime && (
+                <div className="flex items-center gap-2 text-sm text-zinc-400">
+                  <CalendarDays className="w-4 h-4 flex-shrink-0" />
+                  <span>
+                    {viewingInvitedEvent.allDay
+                      ? viewingInvitedEvent.startTime.toDate().toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' }) + ' · All day'
+                      : viewingInvitedEvent.startTime.toDate().toLocaleString('sv-SE', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        + (viewingInvitedEvent.endTime ? ' – ' + viewingInvitedEvent.endTime.toDate().toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : '')
+                    }
+                  </span>
+                </div>
+              )}
+              {viewingInvitedEvent.location && (
+                <p className="text-sm text-zinc-400">📍 {viewingInvitedEvent.location}</p>
+              )}
+              {viewingInvitedEvent.notes && (
+                <p className="text-sm text-zinc-500 leading-relaxed">{viewingInvitedEvent.notes}</p>
+              )}
+            </div>
           </div>
         </div>
       )}

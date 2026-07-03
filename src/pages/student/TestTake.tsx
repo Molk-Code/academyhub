@@ -29,8 +29,9 @@ export default function TestTake() {
   const [current,   setCurrent]   = useState(0)
   const [answers,   setAnswers]   = useState<StudentAnswers>({})
   const [submitting, setSubmitting] = useState(false)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const startedAt = useRef(Date.now())
+  const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
+  const answersRef = useRef<StudentAnswers>({})
+  const startedAt  = useRef(Date.now())
 
   // Load questions
   useEffect(() => {
@@ -82,7 +83,7 @@ export default function TestTake() {
       setSecsLeft(prev => {
         if (prev === null || prev <= 1) {
           clearInterval(timerRef.current!)
-          submitTest(answers)
+          submitTest(answersRef.current)
           return 0
         }
         return prev - 1
@@ -94,7 +95,11 @@ export default function TestTake() {
   }, [timeLimit])
 
   function setAnswer(qId: string, val: string | string[]) {
-    setAnswers(prev => ({ ...prev, [qId]: val }))
+    setAnswers(prev => {
+      const next = { ...prev, [qId]: val }
+      answersRef.current = next
+      return next
+    })
   }
 
   function toggleMultiSelect(qId: string, idx: string) {

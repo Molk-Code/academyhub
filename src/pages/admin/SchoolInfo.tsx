@@ -4,7 +4,6 @@ import { db } from '@/lib/firebase'
 import { useCollection, useDocument, orderBy, where } from '@/hooks/useFirestore'
 import type { LessonBlockDoc, ClassroomDoc, UserDoc, SemesterSettingsDoc } from '@/types'
 import { Plus, Pencil, Trash2, Check, X, Clock, Sun, DoorOpen, Users, Star, CalendarRange, GraduationCap, Link2 } from 'lucide-react'
-import LoadingSpinner from '@/components/common/LoadingSpinner'
 import Avatar from '@/components/common/Avatar'
 
 const DAYS = [
@@ -217,8 +216,6 @@ export default function SchoolInfo() {
       setRoomSaving(false)
     }
   }
-
-  if (loading) return <LoadingSpinner />
 
   return (
     <div className="space-y-8">

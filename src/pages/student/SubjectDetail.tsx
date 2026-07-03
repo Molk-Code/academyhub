@@ -4,9 +4,10 @@ import { useDocument, useCollection, orderBy, where } from '@/hooks/useFirestore
 import { useAuth } from '@/contexts/AuthContext'
 import type { SubjectDoc, SubjectTeacherDoc, LessonDoc, VideoLabDoc, AbsenceReportDoc } from '@/types'
 import { thumbnailUrl } from '@/lib/cloudinary'
-import { ArrowLeft, Link2, FileText, ExternalLink, UserRound, CheckCircle2, XCircle, Globe, Play, Clock } from 'lucide-react'
+import { Link2, FileText, ExternalLink, UserRound, CheckCircle2, XCircle, Globe, Play, Clock } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import SharePointBrowser from '@/components/sharepoint/SharePointBrowser'
+import Breadcrumb from '@/components/common/Breadcrumb'
 
 export default function StudentSubjectDetail() {
   const { id } = useParams<{ id: string }>()
@@ -83,20 +84,18 @@ export default function StudentSubjectDetail() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        <Link to="/subjects" className="mt-1 p-2 text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 rounded-xl transition-colors">
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">{subject.iconEmoji}</span>
-            <div>
-              <h1 className="page-title">{subject.title}</h1>
-              <p className="text-zinc-500 text-sm mt-0.5">{subject.description}</p>
-            </div>
-          </div>
+      <Breadcrumb items={[
+        { label: 'Home', href: '/dashboard' },
+        { label: 'Subjects', href: '/subjects' },
+        { label: subject.title },
+      ]} />
 
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <span className="text-3xl">{subject.iconEmoji}</span>
+        <div>
+          <h1 className="page-title">{subject.title}</h1>
+          <p className="text-zinc-500 text-sm mt-0.5">{subject.description}</p>
         </div>
       </div>
 

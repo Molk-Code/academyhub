@@ -33,7 +33,7 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedDayIdx, setSelectedDayIdx] = useState<number>(() => {
     const d = getDay(new Date())
-    return d >= 1 && d <= 5 ? d - 1 : 0
+    return d === 0 ? 6 : d - 1  // Mon=0 … Sat=5, Sun=6
   })
   const [acting, setActing] = useState(false)
 
@@ -43,7 +43,7 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
   }, [weekOffset])
 
   const weekDays = useMemo(
-    () => Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)),
+    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
     [weekStart],
   )
 
@@ -52,7 +52,7 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
   const selectedDayNum   = getDay(selectedDay)
 
   const weekStartStr = format(weekStart, 'yyyy-MM-dd')
-  const weekEndStr   = format(addDays(weekStart, 4), 'yyyy-MM-dd')
+  const weekEndStr   = format(addDays(weekStart, 6), 'yyyy-MM-dd')
 
   const { data: rooms } = useCollection<RoomDoc>('rooms', [where('isActive', '==', true)])
   const { data: bookings, loading } = useCollection<RoomBookingDoc>(
@@ -103,8 +103,17 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
   )
   const weeklyLimitReached = maxBookingsPerWeek !== null && myWeeklyBookings >= maxBookingsPerWeek
 
+  const todayStr   = format(new Date(), 'yyyy-MM-dd')
+  const nowTimeStr = format(new Date(), 'HH:mm')
+
+  function isSlotExpired(slot: TimeSlot): boolean {
+    if (selectedDateStr < todayStr) return true
+    if (selectedDateStr === todayStr) return slot.endTime <= nowTimeStr
+    return false
+  }
+
   async function handleCellClick(slot: TimeSlot, room: RoomDoc) {
-    if (!profile || acting) return
+    if (!profile || acting || isSlotExpired(slot)) return
     const key      = slotKey(slot, selectedDateStr, room.id)
     const existing = bookingMap.get(key)
 
@@ -138,7 +147,7 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
   function goToday() {
     setWeekOffset(0)
     const d = getDay(new Date())
-    setSelectedDayIdx(d >= 1 && d <= 5 ? d - 1 : 0)
+    setSelectedDayIdx(d === 0 ? 6 : d - 1)
   }
 
   if (loading) return <LoadingSpinner />
@@ -168,11 +177,26 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
       </div>
 
       {/* Week + day navigation */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={() => setWeekOffset(w => w - 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
-          <ChevronLeft className="w-4 h-4 text-zinc-500" />
-        </button>
+      <div className="space-y-2">
+        {/* Row 1: arrows + week label */}
+        <div className="flex items-center gap-2">
+          <button onClick={() => setWeekOffset(w => w - 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
+            <ChevronLeft className="w-4 h-4 text-zinc-500" />
+          </button>
+          <span className="flex-1 text-sm text-zinc-400 text-center">
+            {format(weekStart, 'd MMM')} – {format(addDays(weekStart, 6), 'd MMM yyyy')}
+          </span>
+          <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
+            <ChevronRight className="w-4 h-4 text-zinc-500" />
+          </button>
+          {!isCurrentWeek && (
+            <button onClick={goToday} className="flex items-center gap-1.5 text-sm text-brand-400 hover:text-brand-300 px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors">
+              <CalendarDays className="w-4 h-4" /> Today
+            </button>
+          )}
+        </div>
 
+        {/* Row 2: day pills */}
         <div className="flex gap-1">
           {weekDays.map((day, idx) => {
             const isSelected = idx === selectedDayIdx
@@ -182,7 +206,7 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
                 key={idx}
                 onClick={() => setSelectedDayIdx(idx)}
                 className={cn(
-                  'flex flex-col items-center w-14 py-2 rounded-xl text-sm transition-all',
+                  'flex flex-col items-center flex-1 py-2 rounded-xl text-sm transition-all',
                   isSelected
                     ? 'bg-brand-600 text-white font-semibold shadow-sm'
                     : today
@@ -196,20 +220,6 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
             )
           })}
         </div>
-
-        <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
-          <ChevronRight className="w-4 h-4 text-zinc-500" />
-        </button>
-
-        {!isCurrentWeek && (
-          <button onClick={goToday} className="flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-800 px-3 py-2 rounded-lg hover:bg-brand-50 transition-colors">
-            <CalendarDays className="w-4 h-4" /> Today
-          </button>
-        )}
-
-        <span className="text-sm text-zinc-400 ml-auto hidden sm:block">
-          {format(weekStart, 'd MMM')} – {format(addDays(weekStart, 4), 'd MMM yyyy')}
-        </span>
       </div>
 
       {/* Grid */}
@@ -246,20 +256,21 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
                     <p className="text-sm font-semibold text-zinc-200">{slot.startTime}–{slot.endTime}</p>
                   </td>
                   {sortedRooms.map(room => {
-                    const booking      = bookingMap.get(slotKey(slot, selectedDateStr, room.id))
-                    const isBooked     = !!booking
-                    const isMine       = booking?.studentId === profile?.uid
+                    const booking        = bookingMap.get(slotKey(slot, selectedDateStr, room.id))
+                    const isBooked      = !!booking
+                    const isMine        = booking?.studentId === profile?.uid
                     const isUnavailable = !isRoomAvailableForSlot(room, selectedDateStr, selectedDayNum, slot)
-                    const isLimitHit   = !isBooked && !isMine && weeklyLimitReached
+                    const isPast        = isSlotExpired(slot)
+                    const isLimitHit    = !isBooked && !isMine && weeklyLimitReached
 
                     return (
                       <td key={room.id} className="px-2 py-2 text-center">
                         <button
-                          disabled={isUnavailable || (isBooked && !isMine) || isLimitHit || acting}
+                          disabled={isUnavailable || isPast || (isBooked && !isMine) || isLimitHit || acting}
                           onClick={() => handleCellClick(slot, room)}
                           className={cn(
                             'w-full rounded-xl px-2 py-3.5 text-xs font-medium transition-all border select-none',
-                            isUnavailable
+                            isUnavailable || isPast
                               ? 'bg-zinc-800 border-white/10 text-zinc-400 cursor-not-allowed'
                               : isMine
                                 ? 'bg-amber-400 border-amber-500 text-amber-950 hover:bg-amber-500 active:bg-amber-600'
@@ -272,6 +283,8 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
                         >
                           {isUnavailable ? (
                             <div className="font-medium">—</div>
+                          ) : isPast ? (
+                            <div className="font-medium text-zinc-500">Past</div>
                           ) : isMine ? (
                             <div>
                               <div className="font-semibold">You</div>

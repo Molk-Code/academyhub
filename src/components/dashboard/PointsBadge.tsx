@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 interface Props {
   totalPoints: number
   pointsRedeemed?: number
+  classPoints?: number
   className?: string
 }
 
@@ -19,7 +20,7 @@ function AnimatedNumber({ value }: { value: number }) {
   return <motion.span className="tabular-nums">{rounded}</motion.span>
 }
 
-export default function PointsBadge({ totalPoints, pointsRedeemed = 0, className }: Props) {
+export default function PointsBadge({ totalPoints, pointsRedeemed = 0, classPoints, className }: Props) {
   const available = totalPoints - pointsRedeemed
 
   return (
@@ -52,6 +53,22 @@ export default function PointsBadge({ totalPoints, pointsRedeemed = 0, className
           <p className="text-[10px] text-amber-400 font-medium leading-none mt-0.5">earned total</p>
         </div>
       </div>
+
+      {/* Class total */}
+      {classPoints !== undefined && (
+        <>
+          <div className="w-px bg-amber-200 my-2" />
+          <div className="flex items-center px-4 py-2">
+            <div>
+              <div className="text-sm font-bold text-sky-400 leading-none tabular-nums">
+                <AnimatedNumber value={classPoints} />
+                <span className="text-xs font-medium ml-1">pts</span>
+              </div>
+              <p className="text-[10px] text-sky-500 font-medium leading-none mt-0.5">class total</p>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

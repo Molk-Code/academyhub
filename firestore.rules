@@ -17,14 +17,11 @@ service cloud.firestore {
     }
 
     function isTeacher() {
-      return isSignedIn() && (role() == 'teacher' || docRole() == 'teacher');
+      return isSignedIn() && role() == 'teacher';
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        role() == 'admin' ||
-        docRole() == 'admin'
-      );
+      return isSignedIn() && role() == 'admin';
     }
 
     function isTeacherOrAdmin() {
@@ -54,14 +51,12 @@ service cloud.firestore {
     // ── Users ─────────────────────────────────────────────────────────────────
 
     match /users/{userId} {
-      allow read: if isSignedIn();
+      // FCM tokens live in this doc — restrict to self and staff
+      allow read: if request.auth.uid == userId || isTeacherOrAdmin();
       // Self can update non-privileged display fields (not points/role)
       allow update: if isSelf(userId)
         && !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(['role', 'totalPoints', 'pointsRedeemed']);
-      // Students may update only totalPoints on their own doc (attendance award)
-      allow update: if isSelf(userId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints']);
       // Any signed-in user can update their own lastReadAt (cross-device badge clearing)
       allow update: if isSelf(userId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastReadAt']);
@@ -138,12 +133,8 @@ service cloud.firestore {
     match /points_log/{logId} {
       allow read: if isTeacherOrAdmin()
         || (isStudent() && resource.data.studentId == request.auth.uid);
-      // Students may log their own attendance (+5); teachers may log absence penalties (−5)
-      allow create: if isSignedIn()
-        && (request.resource.data.reason == 'attendance'
-            ? (isStudent() && request.resource.data.studentId == request.auth.uid)
-            : isTeacherOrAdmin());
-      allow update, delete: if false;
+      // Only Cloud Functions write points; no client writes allowed
+      allow write: if false;
     }
 
     // ── Prizes ────────────────────────────────────────────────────────────────
@@ -171,8 +162,15 @@ service cloud.firestore {
     // ── Invitations ───────────────────────────────────────────────────────────
 
     match /invitations/{token} {
-      allow read: if true; // token is unguessable; needed during signup
+      allow read: if true
+        && (!('expiresAt' in resource.data) || resource.data.expiresAt > request.time)
+        && resource.data.used != true;
       allow write: if isTeacherOrAdmin();
+      // Invited user may mark their own invite as used after creating their account
+      allow update: if isSignedIn()
+        && resource.data.email == request.auth.token.email
+        && resource.data.used == false
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used']);
     }
 
     // ── Global settings (school day hours, etc.) ──────────────────────────────
@@ -181,6 +179,11 @@ service cloud.firestore {
     match /settings/{docId} {
       allow read: if isSignedIn() || docId == 'booking';
       allow write: if isAdmin();
+    }
+
+    match /settings/production {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
     }
 
     // ── Subject teachers (subcollection) ─────────────────────────────────────
@@ -227,7 +230,7 @@ service cloud.firestore {
     // ── Lesson attendance (subcollection) ────────────────────────────────────
 
     match /lessons/{lessonId}/attendance/{studentId} {
-      allow read: if isSignedIn();
+      allow read: if isSelf(studentId) || isTeacherOrAdmin();
       allow write: if isSignedIn() && request.auth.uid == studentId;
     }
 
@@ -245,7 +248,7 @@ service cloud.firestore {
     }
 
     match /room_bookings/{bookingId} {
-      allow read: if true;
+      allow read: if isSignedIn() || request.auth == null; // signed-in users + iPad display
       allow create: if isSignedIn()
         && request.resource.data.studentId == request.auth.uid;
       allow delete: if isStaff()
@@ -395,7 +398,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // ── Equipment (Phase 5 — reserved, locked down until implemented) ─────────
+    // ── Equipment Booking System ───────────────────────────────────────────────
 
     match /equipment/{itemId} {
       allow read: if isSignedIn();
@@ -404,8 +407,38 @@ service cloud.firestore {
 
     match /equipment_bookings/{bookingId} {
       allow read: if isTeacherOrAdmin()
-        || (isStudent() && resource.data.studentId == request.auth.uid);
-      allow write: if false; // Cloud Functions only
+        || (isSignedIn() && resource.data.studentId == request.auth.uid);
+      allow create: if isSignedIn()
+        && request.resource.data.studentId == request.auth.uid;
+      allow update: if isTeacherOrAdmin();
+    }
+
+    match /inventory_projects/{projectId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
+
+      match /items/{itemId} {
+        allow read: if isSignedIn();
+        allow write: if isTeacherOrAdmin();
+      }
+    }
+
+    // Collection group rule required for collectionGroup('items') queries
+    match /{path=**}/items/{itemId} {
+      allow read: if isSignedIn();
+    }
+
+    // ── Scan sessions (cross-device QR scanning) ──────────────────────────────
+
+    match /scan_sessions/{sessionId} {
+      allow read: if isSignedIn();
+      allow create: if isTeacherOrAdmin();
+      allow update: if isTeacherOrAdmin();
+
+      match /checkins/{checkinId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn(); // mobile scanners write check-in signals
+      }
     }
 
     // ── Individual Development Plans (NOPRA) ──────────────────────────────────
@@ -438,6 +471,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── Teacher Notebook ─────────────────────────────────────────────────
+
+    match /teacher_notes/{noteId} {
+      allow read, write: if isTeacherOrAdmin();
+    }
+
     // ── GDPR deletion log — append by admins, read by admins ─────────────
 
     match /deletion_log/{logId} {
@@ -446,17 +485,154 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── Personal calendar events ──────────────────────────────────────────────
+
+    match /personal_events/{eventId} {
+      allow read: if isSignedIn()
+        && (resource.data.userId == request.auth.uid
+            || request.auth.uid in resource.data.inviteeIds);
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+    }
+
+    // ── Team Resources ────────────────────────────────────────────────────────
+
+    match /resource_folders/{folderId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
+      // Students can create folders scoped to their own cohort (class resources)
+      allow create: if isStudent()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.cohortId != null;
+    }
+
+    match /team_resources/{resourceId} {
+      allow read: if isSignedIn();
+      // Teachers/admins can create any resource; students can only create class resources (cohortId != null)
+      allow create: if isTeacherOrAdmin()
+        && request.resource.data.createdBy == request.auth.uid;
+      allow create: if isStudent()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.cohortId != null;
+      allow update, delete: if isTeacherOrAdmin();
+    }
+
+    // ── Teacher Assessments (strengths / developments per student) ───────────
+
+    match /teacher_assessments/{studentId} {
+      // Students can read their own; teachers/admins can read all
+      allow read: if isSelf(studentId) || isTeacherOrAdmin();
+      // Only teachers/admins can write assessments
+      allow write: if isTeacherOrAdmin();
+    }
+
+    // ── Crew Roles (admin-managed, student-readable) ──────────────────────────
+
+    match /crew_roles/{roleId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── Production Planning ───────────────────────────────────────────────────
+
+    match /productions/{productionId} {
+      function prodData() { return resource.data; }
+      function canEditProd() {
+        return prodData().createdBy == request.auth.uid
+          || request.auth.uid in prodData().collaborators
+          || isTeacherOrAdmin();
+      }
+      function canReadProd() {
+        return canEditProd()
+          || (prodData().isPublic && prodData().cohortId == request.auth.token.cohortId)
+          || (prodData().viewerIds != null && request.auth.uid in prodData().viewerIds);
+      }
+
+      allow read:   if isSignedIn() && canReadProd();
+      allow create: if isSignedIn()
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isSignedIn() && canEditProd();
+      allow delete: if isSignedIn()
+        && (prodData().createdBy == request.auth.uid || isTeacherOrAdmin());
+
+      match /shotlog/{entryId} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn();
+      }
+
+      match /{subcol}/{docId} {
+        function parentProd() {
+          return get(/databases/$(database)/documents/productions/$(productionId)).data;
+        }
+        function canEditSub() {
+          return parentProd().createdBy == request.auth.uid
+            || request.auth.uid in parentProd().collaborators
+            || isTeacherOrAdmin();
+        }
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() && canEditSub();
+      }
+    }
+
+    // ── Master Production Period ──────────────────────────────────────────────
+
+    match /production_periods/{periodId} {
+      allow read: if isSignedIn();
+      allow create: if isTeacherOrAdmin();
+      allow update: if isTeacherOrAdmin();
+      allow delete: if isTeacherOrAdmin();
+
+      match /allocations/{allocationId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update: if isSignedIn()
+          && (resource.data.createdBy == request.auth.uid || isTeacherOrAdmin());
+        allow delete: if isSignedIn()
+          && (resource.data.createdBy == request.auth.uid || isTeacherOrAdmin());
+      }
+    }
+
     // ── Student to-do items ───────────────────────────────────────────────────
 
     match /todos/{todoId} {
-      allow read: if isTeacherOrAdmin()
-        || (isStudent() && resource.data.studentId == request.auth.uid);
-      allow create: if isStudent()
+      // Ownership check rather than isStudent() — custom claims may not be set
+      allow read: if isSignedIn() && (
+        isTeacherOrAdmin() || resource.data.studentId == request.auth.uid
+      );
+      allow create: if isSignedIn()
         && request.resource.data.studentId == request.auth.uid;
-      allow update: if isStudent()
+      allow update: if isSignedIn()
         && resource.data.studentId == request.auth.uid;
-      allow delete: if isStudent()
+      allow delete: if isSignedIn()
         && resource.data.studentId == request.auth.uid;
+    }
+
+    // ── Schools ───────────────────────────────────────────────────────────────
+
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.email in ['fredrik.fridlund@gmail.com'];
+    }
+
+    match /schools/{schoolId} {
+      // Public existence check — allows unauthenticated slug availability check on signup
+      allow get: if true;
+      // Listing requires auth + admin role or superadmin email
+      allow list: if isSignedIn() && (isAdmin() || isSuperAdmin());
+      allow create: if isSignedIn() && (isAdmin() || isSuperAdmin())
+        && request.resource.data.schoolId == schoolId
+        && !exists(/databases/$(database)/documents/schools/$(schoolId));
+      allow update: if isSignedIn() && (isAdmin() || isSuperAdmin());
+      allow delete: if false;
+    }
+
+    // ── Notification inbox ────────────────────────────────────────────────────
+
+    match /notifications/{notifId} {
+      allow read:   if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
     }
   }
 }

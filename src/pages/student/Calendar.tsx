@@ -7,7 +7,7 @@ import type { EventInput } from '@fullcalendar/core'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
 import { toDate } from '@/lib/utils'
-import type { LessonDoc, AssignmentDoc, SubjectDoc, SemesterSettingsDoc, LessonCategoryDoc, CohortDoc, PersonalEventDoc, UserDoc } from '@/types'
+import type { LessonDoc, AssignmentDoc, SubjectDoc, SemesterSettingsDoc, LessonCategoryDoc, CohortDoc, PersonalEventDoc, UserDoc, SyncedEventDoc } from '@/types'
 import { addDoc, collection, serverTimestamp, Timestamp, updateDoc, deleteDoc, doc } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
@@ -46,7 +46,7 @@ const MOBILE_VIEWS: { id: ViewId; label: string }[] = [
 interface SchoolDayDoc { id: string; startTime: string; endTime: string }
 
 interface SelectedEvent {
-  type: 'lesson' | 'assignment' | 'semesterMarker'
+  type: 'lesson' | 'assignment' | 'semesterMarker' | 'synced'
   lessonId?: string
   title: string
   classroom?: string
@@ -58,6 +58,7 @@ interface SelectedEvent {
   subjectColor?: string
   pointsValue?: number
   dueDate?: Date
+  location?: string
 }
 
 export default function StudentCalendar() {
@@ -122,6 +123,14 @@ export default function StudentCalendar() {
     'personal_events',
     profile ? [where('inviteeIds', 'array-contains', profile.uid)] : [],
     !!profile,
+  )
+
+  // Events synced in from an Outlook calendar (Office 365 Calendar Sync, admin settings)
+  const { data: syncedEvents } = useCollection<SyncedEventDoc>(
+    'synced_events',
+    cohortId ? [where('cohortId', 'in', [cohortId, 'all'])] : [where('cohortId', '==', 'all')],
+    true,
+    cohortId ?? 'all',
   )
 
   const { data: allUsers } = useCollection<UserDoc>('users')
@@ -276,7 +285,23 @@ export default function StudentCalendar() {
     }))
   }, [invitedPersonalEvents])
 
-  const allEvents = useMemo(() => [...events, ...personalEventInputs, ...invitedEventInputs], [events, personalEventInputs, invitedEventInputs])
+  const syncedEventInputs: EventInput[] = useMemo(() => {
+    return syncedEvents.map(e => ({
+      id:    `synced-${e.id}`,
+      title: `📅 ${e.title}`,
+      start: toDate(e.startTime) ?? undefined,
+      end:   e.endTime ? toDate(e.endTime) ?? undefined : undefined,
+      allDay: e.allDay,
+      backgroundColor: '#0078d4',
+      borderColor:     '#0078d4',
+      extendedProps: { isSynced: true, location: e.location },
+    }))
+  }, [syncedEvents])
+
+  const allEvents = useMemo(
+    () => [...events, ...personalEventInputs, ...invitedEventInputs, ...syncedEventInputs],
+    [events, personalEventInputs, invitedEventInputs, syncedEventInputs],
+  )
 
   function resetAddEventForm() {
     setAddEventModal(null)
@@ -490,6 +515,12 @@ export default function StudentCalendar() {
                 <span className="text-xs text-zinc-400">Invited</span>
               </div>
             )}
+            {syncedEvents.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: '#0078d4' }} />
+                <span className="text-xs text-zinc-400">Outlook</span>
+              </div>
+            )}
           </div>
 
           {/* Mobile view switcher dropdown */}
@@ -588,6 +619,16 @@ export default function StudentCalendar() {
                 setAddEventModal({ date, start, end, allDay: info.allDay })
               }}
               eventClick={(info) => {
+                if (info.event.extendedProps.isSynced) {
+                  setSelectedEvent({
+                    type: 'synced',
+                    title: info.event.title.replace(/^📅 /, ''),
+                    startTime: info.event.start ?? undefined,
+                    endTime:   info.event.end   ?? undefined,
+                    location:  info.event.extendedProps.location,
+                  })
+                  return
+                }
                 if (info.event.extendedProps.isSemesterMarker) {
                   setSelectedEvent({
                     type: 'semesterMarker',
@@ -647,10 +688,12 @@ export default function StudentCalendar() {
                   ? <CalendarDays className="w-4 h-4 text-brand-500" />
                   : selectedEvent.type === 'semesterMarker'
                     ? <CalendarDays className="w-4 h-4 text-emerald-500" />
-                    : <BookOpen className="w-4 h-4 text-rose-500" />
+                    : selectedEvent.type === 'synced'
+                      ? <CalendarDays className="w-4 h-4" style={{ color: '#0078d4' }} />
+                      : <BookOpen className="w-4 h-4 text-rose-500" />
                 }
                 <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  {selectedEvent.type === 'lesson' ? 'Lesson' : selectedEvent.type === 'semesterMarker' ? 'Semester' : 'Assignment Deadline'}
+                  {selectedEvent.type === 'lesson' ? 'Lesson' : selectedEvent.type === 'semesterMarker' ? 'Semester' : selectedEvent.type === 'synced' ? 'Outlook Calendar' : 'Assignment Deadline'}
                 </span>
               </div>
               <button onClick={() => setSelectedEvent(null)} className="p-1.5 text-zinc-400 hover:text-zinc-300 rounded-lg hover:bg-zinc-800">
@@ -684,6 +727,25 @@ export default function StudentCalendar() {
                         lessonId={selectedEvent.lessonId}
                         cohortId={cohortId}
                       />
+                    </div>
+                  )}
+                </>
+              )}
+              {selectedEvent.type === 'synced' && (
+                <>
+                  {(selectedEvent.startTime || selectedEvent.endTime) && (
+                    <div className="flex items-center gap-2 text-sm text-zinc-400">
+                      <Clock className="w-4 h-4 text-zinc-400" />
+                      <span>
+                        {selectedEvent.startTime ? format(selectedEvent.startTime, 'EEEE d MMM · HH:mm') : ''}
+                        {selectedEvent.endTime ? ` – ${format(selectedEvent.endTime, 'HH:mm')}` : ''}
+                      </span>
+                    </div>
+                  )}
+                  {selectedEvent.location && (
+                    <div className="flex items-center gap-2 text-sm text-zinc-400">
+                      <MapPin className="w-4 h-4 flex-shrink-0" />
+                      <span>{selectedEvent.location}</span>
                     </div>
                   )}
                 </>

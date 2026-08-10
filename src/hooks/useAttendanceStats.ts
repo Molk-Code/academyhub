@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { isAfter, isBefore, startOfDay } from 'date-fns'
+import { isAfter, isBefore, startOfDay, format } from 'date-fns'
 import { useCollection, where } from '@/hooks/useFirestore'
 import type { LessonDoc, PointsLogDoc, CohortDoc } from '@/types'
 
@@ -7,6 +7,8 @@ export interface AttendanceLessonRow {
   id: string
   title: string
   date: string
+  startTime?: string
+  endTime?: string
   attended: boolean
 }
 
@@ -69,6 +71,8 @@ export function useAttendanceStats(uid: string | null, cohortId: string | null):
       id: l.id,
       title: l.title,
       date: l.startTime?.toDate?.()?.toLocaleDateString('sv-SE') ?? '',
+      startTime: l.startTime?.toDate ? format(l.startTime.toDate(), 'HH:mm') : undefined,
+      endTime:   l.endTime?.toDate   ? format(l.endTime.toDate(),   'HH:mm') : undefined,
       attended: attendedIds.has(l.id),
     }))
 

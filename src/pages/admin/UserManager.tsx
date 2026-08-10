@@ -170,6 +170,11 @@ export default function UserManager() {
     await updateDoc(doc(db, 'users', user.id), { roles: next })
   }
 
+  async function switchPrimaryRole(user: UserDoc, newRole: 'student' | 'teacher') {
+    if (!confirm(`Switch ${user.displayName} to ${newRole}?`)) return
+    await updateDoc(doc(db, 'users', user.id), { role: newRole, roles: [newRole] })
+  }
+
   function copyInviteLink(token: string) {
     const url = `${window.location.origin}/accept-invite?token=${token}`
     navigator.clipboard.writeText(url)
@@ -465,6 +470,13 @@ export default function UserManager() {
                       r === 'admin' ? 'badge-rose' : r === 'teacher' ? 'badge-blue' : 'badge-indigo'
                     }`}>{r}</span>
                   ))}
+                  <button
+                    onClick={() => switchPrimaryRole(user, user.role === 'student' ? 'teacher' : 'student')}
+                    title={`Switch to ${user.role === 'student' ? 'teacher' : 'student'}`}
+                    className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 text-zinc-500 hover:text-zinc-300 hover:border-white/20 transition-colors"
+                  >
+                    → {user.role === 'student' ? 'teacher' : 'student'}
+                  </button>
                   {user.role !== 'student' && (
                     <button
                       onClick={() => toggleSecondaryRole(user, user.role === 'admin' ? 'teacher' : 'admin')}

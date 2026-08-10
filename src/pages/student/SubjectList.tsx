@@ -2,15 +2,19 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useCollection, where } from '@/hooks/useFirestore'
-import type { SubjectDoc, AssignmentDoc, LessonDoc } from '@/types'
+import { useCollection, useDocument, where } from '@/hooks/useFirestore'
+import type { SubjectDoc, AssignmentDoc, LessonDoc, CohortDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 
 export default function SubjectList() {
   const { cohortId, previewCohortId } = useAuth()
   const effectiveCohortId = previewCohortId ?? cohortId
 
-  const { data: subjects, loading } = useCollection<SubjectDoc>('subjects')
+  const { data: cohort } = useDocument<CohortDoc>('cohorts', effectiveCohortId ?? undefined)
+  const { data: allSubjects, loading } = useCollection<SubjectDoc>('subjects')
+  const subjects = allSubjects
+    .filter(s => !cohort || s.programYear === cohort.programYear)
+    .sort((a, b) => a.order - b.order)
 
   const { data: assignments } = useCollection<AssignmentDoc>(
     'assignments',

@@ -4,6 +4,8 @@ import { db } from '@/lib/firebase'
 import { SCHOOL_ID } from '@/lib/school'
 import type { SchoolTier } from '@/types'
 
+export type CurrencyCode = 'SEK' | 'EUR' | 'USD'
+
 interface SchoolConfig {
   name: string
   shortName: string
@@ -16,6 +18,7 @@ interface SchoolConfig {
   tier: SchoolTier | null
   storageQuotaGB: number | undefined
   storageUsedBytes: number | undefined
+  currency: CurrencyCode
 }
 
 const defaultConfig: SchoolConfig = {
@@ -30,6 +33,7 @@ const defaultConfig: SchoolConfig = {
   tier: null,
   storageQuotaGB: undefined,
   storageUsedBytes: undefined,
+  currency: 'SEK',
 }
 
 const SchoolContext = createContext<SchoolConfig>(defaultConfig)

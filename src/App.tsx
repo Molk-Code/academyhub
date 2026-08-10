@@ -81,6 +81,7 @@ const EquipmentRequests          = lazy(() => import('@/pages/teacher/EquipmentR
 const SemesterWheel              = lazy(() => import('@/pages/teacher/SemesterWheel'))
 const Notebook                   = lazy(() => import('@/pages/teacher/Notebook'))
 const TeacherVideoLab            = lazy(() => import('@/pages/teacher/VideoLab'))
+const GuestTeacherBank           = lazy(() => import('@/pages/teacher/GuestTeacherBank'))
 
 // ── Admin lazy ──────────────────────────────────────────────────────────────
 const UserManager       = lazy(() => import('@/pages/admin/UserManager'))
@@ -94,6 +95,7 @@ const MinivanBookings   = lazy(() => import('@/pages/admin/MinivanBookings'))
 const EmailConfig       = lazy(() => import('@/pages/admin/EmailConfig'))
 const LessonCategories  = lazy(() => import('@/pages/admin/LessonCategories'))
 const SharePointSettings = lazy(() => import('@/pages/admin/SharePointSettings'))
+const OfficeCalendarSync = lazy(() => import('@/pages/admin/OfficeCalendarSync'))
 const GuideEditor       = lazy(() => import('@/pages/admin/GuideEditor'))
 const NavSettings       = lazy(() => import('@/pages/admin/NavSettings'))
 const ProductionRoles   = lazy(() => import('@/pages/admin/ProductionRoles'))
@@ -195,6 +197,7 @@ export default function App() {
             <Route path="/teacher/inventory"                  element={<FeatureGate feature="inventory" redirectTo="/teacher"><InventoryPage /></FeatureGate>} />
             <Route path="/teacher/equipment-requests"         element={<FeatureGate feature="equipment" redirectTo="/teacher"><EquipmentRequests /></FeatureGate>} />
             <Route path="/teacher/notebook"                   element={<Notebook />} />
+            <Route path="/teacher/guest-teachers"            element={<GuestTeacherBank />} />
           </Route>
 
           {/* ── Admin ───────────────────────────────────────────────────── */}
@@ -213,6 +216,7 @@ export default function App() {
             <Route path="/admin/lessons"        element={<LessonCategories />} />
             <Route path="/admin/chat"          element={<ChatPage />} />
             <Route path="/admin/sharepoint"    element={<SharePointSettings />} />
+            <Route path="/admin/calendar-sync" element={<OfficeCalendarSync />} />
             <Route path="/admin/guide"         element={<GuideEditor />} />
             <Route path="/admin/video-lab"     element={<AdminVideoLab />} />
             <Route path="/admin/video-lab/:id" element={<VideoLabPlayer />} />

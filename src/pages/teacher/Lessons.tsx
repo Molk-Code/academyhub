@@ -851,7 +851,7 @@ export default function Lessons() {
                 type:       'timeGrid',
                 duration:   { weeks: 1 },
                 hiddenDays: [0, 6],
-                buttonText: 'Wk',
+                buttonText: 'Work week',
               },
             }}
             events={allEvents}

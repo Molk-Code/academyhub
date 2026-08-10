@@ -5,6 +5,7 @@ import {
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, orderBy, where } from '@/hooks/useFirestore'
+import { useCurrency } from '@/hooks/useCurrency'
 import { cn } from '@/lib/utils'
 import { uploadFile } from '@/lib/cloudinary'
 import type { EquipmentDoc, EquipmentCategory, EquipmentBookingDoc } from '@/types'
@@ -447,6 +448,7 @@ function EquipmentCard({ item, onEdit, onDelete, onQR }: {
   onDelete: () => void
   onQR: () => void
 }) {
+  const { symbol } = useCurrency()
   const [deleting, setDeleting] = useState(false)
 
   async function handleDelete() {
@@ -511,7 +513,7 @@ function EquipmentCard({ item, onEdit, onDelete, onQR }: {
               {item.available} / {item.totalQuantity} available
             </span>
             {item.priceInclVat > 0 && (
-              <span className="text-zinc-400">{item.priceInclVat.toFixed(0)} kr</span>
+              <span className="text-zinc-400">{item.priceInclVat.toFixed(0)} {symbol}</span>
             )}
           </div>
           <div className="h-1 bg-zinc-700 rounded-full overflow-hidden">

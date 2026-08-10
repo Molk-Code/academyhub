@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { doc, updateDoc, getDocs, collection } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { cn } from '@/lib/utils'
+import { useSchool } from '@/contexts/SchoolContext'
 import type { ProductionCrewAssignmentDoc, ProductionShootingDayDoc, CrewRoleDoc } from '@/types'
 
 interface BudgetTabProps {
@@ -28,9 +29,11 @@ export function BudgetTab({
   crewAssignments,
   shootingDays,
   budgetLimit,
-  budgetCurrency = 'SEK',
+  budgetCurrency,
   canEdit,
 }: BudgetTabProps) {
+  const { currency: schoolCurrency } = useSchool()
+  const activeCurrency = budgetCurrency || schoolCurrency
   const [crewRoles, setCrewRoles] = useState<CrewRoleDoc[]>([])
   const [overrides, setOverrides] = useState<Record<string, string>>({})
   const [saving,    setSaving]    = useState<string | null>(null)
@@ -81,13 +84,13 @@ export function BudgetTab({
           {/* Total budget */}
           <div className="bg-zinc-900 border border-white/10 rounded-xl p-4">
             <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Total budget</p>
-            <p className="text-xl font-bold text-zinc-100">{fmt(budgetLimit)} <span className="text-sm font-normal text-zinc-500">{budgetCurrency}</span></p>
+            <p className="text-xl font-bold text-zinc-100">{fmt(budgetLimit)} <span className="text-sm font-normal text-zinc-500">{activeCurrency}</span></p>
           </div>
           {/* Salary cost */}
           <div className={cn('rounded-xl p-4 border', overSalary ? 'bg-rose-900/20 border-rose-500/30' : 'bg-zinc-900 border-white/10')}>
             <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Salaries</p>
             <p className={cn('text-xl font-bold', overSalary ? 'text-rose-400' : 'text-zinc-100')}>
-              {fmt(salaryCost)} <span className="text-sm font-normal text-zinc-500">{budgetCurrency}</span>
+              {fmt(salaryCost)} <span className="text-sm font-normal text-zinc-500">{activeCurrency}</span>
             </p>
             <p className={cn('text-xs mt-0.5', overSalary ? 'text-rose-500' : 'text-zinc-600')}>
               {shootingDayCount} shooting {shootingDayCount === 1 ? 'day' : 'days'} · {fmt(salaryCost)} / {fmt(budgetLimit)}
@@ -98,7 +101,7 @@ export function BudgetTab({
           <div className={cn('rounded-xl p-4 border', (equipmentLeft ?? 0) < 0 ? 'bg-rose-900/20 border-rose-500/30' : 'bg-emerald-900/20 border-emerald-500/30')}>
             <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Equipment budget</p>
             <p className={cn('text-xl font-bold', (equipmentLeft ?? 0) < 0 ? 'text-rose-400' : 'text-emerald-400')}>
-              {fmt(Math.max(0, equipmentLeft ?? 0))} <span className="text-sm font-normal text-zinc-500">{budgetCurrency}</span>
+              {fmt(Math.max(0, equipmentLeft ?? 0))} <span className="text-sm font-normal text-zinc-500">{activeCurrency}</span>
             </p>
             <p className="text-xs text-zinc-600 mt-0.5">Remaining after salaries</p>
             <ProgressBar value={Math.max(0, equipmentLeft ?? 0)} max={budgetLimit} color={(equipmentLeft ?? 0) < 0 ? '#f87171' : '#34d399'} />
@@ -147,16 +150,16 @@ export function BudgetTab({
                             onChange={e => setOverrides(prev => ({ ...prev, [key]: e.target.value }))}
                             onBlur={e => saveOverride(key, e.target.value)}
                           />
-                          <span className="text-xs text-zinc-500">{budgetCurrency}</span>
+                          <span className="text-xs text-zinc-500">{activeCurrency}</span>
                           {saving === key && <span className="text-[10px] text-brand-400">saving…</span>}
                         </div>
                       ) : (
-                        <span className="text-zinc-300">{dayRate.toLocaleString('sv-SE')} {budgetCurrency}</span>
+                        <span className="text-zinc-300">{dayRate.toLocaleString('sv-SE')} {activeCurrency}</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right text-zinc-400">{shootingDayCount}</td>
                     <td className="px-4 py-3 text-right font-semibold text-zinc-200">
-                      {total.toLocaleString('sv-SE')} {budgetCurrency}
+                      {total.toLocaleString('sv-SE')} {activeCurrency}
                     </td>
                   </tr>
                 )
@@ -166,7 +169,7 @@ export function BudgetTab({
               <tr className="border-t border-white/10 bg-zinc-950/40">
                 <td colSpan={4} className="px-4 py-3 text-sm font-semibold text-zinc-300">Total salaries</td>
                 <td className={cn('px-4 py-3 text-right font-bold', overSalary ? 'text-rose-400' : 'text-zinc-100')}>
-                  {fmt(salaryCost)} {budgetCurrency}
+                  {fmt(salaryCost)} {activeCurrency}
                 </td>
               </tr>
             </tfoot>

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import {
   Users, GraduationCap, Eye, LogOut, ArrowLeftRight, Clock,
   CalendarCheck, MessageSquare, BookOpen, Share2, BookMarked, Film, Menu, X,
-  UtensilsCrossed, Car, Mail, SlidersHorizontal, ChevronDown, CircleDot, Tv, Shield, Package, ArchiveRestore, ClipboardList, BarChart2,
+  UtensilsCrossed, Car, Mail, SlidersHorizontal, ChevronDown, CircleDot, Tv, Shield, Package, ArchiveRestore, ClipboardList, BarChart2, RefreshCw,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
@@ -23,6 +23,13 @@ interface NavItem { to: string; icon: React.ComponentType<{ className?: string }
 interface NavGroup { id: string; label: string; icon: string; items: NavItem[]; defaultOpen?: boolean }
 
 const NAV_GROUPS: NavGroup[] = [
+  {
+    id: 'school', label: 'School', icon: '🏫', defaultOpen: true,
+    items: [
+      { to: '/admin/school-info', icon: Clock,        label: 'School Info'               },
+      { to: '/admin/chat',        icon: MessageSquare, label: 'Chat', showUnread: true   },
+    ],
+  },
   {
     id: 'people', label: 'People', icon: '👥', defaultOpen: true,
     items: [
@@ -52,17 +59,11 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    id: 'school', label: 'School', icon: '🏫', defaultOpen: false,
-    items: [
-      { to: '/admin/school-info', icon: Clock,        label: 'School Info'               },
-      { to: '/admin/chat',        icon: MessageSquare, label: 'Chat', showUnread: true   },
-    ],
-  },
-  {
     id: 'settings', label: 'Settings', icon: '⚙️', defaultOpen: false,
     items: [
       { to: '/admin/email-config', icon: Mail,             label: 'Email Config' },
       { to: '/admin/sharepoint',   icon: Share2,           label: 'SharePoint'   },
+      { to: '/admin/calendar-sync', icon: RefreshCw,       label: 'Calendar Sync' },
       { to: '/admin/nav-settings', icon: SlidersHorizontal, label: 'Nav Settings' },
       { to: '/admin/gdpr',         icon: Shield,           label: 'GDPR'         },
     ],

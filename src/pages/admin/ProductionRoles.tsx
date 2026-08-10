@@ -4,11 +4,13 @@ import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
 import { Clapperboard, Plus, Pencil, Trash2, Check, X, GripVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useCurrency } from '@/hooks/useCurrency'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import type { CrewRoleDoc } from '@/types'
 
 export default function ProductionRoles() {
   const { data: roles, loading } = useCollection<CrewRoleDoc>('crew_roles', [orderBy('order', 'asc')])
+  const { symbol } = useCurrency()
 
   // ── Production settings ───────────────────────────────────────────────────
   const [maxHours,       setMaxHours]       = useState(8)
@@ -292,7 +294,7 @@ export default function ProductionRoles() {
                 <>
                   <span className="flex-1 text-sm text-zinc-200">{role.name}</span>
                   {role.dayRate != null && (
-                    <span className="text-xs text-zinc-500 mr-1">{role.dayRate.toLocaleString('sv-SE')} SEK/day</span>
+                    <span className="text-xs text-zinc-500 mr-1">{role.dayRate.toLocaleString('sv-SE')} {symbol}/day</span>
                   )}
                   <button
                     onClick={() => { setEditingId(role.id); setEditName(role.name); setEditDayRate(role.dayRate != null ? String(role.dayRate) : '') }}

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
-import { addDoc, updateDoc, deleteDoc, doc, setDoc, collection } from 'firebase/firestore'
+import { addDoc, updateDoc, deleteDoc, doc, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { useCollection, useDocument, orderBy, where } from '@/hooks/useFirestore'
+import { SCHOOL_ID } from '@/lib/school'
+import { useCollection, useDocument, orderBy } from '@/hooks/useFirestore'
+import { useSchool, type CurrencyCode } from '@/contexts/SchoolContext'
 import type { LessonBlockDoc, ClassroomDoc, UserDoc, SemesterSettingsDoc } from '@/types'
-import { Plus, Pencil, Trash2, Check, X, Clock, Sun, DoorOpen, Users, Star, CalendarRange, GraduationCap, Link2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Check, X, Clock, Sun, DoorOpen, Users, Star, CalendarRange, GraduationCap, Link2, Coins } from 'lucide-react'
 import Avatar from '@/components/common/Avatar'
 
 const DAYS = [
@@ -60,6 +62,80 @@ export default function SchoolInfo() {
   const { data: schoolDoc }          = useDocument<{ id: string; name?: string }>('settings', 'school')
   const { data: allUsers }           = useCollection<UserDoc>('users')
   const teachers = allUsers.filter(u => (u.roles?.length ? u.roles : [u.role]).includes('teacher'))
+  const { currency: currentCurrency } = useSchool()
+
+  // Currency
+  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode>(currentCurrency)
+  const [currencySaving,   setCurrencySaving]   = useState(false)
+  const [currencySaved,    setCurrencySaved]     = useState(false)
+  const [currencyError,    setCurrencyError]     = useState<string | null>(null)
+  const [converting,       setConverting]        = useState(false)
+
+  useEffect(() => { setSelectedCurrency(currentCurrency) }, [currentCurrency])
+
+  async function saveCurrency() {
+    setCurrencySaving(true); setCurrencyError(null)
+    try {
+      if (selectedCurrency !== currentCurrency) {
+        setConverting(true)
+        const resp = await fetch(`https://open.er-api.com/v6/latest/${currentCurrency}`)
+        if (!resp.ok) throw new Error('Could not fetch exchange rates')
+        const rateData = await resp.json()
+        const rate: number = rateData.rates?.[selectedCurrency]
+        if (!rate) throw new Error(`No rate found for ${selectedCurrency}`)
+
+        const batch = writeBatch(db)
+
+        const equipSnap = await getDocs(collection(db, 'equipment'))
+        equipSnap.forEach(d => {
+          const eq = d.data()
+          const up: Record<string, number> = {}
+          if (typeof eq.priceExclVat === 'number' && eq.priceExclVat > 0) up.priceExclVat = Math.round(eq.priceExclVat * rate)
+          if (typeof eq.priceInclVat === 'number' && eq.priceInclVat > 0) up.priceInclVat = Math.round(eq.priceInclVat * rate)
+          if (Object.keys(up).length) batch.update(d.ref, up)
+        })
+
+        const rolesSnap = await getDocs(collection(db, 'crew_roles'))
+        rolesSnap.forEach(d => {
+          const r = d.data()
+          if (typeof r.dayRate === 'number' && r.dayRate > 0) batch.update(d.ref, { dayRate: Math.round(r.dayRate * rate) })
+        })
+
+        const prodSnap = await getDocs(collection(db, 'productions'))
+        prodSnap.forEach(d => {
+          const p = d.data()
+          if (typeof p.budgetLimit === 'number' && p.budgetLimit > 0) batch.update(d.ref, { budgetLimit: Math.round(p.budgetLimit * rate) })
+        })
+
+        const periodsSnap = await getDocs(collection(db, 'production_periods'))
+        periodsSnap.forEach(d => {
+          const p = d.data()
+          if (typeof p.budgetPerProduction === 'number' && p.budgetPerProduction > 0) {
+            batch.update(d.ref, { budgetPerProduction: Math.round(p.budgetPerProduction * rate), budgetCurrency: selectedCurrency })
+          }
+        })
+
+        const guestSnap = await getDocs(collection(db, 'guest_teachers'))
+        guestSnap.forEach(d => {
+          const g = d.data()
+          const n = parseFloat(g.price)
+          if (!isNaN(n) && n > 0) batch.update(d.ref, { price: String(Math.round(n * rate)) })
+        })
+
+        await batch.commit()
+        setConverting(false)
+      }
+
+      await setDoc(doc(db, 'schools', SCHOOL_ID), { currency: selectedCurrency }, { merge: true })
+      setCurrencySaved(true)
+      setTimeout(() => setCurrencySaved(false), 2000)
+    } catch (e: any) {
+      setCurrencyError(e.message ?? 'Failed to save currency')
+      setConverting(false)
+    } finally {
+      setCurrencySaving(false)
+    }
+  }
 
   // School name
   const [schoolName,    setSchoolName]    = useState('')
@@ -222,6 +298,46 @@ export default function SchoolInfo() {
       <div>
         <h1 className="page-title">School Info</h1>
         <p className="text-zinc-500 text-sm mt-1">Configure school hours, lesson blocks, and classrooms.</p>
+      </div>
+
+      {/* ── Currency ──────────────────────────────────────────────────────── */}
+      <div className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm p-5">
+        <div className="flex items-center gap-2 mb-1">
+          <Coins className="w-4 h-4 text-amber-500" />
+          <p className="text-sm font-semibold text-zinc-200">Currency</p>
+        </div>
+        <p className="text-xs text-zinc-500 mb-4">
+          Sets the currency for all prices in the portal — equipment, production budgets, crew rates, and guest teachers.
+          When switching, all stored prices are automatically converted using live exchange rates.
+        </p>
+        <div className="flex items-end gap-4 flex-wrap">
+          <div>
+            <label className="label text-xs">Currency</label>
+            <select
+              className="input w-44"
+              value={selectedCurrency}
+              onChange={e => { setSelectedCurrency(e.target.value as CurrencyCode); setCurrencySaved(false); setCurrencyError(null) }}
+            >
+              <option value="SEK">SEK — Swedish Krona (kr)</option>
+              <option value="EUR">EUR — Euro (€)</option>
+              <option value="USD">USD — US Dollar ($)</option>
+            </select>
+          </div>
+          <button
+            onClick={saveCurrency}
+            disabled={currencySaving}
+            className="btn-primary py-2 px-4 text-sm flex items-center gap-2"
+          >
+            <Check className="w-4 h-4" />
+            {currencySaved ? 'Saved!' : converting ? 'Converting prices…' : currencySaving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+        {currencyError && <p className="text-xs text-rose-500 mt-2">{currencyError}</p>}
+        {selectedCurrency !== currentCurrency && (
+          <p className="text-xs text-amber-400 mt-2">
+            Saving will convert all stored prices from {currentCurrency} to {selectedCurrency} using live rates.
+          </p>
+        )}
       </div>
 
       {/* ── School Name ───────────────────────────────────────────────────── */}

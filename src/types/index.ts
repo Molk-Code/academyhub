@@ -146,6 +146,7 @@ export interface SubjectDoc {
   createdBy: string
   curriculum: CurriculumItem[]
   resources: SubjectResource[]
+  cohortIds?: string[] // empty/missing = visible to all cohorts
 }
 
 export interface ClassroomDoc {
@@ -174,6 +175,7 @@ export interface LessonDoc {
   description: string
   teacherId: string       // legacy – kept for backward compat
   teacherIds: string[]   // multi-teacher support
+  guestTeacherIds?: string[]
   classroom: string
   startTime: Timestamp
   endTime: Timestamp
@@ -195,6 +197,47 @@ export interface SubjectTeacherDoc {
   portfolioUrl: string | null
   isGuest: boolean
   order: number
+  expertise?: string
+  guestTeacherId?: string
+  bookingId?: string      // linked GuestTeacherBookingDoc id
+}
+
+export interface GuestTeacherBookingDoc {
+  id: string
+  guestTeacherId: string
+  type: 'subject' | 'lesson'
+  subjectId?: string
+  subjectTitle?: string
+  subjectTeacherId?: string
+  lessonId?: string
+  lessonTitle?: string
+  lessonStart?: Timestamp
+  lessonEnd?: Timestamp
+  createdAt?: Timestamp
+}
+
+export interface GuestTeacherDocument {
+  id: string
+  name: string
+  url: string
+  storagePath: string
+  mimeType: string
+}
+
+export interface GuestTeacherDoc {
+  id: string
+  name: string
+  profilePictureUrl: string | null
+  storagePath: string | null
+  bio: string
+  portfolioUrl: string | null
+  notes: string
+  expertise: string[]
+  price: string
+  location: string
+  email?: string | null
+  documents?: GuestTeacherDocument[]
+  createdAt?: Timestamp
 }
 
 export interface LessonCategoryDoc {
@@ -874,6 +917,37 @@ export interface PersonalEventDoc {
   inviteeIds?: string[]
   organizerName?: string
   createdAt: Timestamp
+}
+
+// ── Office 365 calendar sync ──────────────────────────────────────────────────
+// One doc per external Outlook calendar the admin has wired up via Power Automate.
+// Each sync has its own webhook secret and maps to one CineForge cohort (or 'all').
+
+export interface OfficeCalendarSyncDoc {
+  id: string
+  name: string                 // display name, e.g. "Åk 1 Film - Creating & Producing"
+  cohortId: string | 'all'     // which CineForge calendar these events show up on
+  enabled: boolean             // toggle in the app — webhook no-ops when off
+  webhookSecret: string        // shared secret Power Automate sends as x-webhook-secret
+  eventCount?: number
+  lastReceivedAt?: Timestamp | null
+  createdAt: Timestamp
+  createdBy: string
+  updatedAt?: Timestamp
+}
+
+export interface SyncedEventDoc {
+  id: string                   // `${syncId}_${externalEventId}`
+  syncId: string
+  cohortId: string | 'all'
+  externalId: string
+  title: string
+  startTime: Timestamp
+  endTime: Timestamp | null
+  allDay: boolean
+  location?: string | null
+  source: 'office365'
+  updatedAt: Timestamp
 }
 
 // ── Production Planning ───────────────────────────────────────────────────────

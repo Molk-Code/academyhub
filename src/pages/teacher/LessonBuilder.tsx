@@ -9,7 +9,7 @@ import {
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, orderBy, where } from '@/hooks/useFirestore'
-import type { SubjectDoc, CohortDoc, LessonBlockDoc, ClassroomDoc, UserDoc, LessonCategoryDoc, CurriculumItem } from '@/types'
+import type { SubjectDoc, CohortDoc, LessonBlockDoc, ClassroomDoc, UserDoc, LessonCategoryDoc, CurriculumItem, GuestTeacherDoc } from '@/types'
 import { Link2, Trash2, Video, FileText } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import EmojiPicker    from '@/components/common/EmojiPicker'
@@ -193,7 +193,8 @@ const schema = z.object({
   startTime:   z.string().min(1, 'Start time required'),
   endTime:     z.string().min(1, 'End time required'),
   isOnline:    z.boolean(),
-  teacherIds:  z.array(z.string()),
+  teacherIds:      z.array(z.string()),
+  guestTeacherIds: z.array(z.string()),
   resources:   z.array(resourceSchema),
 })
 
@@ -216,14 +217,16 @@ export default function LessonBuilder() {
   const { data: lcategories } = useCollection<LessonCategoryDoc>('lessonCategories', [orderBy('order', 'asc')])
   const { data: blocks     } = useCollection<LessonBlockDoc>('lessonBlocks', [orderBy('order', 'asc')])
   const { data: classrooms } = useCollection<ClassroomDoc>('classrooms', [orderBy('order', 'asc')])
-  const { data: teachers   } = useCollection<UserDoc>('users', [where('role', '==', 'teacher')])
+  const { data: teachers      } = useCollection<UserDoc>('users', [where('role', '==', 'teacher')])
+  const { data: guestTeachers } = useCollection<GuestTeacherDoc>('guest_teachers')
 
   const { register, handleSubmit, control, setValue, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      resources:  [],
-      isOnline:   false,
-      teacherIds: profile ? [profile.uid] : [],
+      resources:       [],
+      isOnline:        false,
+      teacherIds:      profile ? [profile.uid] : [],
+      guestTeacherIds: [],
       date:       searchParams.get('date')  ?? '',
       endDate:    searchParams.get('date')  ?? '',
       startTime:  searchParams.get('start') ?? '',
@@ -237,7 +240,8 @@ export default function LessonBuilder() {
   const endDate     = watch('endDate')
   const startTime   = watch('startTime')
   const endTime     = watch('endTime')
-  const teacherIds  = watch('teacherIds')
+  const teacherIds      = watch('teacherIds')
+  const guestTeacherIds = watch('guestTeacherIds')
   const selectedSubjectId = watch('subjectId')
 
   const selectedSubject = useMemo(
@@ -258,6 +262,15 @@ export default function LessonBuilder() {
     }
   }
 
+  function toggleGuestTeacher(gid: string) {
+    const current = guestTeacherIds ?? []
+    if (current.includes(gid)) {
+      setValue('guestTeacherIds', current.filter(id => id !== gid))
+    } else {
+      setValue('guestTeacherIds', [...current, gid])
+    }
+  }
+
   // Load existing lesson for editing
   useEffect(() => {
     if (!id) return
@@ -272,7 +285,8 @@ export default function LessonBuilder() {
       setValue('description', d.description ?? '')
       setValue('classroom',   d.classroom)
       setValue('isOnline',    d.isOnline)
-      setValue('teacherIds',  d.teacherIds ?? (d.teacherId ? [d.teacherId] : []))
+      setValue('teacherIds',      d.teacherIds ?? (d.teacherId ? [d.teacherId] : []))
+      setValue('guestTeacherIds', d.guestTeacherIds ?? [])
       setValue('date',        toDateStr(d.startTime))
       setValue('endDate',     toDateStr(d.endTime))
       setValue('startTime',   toTimeStr(d.startTime))
@@ -300,7 +314,8 @@ export default function LessonBuilder() {
       isOnline:    data.isOnline,
       resources:   data.resources,
       teacherId:   profile.uid,
-      teacherIds:  tIds,
+      teacherIds:      tIds,
+      guestTeacherIds: data.guestTeacherIds,
       startTime:            Timestamp.fromDate(startDate),
       endTime:              Timestamp.fromDate(endDate),
       coveredCurriculumIds: coveredCurriculumIds,
@@ -520,6 +535,37 @@ export default function LessonBuilder() {
                     }`}
                   >
                     {t.displayName}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Guest Teachers */}
+        {guestTeachers.length > 0 && (
+          <div>
+            <label className="label">Guest teachers <span className="text-zinc-400 font-normal">(optional)</span></label>
+            <div className="flex flex-wrap gap-2">
+              {guestTeachers.map(g => {
+                const active = (guestTeacherIds ?? []).includes(g.id)
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => toggleGuestTeacher(g.id)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+                      active
+                        ? 'bg-brand-600 border-brand-600 text-white'
+                        : 'bg-zinc-900 border-white/15 text-zinc-400 hover:border-brand-400 hover:text-brand-300'
+                    }`}
+                  >
+                    {g.profilePictureUrl ? (
+                      <img src={g.profilePictureUrl} alt={g.name} className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
+                    ) : (
+                      <span className="w-5 h-5 rounded-full bg-zinc-700 flex-shrink-0" />
+                    )}
+                    {g.name}
                   </button>
                 )
               })}

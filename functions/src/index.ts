@@ -2882,3 +2882,97 @@ export const dailyTeacherSummary = functions.pubsub
     )
     return null
   })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// receiveOfficeCalendarEvent — HTTP webhook for Power Automate → Office 365
+// calendar sync. One sync config (office_calendar_syncs/{syncId}) per external
+// Outlook calendar; each carries its own shared secret and target cohortId.
+// No Firebase Auth involved — Power Automate authenticates with a header secret.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface OfficeSyncPayload {
+  externalId:  string            // Outlook event Id from the Graph trigger
+  subject?:    string
+  start?:      string            // ISO datetime
+  end?:        string            // ISO datetime
+  location?:   string
+  isAllDay?:   boolean
+  changeType?: 'created' | 'updated' | 'deleted'
+}
+
+export const receiveOfficeCalendarEvent = functions.https.onRequest(async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed. Use POST.' })
+    return
+  }
+
+  const syncId = String(req.query.syncId ?? '')
+  if (!syncId) {
+    res.status(400).json({ error: 'Missing ?syncId=... in the webhook URL.' })
+    return
+  }
+
+  const syncSnap = await db.collection('office_calendar_syncs').doc(syncId).get()
+  if (!syncSnap.exists) {
+    res.status(404).json({ error: 'Unknown syncId.' })
+    return
+  }
+  const sync = syncSnap.data()!
+
+  const providedSecret = req.get('x-webhook-secret') ?? ''
+  if (!sync.webhookSecret || providedSecret !== sync.webhookSecret) {
+    res.status(401).json({ error: 'Invalid or missing x-webhook-secret header.' })
+    return
+  }
+
+  if (sync.enabled === false) {
+    // Toggled off in the app — accept the call so the Power Automate run
+    // still shows "succeeded", but don't write anything.
+    res.status(200).json({ ok: true, skipped: true, reason: 'sync is disabled' })
+    return
+  }
+
+  const body = (req.body ?? {}) as OfficeSyncPayload
+  if (!body.externalId) {
+    res.status(400).json({ error: 'externalId is required.' })
+    return
+  }
+
+  const docId = `${syncId}_${body.externalId}`
+  const eventRef = db.collection('synced_events').doc(docId)
+
+  try {
+    if (body.changeType === 'deleted' || !body.subject) {
+      await eventRef.delete()
+    } else {
+      const startDate = body.start ? new Date(body.start) : null
+      const endDate   = body.end   ? new Date(body.end)   : null
+      if (!startDate || isNaN(startDate.getTime())) {
+        res.status(400).json({ error: 'start is required and must be a valid ISO datetime.' })
+        return
+      }
+      await eventRef.set({
+        syncId,
+        cohortId:  sync.cohortId ?? 'all',
+        externalId: body.externalId,
+        title:     body.subject,
+        startTime: admin.firestore.Timestamp.fromDate(startDate),
+        endTime:   endDate && !isNaN(endDate.getTime()) ? admin.firestore.Timestamp.fromDate(endDate) : null,
+        allDay:    !!body.isAllDay,
+        location:  body.location || null,
+        source:    'office365',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true })
+    }
+
+    await syncSnap.ref.update({
+      lastReceivedAt: admin.firestore.FieldValue.serverTimestamp(),
+      eventCount:     admin.firestore.FieldValue.increment(1),
+    })
+
+    res.status(200).json({ ok: true })
+  } catch (err: any) {
+    console.error('receiveOfficeCalendarEvent failed', err)
+    res.status(500).json({ error: err?.message ?? 'Unknown error' })
+  }
+})

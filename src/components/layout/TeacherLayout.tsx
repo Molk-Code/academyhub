@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, CalendarDays, ClipboardList, BookMarked,
   Gift, LogOut, Film, Menu, X, MessageSquare, BookOpen,
   Clapperboard, Video, DoorOpen, ArrowLeftRight, User, CircleDot, CalendarRange,
-  Package, ArchiveRestore, ExternalLink,
+  Package, ArchiveRestore, ExternalLink, UserRound,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
@@ -53,7 +53,8 @@ const NAV: NavItem[] = [
   { to: '/teacher/resources',     icon: BookMarked,      label: 'Resources',      featureId: 'resources',                             tierFeature: 'resources' },
   { to: '/teacher/videos',        icon: Video,           label: 'Videos',         featureId: 'videos',                                tierFeature: 'video_lab' },
   { to: '/teacher/guide',         icon: BookOpen,        label: 'School Guide',   featureId: 'guide',                                 tierFeature: 'faq'       },
-  { to: '/teacher/semester-wheel',icon: CircleDot,       label: 'Semester Wheel', featureId: 'semesterWheel',                         tierFeature: 'semester'  },
+  { to: '/teacher/semester-wheel',    icon: CircleDot,   label: 'Semester Wheel',      featureId: 'semesterWheel',                         tierFeature: 'semester'  },
+  { to: '/teacher/guest-teachers',    icon: UserRound,   label: 'Guest Teacher Library', featureId: 'guestTeachers'                                               },
 ]
 
 function AttendanceOverlay() {

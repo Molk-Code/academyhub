@@ -1,10 +1,10 @@
 import { useState, useMemo, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { doc, updateDoc, addDoc, deleteDoc, collection } from 'firebase/firestore'
+import { doc, updateDoc, addDoc, deleteDoc, collection, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { uploadWithQuota, deleteWithTracking } from '@/lib/uploadWithQuota'
 import { useDocument, useCollection, orderBy, where } from '@/hooks/useFirestore'
-import type { SubjectDoc, CurriculumItem, SubjectResource, SubjectTeacherDoc, UserDoc, LessonDoc, VideoLabDoc, AbsenceReportDoc } from '@/types'
+import type { SubjectDoc, CurriculumItem, SubjectResource, SubjectTeacherDoc, UserDoc, LessonDoc, VideoLabDoc, AbsenceReportDoc, GuestTeacherDoc, GuestTeacherBookingDoc } from '@/types'
 import { thumbnailUrl } from '@/lib/cloudinary'
 import {
   ArrowLeft, Plus, Pencil, Trash2, Check, X,
@@ -25,7 +25,7 @@ const EMPTY_ITEM: Omit<CurriculumItem, 'id' | 'order'> = {
   semester: 1, title: '', content: '', method: 'Lecture',
 }
 
-const EMPTY_TEACHER_FORM = { name: '', title: '', description: '', portfolioUrl: '' }
+const EMPTY_TEACHER_FORM = { name: '', title: '', description: '', portfolioUrl: '', expertise: '' }
 
 export default function SubjectDetail() {
   const { id } = useParams<{ id: string }>()
@@ -53,6 +53,7 @@ export default function SubjectDetail() {
     `videos-${id}`,
   )
   const { data: absenceReports } = useCollection<AbsenceReportDoc>('absence_reports')
+  const { data: guestTeachers } = useCollection<GuestTeacherDoc>('guest_teachers')
 
   // Map: lessonId → [studentName, ...]
   const absenceByLesson = useMemo(() => {
@@ -92,6 +93,7 @@ export default function SubjectDetail() {
   const [teacherPanel,    setTeacherPanel]    = useState<'add' | { id: string } | null>(null)
   const [teacherMode,     setTeacherMode]     = useState<'existing' | 'guest'>('existing')
   const [selectedUserId,  setSelectedUserId]  = useState('')
+  const [selectedGuestId, setSelectedGuestId] = useState('')
   const [teacherForm,     setTeacherForm]     = useState(EMPTY_TEACHER_FORM)
   const [teacherImg,      setTeacherImg]      = useState<File | null>(null)
   const [imgPreviewUrl,   setImgPreviewUrl]   = useState<string | null>(null)
@@ -246,6 +248,7 @@ export default function SubjectDetail() {
     setTeacherPanel('add')
     setTeacherMode('existing')
     setSelectedUserId('')
+    setSelectedGuestId('')
     setTeacherForm(EMPTY_TEACHER_FORM)
     setTeacherImg(null)
     setImgPreviewUrl(null)
@@ -256,11 +259,13 @@ export default function SubjectDetail() {
     setTeacherPanel({ id: t.id })
     setTeacherMode(t.isGuest ? 'guest' : 'existing')
     setSelectedUserId(t.userId ?? '')
+    setSelectedGuestId(t.guestTeacherId ?? '')
     setTeacherForm({
       name: t.name,
       title: t.title,
       description: t.description,
       portfolioUrl: t.portfolioUrl ?? '',
+      expertise: t.expertise ?? '',
     })
     setTeacherImg(null)
     setImgPreviewUrl(t.imageUrl)
@@ -269,6 +274,7 @@ export default function SubjectDetail() {
 
   function cancelTeacher() {
     setTeacherPanel(null)
+    setSelectedGuestId('')
     setTeacherError(null)
   }
 
@@ -289,6 +295,28 @@ export default function SubjectDetail() {
       }))
       setTeacherImg(null)
       setImgPreviewUrl(user.avatarUrl)
+    }
+  }
+
+  function onSelectGuest(guestId: string) {
+    setSelectedGuestId(guestId)
+    if (!guestId) {
+      setTeacherForm(EMPTY_TEACHER_FORM)
+      setImgPreviewUrl(null)
+      return
+    }
+    const g = guestTeachers.find(gt => gt.id === guestId)
+    if (g) {
+      const exps = Array.isArray(g.expertise) ? g.expertise : (g.expertise ? [g.expertise as unknown as string] : [])
+      setTeacherForm(f => ({
+        ...f,
+        name: g.name,
+        description: g.bio,
+        portfolioUrl: g.portfolioUrl ?? '',
+        expertise: exps.join(', '),
+      }))
+      setTeacherImg(null)
+      setImgPreviewUrl(g.profilePictureUrl)
     }
   }
 
@@ -316,18 +344,32 @@ export default function SubjectDetail() {
 
       if (!isEditing) {
         const user = teacherMode === 'existing' ? teacherUsers.find(u => u.id === selectedUserId) : null
+        const resolvedImage = teacherImg ? imageUrl : (teacherMode === 'guest' ? imgPreviewUrl : (user?.avatarUrl ?? null))
         const payload: Omit<SubjectTeacherDoc, 'id'> = {
-          userId:       teacherMode === 'existing' ? selectedUserId : null,
-          name:         teacherForm.name.trim(),
-          title:        teacherForm.title.trim(),
-          description:  teacherForm.description.trim(),
-          portfolioUrl: teacherForm.portfolioUrl.trim() || null,
-          imageUrl:     teacherImg ? imageUrl : (user?.avatarUrl ?? null),
-          storagePath:  teacherImg ? storagePath : null,
-          isGuest:      teacherMode === 'guest',
-          order:        teachers.length,
+          userId:          teacherMode === 'existing' ? selectedUserId : null,
+          name:            teacherForm.name.trim(),
+          title:           teacherForm.title.trim(),
+          description:     teacherForm.description.trim(),
+          portfolioUrl:    teacherForm.portfolioUrl.trim() || null,
+          imageUrl:        resolvedImage,
+          storagePath:     teacherImg ? storagePath : null,
+          isGuest:         teacherMode === 'guest',
+          order:           teachers.length,
+          ...(teacherMode === 'guest' ? { expertise: teacherForm.expertise.trim() } : {}),
+          ...(teacherMode === 'guest' && selectedGuestId ? { guestTeacherId: selectedGuestId } : {}),
         }
-        await addDoc(collection(db, `subjects/${id}/teachers`), payload)
+        const ref = await addDoc(collection(db, `subjects/${id}/teachers`), payload)
+        if (teacherMode === 'guest' && selectedGuestId) {
+          const bookingRef = await addDoc(collection(db, 'guest_teacher_bookings'), {
+            guestTeacherId: selectedGuestId,
+            type: 'subject',
+            subjectId: id,
+            subjectTitle: subject?.title ?? '',
+            subjectTeacherId: ref.id,
+            createdAt: serverTimestamp(),
+          })
+          await updateDoc(ref, { bookingId: bookingRef.id })
+        }
       } else {
         const existing = teachers.find(t => t.id === (teacherPanel as { id: string }).id)
         if (teacherImg && existing?.storagePath) {
@@ -335,20 +377,41 @@ export default function SubjectDetail() {
         }
         const user = teacherMode === 'existing' ? teacherUsers.find(u => u.id === selectedUserId) : null
         const update: Partial<SubjectTeacherDoc> = {
-          userId:       teacherMode === 'existing' ? selectedUserId : null,
-          name:         teacherForm.name.trim(),
-          title:        teacherForm.title.trim(),
-          description:  teacherForm.description.trim(),
-          portfolioUrl: teacherForm.portfolioUrl.trim() || null,
-          isGuest:      teacherMode === 'guest',
+          userId:         teacherMode === 'existing' ? selectedUserId : null,
+          name:           teacherForm.name.trim(),
+          title:          teacherForm.title.trim(),
+          description:    teacherForm.description.trim(),
+          portfolioUrl:   teacherForm.portfolioUrl.trim() || null,
+          isGuest:        teacherMode === 'guest',
+          ...(teacherMode === 'guest' ? { expertise: teacherForm.expertise.trim() } : {}),
+          ...(teacherMode === 'guest' && selectedGuestId ? { guestTeacherId: selectedGuestId } : {}),
         }
         if (teacherImg) {
-          update.imageUrl     = imageUrl
-          update.storagePath  = storagePath
+          update.imageUrl    = imageUrl
+          update.storagePath = storagePath
+        } else if (teacherMode === 'guest' && imgPreviewUrl) {
+          update.imageUrl = imgPreviewUrl
         } else if (!existing?.imageUrl && user?.avatarUrl) {
           update.imageUrl = user.avatarUrl
         }
-        await updateDoc(doc(db, `subjects/${id}/teachers`, (teacherPanel as { id: string }).id), update)
+        const teacherDocId = (teacherPanel as { id: string }).id
+        await updateDoc(doc(db, `subjects/${id}/teachers`, teacherDocId), update)
+
+        // Sync booking: create if newly linking a guest, remove if unlinking
+        if (teacherMode === 'guest' && selectedGuestId && !existing?.bookingId) {
+          const bookingRef = await addDoc(collection(db, 'guest_teacher_bookings'), {
+            guestTeacherId: selectedGuestId,
+            type: 'subject',
+            subjectId: id,
+            subjectTitle: subject?.title ?? '',
+            subjectTeacherId: teacherDocId,
+            createdAt: serverTimestamp(),
+          })
+          await updateDoc(doc(db, `subjects/${id}/teachers`, teacherDocId), { bookingId: bookingRef.id })
+        } else if (existing?.bookingId && (!selectedGuestId || teacherMode !== 'guest')) {
+          try { await deleteDoc(doc(db, 'guest_teacher_bookings', existing.bookingId)) } catch {}
+          await updateDoc(doc(db, `subjects/${id}/teachers`, teacherDocId), { bookingId: null })
+        }
       }
       cancelTeacher()
     } catch (e: any) {
@@ -362,6 +425,9 @@ export default function SubjectDetail() {
     if (!id || !confirm('Remove this teacher?')) return
     if (t.storagePath) {
       try { await deleteWithTracking(t.storagePath) } catch {}
+    }
+    if (t.bookingId) {
+      try { await deleteDoc(doc(db, 'guest_teacher_bookings', t.bookingId)) } catch {}
     }
     await deleteDoc(doc(db, `subjects/${id}/teachers`, t.id))
   }
@@ -487,6 +553,7 @@ export default function SubjectDetail() {
 
                 {addingSem === sem && (
                   <tr className="bg-brand-50">
+                    <td className="px-4 py-2" />
                     <td className="px-4 py-2"><input autoFocus className="input py-1.5 text-sm" value={itemForm.title} onChange={e => setItemForm(f => ({ ...f, title: e.target.value }))} placeholder="Topic name" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
                     <td className="px-4 py-2"><input className="input py-1.5 text-sm" value={itemForm.content} onChange={e => setItemForm(f => ({ ...f, content: e.target.value }))} placeholder="What is covered" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
                     <td className="px-4 py-2"><input className="input py-1.5 text-sm" value={itemForm.method} onChange={e => setItemForm(f => ({ ...f, method: e.target.value }))} list="method-options" placeholder="Lecture" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
@@ -498,13 +565,44 @@ export default function SubjectDetail() {
                 )}
 
                 {items.length === 0 && addingSem !== sem && (
-                  <tr><td colSpan={4} className="px-5 py-4 text-sm text-zinc-400 text-center">No items yet — click "Add item" to start.</td></tr>
+                  <tr><td colSpan={5} className="px-5 py-4 text-sm text-zinc-400 text-center">No items yet — click "Add item" to start.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         )
       })}
+
+      {addingSem !== null && !semesters.includes(addingSem) && (
+        <div className="bg-zinc-900 rounded-2xl overflow-hidden border border-white/10 shadow-sm">
+          <div className={`flex items-center justify-between px-5 py-3 ${subject.color}`}>
+            <h2 className="text-sm font-bold text-white tracking-wide">Semester {addingSem}</h2>
+          </div>
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-white/8">
+                <th className="w-8 px-4 py-2.5" />
+                <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5 w-1/4">Course / Topic</th>
+                <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5">Content</th>
+                <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5 w-36">How</th>
+                <th className="w-16 px-4 py-2.5" />
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="bg-brand-50">
+                <td className="px-4 py-2" />
+                <td className="px-4 py-2"><input autoFocus className="input py-1.5 text-sm" value={itemForm.title} onChange={e => setItemForm(f => ({ ...f, title: e.target.value }))} placeholder="Topic name" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
+                <td className="px-4 py-2"><input className="input py-1.5 text-sm" value={itemForm.content} onChange={e => setItemForm(f => ({ ...f, content: e.target.value }))} placeholder="What is covered" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
+                <td className="px-4 py-2"><input className="input py-1.5 text-sm" value={itemForm.method} onChange={e => setItemForm(f => ({ ...f, method: e.target.value }))} list="method-options" placeholder="Lecture" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
+                <td className="px-4 py-2"><div className="flex gap-1">
+                  <button onClick={confirmAdd} disabled={saving || !itemForm.title.trim()} className="p-1.5 text-emerald-500 hover:text-emerald-600 transition-colors"><Check className="w-4 h-4" /></button>
+                  <button onClick={() => setAddingSem(null)} className="p-1.5 text-zinc-400 hover:text-zinc-400 transition-colors"><X className="w-4 h-4" /></button>
+                </div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {semesters.length === 0 && addingSem === null && (
         <div className="text-center py-16 text-zinc-400">
@@ -616,7 +714,7 @@ export default function SubjectDetail() {
               </button>
               <button
                 type="button"
-                onClick={() => { setTeacherMode('guest'); setSelectedUserId('') }}
+                onClick={() => { setTeacherMode('guest'); setSelectedUserId(''); setSelectedGuestId(''); setTeacherForm(EMPTY_TEACHER_FORM); setImgPreviewUrl(null) }}
                 className={cn('px-3 py-1.5 rounded-lg text-sm font-medium transition-all', teacherMode === 'guest' ? 'bg-brand-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300')}
               >
                 Guest teacher
@@ -635,6 +733,23 @@ export default function SubjectDetail() {
                   <option value="">Choose a teacher…</option>
                   {teacherUsers.map(u => (
                     <option key={u.id} value={u.id}>{u.displayName}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Guest teacher bank picker */}
+            {teacherMode === 'guest' && (
+              <div>
+                <label className="label text-xs">Select from Guest Teacher Library <span className="text-zinc-400 font-normal">(optional)</span></label>
+                <select
+                  value={selectedGuestId}
+                  onChange={e => onSelectGuest(e.target.value)}
+                  className="input"
+                >
+                  <option value="">Choose from library or fill in manually…</option>
+                  {[...guestTeachers].sort((a, b) => a.name.localeCompare(b.name)).map(g => (
+                    <option key={g.id} value={g.id}>{g.name}{Array.isArray(g.expertise) && g.expertise.length ? ` — ${g.expertise.join(', ')}` : (g.expertise ? ` — ${g.expertise}` : '')}</option>
                   ))}
                 </select>
               </div>
@@ -681,15 +796,27 @@ export default function SubjectDetail() {
                       readOnly={teacherMode === 'existing'}
                     />
                   </div>
-                  <div>
-                    <label className="label text-xs">Work title</label>
-                    <input
-                      className="input py-2 text-sm"
-                      value={teacherForm.title}
-                      onChange={e => setTeacherForm(f => ({ ...f, title: e.target.value }))}
-                      placeholder="e.g. Senior Cinematographer"
-                    />
-                  </div>
+                  {teacherMode === 'existing' ? (
+                    <div>
+                      <label className="label text-xs">Work title</label>
+                      <input
+                        className="input py-2 text-sm"
+                        value={teacherForm.title}
+                        onChange={e => setTeacherForm(f => ({ ...f, title: e.target.value }))}
+                        placeholder="e.g. Senior Cinematographer"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="label text-xs">Expertise</label>
+                      <input
+                        className="input py-2 text-sm"
+                        value={teacherForm.expertise}
+                        onChange={e => setTeacherForm(f => ({ ...f, expertise: e.target.value }))}
+                        placeholder="e.g. Cinematography"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -753,9 +880,10 @@ export default function SubjectDetail() {
                 <div>
                   <div className="flex items-center justify-center gap-1.5 flex-wrap">
                     <span className="font-semibold text-sm text-zinc-100">{t.name}</span>
-                    {t.isGuest && <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Guest</span>}
+                    {t.isGuest && <span className="text-xs bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full">Guest</span>}
                   </div>
-                  {t.title && <p className="text-xs text-brand-600 font-medium mt-0.5">{t.title}</p>}
+                  {!t.isGuest && t.title && <p className="text-xs text-brand-400 font-medium mt-0.5">{t.title}</p>}
+                  {t.isGuest && t.expertise && <p className="text-xs text-brand-400 font-medium mt-0.5">{t.expertise}</p>}
                   {t.description && <p className="text-xs text-zinc-500 mt-1 leading-relaxed">{t.description}</p>}
                   {t.portfolioUrl && (
                     <a href={t.portfolioUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-brand-500 hover:underline mt-1.5">

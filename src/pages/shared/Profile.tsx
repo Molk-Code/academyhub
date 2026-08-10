@@ -158,7 +158,14 @@ function AttendanceSection({ uid, cohortId }: { uid: string; cohortId: string | 
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-white font-medium truncate">{lesson.title}</p>
-                    <p className="text-xs text-gray-500">{lesson.date}</p>
+                    <p className="text-xs text-zinc-500">
+                      {lesson.date}
+                      {lesson.startTime && (
+                        <span className="ml-1.5 font-mono">
+                          {lesson.startTime}{lesson.endTime ? `–${lesson.endTime}` : ''}
+                        </span>
+                      )}
+                    </p>
                   </div>
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${styles.badge}`}>
                     {styles.label}
@@ -188,24 +195,36 @@ export default function Profile() {
   const [schoolEmail, setSchoolEmail] = useState(profile?.schoolEmail ?? '')
   const [bio,        setBio]        = useState((profile as any)?.bio ?? '')
   const [portfolio,  setPortfolio]  = useState((profile as any)?.portfolioUrl ?? '')
-  const [uploading,  setUploading]  = useState(false)
-  const [saving,     setSaving]     = useState(false)
-  const [saved,      setSaved]      = useState(false)
+  const [uploading,    setUploading]    = useState(false)
+  const [saving,       setSaving]       = useState(false)
+  const [saved,        setSaved]        = useState(false)
+  const [uploadError,  setUploadError]  = useState<string | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(profile?.avatarUrl ?? null)
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file || !profile) return
-    setAvatarPreview(URL.createObjectURL(file))
+    const previewUrl = URL.createObjectURL(file)
+    setAvatarPreview(previewUrl)
     setUploading(true)
+    setUploadError(null)
     try {
       const path = `avatars/${profile.uid}`
       const url  = await uploadWithQuota(file, path)
       await updateDoc(doc(db, 'users', profile.uid), { avatarUrl: url })
       setAvatarPreview(url)
+      // Sync avatar to any subject teacher entries for this user
+      const snap = await getDocs(query(collectionGroup(db, 'teachers'), where('userId', '==', profile.uid)))
+      if (!snap.empty) {
+        const batch = writeBatch(db)
+        snap.docs.forEach(d => batch.update(d.ref, { imageUrl: url }))
+        await batch.commit()
+      }
       await refreshProfile()
-    } catch (err) {
+    } catch (err: any) {
       console.error('Upload failed', err)
+      setUploadError(err?.message ?? 'Upload failed. Please try again.')
+      setAvatarPreview(profile.avatarUrl ?? null)
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -235,6 +254,7 @@ export default function Profile() {
         if (!snap.empty) {
           const batch = writeBatch(db)
           snap.docs.forEach(d => batch.update(d.ref, {
+            name:         name.trim(),
             description:  bio.trim(),
             portfolioUrl: portfolio.trim() || null,
           }))
@@ -285,6 +305,9 @@ export default function Profile() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-zinc-100">{profile.displayName}</h1>
+          {uploadError && (
+            <p className="text-xs text-rose-400 mt-1">{uploadError}</p>
+          )}
           {isStudent && cohort ? (
             <p className="text-sm text-zinc-500 mt-0.5">{cohort.name} · Year {cohort.programYear}</p>
           ) : (

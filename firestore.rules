@@ -497,6 +497,19 @@ service cloud.firestore {
         && resource.data.userId == request.auth.uid;
     }
 
+    // ── Office 365 calendar sync ───────────────────────────────────────────────
+    // Contains a webhookSecret per doc — admin-only, never exposed to students/teachers.
+    // The webhook itself writes via the Admin SDK and is not subject to these rules.
+
+    match /office_calendar_syncs/{syncId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /synced_events/{eventId} {
+      allow read: if isSignedIn();
+      allow write: if false; // written only by the receiveOfficeCalendarEvent Cloud Function
+    }
+
     // ── Team Resources ────────────────────────────────────────────────────────
 
     match /resource_folders/{folderId} {
@@ -625,6 +638,18 @@ service cloud.firestore {
         && !exists(/databases/$(database)/documents/schools/$(schoolId));
       allow update: if isSignedIn() && (isAdmin() || isSuperAdmin());
       allow delete: if false;
+    }
+
+    // ── Guest Teacher Library ─────────────────────────────────────────────────
+
+    match /guest_teachers/{teacherId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
+    }
+
+    match /guest_teacher_bookings/{bookingId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
     }
 
     // ── Notification inbox ────────────────────────────────────────────────────

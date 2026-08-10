@@ -44,6 +44,13 @@ service firebase.storage {
         && request.resource.contentType == 'application/pdf';
     }
 
+    // ── Guest teacher profile pictures and documents ─────────────────────
+    match /guest_teachers/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin()
+        && request.resource.size < 50 * 1024 * 1024;
+    }
+
     // ── User avatars ──────────────────────────────────────────────────────
     match /avatars/{userId} {
       allow read: if isSignedIn();

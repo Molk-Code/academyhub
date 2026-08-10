@@ -46,6 +46,22 @@ export default function Students() {
 
   const progressMap = Object.fromEntries(progressDocs.map(p => [p.studentId, p]))
   const pendingCount = absenceReports.filter(r => r.status === 'pending').length
+  const lessonMap = useMemo(
+    () => Object.fromEntries(allLessons.map(l => [l.id, l])),
+    [allLessons],
+  )
+
+  function lessonTime(r: AbsenceReportDoc): { start?: string; end?: string } {
+    const start = r.lessonStartTime ?? (r.lessonId ? (() => {
+      const l = lessonMap[r.lessonId!]
+      return l?.startTime?.toDate ? format(l.startTime.toDate(), 'HH:mm') : undefined
+    })() : undefined)
+    const end = r.lessonEndTime ?? (r.lessonId ? (() => {
+      const l = lessonMap[r.lessonId!]
+      return l?.endTime?.toDate ? format(l.endTime.toDate(), 'HH:mm') : undefined
+    })() : undefined)
+    return { start, end }
+  }
 
   const latestLessonByCohort = useMemo(() => {
     const map: Record<string, LessonDoc> = {}
@@ -150,7 +166,10 @@ export default function Students() {
     for (const r of withLesson) {
       const key = r.lessonId!
       if (!groups[key]) {
-        groups[key] = { lessonId: key, lessonTitle: r.lessonTitle ?? key, date: r.date, startTime: r.lessonStartTime, endTime: r.lessonEndTime, reports: [] }
+        const liveLes = lessonMap[key]
+        const startTime = r.lessonStartTime ?? (liveLes?.startTime?.toDate ? format(liveLes.startTime.toDate(), 'HH:mm') : undefined)
+        const endTime   = r.lessonEndTime   ?? (liveLes?.endTime?.toDate   ? format(liveLes.endTime.toDate(),   'HH:mm') : undefined)
+        groups[key] = { lessonId: key, lessonTitle: r.lessonTitle ?? key, date: r.date, startTime, endTime, reports: [] }
       }
       groups[key].reports.push(r)
     }
@@ -249,7 +268,7 @@ export default function Students() {
         body: rows.map(r => [
           r.studentName,
           r.date,
-          r.lessonStartTime ? `${r.lessonStartTime}${r.lessonEndTime ? `–${r.lessonEndTime}` : ''}` : '—',
+          (() => { const { start, end } = lessonTime(r); return start ? `${start}${end ? `–${end}` : ''}` : '—' })(),
           r.type === 'full_day' ? 'Full day' : 'Lesson',
           r.lessonTitle ?? '—',
           r.reason,
@@ -345,7 +364,7 @@ export default function Students() {
                   <div className="flex items-start justify-between gap-2">
                     <Avatar uid={student.uid} name={student.displayName} avatarUrl={student.avatarUrl} size="sm" enlargeable />
                     <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                      student.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-600'
+                      student.isActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
                     }`}>
                       {student.isActive ? 'Active' : 'Inactive'}
                     </span>
@@ -396,7 +415,7 @@ export default function Students() {
                   <th className="w-20 px-4 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-white/5">
                 {filtered.map(student => {
                   const progress    = progressMap[student.uid]
                   const cohort      = cohorts.find(c => c.id === student.cohortId)
@@ -449,7 +468,7 @@ export default function Students() {
                           <button
                             onClick={() => openAddAbsence(student)}
                             title="Log absence"
-                            className="p-1.5 text-zinc-400 hover:text-amber-600 transition-colors rounded-lg hover:bg-amber-50"
+                            className="p-1.5 text-zinc-400 hover:text-amber-600 transition-colors rounded-lg hover:bg-amber-500/10"
                           >
                             <CalendarPlus className="w-4 h-4" />
                           </button>
@@ -494,7 +513,7 @@ export default function Students() {
           ) : (
             lessonAbsenceGroups.map(group => (
               <div key={group.lessonId} className="bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-3 border-b border-white/8 bg-zinc-900/50/60">
+                <div className="flex items-center justify-between px-5 py-3 border-b border-white/8 bg-zinc-950/60">
                   <div className="flex items-center gap-2">
                     <BookOpen className="w-4 h-4 text-brand-500 flex-shrink-0" />
                     <div>
@@ -508,12 +527,12 @@ export default function Students() {
                   </div>
                   <button
                     onClick={() => clearLessonGroup(group.lessonId)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-rose-400 hover:text-rose-600 hover:bg-rose-500/10 transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" /> Clear
                   </button>
                 </div>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-white/5">
                   {group.reports.map(r => (
                     <div key={r.id} className="flex items-center gap-3 px-5 py-3">
                       <div className="flex-1 min-w-0">
@@ -521,14 +540,14 @@ export default function Students() {
                         <p className="text-xs text-zinc-500 mt-0.5 line-clamp-1">{r.reason}</p>
                       </div>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
-                        r.status === 'reviewed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-900/40 text-amber-300'
+                        r.status === 'reviewed' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-900/40 text-amber-300'
                       }`}>
                         {r.status === 'reviewed' ? 'Reviewed' : 'Pending'}
                       </span>
                       {r.status === 'pending' && (
                         <button
                           onClick={() => markReviewed(r.id)}
-                          className="p-1.5 text-zinc-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors"
+                          className="p-1.5 text-zinc-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-500/10 transition-colors"
                         >
                           <Check className="w-4 h-4" />
                         </button>
@@ -564,10 +583,9 @@ export default function Students() {
             <div className="bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden overflow-x-auto">
               <table className="w-full min-w-[520px]">
                 <thead>
-                  <tr className="border-b border-white/8 bg-zinc-900/50/50">
+                  <tr className="border-b border-white/8 bg-zinc-950/50">
                     <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-5 py-3">Student</th>
                     <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-3">Date</th>
-                    <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-3 hidden sm:table-cell">Time</th>
                     <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-3">Type</th>
                     <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Lesson</th>
                     <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-3 hidden lg:table-cell">Reason</th>
@@ -575,19 +593,21 @@ export default function Students() {
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-white/5">
                   {filteredAbsences.map(r => (
-                    <tr key={r.id} className={`hover:bg-white/5 transition-colors ${r.status === 'pending' ? 'bg-amber-50/30' : ''}`}>
+                    <tr key={r.id} className={`hover:bg-white/5 transition-colors ${r.status === 'pending' ? 'bg-amber-500/10' : ''}`}>
                       <td className="px-5 py-3 text-sm font-medium text-zinc-100 whitespace-nowrap">{r.studentName}</td>
-                      <td className="px-4 py-3 text-sm text-zinc-400 whitespace-nowrap font-mono">{r.date}</td>
-                      <td className="px-4 py-3 text-sm text-zinc-400 whitespace-nowrap font-mono hidden sm:table-cell">
-                        {r.lessonStartTime
-                          ? `${r.lessonStartTime}${r.lessonEndTime ? `–${r.lessonEndTime}` : ''}`
-                          : '—'}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <p className="text-sm text-zinc-400 font-mono">{r.date}</p>
+                        {(() => { const { start, end } = lessonTime(r); return start ? (
+                          <p className="text-xs text-zinc-500 font-mono mt-0.5">
+                            {start}{end ? `–${end}` : ''}
+                          </p>
+                        ) : null })()}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          r.type === 'full_day' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                          r.type === 'full_day' ? 'bg-amber-500/20 text-amber-400' : 'bg-sky-500/20 text-sky-400'
                         }`}>
                           {r.type === 'full_day' ? 'Full day' : 'Lesson'}
                         </span>
@@ -600,7 +620,7 @@ export default function Students() {
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          r.status === 'reviewed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-900/40 text-amber-300'
+                          r.status === 'reviewed' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-900/40 text-amber-300'
                         }`}>
                           {r.status === 'reviewed' ? 'Reviewed' : 'Pending'}
                         </span>
@@ -611,7 +631,7 @@ export default function Students() {
                             <button
                               onClick={() => markReviewed(r.id)}
                               title="Mark as reviewed"
-                              className="p-1.5 text-zinc-400 hover:text-emerald-600 transition-colors rounded-lg hover:bg-emerald-50"
+                              className="p-1.5 text-zinc-400 hover:text-emerald-600 transition-colors rounded-lg hover:bg-emerald-500/10"
                             >
                               <Check className="w-4 h-4" />
                             </button>
@@ -619,7 +639,7 @@ export default function Students() {
                           <button
                             onClick={() => deleteReport(r.id)}
                             title="Delete"
-                            className="p-1.5 text-zinc-400 hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-50"
+                            className="p-1.5 text-zinc-400 hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-500/10"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>

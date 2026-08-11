@@ -370,9 +370,31 @@ export default function StudentGuide() {
           <h1 className="text-3xl font-extrabold leading-tight mb-8" style={{ color: 'var(--text-primary)' }}>
             {selectedArticle.title}
           </h1>
-          <ReactMarkdown components={mdComponents} remarkPlugins={[remarkGfm]}>
-            {selectedArticle.content}
-          </ReactMarkdown>
+          {selectedArticle.content.trimStart().startsWith('<') ? (
+            <div
+              className="
+                prose prose-invert prose-sm max-w-none
+                prose-headings:text-zinc-100 prose-h1:text-2xl prose-h2:text-xl prose-h3:text-base
+                prose-p:text-zinc-300 prose-p:leading-relaxed
+                prose-a:text-brand-400 prose-a:underline
+                prose-strong:text-zinc-100 prose-strong:font-semibold
+                prose-em:italic
+                prose-ul:list-disc prose-ul:pl-5 prose-ul:text-zinc-300
+                prose-ol:list-decimal prose-ol:pl-5 prose-ol:text-zinc-300
+                prose-li:mb-1
+                prose-blockquote:border-l-4 prose-blockquote:border-brand-600 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-zinc-400
+                prose-hr:border-white/10
+                prose-code:bg-zinc-800 prose-code:px-1 prose-code:rounded prose-code:text-brand-300 prose-code:text-xs
+                prose-pre:bg-zinc-800 prose-pre:rounded-lg prose-pre:p-4
+                prose-img:rounded-lg prose-img:my-3
+              "
+              dangerouslySetInnerHTML={{ __html: selectedArticle.content }}
+            />
+          ) : (
+            <ReactMarkdown components={mdComponents} remarkPlugins={[remarkGfm]}>
+              {selectedArticle.content}
+            </ReactMarkdown>
+          )}
         </article>
       </div>
     )

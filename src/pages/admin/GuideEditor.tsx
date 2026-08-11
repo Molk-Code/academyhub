@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import MDEditor from '@uiw/react-md-editor'
+import RichTextEditor from '@/components/editor/RichTextEditor'
 import {
   collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch,
 } from 'firebase/firestore'
@@ -274,14 +274,13 @@ function ArticlesPanel({ sections, articles }: { sections: GuideSectionDoc[]; ar
             <Check className="w-4 h-4" /> Save
           </button>
         </div>
-        {/* Full-height MDEditor */}
-        <div data-color-mode="light" className="flex-1 min-h-0 overflow-hidden rounded-xl border border-white/10">
-          <MDEditor
+        {/* Full-height rich text editor */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <RichTextEditor
             value={editContent}
-            onChange={v => setEditContent(v ?? '')}
-            height="100%"
-            preview="live"
-            visibleDragbar={false}
+            onChange={setEditContent}
+            placeholder="Write article content… Paste directly from Word or PDF to import formatting."
+            minHeight={400}
           />
         </div>
       </div>

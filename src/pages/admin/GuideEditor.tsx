@@ -303,7 +303,12 @@ function ArticlesPanel({ sections, articles }: { sections: GuideSectionDoc[]; ar
             <div key={a.id} className="bg-zinc-900 rounded-2xl border border-white/10 px-4 py-3 flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-zinc-100 truncate">{a.title}</p>
-                <p className="text-xs text-zinc-400 truncate">{a.content.slice(0, 80) || 'No content yet'}</p>
+                <p className="text-xs text-zinc-400 truncate">
+                  {a.content.trimStart().startsWith('<')
+                    ? a.content.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80)
+                    : a.content.slice(0, 80)
+                  || 'No content yet'}
+                </p>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <button onClick={() => moveArticle(a.id, -1)} disabled={idx === 0} className="p-1 text-zinc-400 hover:text-zinc-400 disabled:opacity-30"><ChevronUp className="w-4 h-4" /></button>

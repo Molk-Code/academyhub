@@ -7,6 +7,13 @@ import type { GuideSectionDoc, GuideArticleDoc, GuideContactDoc } from '@/types'
 import { Search, Phone, Mail, AlertTriangle, Info } from 'lucide-react'
 import Breadcrumb from '@/components/common/Breadcrumb'
 
+function plainText(content: string, maxLen: number): string {
+  const stripped = content.trimStart().startsWith('<')
+    ? content.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
+    : content.replace(/[#*_`]/g, '').trim()
+  return stripped.slice(0, maxLen)
+}
+
 const PALETTE = [
   '#3b82f6', '#f97316', '#22c55e', '#a855f7',
   '#f59e0b', '#ec4899', '#ef4444', '#14b8a6',
@@ -140,7 +147,7 @@ export default function StudentGuide() {
                 </div>
                 <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{a.title}</p>
                 <p className="text-xs mt-0.5 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
-                  {a.content.slice(0, 120).replace(/[#*_`]/g, '')}…
+                  {plainText(a.content, 120)}…
                 </p>
               </button>
             ))}
@@ -271,7 +278,7 @@ export default function StudentGuide() {
             >
               <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{article.title}</p>
               <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
-                {article.content.slice(0, 100).replace(/[#*_`]/g, '')}…
+                {plainText(article.content, 100)}…
               </p>
               <div className="mt-2.5 h-0.5 w-8 rounded-full" style={{ backgroundColor: c }} />
             </button>

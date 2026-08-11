@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import RichTextEditor from '@/components/editor/RichTextEditor'
 import {
   collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch,
@@ -107,6 +107,78 @@ export default function GuideEditor() {
   )
 }
 
+// ── Emoji picker ─────────────────────────────────────────────────────────────
+
+const EMOJI_LIST = [
+  '📚','📖','📝','📋','📄','📃','🗒️','📌','🗂️','📁','📊','📈','✏️','🖊️','📐',
+  '🎓','🏫','👨‍🏫','👩‍🏫','🧑‍🎓','👥','🤝','💪','👋',
+  '🎬','🎥','📽️','🎞️','🎭','🎨','🎤','🎧','🎵','🎶','📷','📸','📹','🎙️',
+  '💻','🖥️','📱','🔌','📡','🌐',
+  '💡','🔑','🏆','🎯','🎁','📢','🔔','💬','🚀','⭐','🌟','✅','⚡','❤️',
+  '🛠️','⚙️','🔧','🔒','🔓','📅','🗓️','⏰','🕐','📍','🗺️','🌍',
+]
+
+function EmojiPicker({ value, onChange }: { value: string; onChange: (e: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [custom, setCustom] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative flex-shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-12 h-9 text-xl flex items-center justify-center rounded-lg bg-zinc-800 border border-white/10 hover:border-brand-500 transition-colors"
+        title="Choose emoji"
+      >
+        {value || '📄'}
+      </button>
+      {open && (
+        <div className="absolute left-0 top-10 z-50 bg-zinc-900 border border-white/10 rounded-xl shadow-2xl p-3 w-72">
+          <div className="grid grid-cols-10 gap-0.5 mb-3">
+            {EMOJI_LIST.map(e => (
+              <button
+                key={e}
+                type="button"
+                onClick={() => { onChange(e); setOpen(false) }}
+                className={`text-xl p-1 rounded hover:bg-zinc-700 transition-colors ${value === e ? 'bg-zinc-700 ring-1 ring-brand-500' : ''}`}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+          <div className="border-t border-white/10 pt-2 flex items-center gap-2">
+            <span className="text-xs text-zinc-500 flex-shrink-0">Custom:</span>
+            <input
+              value={custom}
+              onChange={e => setCustom(e.target.value)}
+              placeholder="Paste any emoji…"
+              className="input flex-1 py-1 text-sm text-center"
+              maxLength={8}
+            />
+            <button
+              type="button"
+              onClick={() => { if (custom.trim()) { onChange(custom.trim()); setOpen(false); setCustom('') } }}
+              disabled={!custom.trim()}
+              className="p-1.5 text-emerald-500 hover:text-emerald-400 disabled:opacity-30"
+            >
+              <Check className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Sections Panel ────────────────────────────────────────────────────────────
 
 function SectionsPanel({ sections, profile }: { sections: GuideSectionDoc[]; profile: any }) {
@@ -154,7 +226,7 @@ function SectionsPanel({ sections, profile }: { sections: GuideSectionDoc[]; pro
         <div key={s.id} className="bg-zinc-900 rounded-2xl border border-white/10 px-4 py-3 flex items-center gap-3">
           {editingId === s.id ? (
             <>
-              <input value={editForm.icon} onChange={e => setEditForm(f => ({ ...f, icon: e.target.value }))} className="input w-14 text-center text-lg py-1.5" />
+              <EmojiPicker value={editForm.icon} onChange={icon => setEditForm(f => ({ ...f, icon }))} />
               <input autoFocus value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} onKeyDown={e => e.key === 'Enter' && saveEdit(s.id)} className="input flex-1 py-1.5" />
               <button onClick={() => saveEdit(s.id)} className="p-1.5 text-emerald-500 hover:text-emerald-600"><Check className="w-4 h-4" /></button>
               <button onClick={() => setEditingId(null)} className="p-1.5 text-zinc-400 hover:text-zinc-400"><X className="w-4 h-4" /></button>
@@ -177,7 +249,7 @@ function SectionsPanel({ sections, profile }: { sections: GuideSectionDoc[]; pro
 
       {adding ? (
         <div className="bg-zinc-900 rounded-2xl border border-brand-200 p-4 flex items-center gap-3">
-          <input value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} className="input w-14 text-center text-lg py-1.5" placeholder="📄" />
+          <EmojiPicker value={form.icon} onChange={icon => setForm(f => ({ ...f, icon }))} />
           <input autoFocus value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} onKeyDown={e => e.key === 'Enter' && addSection()} className="input flex-1 py-1.5" placeholder="Section title…" />
           <button onClick={addSection} disabled={!form.title.trim()} className="p-1.5 text-emerald-500 hover:text-emerald-600"><Check className="w-4 h-4" /></button>
           <button onClick={() => setAdding(false)} className="p-1.5 text-zinc-400 hover:text-zinc-400"><X className="w-4 h-4" /></button>

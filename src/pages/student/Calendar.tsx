@@ -86,7 +86,8 @@ export default function StudentCalendar() {
   const [editInviteeSearch, setEditInviteeSearch] = useState('')
   const [viewingInvitedEvent, setViewingInvitedEvent] = useState<PersonalEventDoc | null>(null)
   const calendarRef = useRef<FullCalendar>(null)
-  const { profile, cohortId: ctxCohortId, previewCohortId } = useAuth()
+  const { profile, role, cohortId: ctxCohortId, previewCohortId } = useAuth()
+  const isStaff = role === 'teacher' || role === 'admin'
   const cohortId = ctxCohortId ?? previewCohortId ?? profile?.cohortId ?? null
   const { data: schoolDay } = useDocument<SchoolDayDoc>('settings', 'schoolDay')
   const slotMin    = schoolDay?.startTime ? `${schoolDay.startTime}:00` : '07:00:00'
@@ -125,12 +126,13 @@ export default function StudentCalendar() {
     !!profile,
   )
 
-  // Events synced in from an Outlook calendar (Office 365 Calendar Sync, admin settings)
+  // Events synced in from an Outlook calendar (Office 365 Calendar Sync, admin settings).
+  // Teachers/admins see all synced events; students see only their cohort + "all".
   const { data: syncedEvents } = useCollection<SyncedEventDoc>(
     'synced_events',
-    cohortId ? [where('cohortId', 'in', [cohortId, 'all'])] : [where('cohortId', '==', 'all')],
+    isStaff ? [] : cohortId ? [where('cohortId', 'in', [cohortId, 'all'])] : [where('cohortId', '==', 'all')],
     true,
-    cohortId ?? 'all',
+    isStaff ? '__staff__' : cohortId ?? 'none',
   )
 
   const { data: allUsers } = useCollection<UserDoc>('users')

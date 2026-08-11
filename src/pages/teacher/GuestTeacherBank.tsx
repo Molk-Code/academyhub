@@ -3,7 +3,7 @@ import { addDoc, collection, updateDoc, deleteDoc, doc, serverTimestamp, collect
 import { db } from '@/lib/firebase'
 import { uploadWithQuota, deleteWithTracking } from '@/lib/uploadWithQuota'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
-import type { GuestTeacherDoc, GuestTeacherBookingDoc, GuestTeacherDocument, LessonDoc } from '@/types'
+import type { GuestTeacherDoc, GuestTeacherBookingDoc, GuestTeacherDocument, LessonDoc, SyncedEventDoc } from '@/types'
 import {
   Plus, Pencil, Trash2, FileUp, X, UserRound, Search, ExternalLink,
   MapPin, Calendar, Clock, Mail, FileText, Eye, Download, LayoutGrid, List,
@@ -34,6 +34,7 @@ export default function GuestTeacherBank() {
   const { data: guests, loading } = useCollection<GuestTeacherDoc>('guest_teachers')
   const { data: bookings }        = useCollection<GuestTeacherBookingDoc>('guest_teacher_bookings')
   const { data: lessons }         = useCollection<LessonDoc>('lessons', [orderBy('startTime', 'asc')])
+  const { data: syncedEvents }    = useCollection<SyncedEventDoc>('synced_events')
   const { symbol: currencySymbol } = useCurrency()
 
   const [sortKey, setSortKey]         = useState<SortKey>('name')
@@ -337,7 +338,7 @@ export default function GuestTeacherBank() {
       {viewingProfile && (() => {
         const g = viewingProfile
         const guestBookings   = bookingMap[g.id] ?? []
-        const isBooked        = guestBookings.length > 0
+        const isBooked        = guestBookings.length > 0 || syncedEvents.some(e => e.guestTeacherIds?.includes(g.id))
         const subjectBookings = guestBookings.filter(b => b.type === 'subject')
         const lessonBookings  = guestBookings.filter(b => b.type === 'lesson')
         const docs            = g.documents ?? []
@@ -786,7 +787,7 @@ export default function GuestTeacherBank() {
               <tbody className="divide-y divide-white/5">
                 {filtered.map(g => {
                   const guestBookings = bookingMap[g.id] ?? []
-                  const isBooked      = guestBookings.length > 0
+                  const isBooked      = guestBookings.length > 0 || syncedEvents.some(e => e.guestTeacherIds?.includes(g.id))
                   const exps          = toExpertiseArray(g.expertise)
                   const visibleExps   = exps.slice(0, 2)
                   const extraExps     = exps.length - visibleExps.length
@@ -878,7 +879,7 @@ export default function GuestTeacherBank() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map(g => {
             const guestBookings   = bookingMap[g.id] ?? []
-            const isBooked        = guestBookings.length > 0
+            const isBooked        = guestBookings.length > 0 || syncedEvents.some(e => e.guestTeacherIds?.includes(g.id))
             const subjectBookings = guestBookings.filter(b => b.type === 'subject')
             const lessonBookings  = guestBookings.filter(b => b.type === 'lesson')
             const showLessonPanel = lessonPanelFor === g.id

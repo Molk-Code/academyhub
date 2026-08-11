@@ -546,30 +546,39 @@ export default function LessonBuilder() {
         {guestTeachers.length > 0 && (
           <div>
             <label className="label">Guest teachers <span className="text-zinc-400 font-normal">(optional)</span></label>
-            <div className="flex flex-wrap gap-2">
-              {guestTeachers.map(g => {
-                const active = (guestTeacherIds ?? []).includes(g.id)
-                return (
-                  <button
-                    key={g.id}
-                    type="button"
-                    onClick={() => toggleGuestTeacher(g.id)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
-                      active
-                        ? 'bg-brand-600 border-brand-600 text-white'
-                        : 'bg-zinc-900 border-white/15 text-zinc-400 hover:border-brand-400 hover:text-brand-300'
-                    }`}
-                  >
-                    {g.profilePictureUrl ? (
-                      <img src={g.profilePictureUrl} alt={g.name} className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
-                    ) : (
-                      <span className="w-5 h-5 rounded-full bg-zinc-700 flex-shrink-0" />
-                    )}
-                    {g.name}
-                  </button>
-                )
-              })}
-            </div>
+            <select
+              className="input"
+              value=""
+              onChange={e => { if (e.target.value) toggleGuestTeacher(e.target.value) }}
+            >
+              <option value="">Add guest teacher…</option>
+              {guestTeachers
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(g => (
+                  <option key={g.id} value={g.id} disabled={(guestTeacherIds ?? []).includes(g.id)}>
+                    {g.name}{(guestTeacherIds ?? []).includes(g.id) ? ' ✓' : ''}
+                  </option>
+                ))}
+            </select>
+            {(guestTeacherIds ?? []).length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {(guestTeacherIds ?? []).map(gid => {
+                  const g = guestTeachers.find(x => x.id === gid)
+                  if (!g) return null
+                  return (
+                    <span key={gid} className="flex items-center gap-1.5 pl-1.5 pr-2 py-1 bg-zinc-800 border border-white/10 rounded-lg text-sm text-zinc-200">
+                      {g.profilePictureUrl
+                        ? <img src={g.profilePictureUrl} alt={g.name} className="w-5 h-5 rounded-full object-cover" />
+                        : <span className="w-5 h-5 rounded-full bg-zinc-600 flex-shrink-0" />
+                      }
+                      {g.name}
+                      <button type="button" onClick={() => toggleGuestTeacher(gid)} className="ml-1 text-zinc-500 hover:text-rose-400 transition-colors">✕</button>
+                    </span>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 

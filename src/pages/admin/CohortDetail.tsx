@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { parseISO } from 'date-fns'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -269,9 +270,19 @@ export default function CohortDetail() {
           <ArrowLeft className="w-4 h-4" /> Back to Classes
         </button>
         <h1 className="page-title">{cohort.name}</h1>
-        <p className="text-zinc-400 text-sm mt-1">
-          Year {cohort.programYear} · {shortDate(cohort.startDate)} → {shortDate(cohort.endDate)}
-        </p>
+        {(() => {
+          const startStr = cohort.semesterStartDate ?? globalSemester?.startDate
+          const endStr   = (cohort.semesterSem2EndDate ?? cohort.semesterEndDate)
+                        ?? (globalSemester?.sem2End    ?? globalSemester?.endDate)
+          const startD   = startStr ? parseISO(startStr) : cohort.startDate
+          const endD     = endStr   ? parseISO(endStr)   : cohort.endDate
+          return (
+            <p className="text-zinc-400 text-sm mt-1">
+              {cohort.programYear ? `Year ${cohort.programYear} · ` : ''}
+              {shortDate(startD)} → {shortDate(endD)}
+            </p>
+          )
+        })()}
       </div>
 
       {/* ── Semester Dates ─────────────────────────────────────────────── */}

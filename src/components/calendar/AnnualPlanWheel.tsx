@@ -5,7 +5,7 @@ import {
   eachMonthOfInterval, startOfMonth, endOfMonth,
   getYear, addMonths,
 } from 'date-fns'
-import type { LessonDoc, LessonCategoryDoc, SubjectDoc } from '@/types'
+import type { LessonDoc, LessonCategoryDoc, SubjectDoc, SyncedEventDoc, CohortDoc } from '@/types'
 import { cn } from '@/lib/utils'
 
 // ── Geometry helpers ──────────────────────────────────────────────────────────
@@ -64,21 +64,29 @@ function annulusPath(
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
+const COHORT_FALLBACK_COLORS = [
+  '#f26419','#33658a','#10b981','#8b5cf6','#f6ae2d',
+  '#f43f5e','#0ea5e9','#14b8a6','#86bbd8','#e879f9',
+]
+
 interface Props {
-  lessons:    LessonDoc[]
-  subjects:   SubjectDoc[]
-  categories: LessonCategoryDoc[]
-  sem1Start:  string
-  sem1End:    string
-  sem2Start?: string | null
-  sem2End?:   string | null
+  lessons:       LessonDoc[]
+  subjects:      SubjectDoc[]
+  categories:    LessonCategoryDoc[]
+  sem1Start:     string
+  sem1End:       string
+  sem2Start?:    string | null
+  sem2End?:      string | null
+  syncedEvents?: SyncedEventDoc[]
+  cohorts?:      CohortDoc[]
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function AnnualPlanWheel({ lessons, subjects, categories, sem1Start, sem1End, sem2Start, sem2End }: Props) {
-  const [hoveredWeek,   setHoveredWeek]   = useState<string | null>(null)
-  const [showCategories, setShowCategories] = useState(false)
+export default function AnnualPlanWheel({ lessons, subjects, categories, sem1Start, sem1End, sem2Start, sem2End, syncedEvents = [], cohorts = [] }: Props) {
+  const [hoveredWeek,        setHoveredWeek]        = useState<string | null>(null)
+  const [hoveredSyncedEvent, setHoveredSyncedEvent] = useState<string | null>(null)
+  const [showCategories,     setShowCategories]     = useState(false)
 
   const subjectMap  = useMemo(() => Object.fromEntries(subjects.map(s => [s.id, s])),  [subjects])
   const categoryMap = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c])), [categories])
@@ -244,7 +252,7 @@ export default function AnnualPlanWheel({ lessons, subjects, categories, sem1Sta
       sem1StartFrac, sem1EndFrac,
       sem2StartFrac, sem2EndFrac,
       sem2EndFracActual,
-      hasSem2, yearLabel, totalDays, jan1Frac, fa,
+      hasSem2, yearLabel, totalDays, yearStart, yearEnd, jan1Frac, fa,
     }
   }, [lessons, subjects, categories, sem1Start, sem1End, sem2Start, sem2End, subjectMap, categoryMap])
 
@@ -261,7 +269,26 @@ export default function AnnualPlanWheel({ lessons, subjects, categories, sem1Sta
     })
   }, [subjects, lessons])
 
-  const { weekSegs, monthMarks, todayAngle, sem1StartFrac, sem1EndFrac, sem2StartFrac, sem2EndFrac, sem2EndFracActual, hasSem2, yearLabel, jan1Frac, fa } = wheel
+  const { weekSegs, monthMarks, todayAngle, sem1StartFrac, sem1EndFrac, sem2StartFrac, sem2EndFrac, sem2EndFracActual, hasSem2, yearLabel, totalDays, yearStart, yearEnd, jan1Frac, fa } = wheel
+
+  const cohortMap = useMemo(() => Object.fromEntries(cohorts.map(c => [c.id, c])), [cohorts])
+
+  // Synced event tick markers — use wheel's own yearStart/yearEnd/totalDays so fractions match
+  const syncedMarkers = useMemo(() => {
+    return syncedEvents.flatMap(e => {
+      const d = e.startTime?.toDate?.()
+      if (!d || d < yearStart || d > yearEnd) return []
+      const frac  = differenceInCalendarDays(d, yearStart) / totalDays
+      const angle = fa(frac)
+      const cohortObj = cohortMap[e.cohortId]
+      const cohortIdx = cohorts.findIndex(c => c.id === e.cohortId)
+      const color = cohortObj?.color ?? (cohortIdx >= 0 ? COHORT_FALLBACK_COLORS[cohortIdx % COHORT_FALLBACK_COLORS.length] : '#0078d4')
+      const [x1, y1] = polarXY(CX, CY, R_WEEK + 1,  angle)
+      const [x2, y2] = polarXY(CX, CY, R_OUTER - 2, angle)
+      const [mx, my] = polarXY(CX, CY, (R_WEEK + R_OUTER) / 2, angle)
+      return [{ id: e.id, x1, y1, x2, y2, mx, my, color, title: e.title }]
+    })
+  }, [syncedEvents, cohortMap, cohorts, yearStart, yearEnd, totalDays, fa])
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -442,6 +469,30 @@ export default function AnnualPlanWheel({ lessons, subjects, categories, sem1Sta
         </text>
 
         {/* ── Today pointer ─────────────────────────────────────────────── */}
+        {/* ── Synced event ticks ────────────────────────────────────────── */}
+        {syncedMarkers.map(m => (
+          <g key={m.id}
+            onMouseEnter={() => setHoveredSyncedEvent(m.id)}
+            onMouseLeave={() => setHoveredSyncedEvent(null)}
+            style={{ cursor: 'pointer' }}
+          >
+            {/* visible tick */}
+            <line
+              x1={m.x1} y1={m.y1} x2={m.x2} y2={m.y2}
+              stroke={m.color}
+              strokeWidth={hoveredSyncedEvent === m.id ? 5 : 3}
+              strokeLinecap="round"
+              opacity={hoveredSyncedEvent === m.id ? 1 : 0.85}
+            />
+            {/* invisible wider hit area */}
+            <line
+              x1={m.x1} y1={m.y1} x2={m.x2} y2={m.y2}
+              stroke="transparent"
+              strokeWidth={12}
+            />
+          </g>
+        ))}
+
         {todayAngle !== null && (() => {
           const [px, py] = polarXY(CX, CY, R_WEEK + 12, todayAngle)
           const [qx, qy] = polarXY(CX, CY, R_WEEK - 2,  todayAngle)
@@ -450,6 +501,22 @@ export default function AnnualPlanWheel({ lessons, subjects, categories, sem1Sta
             <g>
               <line x1={px} y1={py} x2={qx} y2={qy} stroke="#ef4444" strokeWidth={3} strokeLinecap="round" />
               <circle cx={px} cy={py} r={6} fill="#ef4444" />
+            </g>
+          )
+        })()}
+
+        {/* ── Hovered synced event tooltip ─────────────────────────────── */}
+        {hoveredSyncedEvent && (() => {
+          const m = syncedMarkers.find(x => x.id === hoveredSyncedEvent)
+          if (!m) return null
+          const boxW = 200, boxH = 44
+          const bx = Math.max(5, Math.min(m.mx - boxW / 2, 760 - boxW - 5))
+          const by = Math.max(5, Math.min(m.my - boxH / 2 - 20, 760 - boxH - 5))
+          return (
+            <g style={{ pointerEvents: 'none' }}>
+              <rect x={bx} y={by} width={boxW} height={boxH} rx={8} fill="#1e293b" opacity={0.95} />
+              <text x={bx + boxW / 2} y={by + 15} textAnchor="middle" dominantBaseline="middle" fontSize={11} fill="#94a3b8">📅 Outlook</text>
+              <text x={bx + boxW / 2} y={by + 31} textAnchor="middle" dominantBaseline="middle" fontSize={13} fontWeight={600} fill="white">{m.title}</text>
             </g>
           )
         })()}

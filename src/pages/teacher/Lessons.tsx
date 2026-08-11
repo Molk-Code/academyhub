@@ -6,7 +6,7 @@ import { db, functions } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
 import { shortDate, timeStr, toDate } from '@/lib/utils'
-import type { LessonDoc, SubjectDoc, CohortDoc, LessonBlockDoc, SemesterSettingsDoc, LessonCategoryDoc, UserDoc, PersonalEventDoc } from '@/types'
+import type { LessonDoc, SubjectDoc, CohortDoc, LessonBlockDoc, SemesterSettingsDoc, LessonCategoryDoc, UserDoc, PersonalEventDoc, SyncedEventDoc, GuestTeacherDoc } from '@/types'
 import { Plus, Pencil, Trash2, CalendarDays, List, X, QrCode, Circle, SlidersHorizontal, ChevronDown, Check, MapPin } from 'lucide-react'
 import { markCalendarInvitesSeen } from '@/hooks/useCalendarInviteBadge'
 import AnnualPlanWheel from '@/components/calendar/AnnualPlanWheel'
@@ -156,6 +156,13 @@ export default function Lessons() {
   const { profile } = useAuth()
   const navigate    = useNavigate()
   const { startAttendance } = useAttendance()
+  const [showGhostBlocks,       setShowGhostBlocks]       = useState(true)
+  const [editingSyncedEvent,    setEditingSyncedEvent]    = useState<SyncedEventDoc | null>(null)
+  const [syncedEditLocation,    setSyncedEditLocation]    = useState('')
+  const [syncedEditNotes,       setSyncedEditNotes]       = useState('')
+  const [syncedEditTeachers,    setSyncedEditTeachers]    = useState<string[]>([])
+  const [syncedEditGuestTeachers, setSyncedEditGuestTeachers] = useState<string[]>([])
+  const [savingSyncedEdit,      setSavingSyncedEdit]      = useState(false)
   const [view,             setView]             = useState<'calendar' | 'list' | 'wheel'>('calendar')
   const [deleting,         setDeleting]         = useState<string | null>(null)
   const [selected,         setSelected]         = useState<SelectedLesson | null>(null)
@@ -207,11 +214,12 @@ export default function Lessons() {
   const { data: semesterDoc } = useDocument<SemesterSettingsDoc>('settings', 'semester')
   const { data: categories  } = useCollection<LessonCategoryDoc>('lessonCategories', [orderBy('order', 'asc')])
 
-  // Other teachers for filter panel
+  // Other teachers for filter panel — include anyone with teacher in their roles array
   const { data: allTeacherUsers } = useCollection<UserDoc>(
     'users',
-    [where('role', '==', 'teacher')],
+    [where('roles', 'array-contains', 'teacher')],
   )
+  const { data: guestTeachers } = useCollection<GuestTeacherDoc>('guest_teachers')
 
   // My personal events
   const { data: myPersonalEvents } = useCollection<PersonalEventDoc>(
@@ -232,6 +240,9 @@ export default function Lessons() {
     profile ? [where('inviteeIds', 'array-contains', profile.uid)] : [],
     !!profile,
   )
+
+  // Office 365 synced events — teachers see all cohorts
+  const { data: syncedEvents } = useCollection<SyncedEventDoc>('synced_events', [])
 
   // All users for invitee picker
   const { data: allUsers } = useCollection<UserDoc>('users')
@@ -441,6 +452,24 @@ export default function Lessons() {
     }))
   }, [invitedPersonalEvents])
 
+  const syncedEventInputs: EventInput[] = useMemo(() => {
+    return syncedEvents.map(e => {
+      const cohortObj = cohortMap[e.cohortId]
+      const cohortIdx = cohorts.findIndex(c => c.id === e.cohortId)
+      const color = cohortObj?.color ?? (cohortIdx >= 0 ? COHORT_FALLBACK_COLORS[cohortIdx % COHORT_FALLBACK_COLORS.length] : '#0078d4')
+      return {
+        id:    `synced-${e.id}`,
+        title: `📅 ${e.title}`,
+        start: toDate(e.startTime) ?? undefined,
+        end:   e.endTime ? toDate(e.endTime) ?? undefined : undefined,
+        allDay: e.allDay,
+        backgroundColor: color,
+        borderColor:     color,
+        extendedProps: { isSynced: true, location: e.location, cohortId: e.cohortId },
+      }
+    })
+  }, [syncedEvents, cohortMap, cohorts])
+
   // Filtered lesson events (by cohort toggle)
   const filteredLessonEvents = useMemo(
     () => lessonEvents.filter(e => activeCohortIds[e.extendedProps?.cohortId] !== false),
@@ -448,8 +477,8 @@ export default function Lessons() {
   )
 
   const allEvents = useMemo(
-    () => [...ghostEvents, ...filteredLessonEvents, ...semesterEvents, ...personalEventInputs, ...invitedEventInputs],
-    [ghostEvents, filteredLessonEvents, semesterEvents, personalEventInputs, invitedEventInputs],
+    () => [...(showGhostBlocks ? ghostEvents : []), ...filteredLessonEvents, ...semesterEvents, ...personalEventInputs, ...invitedEventInputs, ...syncedEventInputs],
+    [showGhostBlocks, ghostEvents, filteredLessonEvents, semesterEvents, personalEventInputs, invitedEventInputs, syncedEventInputs],
   )
 
   const dayDetailLessons = useMemo(() => {
@@ -594,6 +623,30 @@ export default function Lessons() {
       if (prev[repId]) { const next = { ...prev }; delete next[repId]; return next }
       return { ...prev, [repId]: allIds }
     })
+  }
+
+  function openSyncedEventEdit(e: SyncedEventDoc) {
+    setEditingSyncedEvent(e)
+    setSyncedEditLocation(e.customLocation ?? e.location ?? '')
+    setSyncedEditNotes(e.notes ?? '')
+    setSyncedEditTeachers(e.teacherIds ?? [])
+    setSyncedEditGuestTeachers(e.guestTeacherIds ?? [])
+  }
+
+  async function saveSyncedEventEdit() {
+    if (!editingSyncedEvent) return
+    setSavingSyncedEdit(true)
+    try {
+      await updateDoc(doc(db, 'synced_events', editingSyncedEvent.id), {
+        customLocation:  syncedEditLocation.trim() || null,
+        notes:           syncedEditNotes.trim() || null,
+        teacherIds:      syncedEditTeachers,
+        guestTeacherIds: syncedEditGuestTeachers,
+      })
+      setEditingSyncedEvent(null)
+    } finally {
+      setSavingSyncedEdit(false)
+    }
   }
 
   async function savePersonalEvent() {
@@ -827,11 +880,17 @@ export default function Lessons() {
             )}
           </div>
 
-        <div className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm overflow-hidden [&_.fc-toolbar]:flex-wrap [&_.fc-toolbar]:gap-y-2 [&_.fc-toolbar-title]:text-base [&_.fc-button]:text-xs [&_.fc-button]:px-2 [&_.fc-button]:py-1 sm:[&_.fc-button]:text-sm sm:[&_.fc-button]:px-3 sm:[&_.fc-button]:py-1.5">
+        <div className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm overflow-hidden [&_.fc-toolbar]:flex-wrap [&_.fc-toolbar]:gap-y-2 [&_.fc-toolbar]:px-4 [&_.fc-toolbar]:pt-3 [&_.fc-toolbar-title]:text-base [&_.fc-button]:text-xs [&_.fc-button]:px-2 [&_.fc-button]:py-1 sm:[&_.fc-button]:text-sm sm:[&_.fc-button]:px-3 sm:[&_.fc-button]:py-1.5">
           {blocks.length > 0 && (
             <div className="px-4 pt-3 pb-1 flex items-center gap-2 text-xs text-zinc-400">
               <span className="inline-block w-3 h-3 rounded-sm border border-dashed border-amber-400 bg-amber-950/40" />
               Ghost blocks — click to schedule a lesson in that slot
+              <button
+                onClick={() => setShowGhostBlocks(v => !v)}
+                className={`ml-2 px-2 py-0.5 rounded text-xs border transition-colors ${showGhostBlocks ? 'border-amber-400/50 text-amber-400 bg-amber-950/30 hover:bg-amber-950/60' : 'border-zinc-600 text-zinc-500 hover:text-zinc-300'}`}
+              >
+                {showGhostBlocks ? 'Hide' : 'Show'}
+              </button>
             </div>
           )}
           <FullCalendar
@@ -851,7 +910,7 @@ export default function Lessons() {
                 type:       'timeGrid',
                 duration:   { weeks: 1 },
                 hiddenDays: [0, 6],
-                buttonText: 'Work week',
+                buttonText: 'work week',
               },
             }}
             events={allEvents}
@@ -911,6 +970,12 @@ export default function Lessons() {
             }}
             eventClick={(info) => {
               if (info.event.extendedProps.isSemesterMarker) return
+              if (info.event.extendedProps.isSynced) {
+                const docId = info.event.id.replace(/^synced-/, '')
+                const ev = syncedEvents.find(e => e.id === docId)
+                if (ev) openSyncedEventEdit(ev)
+                return
+              }
               if (info.event.extendedProps.isPersonal) {
                 const docId: string = info.event.extendedProps.docId
                 if (info.event.extendedProps.isInvited) {
@@ -966,8 +1031,8 @@ export default function Lessons() {
                 )
               }
               return (
-                <div className="px-1 py-0.5 overflow-hidden">
-                  <p className="text-xs font-semibold truncate">{arg.event.title}</p>
+                <div className="px-1 py-0.5 h-full overflow-hidden">
+                  <p className="text-xs font-semibold leading-tight line-clamp-3">{arg.event.title}</p>
                   {arg.event.extendedProps.className && (
                     <p className="text-xs opacity-80 truncate">{arg.event.extendedProps.className}</p>
                   )}
@@ -975,6 +1040,9 @@ export default function Lessons() {
                     <p className="text-xs opacity-70 truncate">
                       {arg.event.extendedProps.isOnline ? '🌐' : '📍'} {arg.event.extendedProps.classroom}
                     </p>
+                  )}
+                  {arg.event.extendedProps.isSynced && arg.event.extendedProps.location && (
+                    <p className="text-xs opacity-70 truncate">📍 {arg.event.extendedProps.location}</p>
                   )}
                 </div>
               )
@@ -995,59 +1063,195 @@ export default function Lessons() {
             sem1End={semesterDoc.endDate}
             sem2Start={semesterDoc.sem2Start}
             sem2End={semesterDoc.sem2End}
+            syncedEvents={syncedEvents}
+            cohorts={cohorts}
           />
         </div>
       )}
 
       {/* ── List view ────────────────────────────────────────────────────── */}
       {view === 'list' && (
-        lessons.length === 0 ? (
-          <EmptyState
-            icon={CalendarDays}
-            title="No lessons yet"
-            description="Click New Lesson or tap an empty slot in the calendar to get started."
-          />
-        ) : (
-          <div className="space-y-3">
-            {lessons.map(lesson => {
-              const subj   = subjectMap[lesson.subjectId]
-              const cohort = cohortMap[lesson.cohortId]
-              return (
-                <div key={lesson.id} className="bg-zinc-900 rounded-2xl border border-white/10 p-4 flex items-center gap-4 shadow-sm">
-                  <div className={`w-1 self-stretch rounded-full flex-shrink-0 ${subj?.color ?? 'bg-brand-500'}`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold text-zinc-100">{lesson.iconEmoji ? `${lesson.iconEmoji} ` : ''}{lesson.title}</p>
-                      {lesson.isOnline && <span className="badge badge-blue">Online</span>}
+        <div className="space-y-6">
+          {lessons.length === 0 ? (
+            <EmptyState
+              icon={CalendarDays}
+              title="No lessons yet"
+              description="Click New Lesson or tap an empty slot in the calendar to get started."
+            />
+          ) : (
+            <div className="space-y-3">
+              {lessons.map(lesson => {
+                const subj   = subjectMap[lesson.subjectId]
+                const cohort = cohortMap[lesson.cohortId]
+                return (
+                  <div key={lesson.id} className="bg-zinc-900 rounded-2xl border border-white/10 p-4 flex items-center gap-4 shadow-sm">
+                    <div className={`w-1 self-stretch rounded-full flex-shrink-0 ${subj?.color ?? 'bg-brand-500'}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-zinc-100">{lesson.iconEmoji ? `${lesson.iconEmoji} ` : ''}{lesson.title}</p>
+                        {lesson.isOnline && <span className="badge badge-blue">Online</span>}
+                      </div>
+                      <p className="text-xs text-zinc-500 mt-0.5">
+                        {subj ? `${subj.iconEmoji} ${subj.title}` : '—'}
+                        {cohort ? ` · ${cohort.name}` : ''}
+                        {' · '}
+                        {shortDate(lesson.startTime)} {timeStr(lesson.startTime)}–{timeStr(lesson.endTime)}
+                        {lesson.classroom ? ` · ${lesson.classroom}` : ''}
+                      </p>
                     </div>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                      {subj ? `${subj.iconEmoji} ${subj.title}` : '—'}
-                      {cohort ? ` · ${cohort.name}` : ''}
-                      {' · '}
-                      {shortDate(lesson.startTime)} {timeStr(lesson.startTime)}–{timeStr(lesson.endTime)}
-                      {lesson.classroom ? ` · ${lesson.classroom}` : ''}
-                    </p>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Link
+                        to={`/teacher/lessons/${lesson.id}/edit`}
+                        className="p-2 text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(lesson.id)}
+                        disabled={deleting === lesson.id}
+                        className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-zinc-800 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <Link
-                      to={`/teacher/lessons/${lesson.id}/edit`}
-                      className="p-2 text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(lesson.id)}
-                      disabled={deleting === lesson.id}
-                      className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-zinc-800 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {syncedEvents.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider px-1">📅 Outlook Calendar Events</p>
+              {[...syncedEvents]
+                .sort((a, b) => (a.startTime?.toMillis?.() ?? 0) - (b.startTime?.toMillis?.() ?? 0))
+                .map(e => {
+                  const cohortObj = cohortMap[e.cohortId]
+                  const cohortIdx = cohorts.findIndex(c => c.id === e.cohortId)
+                  const color = cohortObj?.color ?? (cohortIdx >= 0 ? COHORT_FALLBACK_COLORS[cohortIdx % COHORT_FALLBACK_COLORS.length] : '#0078d4')
+                  const location = e.customLocation ?? e.location
+                  return (
+                    <div key={e.id} className="bg-zinc-900 rounded-2xl border border-white/10 p-4 flex items-center gap-4 shadow-sm">
+                      <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-zinc-100">{e.title}</p>
+                        <p className="text-xs text-zinc-500 mt-0.5">
+                          {cohortObj?.name ?? e.cohortId}
+                          {' · '}
+                          {e.allDay
+                            ? toDate(e.startTime)?.toLocaleDateString('sv-SE', { weekday: 'short', month: 'short', day: 'numeric' })
+                            : `${shortDate(e.startTime)} ${timeStr(e.startTime)}${e.endTime ? `–${timeStr(e.endTime)}` : ''}`
+                          }
+                          {location ? ` · ${location}` : ''}
+                        </p>
+                        {e.notes && <p className="text-xs text-zinc-500 mt-0.5 italic">{e.notes}</p>}
+                      </div>
+                      <button
+                        onClick={() => openSyncedEventEdit(e)}
+                        className="p-2 text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors flex-shrink-0"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )
+                })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Synced event edit modal ──────────────────────────────────────── */}
+      {editingSyncedEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setEditingSyncedEvent(null)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-base font-bold text-zinc-100">{editingSyncedEvent.title}</p>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  📅 Outlook · {cohortMap[editingSyncedEvent.cohortId]?.name ?? editingSyncedEvent.cohortId}
+                </p>
+              </div>
+              <button onClick={() => setEditingSyncedEvent(null)} className="text-zinc-400 hover:text-zinc-200 p-1"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Location override</label>
+                <input
+                  value={syncedEditLocation}
+                  onChange={e => setSyncedEditLocation(e.target.value)}
+                  placeholder={editingSyncedEvent.location ?? 'Add location…'}
+                  className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-brand-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Assign teachers</label>
+                <div className="flex flex-wrap gap-1.5 mb-1.5">
+                  {syncedEditTeachers.map(tid => {
+                    const t = allTeacherUsers.find(u => u.uid === tid || u.id === tid)
+                    return (
+                      <span key={tid} className="flex items-center gap-1 bg-zinc-700 text-xs text-zinc-200 px-2 py-0.5 rounded-full">
+                        {t?.displayName ?? tid}
+                        <button onClick={() => setSyncedEditTeachers(prev => prev.filter(id => id !== tid))} className="text-zinc-400 hover:text-zinc-200"><X className="w-3 h-3" /></button>
+                      </span>
+                    )
+                  })}
                 </div>
-              )
-            })}
+                <select
+                  className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-brand-500"
+                  value=""
+                  onChange={e => { if (e.target.value && !syncedEditTeachers.includes(e.target.value)) setSyncedEditTeachers(prev => [...prev, e.target.value]) }}
+                >
+                  <option value="">+ Add teacher…</option>
+                  {allTeacherUsers.filter(t => !syncedEditTeachers.includes(t.uid ?? t.id)).map(t => (
+                    <option key={t.uid ?? t.id} value={t.uid ?? t.id}>{t.displayName}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Assign guest teachers</label>
+                <div className="flex flex-wrap gap-1.5 mb-1.5">
+                  {syncedEditGuestTeachers.map(gid => {
+                    const g = guestTeachers.find(gt => gt.id === gid)
+                    return (
+                      <span key={gid} className="flex items-center gap-1 bg-zinc-700 text-xs text-zinc-200 px-2 py-0.5 rounded-full">
+                        {g?.name ?? gid}
+                        <button onClick={() => setSyncedEditGuestTeachers(prev => prev.filter(id => id !== gid))} className="text-zinc-400 hover:text-zinc-200"><X className="w-3 h-3" /></button>
+                      </span>
+                    )
+                  })}
+                </div>
+                <select
+                  className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-brand-500"
+                  value=""
+                  onChange={e => { if (e.target.value && !syncedEditGuestTeachers.includes(e.target.value)) setSyncedEditGuestTeachers(prev => [...prev, e.target.value]) }}
+                >
+                  <option value="">+ Add guest teacher…</option>
+                  {[...guestTeachers].sort((a,b) => a.name.localeCompare(b.name)).filter(g => !syncedEditGuestTeachers.includes(g.id)).map(g => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Notes</label>
+                <textarea
+                  value={syncedEditNotes}
+                  onChange={e => setSyncedEditNotes(e.target.value)}
+                  placeholder="Internal notes…"
+                  rows={2}
+                  className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-brand-500 resize-none"
+                />
+              </div>
+            </div>
+            <button
+              onClick={saveSyncedEventEdit}
+              disabled={savingSyncedEdit}
+              className="w-full btn-primary text-sm py-2"
+            >
+              {savingSyncedEdit ? 'Saving…' : 'Save'}
+            </button>
           </div>
-        )
+        </div>
       )}
 
       {/* ── Lesson detail modal ──────────────────────────────────────────── */}

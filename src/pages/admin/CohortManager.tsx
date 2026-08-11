@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { collection, addDoc, updateDoc, doc, Timestamp } from 'firebase/firestore'
+import { parseISO } from 'date-fns'
+import { collection, addDoc, Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, useDocument, where } from '@/hooks/useFirestore'
 import type { CohortDoc, UserDoc, SemesterSettingsDoc } from '@/types'
@@ -24,7 +25,7 @@ export default function CohortManager() {
   const [saving,   setSaving]   = useState(false)
 
   const { data: cohorts  } = useCollection<CohortDoc>('cohorts')
-  const { data: teachers } = useCollection<UserDoc>('users', [where('role', '==', 'teacher')])
+  const { data: teachers } = useCollection<UserDoc>('users', [where('roles', 'array-contains', 'teacher')])
   const { data: students } = useCollection<UserDoc>('users', [where('role', '==', 'student')])
   const { data: semesterDoc } = useDocument<SemesterSettingsDoc>('settings', 'semester')
 
@@ -51,13 +52,6 @@ export default function CohortManager() {
     reset()
     setShowForm(false)
     setSaving(false)
-  }
-
-  async function assignTeacher(cohortId: string, teacherId: string, currentIds: string[]) {
-    const updated = currentIds.includes(teacherId)
-      ? currentIds.filter(id => id !== teacherId)
-      : [...currentIds, teacherId]
-    await updateDoc(doc(db, 'cohorts', cohortId), { teacherIds: updated })
   }
 
   return (
@@ -118,7 +112,14 @@ export default function CohortManager() {
                 <div>
                   <h3 className="font-bold text-white text-base">{cohort.name}</h3>
                   <p className="text-xs text-zinc-400 mt-0.5">
-                    Year {cohort.programYear} · {shortDate(cohort.startDate)} → {shortDate(cohort.endDate)}
+                    {(() => {
+                      const startStr = cohort.semesterStartDate ?? semesterDoc?.startDate
+                      const endStr   = (cohort.semesterSem2EndDate ?? cohort.semesterEndDate)
+                                    ?? (semesterDoc?.sem2End ?? semesterDoc?.endDate)
+                      const startD   = startStr ? parseISO(startStr) : cohort.startDate
+                      const endD     = endStr   ? parseISO(endStr)   : cohort.endDate
+                      return `Year ${cohort.programYear} · ${shortDate(startD)} → ${shortDate(endD)}`
+                    })()}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -143,20 +144,17 @@ export default function CohortManager() {
               <div>
                 <p className="text-xs font-medium text-zinc-400 mb-2">Teachers</p>
                 <div className="flex flex-wrap gap-2">
-                  {teachers.map(teacher => (
-                    <button
+                  {teachers.filter(t => cohort.teacherIds?.includes(t.uid)).map(teacher => (
+                    <span
                       key={teacher.uid}
-                      onClick={() => assignTeacher(cohort.id, teacher.uid, cohort.teacherIds)}
-                      className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
-                        cohort.teacherIds.includes(teacher.uid)
-                          ? 'bg-brand-600 text-white'
-                          : 'bg-zinc-700 text-zinc-400 hover:bg-slate-600'
-                      }`}
+                      className="text-xs px-2.5 py-1 rounded-full font-medium bg-brand-600 text-white"
                     >
                       {teacher.displayName}
-                    </button>
+                    </span>
                   ))}
-                  {teachers.length === 0 && <span className="text-xs text-zinc-500">No teachers yet.</span>}
+                  {!cohort.teacherIds?.some(id => teachers.find(t => t.uid === id)) && (
+                    <span className="text-xs text-zinc-500">No teachers assigned.</span>
+                  )}
                 </div>
               </div>
 

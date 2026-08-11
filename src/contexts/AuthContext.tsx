@@ -79,7 +79,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const profileDoc = { ...data, uid: snap.id }
           setProfile(profileDoc)
           setRoles(profileDoc.roles?.length ? profileDoc.roles : (primaryRole ? [primaryRole] : []))
-          setCohortId(claimCohortId ?? profileDoc.cohortId ?? null)
+          // Teachers and admins are never bound to a cohort — always use Firestore doc
+          // (ignores any stale cohortId claim left over from before a role switch)
+          const isStaff = primaryRole === 'teacher' || primaryRole === 'admin'
+          setCohortId(isStaff ? (profileDoc.cohortId ?? null) : (claimCohortId ?? profileDoc.cohortId ?? null))
         } else if (primaryRole) {
           setRoles([primaryRole])
         }

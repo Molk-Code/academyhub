@@ -44,10 +44,6 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    function inCohort(cohortId) {
-      return isSignedIn() && request.auth.token.cohortId == cohortId;
-    }
-
     // ── Users ─────────────────────────────────────────────────────────────────
 
     match /users/{userId} {

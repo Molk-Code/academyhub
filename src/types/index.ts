@@ -948,6 +948,11 @@ export interface SyncedEventDoc {
   location?: string | null
   source: 'office365'
   updatedAt: Timestamp
+  // User-editable overrides (not touched by webhook)
+  customLocation?: string | null
+  teacherIds?: string[]
+  guestTeacherIds?: string[]
+  notes?: string | null
 }
 
 // ── Production Planning ───────────────────────────────────────────────────────

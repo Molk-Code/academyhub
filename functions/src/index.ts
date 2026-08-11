@@ -1,5 +1,5 @@
 import * as admin from 'firebase-admin'
-import * as functions from 'firebase-functions'
+import * as functions from 'firebase-functions/v1'
 import { Resend } from 'resend'
 import * as PDFDocumentLib from 'pdfkit'
 import * as path from 'path'
@@ -2896,9 +2896,87 @@ interface OfficeSyncPayload {
   start?:      string            // ISO datetime
   end?:        string            // ISO datetime
   location?:   string
-  isAllDay?:   boolean
-  changeType?: 'created' | 'updated' | 'deleted'
+  isAllDay?:   boolean | string  // Power Automate often sends "True"/"False" as text
+  changeType?: string
 }
+
+// Power Automate's raw-JSON body editor frequently stringifies non-string dynamic
+// content (booleans included), so accept either shape here.
+function toBool(v: boolean | string | undefined): boolean {
+  if (typeof v === 'boolean') return v
+  return String(v ?? '').toLowerCase() === 'true'
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// inspectUserClaims — admin: get + optionally clear stale cohortId claim
+// Usage: { uid, fix: false } → inspect only  |  { uid, fix: true } → clear claim
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const inspectUserClaims = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  if (context.auth.token.role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'Admin only.')
+
+  const uid = data?.uid as string | undefined
+  if (!uid) throw new functions.https.HttpsError('invalid-argument', 'uid required.')
+
+  const userRecord = await admin.auth().getUser(uid)
+  const claims     = userRecord.customClaims ?? {}
+  const firestoreSnap = await db.collection('users').doc(uid).get()
+  const firestoreDoc  = firestoreSnap.exists ? firestoreSnap.data() : null
+
+  const report = {
+    uid,
+    email:             userRecord.email,
+    claimRole:         claims.role     ?? null,
+    claimCohortId:     claims.cohortId ?? null,
+    firestoreRole:     firestoreDoc?.role     ?? null,
+    firestoreCohortId: firestoreDoc?.cohortId ?? null,
+    mismatch:          (claims.cohortId ?? null) !== (firestoreDoc?.cohortId ?? null),
+    fixed:             false,
+  }
+
+  if (data?.fix === true && report.mismatch) {
+    await admin.auth().setCustomUserClaims(uid, {
+      ...claims,
+      cohortId: firestoreDoc?.cohortId ?? null,
+    })
+    report.fixed = true
+  }
+
+  return report
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// fixAllTeacherClaims — admin: scan all teacher/admin users and clear stale cohortId claims
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const fixAllTeacherClaims = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  if (context.auth.token.role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'Admin only.')
+
+  const usersSnap = await db.collection('users')
+    .where('role', 'in', ['teacher', 'admin'])
+    .get()
+
+  const results: { uid: string; email: string; was: string | null; fixed: boolean }[] = []
+
+  for (const docSnap of usersSnap.docs) {
+    const fsData  = docSnap.data()
+    const uid     = docSnap.id
+    let userRecord: admin.auth.UserRecord
+    try { userRecord = await admin.auth().getUser(uid) } catch { continue }
+    const claims = userRecord.customClaims ?? {}
+    const claimCohortId = claims.cohortId ?? null
+    if (claimCohortId !== null) {
+      await admin.auth().setCustomUserClaims(uid, { ...claims, cohortId: null })
+      results.push({ uid, email: userRecord.email ?? '', was: claimCohortId, fixed: true })
+    } else {
+      results.push({ uid, email: userRecord.email ?? '', was: null, fixed: false })
+    }
+  }
+
+  return { scanned: results.length, fixed: results.filter(r => r.fixed).length, results }
+})
 
 export const receiveOfficeCalendarEvent = functions.https.onRequest(async (req, res) => {
   if (req.method !== 'POST') {
@@ -2933,6 +3011,20 @@ export const receiveOfficeCalendarEvent = functions.https.onRequest(async (req, 
   }
 
   const body = (req.body ?? {}) as OfficeSyncPayload
+
+  // Log full payload so we can see exactly what Power Automate sends
+  console.log('[officeSync] raw body:', JSON.stringify({
+    externalId:  body.externalId,
+    subject:     body.subject,
+    start:       body.start,
+    end:         body.end,
+    isAllDay:    body.isAllDay,
+    changeType:  body.changeType,
+    location:    body.location,
+    syncId,
+    allKeys: Object.keys(req.body ?? {}),
+  }))
+
   if (!body.externalId) {
     res.status(400).json({ error: 'externalId is required.' })
     return
@@ -2942,8 +3034,29 @@ export const receiveOfficeCalendarEvent = functions.https.onRequest(async (req, 
   const eventRef = db.collection('synced_events').doc(docId)
 
   try {
-    if (body.changeType === 'deleted' || !body.subject) {
+    const DELETE_MARKERS = [
+      'deleted', 'delete', 'removed',
+      'togs bort', 'borttagen', 'raderad',
+      'cancelled', 'canceled',
+    ]
+    const changeTypeLc = (body.changeType ?? '').toLowerCase()
+    const isDelete = DELETE_MARKERS.some(m => changeTypeLc.includes(m)) || !body.subject
+
+    console.log('[officeSync] action:', isDelete ? 'DELETE' : 'UPSERT',
+      '| changeType:', body.changeType, '| docId:', docId)
+
+    if (isDelete) {
       await eventRef.delete()
+      // Also scan for any docs with same externalId but different syncId prefix (safety net)
+      const staleSnap = await db.collection('synced_events')
+        .where('externalId', '==', body.externalId)
+        .get()
+      if (!staleSnap.empty) {
+        const batch = db.batch()
+        staleSnap.docs.forEach(d => batch.delete(d.ref))
+        await batch.commit()
+        console.log('[officeSync] deleted', staleSnap.size, 'stale doc(s) with externalId', body.externalId)
+      }
     } else {
       const startDate = body.start ? new Date(body.start) : null
       const endDate   = body.end   ? new Date(body.end)   : null
@@ -2951,17 +3064,19 @@ export const receiveOfficeCalendarEvent = functions.https.onRequest(async (req, 
         res.status(400).json({ error: 'start is required and must be a valid ISO datetime.' })
         return
       }
+      const allDay = toBool(body.isAllDay)
+      console.log('[officeSync] allDay resolved:', allDay, '(raw:', body.isAllDay, ')')
       await eventRef.set({
         syncId,
-        cohortId:  sync.cohortId ?? 'all',
+        cohortId:   sync.cohortId ?? 'all',
         externalId: body.externalId,
-        title:     body.subject,
-        startTime: admin.firestore.Timestamp.fromDate(startDate),
-        endTime:   endDate && !isNaN(endDate.getTime()) ? admin.firestore.Timestamp.fromDate(endDate) : null,
-        allDay:    !!body.isAllDay,
-        location:  body.location || null,
-        source:    'office365',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        title:      body.subject,
+        startTime:  admin.firestore.Timestamp.fromDate(startDate),
+        endTime:    endDate && !isNaN(endDate.getTime()) ? admin.firestore.Timestamp.fromDate(endDate) : null,
+        allDay,
+        location:   body.location || null,
+        source:     'office365',
+        updatedAt:  admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true })
     }
 

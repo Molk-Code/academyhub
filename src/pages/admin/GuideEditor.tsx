@@ -434,7 +434,7 @@ function ContactsPanel({ contacts }: { contacts: GuideContactDoc[] }) {
     await deleteDoc(doc(db, 'guide_contacts', id))
   }
 
-  const ContactForm = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+  const contactFormJsx = (onSave: () => void, onCancel: () => void) => (
     <div className="bg-zinc-900 rounded-2xl border border-brand-200 p-4 grid grid-cols-2 gap-3">
       <input className="input py-1.5 text-sm" placeholder="Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
       <input className="input py-1.5 text-sm" placeholder="Role / Title" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} />
@@ -452,7 +452,7 @@ function ContactsPanel({ contacts }: { contacts: GuideContactDoc[] }) {
       {contacts.map(c => (
         <div key={c.id}>
           {editingId === c.id ? (
-            <ContactForm onSave={() => saveContact(c.id)} onCancel={() => setEditingId(null)} />
+            contactFormJsx(() => saveContact(c.id), () => setEditingId(null))
           ) : (
             <div className="bg-zinc-900 rounded-2xl border border-white/10 px-4 py-3 flex items-center gap-3">
               <div className="flex-1 min-w-0">
@@ -473,7 +473,7 @@ function ContactsPanel({ contacts }: { contacts: GuideContactDoc[] }) {
       ))}
 
       {adding ? (
-        <ContactForm onSave={addContact} onCancel={() => { setAdding(false); setForm(emptyForm) }} />
+        contactFormJsx(addContact, () => { setAdding(false); setForm(emptyForm) })
       ) : (
         <button onClick={() => setAdding(true)} className="w-full rounded-2xl border-2 border-dashed border-white/10 p-3 text-sm text-zinc-400 hover:border-brand-300 hover:text-brand-600 transition-all flex items-center justify-center gap-2">
           <Plus className="w-4 h-4" /> Add contact

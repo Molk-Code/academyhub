@@ -949,6 +949,7 @@ export interface SyncedEventDoc {
   source: 'office365'
   updatedAt: Timestamp
   // User-editable overrides (not touched by webhook)
+  customTitle?: string | null
   customLocation?: string | null
   teacherIds?: string[]
   guestTeacherIds?: string[]

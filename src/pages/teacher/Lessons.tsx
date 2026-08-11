@@ -157,12 +157,14 @@ export default function Lessons() {
   const navigate    = useNavigate()
   const { startAttendance } = useAttendance()
   const [showGhostBlocks,       setShowGhostBlocks]       = useState(true)
-  const [editingSyncedEvent,    setEditingSyncedEvent]    = useState<SyncedEventDoc | null>(null)
-  const [syncedEditLocation,    setSyncedEditLocation]    = useState('')
-  const [syncedEditNotes,       setSyncedEditNotes]       = useState('')
-  const [syncedEditTeachers,    setSyncedEditTeachers]    = useState<string[]>([])
+  const [editingSyncedEvent,      setEditingSyncedEvent]      = useState<SyncedEventDoc | null>(null)
+  const [syncedEditTitle,         setSyncedEditTitle]         = useState('')
+  const [syncedEditLocation,      setSyncedEditLocation]      = useState('')
+  const [syncedEditNotes,         setSyncedEditNotes]         = useState('')
+  const [syncedEditTeachers,      setSyncedEditTeachers]      = useState<string[]>([])
   const [syncedEditGuestTeachers, setSyncedEditGuestTeachers] = useState<string[]>([])
-  const [savingSyncedEdit,      setSavingSyncedEdit]      = useState(false)
+  const [savingSyncedEdit,        setSavingSyncedEdit]        = useState(false)
+  const [syncedEditExpanded,      setSyncedEditExpanded]      = useState(false)
   const [view,             setView]             = useState<'calendar' | 'list' | 'wheel'>('calendar')
   const [deleting,         setDeleting]         = useState<string | null>(null)
   const [selected,         setSelected]         = useState<SelectedLesson | null>(null)
@@ -459,7 +461,7 @@ export default function Lessons() {
       const color = cohortObj?.color ?? (cohortIdx >= 0 ? COHORT_FALLBACK_COLORS[cohortIdx % COHORT_FALLBACK_COLORS.length] : '#0078d4')
       return {
         id:    `synced-${e.id}`,
-        title: `📅 ${e.title}`,
+        title: `📅 ${e.customTitle || e.title}`,
         start: toDate(e.startTime) ?? undefined,
         end:   e.endTime ? toDate(e.endTime) ?? undefined : undefined,
         allDay: e.allDay,
@@ -627,10 +629,12 @@ export default function Lessons() {
 
   function openSyncedEventEdit(e: SyncedEventDoc) {
     setEditingSyncedEvent(e)
-    setSyncedEditLocation(e.customLocation ?? e.location ?? '')
+    setSyncedEditTitle(e.customTitle ?? '')
+    setSyncedEditLocation(e.customLocation ?? '')
     setSyncedEditNotes(e.notes ?? '')
     setSyncedEditTeachers(e.teacherIds ?? [])
     setSyncedEditGuestTeachers(e.guestTeacherIds ?? [])
+    setSyncedEditExpanded(false)
   }
 
   async function saveSyncedEventEdit() {
@@ -638,6 +642,7 @@ export default function Lessons() {
     setSavingSyncedEdit(true)
     try {
       await updateDoc(doc(db, 'synced_events', editingSyncedEvent.id), {
+        customTitle:     syncedEditTitle.trim() || null,
         customLocation:  syncedEditLocation.trim() || null,
         notes:           syncedEditNotes.trim() || null,
         teacherIds:      syncedEditTeachers,
@@ -1134,7 +1139,7 @@ export default function Lessons() {
                     <div key={e.id} className="bg-zinc-900 rounded-2xl border border-white/10 p-4 flex items-center gap-4 shadow-sm">
                       <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-zinc-100">{e.title}</p>
+                        <p className="text-sm font-semibold text-zinc-100">{e.customTitle || e.title}</p>
                         <p className="text-xs text-zinc-500 mt-0.5">
                           {cohortObj?.name ?? e.cohortId}
                           {' · '}
@@ -1160,99 +1165,181 @@ export default function Lessons() {
         </div>
       )}
 
-      {/* ── Synced event edit modal ──────────────────────────────────────── */}
-      {editingSyncedEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setEditingSyncedEvent(null)}>
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div className="relative bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-base font-bold text-zinc-100">{editingSyncedEvent.title}</p>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  📅 Outlook · {cohortMap[editingSyncedEvent.cohortId]?.name ?? editingSyncedEvent.cohortId}
-                </p>
-              </div>
-              <button onClick={() => setEditingSyncedEvent(null)} className="text-zinc-400 hover:text-zinc-200 p-1"><X className="w-4 h-4" /></button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-zinc-400 mb-1">Location override</label>
-                <input
-                  value={syncedEditLocation}
-                  onChange={e => setSyncedEditLocation(e.target.value)}
-                  placeholder={editingSyncedEvent.location ?? 'Add location…'}
-                  className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-brand-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-400 mb-1">Assign teachers</label>
-                <div className="flex flex-wrap gap-1.5 mb-1.5">
-                  {syncedEditTeachers.map(tid => {
-                    const t = allTeacherUsers.find(u => u.uid === tid || u.id === tid)
-                    return (
-                      <span key={tid} className="flex items-center gap-1 bg-zinc-700 text-xs text-zinc-200 px-2 py-0.5 rounded-full">
-                        {t?.displayName ?? tid}
-                        <button onClick={() => setSyncedEditTeachers(prev => prev.filter(id => id !== tid))} className="text-zinc-400 hover:text-zinc-200"><X className="w-3 h-3" /></button>
-                      </span>
-                    )
-                  })}
-                </div>
-                <select
-                  className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-brand-500"
-                  value=""
-                  onChange={e => { if (e.target.value && !syncedEditTeachers.includes(e.target.value)) setSyncedEditTeachers(prev => [...prev, e.target.value]) }}
-                >
-                  <option value="">+ Add teacher…</option>
-                  {allTeacherUsers.filter(t => !syncedEditTeachers.includes(t.uid ?? t.id)).map(t => (
-                    <option key={t.uid ?? t.id} value={t.uid ?? t.id}>{t.displayName}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-400 mb-1">Assign guest teachers</label>
-                <div className="flex flex-wrap gap-1.5 mb-1.5">
-                  {syncedEditGuestTeachers.map(gid => {
-                    const g = guestTeachers.find(gt => gt.id === gid)
-                    return (
-                      <span key={gid} className="flex items-center gap-1 bg-zinc-700 text-xs text-zinc-200 px-2 py-0.5 rounded-full">
-                        {g?.name ?? gid}
-                        <button onClick={() => setSyncedEditGuestTeachers(prev => prev.filter(id => id !== gid))} className="text-zinc-400 hover:text-zinc-200"><X className="w-3 h-3" /></button>
-                      </span>
-                    )
-                  })}
-                </div>
-                <select
-                  className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-brand-500"
-                  value=""
-                  onChange={e => { if (e.target.value && !syncedEditGuestTeachers.includes(e.target.value)) setSyncedEditGuestTeachers(prev => [...prev, e.target.value]) }}
-                >
-                  <option value="">+ Add guest teacher…</option>
-                  {[...guestTeachers].sort((a,b) => a.name.localeCompare(b.name)).filter(g => !syncedEditGuestTeachers.includes(g.id)).map(g => (
-                    <option key={g.id} value={g.id}>{g.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-400 mb-1">Notes</label>
-                <textarea
-                  value={syncedEditNotes}
-                  onChange={e => setSyncedEditNotes(e.target.value)}
-                  placeholder="Internal notes…"
-                  rows={2}
-                  className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-brand-500 resize-none"
-                />
-              </div>
-            </div>
-            <button
-              onClick={saveSyncedEventEdit}
-              disabled={savingSyncedEdit}
-              className="w-full btn-primary text-sm py-2"
+      {/* ── Synced event panel (matches regular lesson detail) ──────────── */}
+      {editingSyncedEvent && (() => {
+        const cohortObj = cohortMap[editingSyncedEvent.cohortId]
+        const cohortIdx = cohorts.findIndex(c => c.id === editingSyncedEvent.cohortId)
+        const accentColor = cohortObj?.color ?? (cohortIdx >= 0 ? COHORT_FALLBACK_COLORS[cohortIdx % COHORT_FALLBACK_COLORS.length] : '#0078d4')
+        const displayTitle = editingSyncedEvent.customTitle || editingSyncedEvent.title
+        const displayLocation = editingSyncedEvent.customLocation || editingSyncedEvent.location
+        const startD = editingSyncedEvent.startTime?.toDate?.()
+        const endD   = editingSyncedEvent.endTime?.toDate?.()
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setEditingSyncedEvent(null)}>
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <div
+              className="relative bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto"
+              onClick={e => e.stopPropagation()}
             >
-              {savingSyncedEdit ? 'Saving…' : 'Save'}
-            </button>
+              <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ backgroundColor: accentColor }} />
+
+              {/* Header */}
+              <div className="flex items-start justify-between pt-1">
+                <div>
+                  <p className="text-base font-bold text-zinc-100">{displayTitle}</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    📅 Outlook · {cohortObj?.name ?? editingSyncedEvent.cohortId}
+                  </p>
+                </div>
+                <button onClick={() => setEditingSyncedEvent(null)} className="p-1.5 text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Info */}
+              <div className="text-sm text-zinc-400 space-y-1">
+                {startD && (
+                  <p>
+                    <span className="font-medium text-zinc-300">Time: </span>
+                    {startD.toLocaleDateString('sv-SE', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    {' '}
+                    {startD.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                    {endD && ` – ${endD.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}`}
+                  </p>
+                )}
+                {displayLocation && (
+                  <p><span className="font-medium text-zinc-300">Location: </span>{displayLocation}</p>
+                )}
+                {syncedEditTeachers.length > 0 && (
+                  <p><span className="font-medium text-zinc-300">Teachers: </span>
+                    {syncedEditTeachers.map(tid => allTeacherUsers.find(u => u.uid === tid || u.id === tid)?.displayName ?? tid).join(', ')}
+                  </p>
+                )}
+              </div>
+
+              {/* Attendance */}
+              <LessonAttendance
+                lessonId={editingSyncedEvent.id}
+                cohortId={editingSyncedEvent.cohortId !== 'all' ? editingSyncedEvent.cohortId : undefined}
+              />
+
+              {/* Start attendance */}
+              <button
+                onClick={() => {
+                  startAttendance(editingSyncedEvent.id, displayTitle)
+                  setEditingSyncedEvent(null)
+                }}
+                className="w-full btn-primary py-2.5 text-sm"
+              >
+                <QrCode className="w-4 h-4" /> Start Attendance
+              </button>
+
+              {/* Edit overrides */}
+              <div className="border-t border-white/8 pt-3">
+                <button
+                  onClick={() => setSyncedEditExpanded(v => !v)}
+                  className="w-full flex items-center justify-between text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition-colors py-1"
+                >
+                  <span>Edit / Override Outlook Data</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${syncedEditExpanded ? 'rotate-180' : ''}`} />
+                </button>
+
+                {syncedEditExpanded && (
+                  <div className="space-y-3 mt-3">
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">
+                        Title override <span className="text-zinc-600">(Outlook: {editingSyncedEvent.title})</span>
+                      </label>
+                      <input
+                        value={syncedEditTitle}
+                        onChange={e => setSyncedEditTitle(e.target.value)}
+                        placeholder={editingSyncedEvent.title}
+                        className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-brand-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">
+                        Location override <span className="text-zinc-600">{editingSyncedEvent.location ? `(Outlook: ${editingSyncedEvent.location})` : ''}</span>
+                      </label>
+                      <input
+                        value={syncedEditLocation}
+                        onChange={e => setSyncedEditLocation(e.target.value)}
+                        placeholder={editingSyncedEvent.location ?? 'Add location…'}
+                        className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-brand-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">Assign teachers</label>
+                      <div className="flex flex-wrap gap-1.5 mb-1.5">
+                        {syncedEditTeachers.map(tid => {
+                          const t = allTeacherUsers.find(u => u.uid === tid || u.id === tid)
+                          return (
+                            <span key={tid} className="flex items-center gap-1 bg-zinc-700 text-xs text-zinc-200 px-2 py-0.5 rounded-full">
+                              {t?.displayName ?? tid}
+                              <button onClick={() => setSyncedEditTeachers(prev => prev.filter(id => id !== tid))} className="text-zinc-400 hover:text-zinc-200"><X className="w-3 h-3" /></button>
+                            </span>
+                          )
+                        })}
+                      </div>
+                      <select
+                        className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-brand-500"
+                        value=""
+                        onChange={e => { if (e.target.value && !syncedEditTeachers.includes(e.target.value)) setSyncedEditTeachers(prev => [...prev, e.target.value]) }}
+                      >
+                        <option value="">+ Add teacher…</option>
+                        {allTeacherUsers.filter(t => !syncedEditTeachers.includes(t.uid ?? t.id)).map(t => (
+                          <option key={t.uid ?? t.id} value={t.uid ?? t.id}>{t.displayName}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">Assign guest teachers</label>
+                      <div className="flex flex-wrap gap-1.5 mb-1.5">
+                        {syncedEditGuestTeachers.map(gid => {
+                          const g = guestTeachers.find(gt => gt.id === gid)
+                          return (
+                            <span key={gid} className="flex items-center gap-1 bg-zinc-700 text-xs text-zinc-200 px-2 py-0.5 rounded-full">
+                              {g?.name ?? gid}
+                              <button onClick={() => setSyncedEditGuestTeachers(prev => prev.filter(id => id !== gid))} className="text-zinc-400 hover:text-zinc-200"><X className="w-3 h-3" /></button>
+                            </span>
+                          )
+                        })}
+                      </div>
+                      <select
+                        className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-brand-500"
+                        value=""
+                        onChange={e => { if (e.target.value && !syncedEditGuestTeachers.includes(e.target.value)) setSyncedEditGuestTeachers(prev => [...prev, e.target.value]) }}
+                      >
+                        <option value="">+ Add guest teacher…</option>
+                        {[...guestTeachers].sort((a, b) => a.name.localeCompare(b.name)).filter(g => !syncedEditGuestTeachers.includes(g.id)).map(g => (
+                          <option key={g.id} value={g.id}>{g.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">Notes</label>
+                      <textarea
+                        value={syncedEditNotes}
+                        onChange={e => setSyncedEditNotes(e.target.value)}
+                        placeholder="Internal notes…"
+                        rows={2}
+                        className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-brand-500 resize-none"
+                      />
+                    </div>
+                    <button
+                      onClick={saveSyncedEventEdit}
+                      disabled={savingSyncedEdit}
+                      className="w-full btn-primary text-sm py-2"
+                    >
+                      {savingSyncedEdit ? 'Saving…' : 'Save changes'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* ── Lesson detail modal ──────────────────────────────────────────── */}
       {selected && (

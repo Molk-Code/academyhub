@@ -1292,8 +1292,9 @@ export const sendFoodBoxEmail = functions.runWith({ secrets: ['RESEND_API_KEY'] 
     recipients.add(emailCfg.foodBoxEmail)
   }
 
+  const sanitize = (s: string) => String(s ?? '').replace(/[\r\n]/g, ' ').trim()
   const pdfBuffer = await generateFoodBoxPdf(d)
-  const filename  = `food-order-${d.pickupDate}-${d.contactPerson.replace(/\s+/g, '-')}.pdf`
+  const filename  = `food-order-${sanitize(d.pickupDate)}-${sanitize(d.contactPerson).replace(/\s+/g, '-')}.pdf`
   const fromName  = emailCfg?.fromName  || 'CineForge'
   const fromEmail = emailCfg?.fromEmail || 'onboarding@resend.dev'
 
@@ -1301,8 +1302,8 @@ export const sendFoodBoxEmail = functions.runWith({ secrets: ['RESEND_API_KEY'] 
     from:        `${fromName} <${fromEmail}>`,
     to:          [...recipients],
     replyTo:    d.studentEmail || undefined,
-    subject:     `Food Box Order – ${d.pickupDate} at ${d.pickupTime} (${d.contactPerson})`,
-    text:        `New food box order from ${d.studentName}. See attached PDF.`,
+    subject:     `Food Box Order – ${sanitize(d.pickupDate)} at ${sanitize(d.pickupTime)} (${sanitize(d.contactPerson)})`,
+    text:        `New food box order from ${sanitize(d.studentName)}. See attached PDF.`,
     attachments: [{ filename, content: pdfBuffer.toString('base64') }],
   })
 
@@ -1376,7 +1377,7 @@ export const sendMinivanEmail = functions.runWith({ secrets: ['RESEND_API_KEY'] 
     from:      `${fromName} <${fromEmail}>`,
     to:        [emailCfg.minivanEmail],
     replyTo:  d.studentEmail || undefined,
-    subject:   `Minivan Request – ${d.dateFrom} → ${d.dateTo} (${d.contactPerson})`,
+    subject:   `Minivan Request – ${String(d.dateFrom ?? '').replace(/[\r\n]/g, ' ')} → ${String(d.dateTo ?? '').replace(/[\r\n]/g, ' ')} (${String(d.contactPerson ?? '').replace(/[\r\n]/g, ' ')})`,
     html,
   })
 
@@ -2410,8 +2411,8 @@ export const deleteUserData = functions.https.onCall(async (data, context) => {
 export const disableUser = functions.https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
   const callerDoc = await db.collection('users').doc(context.auth.uid).get()
-  const callerRole = callerDoc.data()?.role ?? context.auth.token.role
-  if (!['admin', 'teacher'].includes(callerRole)) {
+  const callerRole = callerDoc.data()?.role
+  if (callerRole !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'Admin only.')
   }
   const { uid } = data as { uid: string }
@@ -2427,8 +2428,8 @@ export const disableUser = functions.https.onCall(async (data, context) => {
 export const restoreUser = functions.https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
   const callerDoc = await db.collection('users').doc(context.auth.uid).get()
-  const callerRole = callerDoc.data()?.role ?? context.auth.token.role
-  if (!['admin', 'teacher'].includes(callerRole)) {
+  const callerRole = callerDoc.data()?.role
+  if (callerRole !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'Admin only.')
   }
   const { uid } = data as { uid: string }

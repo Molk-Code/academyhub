@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin  from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -56,15 +57,18 @@ interface SelectedEvent {
   description?: string
   subjectTitle?: string
   subjectColor?: string
+  subjectId?: string
   pointsValue?: number
   dueDate?: Date
   location?: string
+  overrideTeachers?: string[]
+  overrideNotes?: string
 }
 
 export default function StudentCalendar() {
   const [showWheel, setShowWheel] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<SelectedEvent | null>(null)
-  const [mobileView, setMobileView] = useState<ViewId>('timeGridWorkWeek')
+  const [mobileView, setMobileView] = useState<ViewId>('timeGridWeek')
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false)
   const [addEventModal, setAddEventModal] = useState<{ date: string; start: string; end: string; allDay: boolean } | null>(null)
   const [newEventTitle, setNewEventTitle] = useState('')
@@ -85,9 +89,203 @@ export default function StudentCalendar() {
   const [editInviteeIds, setEditInviteeIds] = useState<string[]>([])
   const [editInviteeSearch, setEditInviteeSearch] = useState('')
   const [viewingInvitedEvent, setViewingInvitedEvent] = useState<PersonalEventDoc | null>(null)
-  const calendarRef = useRef<FullCalendar>(null)
-  const { profile, role, cohortId: ctxCohortId, previewCohortId } = useAuth()
-  const isStaff = role === 'teacher' || role === 'admin'
+  const calendarRef    = useRef<FullCalendar>(null)
+  const calendarCardRef = useRef<HTMLDivElement>(null)
+
+  // Extend the native now-indicator line across ALL day columns (not just today's)
+  useEffect(() => {
+    const card = calendarCardRef.current
+    if (!card) return
+
+    let scheduled = false
+    let obs: MutationObserver | null = null
+    function sync() {
+      scheduled = false
+      const card = calendarCardRef.current
+      if (!card) return
+      obs?.disconnect()
+      try {
+        card.querySelectorAll('.x-now-ext').forEach(el => el.remove())
+
+        const body = card.querySelector<HTMLElement>('.fc-timegrid-body')
+        const todayLine = card.querySelector<HTMLElement>(
+          '.fc-timegrid-col.fc-day-today .fc-timegrid-now-indicator-line',
+        )
+        if (!body || !todayLine) return
+
+        const bodyRect = body.getBoundingClientRect()
+        const lineRect = todayLine.getBoundingClientRect()
+        const topPx = lineRect.top - bodyRect.top
+
+        // First non-axis day column defines the left edge; last defines the right
+        const dayCols = Array.from(card.querySelectorAll<HTMLElement>(
+          '.fc-timegrid-col:not(.fc-timegrid-axis)',
+        ))
+        if (dayCols.length === 0) return
+        const firstRect = dayCols[0].getBoundingClientRect()
+        const lastRect  = dayCols[dayCols.length - 1].getBoundingClientRect()
+        const leftPx  = firstRect.left - bodyRect.left
+        const widthPx = lastRect.right - firstRect.left
+
+        const el = document.createElement('div')
+        el.className = 'x-now-ext'
+        el.style.cssText = `position:absolute;top:${topPx}px;left:${leftPx}px;width:${widthPx}px;height:0;border-top:2px solid #f26419;pointer-events:none;z-index:5;`
+        body.appendChild(el)
+      } finally {
+        obs?.observe(card, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] })
+      }
+    }
+    function schedule() {
+      if (scheduled) return
+      scheduled = true
+      requestAnimationFrame(sync)
+    }
+
+    const t1 = setTimeout(sync, 400)
+    const t2 = setTimeout(sync, 1200)
+    const id = setInterval(sync, 60_000)
+    obs = new MutationObserver(schedule)
+    obs.observe(card, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] })
+    window.addEventListener('resize', schedule)
+    card.addEventListener('scroll', schedule, true)
+
+    return () => {
+      clearTimeout(t1); clearTimeout(t2); clearInterval(id)
+      obs?.disconnect()
+      window.removeEventListener('resize', schedule)
+      card?.removeEventListener('scroll', schedule, true)
+      calendarCardRef.current?.querySelectorAll('.x-now-ext').forEach(el => el.remove())
+    }
+  }, [mobileView])
+
+  const swipeTouchX  = useRef<number | null>(null)
+  const swipeTouchY  = useRef<number | null>(null)
+  const swipeAxis    = useRef<'h' | 'v' | null>(null)
+
+  function renderEventContent(arg: import('@fullcalendar/core').EventContentArg) {
+    const { event, view } = arg
+    const isMonth  = view.type === 'dayGridMonth'
+    const isAllDay = event.allDay
+    // Strip emoji characters from titles (e.g. synced Apple Calendar 📅 icon)
+    const title = event.title.replace(/\p{Emoji_Presentation}/gu, '').replace(/\s+/g, ' ').trim()
+
+    if (isMonth || isAllDay) {
+      return (
+        <div style={{ fontSize: '10px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', padding: '0 2px', lineHeight: '1' }}>
+          {title}
+        </div>
+      )
+    }
+
+    const durationMin = event.end && event.start
+      ? (event.end.getTime() - event.start.getTime()) / 60000
+      : 60
+
+    if (durationMin <= 25) {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', width: '100%', height: '100%', overflow: 'hidden', padding: '0 2px' }}>
+          <span style={{ fontSize: '9px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '1' }}>{title}</span>
+        </div>
+      )
+    }
+
+    if (durationMin <= 55) {
+      return (
+        <div style={{ display: 'flex', alignItems: 'flex-start', width: '100%', height: '100%', overflow: 'hidden', padding: '2px 2px 1px' }}>
+          <span style={{ fontSize: '10px', fontWeight: 600, lineHeight: '1.25', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{title}</span>
+        </div>
+      )
+    }
+
+    if (durationMin <= 100) {
+      return (
+        <div style={{ display: 'flex', alignItems: 'flex-start', width: '100%', height: '100%', overflow: 'hidden', padding: '3px 2px 2px' }}>
+          <span style={{ fontSize: '11px', fontWeight: 600, lineHeight: '1.3', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical' }}>{title}</span>
+        </div>
+      )
+    }
+
+    return (
+      <div style={{ display: 'flex', alignItems: 'flex-start', width: '100%', height: '100%', overflow: 'hidden', padding: '4px 2px 2px' }}>
+        <span style={{ fontSize: '12px', fontWeight: 600, lineHeight: '1.35', overflow: 'hidden' }}>{title}</span>
+      </div>
+    )
+  }
+
+  function getViewHarness(): HTMLElement | null {
+    return (calendarCardRef.current?.querySelector('.fc-view-harness') as HTMLElement) ?? null
+  }
+
+  function slideAndNavigate(direction: 'next' | 'prev') {
+    const api = calendarRef.current?.getApi()
+    if (!api) return
+    const vh = getViewHarness()
+    if (!vh) return
+    const w      = vh.offsetWidth
+    const exitX  = direction === 'next' ? -w : w
+    const enterX = direction === 'next' ?  w : -w
+    // Animate out from current drag position to full exit
+    vh.style.transition = 'transform 160ms ease-in'
+    vh.style.transform  = `translateX(${exitX}px)`
+    setTimeout(() => {
+      direction === 'next' ? api.next() : api.prev()
+      const vhNew = getViewHarness()
+      if (!vhNew) return
+      vhNew.style.transition = 'none'
+      vhNew.style.transform  = `translateX(${enterX}px)`
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        vhNew.style.transition = 'transform 240ms cubic-bezier(0.25,0.46,0.45,0.94)'
+        vhNew.style.transform  = ''
+      }))
+    }, 160)
+  }
+
+  // Imperative touch listeners with passive:false so we can preventDefault and stop iOS scroll
+  useEffect(() => {
+    const el = calendarCardRef.current
+    if (!el) return
+    const onStart = (e: TouchEvent) => {
+      swipeTouchX.current = e.touches[0].clientX
+      swipeTouchY.current = e.touches[0].clientY
+      swipeAxis.current   = null
+    }
+    const onMove = (e: TouchEvent) => {
+      if (swipeTouchX.current === null) return
+      const dx = e.touches[0].clientX - swipeTouchX.current
+      const dy = e.touches[0].clientY - (swipeTouchY.current ?? 0)
+      if (!swipeAxis.current) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return
+        swipeAxis.current = Math.abs(dx) > Math.abs(dy) * 1.5 ? 'h' : 'v'
+      }
+      if (swipeAxis.current !== 'h') return
+      // touch-action:pan-y on the container means browser won't scroll horizontally,
+      // so no preventDefault needed — horizontal movement goes straight to JS
+      const vh = getViewHarness()
+      if (vh) { vh.style.transition = 'none'; vh.style.transform = `translateX(${dx * 0.4}px)` }
+    }
+    const onEnd = (e: TouchEvent) => {
+      if (swipeTouchX.current === null) return
+      const dx = e.changedTouches[0].clientX - swipeTouchX.current
+      swipeTouchX.current = null
+      if (swipeAxis.current !== 'h' || Math.abs(dx) < 60) {
+        const vh = getViewHarness()
+        if (vh) { vh.style.transition = 'transform 200ms ease-out'; vh.style.transform = '' }
+        return
+      }
+      slideAndNavigate(dx < 0 ? 'next' : 'prev')
+    }
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove',  onMove,  { passive: false })
+    el.addEventListener('touchend',   onEnd,   { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove',  onMove)
+      el.removeEventListener('touchend',   onEnd)
+    }
+  }, [])
+
+  const { profile, role, roles, cohortId: ctxCohortId, previewCohortId } = useAuth()
+  const isStaff = roles.some(r => r === 'teacher' || r === 'admin') || (role ?? profile?.role) === 'teacher' || (role ?? profile?.role) === 'admin'
   const cohortId = ctxCohortId ?? previewCohortId ?? profile?.cohortId ?? null
   const { data: schoolDay } = useDocument<SchoolDayDoc>('settings', 'schoolDay')
   const slotMin    = schoolDay?.startTime ? `${schoolDay.startTime}:00` : '07:00:00'
@@ -128,11 +326,14 @@ export default function StudentCalendar() {
 
   // Events synced in from an Outlook calendar (Office 365 Calendar Sync, admin settings).
   // Teachers/admins see all synced events; students see only their cohort + "all".
+  // Preview mode (previewCohortId set) narrows staff to the previewed cohort so it matches
+  // what the student would see.
+  const showAllSynced = isStaff && !previewCohortId
   const { data: syncedEvents } = useCollection<SyncedEventDoc>(
     'synced_events',
-    isStaff ? [] : cohortId ? [where('cohortId', 'in', [cohortId, 'all'])] : [where('cohortId', '==', 'all')],
+    showAllSynced ? [] : cohortId ? [where('cohortId', 'in', [cohortId, 'all'])] : [where('cohortId', '==', 'all')],
     true,
-    isStaff ? '__staff__' : cohortId ?? 'none',
+    showAllSynced ? '__staff__' : cohortId ?? 'none',
   )
 
   const { data: allUsers } = useCollection<UserDoc>('users')
@@ -214,7 +415,7 @@ export default function StudentCalendar() {
           allDay: true,
           backgroundColor: color,
           borderColor:     color,
-          extendedProps: { type: 'lesson', classroom: l.classroom, isOnline: l.isOnline },
+          extendedProps: { type: 'lesson', classroom: l.classroom, isOnline: l.isOnline, subjectId: l.subjectId, subjectTitle: subjectMap[l.subjectId]?.title },
         }
       }
 
@@ -287,18 +488,33 @@ export default function StudentCalendar() {
     }))
   }, [invitedPersonalEvents])
 
+  const cohortColorMap = useMemo(
+    () => Object.fromEntries(cohorts.map(c => [c.id, c.color ?? '#0078d4'])),
+    [cohorts],
+  )
+
   const syncedEventInputs: EventInput[] = useMemo(() => {
-    return syncedEvents.map(e => ({
-      id:    `synced-${e.id}`,
-      title: `📅 ${e.title}`,
-      start: toDate(e.startTime) ?? undefined,
-      end:   e.endTime ? toDate(e.endTime) ?? undefined : undefined,
-      allDay: e.allDay,
-      backgroundColor: '#0078d4',
-      borderColor:     '#0078d4',
-      extendedProps: { isSynced: true, location: e.location },
-    }))
-  }, [syncedEvents])
+    return syncedEvents.map(e => {
+      const color = e.cohortId === 'all' ? '#0078d4' : (cohortColorMap[e.cohortId] ?? '#0078d4')
+      return {
+        id:    `synced-${e.id}`,
+        title: `📅 ${e.customTitle || e.title}`,
+        start: toDate(e.startTime) ?? undefined,
+        end:   e.endTime ? toDate(e.endTime) ?? undefined : undefined,
+        allDay: e.allDay,
+        backgroundColor: color,
+        borderColor:     color,
+        extendedProps: {
+          isSynced: true,
+          docId: e.id,
+          location: e.customLocation || e.location,
+          subjectId: e.subjectId ?? null,
+          teacherIds: e.teacherIds ?? [],
+          notes: e.notes ?? null,
+        },
+      }
+    })
+  }, [syncedEvents, cohortColorMap])
 
   const allEvents = useMemo(
     () => [...events, ...personalEventInputs, ...invitedEventInputs, ...syncedEventInputs],
@@ -333,7 +549,7 @@ export default function StudentCalendar() {
         ? Timestamp.fromDate(new Date(`${date}T00:00:00`))
         : Timestamp.fromDate(new Date(`${date}T${start}:00`))
       const endTime = allDay ? null : Timestamp.fromDate(new Date(`${date}T${end}:00`))
-      await addDoc(collection(db, 'personal_events'), {
+      const eventRef = await addDoc(collection(db, 'personal_events'), {
         userId:        profile.uid,
         organizerName: profile.displayName,
         role:          'student',
@@ -350,6 +566,7 @@ export default function StudentCalendar() {
       if (invitees.length > 0) {
         const fn = httpsCallable(functions, 'sendEventInviteNotifications')
         fn({
+          eventId:       eventRef.id,
           inviteeIds:    invitees,
           organizerName: profile.displayName,
           title,
@@ -414,12 +631,12 @@ export default function StudentCalendar() {
       })
       const fn = httpsCallable(functions, 'sendEventInviteNotifications')
       if (removedIds.length > 0) {
-        fn({ inviteeIds: removedIds, organizerName: profile.displayName,
+        fn({ eventId: editingEvent.id, inviteeIds: removedIds, organizerName: profile.displayName,
           title: editTitle.trim(), canceled: true,
         }).catch(e => console.error('cancel notify failed', e))
       }
       if (addedIds.length > 0) {
-        fn({ inviteeIds: addedIds, organizerName: profile.displayName,
+        fn({ eventId: editingEvent.id, inviteeIds: addedIds, organizerName: profile.displayName,
           title: editTitle.trim(), dateStr: editDate,
           timeStr: editingEvent.allDay ? 'All day' : editStart,
           location: editLocation.trim(),
@@ -439,7 +656,7 @@ export default function StudentCalendar() {
       await deleteDoc(doc(db, 'personal_events', editingEvent.id))
       if (allIds.length > 0 && profile) {
         const fn = httpsCallable(functions, 'sendEventInviteNotifications')
-        fn({ inviteeIds: allIds, organizerName: profile.displayName,
+        fn({ eventId: editingEvent.id, inviteeIds: allIds, organizerName: profile.displayName,
           title: editingEvent.title, dateStr: editDate,
           timeStr: editingEvent.allDay ? 'All day' : editStart,
           location: editingEvent.location ?? '', canceled: true,
@@ -454,8 +671,10 @@ export default function StudentCalendar() {
   const hasSemester = !!(semesterDoc?.startDate && semesterDoc?.endDate)
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="space-y-4">
+
+      {/* ── Desktop header (hidden on mobile) ───────────────────────────── */}
+      <div className="hidden sm:flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="page-title">Calendar</h1>
           <p className="text-zinc-500 text-sm mt-1">Your lessons and deadlines at a glance.</p>
@@ -479,6 +698,70 @@ export default function StudentCalendar() {
         )}
       </div>
 
+      {/* ── Mobile compact toolbar (hidden on desktop) ───────────────────── */}
+      <div className="sm:hidden flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h1 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Calendar</h1>
+          {hasSemester && (
+            <div className="flex gap-0.5 bg-zinc-800 rounded-lg p-0.5">
+              <button
+                onClick={() => setShowWheel(false)}
+                className={`px-2 py-1 rounded-md text-xs font-medium transition-all ${!showWheel ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500'}`}
+              >
+                Cal
+              </button>
+              <button
+                onClick={() => setShowWheel(true)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all ${showWheel ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500'}`}
+              >
+                <Circle className="w-3 h-3" />
+                Plan
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* View dropdown — only shown when in calendar mode */}
+        {!showWheel && (
+          <div className="relative">
+            <button
+              onClick={() => setViewDropdownOpen(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium border transition-all"
+              style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+            >
+              {MOBILE_VIEWS.find(v => v.id === mobileView)?.label}
+              <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+            </button>
+            {viewDropdownOpen && (
+              <div
+                className="absolute top-full right-0 mt-1 z-20 rounded-xl shadow-lg overflow-hidden min-w-[140px]"
+                style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)' }}
+              >
+                {MOBILE_VIEWS.map(v => (
+                  <button
+                    key={v.id}
+                    onClick={() => {
+                      setMobileView(v.id)
+                      const api = calendarRef.current?.getApi()
+                      if (api) {
+                        if (v.id === 'timeGridDay') api.gotoDate(new Date())
+                        api.changeView(v.id)
+                      }
+                      setViewDropdownOpen(false)
+                    }}
+                    className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-white/5"
+                    style={{ color: v.id === mobileView ? 'var(--brand)' : 'var(--text-primary)' }}
+                  >
+                    {v.label}
+                    {v.id === mobileView && <Check className="w-3.5 h-3.5 flex-shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {showWheel && hasSemester ? (
         <div className="card py-2 px-0 sm:py-8 sm:px-8">
           <AnnualPlanWheel
@@ -493,8 +776,8 @@ export default function StudentCalendar() {
         </div>
       ) : (
         <>
-          {/* Legend */}
-          <div className="flex items-center gap-4 flex-wrap mb-4">
+          {/* Legend — desktop only */}
+          <div className="hidden sm:flex items-center gap-4 flex-wrap">
             {subjects.map(s => (
               <div key={s.id} className="flex items-center gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: subjectHexMap[s.color] ?? '#6366f1' }} />
@@ -517,53 +800,32 @@ export default function StudentCalendar() {
                 <span className="text-xs text-zinc-400">Invited</span>
               </div>
             )}
-            {syncedEvents.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: '#0078d4' }} />
-                <span className="text-xs text-zinc-400">Outlook</span>
-              </div>
-            )}
+            {(() => {
+              const usedCohortIds = Array.from(new Set(syncedEvents.map(e => e.cohortId)))
+              return usedCohortIds.map(cid => {
+                const color = cid === 'all' ? '#0078d4' : (cohortColorMap[cid] ?? '#0078d4')
+                const label = cid === 'all'
+                  ? 'Outlook (all)'
+                  : `Outlook · ${cohorts.find(c => c.id === cid)?.name ?? 'Cohort'}`
+                return (
+                  <div key={`synced-legend-${cid}`} className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                    <span className="text-xs text-zinc-400">{label}</span>
+                  </div>
+                )
+              })
+            })()}
           </div>
 
-          {/* Mobile view switcher dropdown */}
-          <div className="relative sm:hidden flex justify-end">
-            <button
-              onClick={() => setViewDropdownOpen(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium border transition-all"
-              style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-            >
-              {MOBILE_VIEWS.find(v => v.id === mobileView)?.label}
-              <ChevronDown className="w-3.5 h-3.5 opacity-60" />
-            </button>
-            {viewDropdownOpen && (
-              <div
-                className="absolute top-full right-0 mt-1 z-20 rounded-xl shadow-lg overflow-hidden min-w-[140px]"
-                style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)' }}
-              >
-                {MOBILE_VIEWS.map(v => (
-                  <button
-                    key={v.id}
-                    onClick={() => {
-                      setMobileView(v.id)
-                      calendarRef.current?.getApi().changeView(v.id)
-                      setViewDropdownOpen(false)
-                    }}
-                    className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-white/5"
-                    style={{ color: v.id === mobileView ? 'var(--brand)' : 'var(--text-primary)' }}
-                  >
-                    {v.label}
-                    {v.id === mobileView && <Check className="w-3.5 h-3.5 flex-shrink-0" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="card p-0 overflow-hidden [&_.fc-toolbar]:flex-wrap [&_.fc-toolbar]:gap-y-2 [&_.fc-toolbar-title]:text-base [&_.fc-button]:text-xs [&_.fc-button]:px-2 [&_.fc-button]:py-1 sm:[&_.fc-button]:text-sm sm:[&_.fc-button]:px-3 sm:[&_.fc-button]:py-1.5 [&_.fc-timegrid-slot-label-cushion]:text-[10px] [&_.fc-timegrid-axis-cushion]:text-[10px] [&_.fc-timegrid-axis]:w-8 [&_.fc-col-header-cell-cushion]:text-xs [&_.fc-timegrid-axis-frame]:items-start [&_.fc-timegrid-axis-frame]:pt-1 [&_.fc-daygrid-week-number]:text-[9px] [&_.fc-daygrid-week-number]:leading-tight [&_.fc-daygrid-week-number]:p-0.5 [&_.fc-week-number]:w-5">
+          <div
+            ref={calendarCardRef}
+            style={{ touchAction: 'pan-y' }}
+            className="card p-0 overflow-hidden [&_.fc-toolbar]:flex-wrap [&_.fc-toolbar]:gap-y-2 [&_.fc-toolbar-title]:text-base [&_.fc-button]:text-xs [&_.fc-button]:px-2 [&_.fc-button]:py-1 sm:[&_.fc-button]:text-sm sm:[&_.fc-button]:px-3 sm:[&_.fc-button]:py-1.5 [&_.fc-timegrid-slot-label-cushion]:text-[10px] [&_.fc-timegrid-axis-cushion]:text-[10px] [&_.fc-timegrid-axis]:w-8 [&_.fc-col-header-cell-cushion]:text-xs [&_.fc-timegrid-axis-frame]:items-start [&_.fc-timegrid-axis-frame]:pt-1 [&_.fc-daygrid-week-number]:text-[9px] [&_.fc-daygrid-week-number]:leading-tight [&_.fc-daygrid-week-number]:p-0.5 [&_.fc-week-number]:w-5 [&_.fc-view-harness]:overflow-visible"
+          >
             <FullCalendar
               ref={calendarRef}
               plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-              initialView={typeof window !== 'undefined' && window.innerWidth < 768 ? 'timeGridWorkWeek' : 'timeGridWeek'}
+              initialView={typeof window !== 'undefined' && window.innerWidth < 768 ? 'timeGridWeek' : 'timeGridWeek'}
               firstDay={1}
               weekNumbers={true}
               weekNumberContent={(arg) => `W${arg.num}`}
@@ -589,13 +851,18 @@ export default function StudentCalendar() {
                   buttonText: 'Day',
                 },
               }}
+              eventContent={renderEventContent}
               events={allEvents}
-              height={typeof window !== 'undefined' && window.innerWidth < 768 ? 'calc(100vh - 130px)' : 'calc(100vh - 180px)'}
+              height={typeof window !== 'undefined' && window.innerWidth < 768
+                ? 'calc(100dvh - 13.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
+                : 'calc(100vh - 180px)'
+              }
               slotMinTime="00:00:00"
               slotMaxTime="24:00:00"
               scrollTime={scrollTime}
               allDaySlot={true}
               allDayText="ALL DAY"
+              dayMaxEventRows={2}
               nowIndicator={true}
               dayHeaderFormat={{ weekday: 'short', day: 'numeric' }}
               eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
@@ -622,12 +889,21 @@ export default function StudentCalendar() {
               }}
               eventClick={(info) => {
                 if (info.event.extendedProps.isSynced) {
+                  const ep = info.event.extendedProps
+                  const subj = ep.subjectId ? subjects.find(s => s.id === ep.subjectId) : undefined
+                  const teachers = (ep.teacherIds as string[] ?? [])
+                    .map(tid => allUsers.find(u => u.uid === tid || u.id === tid)?.displayName)
+                    .filter(Boolean) as string[]
                   setSelectedEvent({
                     type: 'synced',
                     title: info.event.title.replace(/^📅 /, ''),
                     startTime: info.event.start ?? undefined,
                     endTime:   info.event.end   ?? undefined,
-                    location:  info.event.extendedProps.location,
+                    location:  ep.location,
+                    subjectTitle: subj?.title,
+                    subjectId: ep.subjectId ?? undefined,
+                    overrideTeachers: teachers.length > 0 ? teachers : undefined,
+                    overrideNotes: ep.notes ?? undefined,
                   })
                   return
                 }
@@ -652,15 +928,21 @@ export default function StudentCalendar() {
                 }
                 const p = info.event.extendedProps
                 if (p.type === 'lesson') {
-                  const rawId = info.event.id // "lesson-{lessonId}"
+                  const rawId   = info.event.id
+                  const lessonId = rawId.startsWith('lesson-') ? rawId.slice(7) : rawId
+                  // Live-lookup so we always have up-to-date subject data
+                  const lesson  = lessons.find(l => l.id === lessonId)
+                  const subject = lesson ? subjects.find(s => s.id === lesson.subjectId) : undefined
                   setSelectedEvent({
                     type: 'lesson',
-                    lessonId: rawId.startsWith('lesson-') ? rawId.slice(7) : rawId,
+                    lessonId,
                     title: info.event.title,
                     classroom: p.classroom,
                     isOnline: p.isOnline,
                     startTime: info.event.start ?? undefined,
                     endTime:   info.event.end   ?? undefined,
+                    subjectId:    subject?.id ?? p.subjectId ?? undefined,
+                    subjectTitle: subject?.title ?? p.subjectTitle ?? undefined,
                   })
                 } else if (p.type === 'assignment') {
                   setSelectedEvent({
@@ -715,14 +997,26 @@ export default function StudentCalendar() {
                       </span>
                     </div>
                   )}
-                  <div className="flex items-center gap-2 text-sm text-zinc-400">
-                    {selectedEvent.isOnline
-                      ? <span className="px-2 py-0.5 bg-sky-100 text-sky-700 rounded-full text-xs font-medium">Online</span>
-                      : selectedEvent.classroom
-                        ? <span className="text-zinc-500">📍 {selectedEvent.classroom}</span>
-                        : null
-                    }
-                  </div>
+                  {(selectedEvent.classroom || selectedEvent.isOnline) && (
+                    <div className="flex items-center gap-2 text-sm text-zinc-400">
+                      {selectedEvent.isOnline
+                        ? <span className="px-2 py-0.5 bg-sky-100 text-sky-700 rounded-full text-xs font-medium">Online</span>
+                        : <span className="text-zinc-500">📍 {selectedEvent.classroom}</span>
+                      }
+                    </div>
+                  )}
+                  {selectedEvent.subjectTitle && (
+                    <div className="flex items-center gap-2 text-sm text-zinc-400">
+                      <BookOpen className="w-4 h-4 text-zinc-500" />
+                      {selectedEvent.subjectId ? (
+                        <Link to={`/subjects/${selectedEvent.subjectId}`} className="text-brand-400 hover:underline" onClick={() => setSelectedEvent(null)}>
+                          {selectedEvent.subjectTitle}
+                        </Link>
+                      ) : (
+                        <span>{selectedEvent.subjectTitle}</span>
+                      )}
+                    </div>
+                  )}
                   {selectedEvent.lessonId && (
                     <div className="pt-1 border-t border-white/8">
                       <LessonAttendancePanel
@@ -749,6 +1043,25 @@ export default function StudentCalendar() {
                       <MapPin className="w-4 h-4 flex-shrink-0" />
                       <span>{selectedEvent.location}</span>
                     </div>
+                  )}
+                  {selectedEvent.subjectTitle && (
+                    <div className="flex items-center gap-2 text-sm text-zinc-400">
+                      <BookOpen className="w-4 h-4 flex-shrink-0" />
+                      {selectedEvent.subjectId ? (
+                        <Link to={`/subjects/${selectedEvent.subjectId}`} className="text-brand-400 hover:underline" onClick={() => setSelectedEvent(null)}>{selectedEvent.subjectTitle}</Link>
+                      ) : (
+                        <span>{selectedEvent.subjectTitle}</span>
+                      )}
+                    </div>
+                  )}
+                  {selectedEvent.overrideTeachers && selectedEvent.overrideTeachers.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-zinc-400">
+                      <span className="text-zinc-500">👤</span>
+                      <span>{selectedEvent.overrideTeachers.join(', ')}</span>
+                    </div>
+                  )}
+                  {selectedEvent.overrideNotes && (
+                    <p className="text-sm text-zinc-500 leading-relaxed">{selectedEvent.overrideNotes}</p>
                   )}
                 </>
               )}

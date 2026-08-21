@@ -207,6 +207,7 @@ export default function Lessons() {
   const [editInviteeIds,   setEditInviteeIds]   = useState<string[]>([])
   const [editInviteeSearch, setEditInviteeSearch] = useState('')
   const [viewingInvitedEvent, setViewingInvitedEvent] = useState<PersonalEventDoc | null>(null)
+  const [pdfPickerOpen, setPdfPickerOpen] = useState(false)
   const calendarRef     = useRef<FullCalendar>(null)
   const calendarCardRef = useRef<HTMLDivElement>(null)
 
@@ -618,7 +619,7 @@ export default function Lessons() {
     setDeleting(null)
   }
 
-  async function exportWeekPdf() {
+  async function exportWeekPdf(cohortScope: 'all' | string) {
     const api = calendarRef.current?.getApi()
     let rangeStart: Date
     let rangeEnd: Date
@@ -661,8 +662,10 @@ export default function Lessons() {
       return !!d && d >= rangeStart && d < rangeEnd
     }
 
+    const cohortAllowed = (id: string) => cohortScope === 'all' ? true : id === cohortScope
+
     for (const l of lessons) {
-      if (activeCohortIds[l.cohortId] === false) continue
+      if (!cohortAllowed(l.cohortId)) continue
       const s = toDate(l.startTime)
       const e = toDate(l.endTime)
       if (!inRange(s)) continue
@@ -677,34 +680,36 @@ export default function Lessons() {
         allDay: false,
       })
     }
-    for (const ev of myPersonalEvents) {
-      const s = toDate(ev.startTime)
-      const e = toDate(ev.endTime)
-      if (!inRange(s)) continue
-      pushRow(dayIndexOf(s!), {
-        time: ev.allDay ? 'All day' : (e ? `${fmtTime(s!)}–${fmtTime(e)}` : fmtTime(s!)),
-        sortKey: ev.allDay ? -1 : s!.getTime(),
-        title: ev.title,
-        location: ev.location ?? '',
-        cohort: 'Personal',
-        allDay: !!ev.allDay,
-      })
-    }
-    for (const ev of invitedPersonalEvents) {
-      const s = toDate(ev.startTime)
-      const e = toDate(ev.endTime)
-      if (!inRange(s)) continue
-      pushRow(dayIndexOf(s!), {
-        time: ev.allDay ? 'All day' : (e ? `${fmtTime(s!)}–${fmtTime(e)}` : fmtTime(s!)),
-        sortKey: ev.allDay ? -1 : s!.getTime(),
-        title: `${ev.organizerName ?? 'Invite'}: ${ev.title}`,
-        location: ev.location ?? '',
-        cohort: 'Invited',
-        allDay: !!ev.allDay,
-      })
+    if (cohortScope === 'all') {
+      for (const ev of myPersonalEvents) {
+        const s = toDate(ev.startTime)
+        const e = toDate(ev.endTime)
+        if (!inRange(s)) continue
+        pushRow(dayIndexOf(s!), {
+          time: ev.allDay ? 'All day' : (e ? `${fmtTime(s!)}–${fmtTime(e)}` : fmtTime(s!)),
+          sortKey: ev.allDay ? -1 : s!.getTime(),
+          title: ev.title,
+          location: ev.location ?? '',
+          cohort: 'Personal',
+          allDay: !!ev.allDay,
+        })
+      }
+      for (const ev of invitedPersonalEvents) {
+        const s = toDate(ev.startTime)
+        const e = toDate(ev.endTime)
+        if (!inRange(s)) continue
+        pushRow(dayIndexOf(s!), {
+          time: ev.allDay ? 'All day' : (e ? `${fmtTime(s!)}–${fmtTime(e)}` : fmtTime(s!)),
+          sortKey: ev.allDay ? -1 : s!.getTime(),
+          title: `${ev.organizerName ?? 'Invite'}: ${ev.title}`,
+          location: ev.location ?? '',
+          cohort: 'Invited',
+          allDay: !!ev.allDay,
+        })
+      }
     }
     for (const ev of syncedEvents) {
-      if (activeCohortIds[ev.cohortId] === false) continue
+      if (!cohortAllowed(ev.cohortId)) continue
       const s = toDate(ev.startTime)
       const e = toDate(ev.endTime)
       if (!inRange(s)) continue
@@ -724,9 +729,10 @@ export default function Lessons() {
     const { default: autoTable } = await import('jspdf-autotable')
     const pdf = new jsPDF({ orientation: 'landscape' })
     const weekNum = isoWeek(rangeStart)
+    const scopeName = cohortScope === 'all' ? 'All classes' : (cohortMap[cohortScope]?.name ?? 'Class')
     const rangeLabel = `${rangeStart.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })} – ${new Date(rangeEnd.getTime() - 86400000).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}`
     pdf.setFontSize(16)
-    pdf.text(`Weekly Schedule — Week ${weekNum}`, 14, 16)
+    pdf.text(`Weekly Schedule — Week ${weekNum} · ${scopeName}`, 14, 16)
     pdf.setFontSize(10)
     pdf.setTextColor(120)
     pdf.text(rangeLabel, 14, 22)
@@ -762,7 +768,8 @@ export default function Lessons() {
       pdf.text('No lessons or events scheduled for this week.', 14, y)
     }
 
-    pdf.save(`weekly-schedule-w${weekNum}-${rangeStart.toISOString().slice(0, 10)}.pdf`)
+    const slug = scopeName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'all'
+    pdf.save(`weekly-schedule-${slug}-w${weekNum}-${rangeStart.toISOString().slice(0, 10)}.pdf`)
   }
 
   function openEditEvent(event: PersonalEventDoc) {
@@ -987,7 +994,7 @@ export default function Lessons() {
             <SlidersHorizontal className="w-4 h-4" /> <span className="hidden sm:inline">Filters</span>
           </button>
           <button
-            onClick={exportWeekPdf}
+            onClick={() => setPdfPickerOpen(true)}
             className="btn-secondary py-2"
             title="Download the visible week as PDF"
           >
@@ -2129,6 +2136,52 @@ export default function Lessons() {
               {viewingInvitedEvent.notes && (
                 <p className="text-sm text-zinc-500 leading-relaxed">{viewingInvitedEvent.notes}</p>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PDF export cohort picker ─────────────────────────────────────── */}
+      {pdfPickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setPdfPickerOpen(false)}>
+          <div className="bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
+              <div className="flex items-center gap-2">
+                <Download className="w-4 h-4 text-brand-400" />
+                <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Download Weekly PDF</span>
+              </div>
+              <button onClick={() => setPdfPickerOpen(false)} className="p-1.5 text-zinc-400 hover:text-zinc-300 rounded-lg hover:bg-zinc-800">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-2">
+              <p className="text-sm text-zinc-400 mb-2">Pick which class to include in the schedule:</p>
+              <button
+                onClick={() => { setPdfPickerOpen(false); exportWeekPdf('all') }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 bg-zinc-800/60 hover:bg-zinc-800 transition-colors text-left"
+              >
+                <div className="w-3 h-3 rounded-full bg-brand-400 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="text-sm font-semibold text-zinc-100">All classes</div>
+                  <div className="text-xs text-zinc-500">Full week including personal &amp; invited events</div>
+                </div>
+              </button>
+              {cohorts.length === 0 && (
+                <p className="text-xs text-zinc-500 italic text-center py-2">No classes configured.</p>
+              )}
+              {cohorts.map((c, idx) => {
+                const color = c.color ?? COHORT_FALLBACK_COLORS[idx % COHORT_FALLBACK_COLORS.length]
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => { setPdfPickerOpen(false); exportWeekPdf(c.id) }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 hover:bg-zinc-800/60 transition-colors text-left"
+                  >
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                    <div className="flex-1 text-sm font-medium text-zinc-100">{c.name}</div>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>

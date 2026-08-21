@@ -1,5 +1,5 @@
 import { admin, functions, db, escapeHtml, getResend, getEmailConfig } from './lib'
-import { sendPush, saveNotifications, sendFcmToTokens } from './notifications'
+import { sendPush, saveNotifications, sendFcmToTokens } from './notifications-core'
 import { checkLevelUp } from './points'
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { admin, functions, db, requireTeacherOrAdmin } from './lib'
-import { sendPush, pushToTeachersAndAdmins } from './notifications'
+import { sendPush, pushToTeachersAndAdmins } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // processRedemption — validate and record a prize claim

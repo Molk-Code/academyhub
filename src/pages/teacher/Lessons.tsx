@@ -564,9 +564,19 @@ export default function Lessons() {
     [lessonEvents, activeCohortIds],
   )
 
+  // Synced Outlook events respect the same cohort toggle. Events tagged "all" (shared) always show.
+  const filteredSyncedEventInputs = useMemo(
+    () => syncedEventInputs.filter(e => {
+      const cid = e.extendedProps?.cohortId
+      if (cid === 'all' || !cid) return true
+      return activeCohortIds[cid] !== false
+    }),
+    [syncedEventInputs, activeCohortIds],
+  )
+
   const allEvents = useMemo(
-    () => [...(isTeacher && showGhostBlocks ? ghostEvents : []), ...filteredLessonEvents, ...semesterEvents, ...personalEventInputs, ...invitedEventInputs, ...syncedEventInputs],
-    [isTeacher, showGhostBlocks, ghostEvents, filteredLessonEvents, semesterEvents, personalEventInputs, invitedEventInputs, syncedEventInputs],
+    () => [...(isTeacher && showGhostBlocks ? ghostEvents : []), ...filteredLessonEvents, ...semesterEvents, ...personalEventInputs, ...invitedEventInputs, ...filteredSyncedEventInputs],
+    [isTeacher, showGhostBlocks, ghostEvents, filteredLessonEvents, semesterEvents, personalEventInputs, invitedEventInputs, filteredSyncedEventInputs],
   )
 
   const dayDetailLessons = useMemo(() => {

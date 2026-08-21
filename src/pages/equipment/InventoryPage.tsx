@@ -16,7 +16,14 @@ import {
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { NotFoundException } from '@zxing/library'
 import { QRCodeSVG } from 'qrcode.react'
+import { optimizeImageUrl } from '@/lib/cloudinary'
 import './molkom.css'
+
+function EquipmentImg({ url, name, fallback }: { url: string | undefined | null; name: string; fallback: React.ReactNode }) {
+  const [failed, setFailed] = useState(false)
+  if (!url || failed) return <>{fallback}</>
+  return <img src={optimizeImageUrl(url)} alt={name} onError={() => setFailed(true)} />
+}
 
 type InvTab = 'dashboard' | 'all-projects' | 'equipment-status' | 'borrower-stats' | 'statistics'
 
@@ -109,10 +116,11 @@ function EquipmentPicker({
           {filtered.map(e => (
             <button key={e.id} className="equip-picker-card" onClick={() => onPick(e.name)}>
               <div className="equip-picker-img">
-                {e.imageUrl
-                  ? <img src={e.imageUrl} alt={e.name} />
-                  : <div className="equip-picker-placeholder">{e.name}</div>
-                }
+                <EquipmentImg
+                  url={e.imageUrl}
+                  name={e.name}
+                  fallback={<div className="equip-picker-placeholder">{e.name}</div>}
+                />
                 <span className="equip-picker-cat-tag">{e.category}</span>
                 {e.priceInclVat > 0 && (
                   <span className="equip-picker-price-tag">{e.priceInclVat} kr/day</span>

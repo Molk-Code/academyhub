@@ -1,16 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore'
+import { sendPasswordResetEmail, sendSignInLinkToEmail } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
 import { useCollection, where } from '@/hooks/useFirestore'
 import type { UserDoc, CohortDoc } from '@/types'
-import { nanoid } from 'nanoid'
-import { sendPasswordResetEmail } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
-import { Copy, Check, UserPlus, UserX, UserCheck, Mail, ShieldCheck, Trash2, KeyRound, X, Users, ClipboardCopy, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react'
+import { Copy, Check, UserPlus, UserX, UserCheck, Mail, ShieldCheck, Trash2, KeyRound, X, Users, ClipboardCopy, ChevronDown, ChevronUp, RotateCcw, Link } from 'lucide-react'
 import Avatar from '@/components/common/Avatar'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 
@@ -34,6 +33,7 @@ export default function UserManager() {
   const [copiedToken,       setCopiedToken]       = useState<string | null>(null)
   const [saving,            setSaving]            = useState(false)
   const [resetEmailSent,    setResetEmailSent]    = useState<string | null>(null)
+  const [copiedResetLink,   setCopiedResetLink]   = useState<string | null>(null)
   const [toastMsg,          setToastMsg]          = useState<string | null>(null)
   const [lastInviteUrl,     setLastInviteUrl]     = useState<string | null>(null)
   const [copiedLastInvite,  setCopiedLastInvite]  = useState(false)
@@ -53,6 +53,23 @@ export default function UserManager() {
   const { data: cohorts }              = useCollection<CohortDoc>('cohorts')
   const { data: invitations }          = useCollection<Invitation>('invitations')
 
+  // Self-heal: strip 'student' from any teacher/admin's roles array on first load
+  const healedRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!users.length) return
+    const isStaff = (r: string) => r === 'teacher' || r === 'admin'
+    users.forEach(u => {
+      if (!isStaff(u.role) || healedRef.current.has(u.id)) return
+      const hasBadRole = (u.roles ?? []).some(r => !isStaff(r))
+      if (!hasBadRole) return
+      healedRef.current.add(u.id)
+      const cleanRoles = (u.roles ?? [u.role]).filter(isStaff)
+      if (!cleanRoles.includes(u.role)) cleanRoles.unshift(u.role)
+      httpsCallable(functions, 'setUserRole')({ uid: u.id, role: u.role, roles: cleanRoles }).catch(() => {})
+    })
+  }, [users])
+
+
   const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { role: 'student' },
@@ -67,32 +84,38 @@ export default function UserManager() {
 
   async function onSubmit(data: FormData) {
     setSaving(true)
-    const token = nanoid(24)
-    await addDoc(collection(db, 'invitations'), {
-      token,
-      email:     data.email,
-      role:      data.role,
-      cohortId:  data.cohortId || null,
-      used:      false,
-      createdAt: serverTimestamp(),
-      expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
-    })
-    const url = `${window.location.origin}/accept-invite?token=${token}`
-    setLastInviteUrl(url)
     try {
-      await navigator.clipboard.writeText(url)
-      showToast('Invite link copied to clipboard!')
-    } catch {
-      const input = document.createElement('input')
-      input.value = url
-      document.body.appendChild(input)
-      input.select()
-      document.execCommand('copy')
-      document.body.removeChild(input)
-      showToast('Invite link copied!')
+      const normalizedEmail = data.email.trim().toLowerCase()
+      const ref = await addDoc(collection(db, 'invitations'), {
+        email:     normalizedEmail,
+        role:      data.role,
+        cohortId:  data.cohortId || null,
+        used:      false,
+        createdAt: serverTimestamp(),
+        expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+      })
+      const url = `${window.location.origin}/accept-invite?token=${ref.id}`
+      setLastInviteUrl(url)
+
+      let emailSent = false
+      try {
+        await sendSignInLinkToEmail(auth, normalizedEmail, {
+          url,
+          handleCodeInApp: true,
+        })
+        emailSent = true
+      } catch {
+        // Email sending failed (e.g. domain not authorized) — link still works
+      }
+
+      try { await navigator.clipboard.writeText(url) } catch { /* ignore */ }
+      showToast(emailSent ? 'Invite email sent & link copied!' : 'Invite link copied!')
+      reset()
+    } catch (err: any) {
+      alert(`Failed to create invite: ${err?.message ?? 'Unknown error'}`)
+    } finally {
+      setSaving(false)
     }
-    reset()
-    setSaving(false)
   }
 
   async function onBulkSubmit() {
@@ -106,9 +129,7 @@ export default function UserManager() {
     try {
       const results: { email: string; inviteId: string }[] = []
       for (const email of emails) {
-        const token = nanoid(24)
         const ref = await addDoc(collection(db, 'invitations'), {
-          token,
           email,
           role:      bulkRole,
           cohortId:  bulkCohortId || null,
@@ -143,8 +164,20 @@ export default function UserManager() {
     try {
       await httpsCallable(functions, 'disableUser')({ uid: user.uid })
     } catch {
-      // CF may not exist yet — fall back to Firestore-only
       await updateDoc(doc(db, 'users', user.id), { disabled: true, isActive: false })
+    }
+  }
+
+  async function permanentlyDeleteUser(user: UserDoc) {
+    const confirmed = confirm(
+      `Permanently delete ${user.displayName}?\n\nThis will remove their account, assignments, attendance records, messages, bookings, and all other personal data. This cannot be undone.`
+    )
+    if (!confirmed) return
+    try {
+      await httpsCallable(functions, 'deleteUserData')({ userId: user.uid })
+      setToastMsg(`${user.displayName} deleted.`)
+    } catch (err: any) {
+      alert(`Delete failed: ${err?.message ?? 'Unknown error'}`)
     }
   }
 
@@ -161,18 +194,38 @@ export default function UserManager() {
   }
 
   async function toggleSecondaryRole(user: UserDoc, secondaryRole: 'teacher' | 'admin') {
-    const currentRoles: string[] = user.roles?.length ? user.roles : [user.role]
+    // Only teacher↔admin combinations are valid; students can't have secondary roles
+    if (user.role === 'student') return
+    const isStaff = (r: string) => r === 'teacher' || r === 'admin'
+    const currentRoles: string[] = (user.roles?.length ? user.roles : [user.role]).filter(isStaff)
     const hasRole = currentRoles.includes(secondaryRole)
     const next = hasRole
       ? currentRoles.filter(r => r !== secondaryRole)
       : [...currentRoles, secondaryRole]
     if (!next.includes(user.role)) next.unshift(user.role)
-    await updateDoc(doc(db, 'users', user.id), { roles: next })
+    try {
+      await httpsCallable(functions, 'setUserRole')({ uid: user.id, role: user.role, roles: next })
+    } catch (err: any) {
+      alert(`Failed to update role: ${err?.message ?? err}`)
+    }
   }
 
-  async function switchPrimaryRole(user: UserDoc, newRole: 'student' | 'teacher') {
-    if (!confirm(`Switch ${user.displayName} to ${newRole}?`)) return
-    await updateDoc(doc(db, 'users', user.id), { role: newRole, roles: [newRole] })
+  async function switchPrimaryRole(user: UserDoc, newRole: 'student' | 'teacher' | 'admin') {
+    if (!confirm(`Switch ${user.displayName}'s primary role to ${newRole}? They will need to sign out and back in for the change to take full effect.`)) return
+    const isStaff = (r: string) => r === 'teacher' || r === 'admin'
+    let next: string[]
+    if (newRole === 'student') {
+      next = ['student']
+    } else {
+      // Keep only staff roles, ensuring new primary is first
+      const staffRoles = (user.roles?.length ? user.roles : [user.role]).filter(isStaff)
+      next = staffRoles.includes(newRole) ? staffRoles : [newRole, ...staffRoles.filter(r => r !== newRole)]
+    }
+    try {
+      await httpsCallable(functions, 'setUserRole')({ uid: user.id, role: newRole, roles: next })
+    } catch (err: any) {
+      alert(`Failed to update role: ${err?.message ?? err}`)
+    }
   }
 
   function copyInviteLink(token: string) {
@@ -184,11 +237,26 @@ export default function UserManager() {
 
   async function sendResetEmail(user: UserDoc) {
     try {
-      await sendPasswordResetEmail(auth, user.email)
+      await sendPasswordResetEmail(auth, user.email, {
+        url: `${window.location.origin}/login`,
+      })
       setResetEmailSent(user.id)
       setTimeout(() => setResetEmailSent(null), 3000)
-    } catch {
-      alert('Failed to send reset email. Check the email address is valid.')
+    } catch (err: any) {
+      alert(`Failed to send reset email: ${err?.code ?? err?.message ?? 'unknown error'}`)
+    }
+  }
+
+  async function copyResetLink(user: UserDoc) {
+    try {
+      const result = await httpsCallable<{ email: string }, { link: string }>(
+        functions, 'generatePasswordResetLink'
+      )({ email: user.email })
+      await navigator.clipboard.writeText(result.data.link)
+      setCopiedResetLink(user.id)
+      setTimeout(() => setCopiedResetLink(null), 3000)
+    } catch (err: any) {
+      alert(`Failed to generate reset link: ${err?.message ?? 'unknown error'}`)
     }
   }
 
@@ -203,7 +271,7 @@ export default function UserManager() {
     await Promise.all([...selectedIds].map(uid =>
       updateDoc(doc(db, 'users', uid), { cohortId: assignCohort }),
     ))
-    const cohortName = cohorts.find(c => c.id === assignCohort)?.name ?? 'cohort'
+    const cohortName = cohorts.find(c => c.id === assignCohort)?.name ?? 'class'
     setAssignedMsg(`${selectedIds.size} user${selectedIds.size !== 1 ? 's' : ''} assigned to ${cohortName}`)
     setTimeout(() => setAssignedMsg(''), 3000)
     clearAll()
@@ -425,7 +493,7 @@ export default function UserManager() {
                 onChange={e => setAssignCohort(e.target.value)}
                 className="flex-1 bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none"
               >
-                <option value="">Assign to cohort…</option>
+                <option value="">Assign to class…</option>
                 {cohorts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               <button
@@ -492,13 +560,22 @@ export default function UserManager() {
               </div>
               <div className="flex items-center gap-0.5 flex-shrink-0">
                 {user.disabled ? (
-                  <button
-                    onClick={() => restoreUser(user)}
-                    className="p-2 text-zinc-400 hover:text-emerald-500 transition-colors rounded-lg hover:bg-white/5"
-                    title="Restore account"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                  </button>
+                  <>
+                    <button
+                      onClick={() => restoreUser(user)}
+                      className="p-2 text-zinc-400 hover:text-emerald-500 transition-colors rounded-lg hover:bg-white/5"
+                      title="Restore account"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => permanentlyDeleteUser(user)}
+                      className="p-2 text-zinc-400 hover:text-rose-600 transition-colors rounded-lg hover:bg-white/5"
+                      title="Permanently delete account and all data"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
                 ) : (
                   <>
                     <button
@@ -512,16 +589,26 @@ export default function UserManager() {
                       }
                     </button>
                     <button
-                      onClick={() => toggleActive(user)}
-                      className="p-2 text-zinc-400 hover:text-zinc-300 transition-colors rounded-lg hover:bg-white/5"
-                      title={user.isActive ? 'Deactivate' : 'Activate'}
+                      onClick={() => copyResetLink(user)}
+                      className="p-2 transition-colors rounded-lg hover:bg-white/5"
+                      title="Copy reset link (send manually)"
                     >
-                      {user.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                      {copiedResetLink === user.id
+                        ? <Check className="w-4 h-4 text-emerald-500" />
+                        : <Link className="w-4 h-4 text-zinc-400 hover:text-brand-400" />
+                      }
                     </button>
                     <button
                       onClick={() => disableUser(user)}
-                      className="p-2 text-zinc-400 hover:text-rose-500 transition-colors rounded-lg hover:bg-white/5"
-                      title="Disable account"
+                      className="p-2 text-zinc-400 hover:text-amber-500 transition-colors rounded-lg hover:bg-white/5"
+                      title="Deactivate account (reversible)"
+                    >
+                      <UserX className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => permanentlyDeleteUser(user)}
+                      className="p-2 text-zinc-400 hover:text-rose-600 transition-colors rounded-lg hover:bg-white/5"
+                      title="Permanently delete account and all data"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

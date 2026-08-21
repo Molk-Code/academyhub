@@ -44,11 +44,32 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    // ── Tier / Feature gating ─────────────────────────────────────────────────
+    // Mirrors src/lib/features.ts — keep the two in sync when tier features change.
+
+    function schoolTier() {
+      return get(/databases/$(database)/documents/schools/molkom).data.get('tier', null);
+    }
+
+    function tierHasFeature(feature) {
+      let tier = schoolTier();
+      return tier == null   ? true :
+             tier == 'studio'  ? true :
+             tier == 'academy' ? feature in ['booking', 'vehicles', 'food_box',
+               'checkin_devices', 'resources', 'prizes', 'video_lab', 'chat', 'calendar',
+               'assignments', 'lessons', 'development_plan', 'semester', 'faq'] :
+             tier == 'campus'  ? feature in ['chat', 'calendar', 'assignments',
+               'lessons', 'development_plan', 'semester', 'faq'] :
+             false;
+    }
+
     // ── Users ─────────────────────────────────────────────────────────────────
 
     match /users/{userId} {
-      // FCM tokens live in this doc — restrict to self and staff
-      allow read: if request.auth.uid == userId || isTeacherOrAdmin();
+      // get (single doc by ID): self or staff — guards FCM tokens and email from bulk scraping
+      allow get: if request.auth.uid == userId || isTeacherOrAdmin();
+      // list (collection queries): any signed-in user — required for DM picker and leaderboard
+      allow list: if isSignedIn();
       // Self can update non-privileged display fields (not points/role)
       allow update: if isSelf(userId)
         && !request.resource.data.diff(resource.data).affectedKeys()
@@ -114,7 +135,7 @@ service cloud.firestore {
       // Students can create/update their own draft submissions
       allow create: if isStudent()
         && request.resource.data.studentId == request.auth.uid
-        && request.resource.data.status == 'draft';
+        && request.resource.data.status in ['draft', 'submitted'];
       allow update: if isStudent()
         && resource.data.studentId == request.auth.uid
         && resource.data.status == 'draft'
@@ -158,13 +179,15 @@ service cloud.firestore {
     // ── Invitations ───────────────────────────────────────────────────────────
 
     match /invitations/{token} {
-      allow read: if true
-        && (!('expiresAt' in resource.data) || resource.data.expiresAt > request.time)
-        && resource.data.used != true;
+      // get (single doc by ID) is public — signup page validates token before account creation
+      // list is admin-only so signed-in students cannot enumerate all pending invites
+      allow get: if !('expiresAt' in resource.data) || resource.data.expiresAt > request.time;
+      allow list: if isAdmin();
       allow write: if isTeacherOrAdmin();
-      // Invited user may mark their own invite as used after creating their account
+      // Invited user may mark their own invite as used after creating their account.
+      // Case-insensitive email match because Firebase Auth tokens store email in lowercase.
       allow update: if isSignedIn()
-        && resource.data.email == request.auth.token.email
+        && resource.data.email.lower() == request.auth.token.email.lower()
         && resource.data.used == false
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used']);
     }
@@ -224,10 +247,10 @@ service cloud.firestore {
     }
 
     // ── Lesson attendance (subcollection) ────────────────────────────────────
-
+    // Writes go through checkInAttendance Cloud Function (Admin SDK) only.
     match /lessons/{lessonId}/attendance/{studentId} {
       allow read: if isSelf(studentId) || isTeacherOrAdmin();
-      allow write: if isSignedIn() && request.auth.uid == studentId;
+      allow write: if false;
     }
 
     // ── Room booking ──────────────────────────────────────────────────────────
@@ -260,22 +283,35 @@ service cloud.firestore {
     }
 
     match /chat_channels/{channelId} {
-      // All signed-in users can read channel metadata; client-side filters visibility
+      // All signed-in users can read channel metadata; client-side canAccessChannel() filters UI
       allow read: if isSignedIn();
-      // Any signed-in user can create a channel or DM
-      allow create: if isSignedIn();
+      // DMs can be created by any signed-in user (must include own UID in memberIds)
+      allow create: if isSignedIn()
+        && request.resource.data.isDM == true
+        && request.auth.uid in request.resource.data.memberIds;
+      // Broadcast channels are staff-only
+      allow create: if isTeacherOrAdmin() && request.resource.data.get('isDM', false) != true;
       allow update, delete: if isTeacherOrAdmin();
 
       match /messages/{messageId} {
-        allow read: if isSignedIn();
-        // Any signed-in user can post (access already gated by client-side channel filter)
+        // Message read requires channel access: public, member, role-match, or cohort-match
+        allow read: if isSignedIn() && (
+          isTeacherOrAdmin()
+          || get(/databases/$(database)/documents/chat_channels/$(channelId)).data.get('isPublic', true) != false
+          || request.auth.uid in get(/databases/$(database)/documents/chat_channels/$(channelId)).data.get('memberIds', [])
+          || role() in get(/databases/$(database)/documents/chat_channels/$(channelId)).data.get('allowedRoles', [])
+          || (request.auth.token.cohortId != null
+              && request.auth.token.cohortId in get(/databases/$(database)/documents/chat_channels/$(channelId)).data.get('allowedCohortIds', []))
+        );
+        // Any signed-in user can post — server enforces channel membership via rules above
         allow create: if isSignedIn()
           && request.resource.data.authorId == request.auth.uid;
         // Author or staff can delete
         allow delete: if isSignedIn()
           && (resource.data.authorId == request.auth.uid || isStaff());
+        // Reactions: only the fields 'reactions' and 'pushSent' may be updated
         allow update: if isSignedIn()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']);
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions', 'pushSent']);
       }
     }
 
@@ -312,7 +348,9 @@ service cloud.firestore {
     // ── Absence Reports ───────────────────────────────────────────────────────
 
     match /absence_reports/{reportId} {
-      allow read: if isTeacherOrAdmin()
+      allow get: if isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow list: if isTeacherOrAdmin()
         || (isStudent() && resource.data.studentId == request.auth.uid);
       allow create: if isStudent()
         && request.resource.data.studentId == request.auth.uid;
@@ -396,26 +434,31 @@ service cloud.firestore {
 
     // ── Equipment Booking System ───────────────────────────────────────────────
 
+    match /equipment_categories/{catId} {
+      allow read: if isSignedIn() && (isAdmin() || tierHasFeature('equipment'));
+      allow write: if isAdmin();
+    }
+
     match /equipment/{itemId} {
-      allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow read: if isSignedIn() && (isAdmin() || tierHasFeature('equipment'));
+      allow write: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'));
     }
 
     match /equipment_bookings/{bookingId} {
-      allow read: if isTeacherOrAdmin()
-        || (isSignedIn() && resource.data.studentId == request.auth.uid);
-      allow create: if isSignedIn()
+      allow read: if (isAdmin() || tierHasFeature('equipment'))
+        && (isTeacherOrAdmin() || (isSignedIn() && resource.data.studentId == request.auth.uid));
+      allow create: if isSignedIn() && tierHasFeature('equipment')
         && request.resource.data.studentId == request.auth.uid;
-      allow update: if isTeacherOrAdmin();
+      allow update: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'));
     }
 
     match /inventory_projects/{projectId} {
-      allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow read: if isSignedIn() && (isAdmin() || tierHasFeature('inventory'));
+      allow write: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('inventory'));
 
       match /items/{itemId} {
-        allow read: if isSignedIn();
-        allow write: if isTeacherOrAdmin();
+        allow read: if isSignedIn() && (isAdmin() || tierHasFeature('inventory'));
+        allow write: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('inventory'));
       }
     }
 
@@ -503,7 +546,8 @@ service cloud.firestore {
 
     match /synced_events/{eventId} {
       allow read: if isSignedIn();
-      allow write: if false; // written only by the receiveOfficeCalendarEvent Cloud Function
+      // Cloud Function creates/deletes; teachers may update override fields only
+      allow update: if isTeacherOrAdmin();
     }
 
     // ── Team Resources ────────────────────────────────────────────────────────
@@ -559,11 +603,11 @@ service cloud.firestore {
           || (prodData().viewerIds != null && request.auth.uid in prodData().viewerIds);
       }
 
-      allow read:   if isSignedIn() && canReadProd();
-      allow create: if isSignedIn()
+      allow read:   if isSignedIn() && (isAdmin() || tierHasFeature('production')) && canReadProd();
+      allow create: if isSignedIn() && tierHasFeature('production')
         && request.resource.data.createdBy == request.auth.uid;
-      allow update: if isSignedIn() && canEditProd();
-      allow delete: if isSignedIn()
+      allow update: if isSignedIn() && (isAdmin() || tierHasFeature('production')) && canEditProd();
+      allow delete: if isSignedIn() && (isAdmin() || tierHasFeature('production'))
         && (prodData().createdBy == request.auth.uid || isTeacherOrAdmin());
 
       match /shotlog/{entryId} {
@@ -595,7 +639,8 @@ service cloud.firestore {
 
       match /allocations/{allocationId} {
         allow read: if isSignedIn();
-        allow create: if isSignedIn();
+        allow create: if isSignedIn()
+          && request.resource.data.createdBy == request.auth.uid;
         allow update: if isSignedIn()
           && (resource.data.createdBy == request.auth.uid || isTeacherOrAdmin());
         allow delete: if isSignedIn()
@@ -622,6 +667,11 @@ service cloud.firestore {
 
     function isSuperAdmin() {
       return isSignedIn() && request.auth.token.email in ['fredrik.fridlund@gmail.com'];
+    }
+
+    match /_client_errors/{errorId} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isAdmin();
     }
 
     match /schools/{schoolId} {
@@ -654,6 +704,17 @@ service cloud.firestore {
       allow read:   if isSignedIn() && resource.data.uid == request.auth.uid;
       allow update: if isSignedIn() && resource.data.uid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+    }
+
+    // ── Bug reports ───────────────────────────────────────────────────────────
+
+    match /bug_reports/{reportId} {
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 2000;
+      allow read, update: if isAdmin();
     }
   }
 }

@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { collection, addDoc, serverTimestamp, deleteDoc, updateDoc, doc, Timestamp } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, deleteDoc, updateDoc, doc, Timestamp, arrayUnion, arrayRemove } from 'firebase/firestore'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/firebase'
 import { useDocument, useCollection, where } from '@/hooks/useFirestore'
@@ -140,14 +140,13 @@ export default function CohortDetail() {
     'users',
     [where('role', '==', 'student')],
   )
-  const { data: teachers } = useCollection<UserDoc>(
-    'users',
-    id ? [where('cohortId', '==', id), where('roles', 'array-contains', 'teacher')] : [],
-    !!id,
-  )
   const { data: allTeachers } = useCollection<UserDoc>(
     'users',
     [where('roles', 'array-contains', 'teacher')],
+  )
+  const teachers = useMemo(
+    () => allTeachers.filter(t => cohort?.teacherIds?.includes(t.id)),
+    [allTeachers, cohort],
   )
   const { data: allInvitations } = useCollection<Invitation>('invitations')
 
@@ -218,12 +217,12 @@ export default function CohortDetail() {
   const teacherCandidates  = allTeachers.filter(t => !enrolledTeacherIds.has(t.id))
 
   async function addTeacher(user: UserDoc) {
-    await updateDoc(doc(db, 'users', user.id), { cohortId: id })
+    await updateDoc(doc(db, 'cohorts', id!), { teacherIds: arrayUnion(user.id) })
   }
 
   async function removeTeacher(teacher: UserDoc) {
     if (!confirm(`Remove ${teacher.displayName} from this class?`)) return
-    await updateDoc(doc(db, 'users', teacher.id), { cohortId: null })
+    await updateDoc(doc(db, 'cohorts', id!), { teacherIds: arrayRemove(teacher.id) })
   }
 
   async function deleteInvite(invId: string) {
@@ -237,7 +236,7 @@ export default function CohortDetail() {
     const token = nanoid(24)
     await addDoc(collection(db, 'invitations'), {
       token,
-      email:       data.email,
+      email:       data.email.trim().toLowerCase(),
       role:        'student',
       cohortId:    id,
       displayName: data.name,

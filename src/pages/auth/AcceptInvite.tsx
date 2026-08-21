@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
 import { Film, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react'
-import { doc, getDoc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc, getDocs, updateDoc, setDoc, deleteDoc, serverTimestamp, collection, query, where, arrayUnion } from 'firebase/firestore'
 import { createUserWithEmailAndPassword as createUser, updateProfile as updateFbProfile } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -47,7 +47,8 @@ export default function AcceptInvite() {
   const [error,        setError]        = useState('')
   const [showPw,       setShowPw]       = useState(false)
   const [done,         setDone]         = useState(false)
-  const [privacyAccepted, setPrivacyAccepted] = useState(false)
+  // GDPR step: null = not yet decided, true = accepted, false = declined
+  const [gdprAccepted, setGdprAccepted] = useState<boolean | null>(null)
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, setValue } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -79,17 +80,35 @@ export default function AcceptInvite() {
   async function onSubmit(data: FormData) {
     if (!invite) return
     setError('')
+    // Firebase Auth normalizes token.email to lowercase — invitation update rule compares against it
+    const normalizedEmail = invite.email.trim().toLowerCase()
+    let cred: Awaited<ReturnType<typeof createUser>> | null = null
+    let stage = 'init'
     try {
-      // Create Firebase Auth account
-      const cred = await createUser(auth, invite.email, data.password)
-      // Set display name
+      stage = 'create-auth-account'
+      cred = await createUser(auth, normalizedEmail, data.password)
+      stage = 'update-auth-profile'
       await updateFbProfile(cred.user, { displayName: data.displayName })
-      // Create Firestore user document (role + cohortId set by onUserCreate Cloud Function)
+
+      // Delete any orphan user docs whose uid field matches but doc.id doesn't.
+      // Best-effort — new users can't delete other user docs (rule requires admin);
+      // orphans are extremely rare and shouldn't block signup.
+      try {
+        stage = 'orphan-cleanup'
+        const orphans = await getDocs(query(collection(db, 'users'),
+          where('uid', '==', cred.user.uid)))
+        await Promise.all(orphans.docs
+          .filter(d => d.id !== cred!.user.uid)
+          .map(d => deleteDoc(d.ref).catch(() => {})))
+      } catch { /* best-effort */ }
+
+      stage = 'create-user-doc'
       await setDoc(doc(db, 'users', cred.user.uid), {
         uid:                cred.user.uid,
-        email:              invite.email,
+        email:              normalizedEmail,
         displayName:        data.displayName,
         role:               invite.role,
+        roles:              [invite.role],
         avatarUrl:          null,
         cohortId:           invite.cohortId,
         enrolledAt:         serverTimestamp(),
@@ -101,21 +120,53 @@ export default function AcceptInvite() {
           given:     true,
           timestamp: serverTimestamp(),
           version:   '1.0',
-          method:    'invite-acceptance-checkbox',
+          method:    'invite-acceptance-explicit',
           ipHash:    null,
         },
       })
-      // Mark invite as used
+
+      stage = 'mark-invite-used'
       await updateDoc(doc(db, 'invitations', token), { used: true })
-      // Force token refresh so custom claims are live
+
+      // For teacher invites with a cohort, add them to the cohort's teacherIds.
+      // Best-effort — a fresh teacher account has no admin/teacher claim yet, so the
+      // cohorts write rule may reject it. The onUserCreate Cloud Function reconciles later.
+      if (invite.role === 'teacher' && invite.cohortId) {
+        try {
+          stage = 'add-teacher-to-cohort'
+          await updateDoc(doc(db, 'cohorts', invite.cohortId), {
+            teacherIds: arrayUnion(cred.user.uid),
+          })
+        } catch (err) {
+          console.warn('add-teacher-to-cohort failed (will retry via Cloud Function):', err)
+        }
+      }
+
+      // Poll for role claims — Cloud Function sets them asynchronously
+      stage = 'poll-claims'
       await refreshToken()
+      for (let i = 0; i < 5; i++) {
+        const t = await cred.user.getIdTokenResult(false)
+        if (t.claims.role) break
+        await new Promise(r => setTimeout(r, 1200))
+        await refreshToken()
+      }
       setDone(true)
       setTimeout(() => {
-        if (invite.role === 'teacher') navigate('/teacher')
-        else navigate('/dashboard')
-      }, 2000)
+        if (invite.role === 'admin')        navigate('/admin/users')
+        else if (invite.role === 'teacher') navigate('/teacher')
+        else                                navigate('/dashboard')
+      }, 1500)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Something went wrong')
+      const raw = e instanceof Error ? e.message : String(e)
+      const code = (e as { code?: string })?.code
+      console.error(`AcceptInvite failed at stage=${stage}`, { code, raw, error: e })
+      // If Auth account was created but Firestore setup failed, delete the orphaned Auth account
+      // so the user can retry with the same email rather than being permanently locked out.
+      if (cred) {
+        try { await cred.user.delete() } catch { /* best-effort cleanup */ }
+      }
+      setError(`Signup failed at "${stage}": ${raw}`)
     }
   }
 
@@ -128,13 +179,13 @@ export default function AcceptInvite() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-brand-900 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-brand-900 to-slate-900 overflow-y-auto flex items-start sm:items-center justify-center px-4 py-8">
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-sm"
       >
-        <div className="bg-zinc-900 rounded-3xl shadow-2xl p-8">
+        <div className="bg-zinc-900 rounded-3xl shadow-2xl p-6 sm:p-8">
           <div className="flex flex-col items-center mb-8">
             <div className="w-14 h-14 bg-brand-600 rounded-2xl flex items-center justify-center mb-3">
               <Film className="w-7 h-7 text-white" />
@@ -156,11 +207,85 @@ export default function AcceptInvite() {
               <AlertCircle className="w-5 h-5 text-rose-500" />
               <p className="text-sm text-rose-600">{error}</p>
             </div>
+          ) : gdprAccepted === false ? (
+            /* ── GDPR declined ── */
+            <div className="text-center space-y-4 py-2">
+              <div className="w-12 h-12 bg-rose-950/50 rounded-full flex items-center justify-center mx-auto">
+                <AlertCircle className="w-6 h-6 text-rose-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-zinc-200">Privacy policy declined</p>
+                <p className="text-sm text-zinc-500 mt-1">
+                  You cannot create an account without accepting the privacy policy.
+                  Contact your teacher if you have questions.
+                </p>
+              </div>
+              <button
+                onClick={() => setGdprAccepted(null)}
+                className="text-sm text-brand-400 hover:text-brand-300 underline"
+              >
+                Go back
+              </button>
+            </div>
+          ) : gdprAccepted === null ? (
+            /* ── GDPR consent step ── */
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-base font-semibold text-zinc-100">Privacy &amp; data consent</h2>
+                <p className="text-xs text-zinc-500 mt-0.5">Please read before creating your account</p>
+              </div>
+
+              <div className="bg-zinc-800/60 rounded-xl p-4 space-y-3 text-xs text-zinc-400 leading-relaxed max-h-56 overflow-y-auto">
+                <div>
+                  <p className="font-semibold text-zinc-300 mb-1">What data we collect</p>
+                  <p>Name, email address, profile photo, attendance records, assignment results, points, and messages sent within the platform.</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-zinc-300 mb-1">How it is used</p>
+                  <p>Your data is used solely to run the educational platform — tracking progress, scheduling, and communication between students and teachers.</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-zinc-300 mb-1">Who can see it</p>
+                  <p>Your teachers and school administrators. Your data is never shared with third parties or used for advertising.</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-zinc-300 mb-1">How long it is kept</p>
+                  <p>All personal data — including your profile, attendance, grades, development plans, and chat messages — is deleted <strong className="text-zinc-200">1 year after your course ends</strong>. Deletion logs are kept for 5 years as required by law.</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-zinc-300 mb-1">Your rights (GDPR)</p>
+                  <p>You have the right to access, correct, and request deletion of your personal data at any time. Contact your school administrator to exercise these rights.</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-zinc-500">
+                Full details in our{' '}
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:underline">
+                  Privacy Policy
+                </a>.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setGdprAccepted(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 text-sm font-medium transition-colors"
+                >
+                  Decline
+                </button>
+                <button
+                  onClick={() => setGdprAccepted(true)}
+                  className="flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold transition-colors"
+                >
+                  Accept &amp; continue
+                </button>
+              </div>
+            </div>
           ) : (
+            /* ── Account creation form (after GDPR accepted) ── */
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
                 <label className="label">Full name</label>
-                <input {...register('displayName')} className="input" placeholder="Jane Doe" />
+                <input {...register('displayName')} className="input" placeholder="Jane Doe" autoComplete="name" style={{ fontSize: 16 }} />
                 {errors.displayName && <p className="text-xs text-rose-500 mt-1">{errors.displayName.message}</p>}
               </div>
 
@@ -172,6 +297,8 @@ export default function AcceptInvite() {
                     type={showPw ? 'text' : 'password'}
                     className="input pr-10"
                     placeholder="Min 8 chars, 1 upper, 1 number"
+                    autoComplete="new-password"
+                    style={{ fontSize: 16 }}
                   />
                   <button type="button" onClick={() => setShowPw(v => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">
@@ -188,6 +315,8 @@ export default function AcceptInvite() {
                   type="password"
                   className="input"
                   placeholder="Repeat password"
+                  autoComplete="new-password"
+                  style={{ fontSize: 16 }}
                 />
                 {errors.confirmPassword && <p className="text-xs text-rose-500 mt-1">{errors.confirmPassword.message}</p>}
               </div>
@@ -199,22 +328,12 @@ export default function AcceptInvite() {
                 </div>
               )}
 
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={privacyAccepted}
-                  onChange={e => setPrivacyAccepted(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded border-zinc-600 bg-zinc-800 accent-brand-500 flex-shrink-0"
-                />
-                <span className="text-xs text-zinc-400 leading-relaxed">
-                  I have read and accept the{' '}
-                  <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:underline">
-                    Privacy Policy
-                  </a>
-                </span>
-              </label>
+              <p className="text-xs text-zinc-500">
+                ✓ Privacy policy accepted.{' '}
+                <button type="button" onClick={() => setGdprAccepted(null)} className="text-brand-400 hover:underline">Review again</button>
+              </p>
 
-              <button type="submit" disabled={isSubmitting || !privacyAccepted} className="btn-primary w-full py-3 text-base mt-2 disabled:opacity-50">
+              <button type="submit" disabled={isSubmitting} className="btn-primary w-full py-3 text-base mt-2 disabled:opacity-50">
                 {isSubmitting ? 'Creating account…' : 'Create account'}
               </button>
             </form>

@@ -9,7 +9,14 @@ import {
   ShoppingCart, X, Search, Package, Calendar, Check,
   AlertTriangle, ChevronDown, ChevronRight, CheckCircle2, Clock, Truck, RotateCcw, XCircle, Lock,
 } from 'lucide-react'
+import { optimizeImageUrl } from '@/lib/cloudinary'
 import './molkom.css'
+
+function EquipmentImg({ url, name, fallback }: { url: string | undefined | null; name: string; fallback: React.ReactNode }) {
+  const [failed, setFailed] = useState(false)
+  if (!url || failed) return <>{fallback}</>
+  return <img src={optimizeImageUrl(url)} alt={name} onError={() => setFailed(true)} />
+}
 
 type EquipmentCategory = 'ALL' | 'CAMERA' | 'GRIP' | 'LIGHTS' | 'SOUND' | 'LOCATION' | 'BOOKS' | 'OTHER'
 type ViewMode = 'browse' | 'checkout' | 'success' | 'my-bookings'
@@ -78,8 +85,11 @@ function weeklyRate(pricePerDay: number): number {
 }
 
 export default function EquipmentBookingPage() {
-  const { profile, cohortId: ctxCohortId, previewCohortId } = useAuth()
+  const { profile, role, loading: authLoading, cohortId: ctxCohortId, previewCohortId } = useAuth()
   const cohortId = ctxCohortId ?? previewCohortId ?? profile?.cohortId ?? ''
+  // Use profile.role as fallback — token claims can lag behind or be missing
+  const effectiveRole = role ?? profile?.role ?? null
+  const isStaff = effectiveRole === 'teacher' || effectiveRole === 'admin'
 
   const { data: equipmentRaw } = useCollection<EquipmentDoc>('equipment')
   const { data: cohort } = useDocument<CohortDoc>('cohorts', cohortId || null)
@@ -90,13 +100,35 @@ export default function EquipmentBookingPage() {
     profile?.uid ?? '',
   )
 
-  // All productions in the cohort — same scope as the Production page
-  const { data: userProductions } = useCollection<ProductionDoc>(
+  // Teachers/admins see all productions; students see productions they created or collaborate on.
+  // Firestore rules reject the cohortId-only query for students because it can't guarantee readability.
+  const { data: staffProductions } = useCollection<ProductionDoc>(
     'productions',
-    cohortId ? [where('cohortId', '==', cohortId)] : [],
-    !!cohortId,
-    cohortId,
+    [],
+    !!profile && !authLoading && isStaff,
+    'staff-all',
   )
+  const { data: myOwnProds } = useCollection<ProductionDoc>(
+    'productions',
+    profile?.uid ? [where('createdBy', '==', profile.uid)] : [],
+    !!profile?.uid && !authLoading && !isStaff,
+    `own:${profile?.uid ?? ''}`,
+  )
+  const { data: collabProds } = useCollection<ProductionDoc>(
+    'productions',
+    profile?.uid ? [where('collaborators', 'array-contains', profile.uid)] : [],
+    !!profile?.uid && !authLoading && !isStaff,
+    `collab:${profile?.uid ?? ''}`,
+  )
+  const userProductions = useMemo(() => {
+    if (isStaff) return staffProductions
+    const seen = new Set<string>()
+    return [...myOwnProds, ...collabProds].filter(p => {
+      if (seen.has(p.id)) return false
+      seen.add(p.id)
+      return true
+    })
+  }, [isStaff, staffProductions, myOwnProds, collabProds])
 
   const [selectedProductionId, setSelectedProductionId] = useState<string | null>(null)
   const [productionReadiness, setProductionReadiness] = useState<Record<string, ProductionReadiness>>({})
@@ -235,6 +267,9 @@ export default function EquipmentBookingPage() {
 
   async function handleSubmit() {
     if (!fromDate || !toDate) return
+    const today = new Date().toISOString().slice(0, 10)
+    if (fromDate < today) { setSubmitError('Checkout date cannot be in the past'); return }
+    if (toDate < fromDate) { setSubmitError('Return date must be on or after the checkout date'); return }
     setSubmitting(true)
     setSubmitError('')
     try {
@@ -290,11 +325,14 @@ export default function EquipmentBookingPage() {
     )
   }, [])
 
-  // Load subcollections for all user productions and compute readiness
+  // Load subcollections for all user productions and compute readiness.
+  // Also refetches on tab visibility change and when the user picks a production —
+  // subcollections (crew/cast/etc.) can change on other pages without triggering
+  // the userProductions identity to change.
   useEffect(() => {
     if (userProductions.length === 0) return
-    setReadinessLoading(true)
-    Promise.all(userProductions.map(async prod => {
+    let cancelled = false
+    async function loadOne(prod: ProductionDoc) {
       const [scenesSnap, crewSnap, castSnap, locSnap, daysSnap] = await Promise.all([
         getDocs(collection(db, `productions/${prod.id}/scenes`)),
         getDocs(collection(db, `productions/${prod.id}/crew`)),
@@ -310,20 +348,71 @@ export default function EquipmentBookingPage() {
         locations: locSnap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionLocationDoc)),
         days:     daysSnap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionShootingDayDoc)),
       }
-    })).then(results => {
-      const readiness: Record<string, ProductionReadiness> = {}
-      const daysMap:   Record<string, ProductionShootingDayDoc[]> = {}
-      const crewMap:   Record<string, ProductionCrewAssignmentDoc[]> = {}
-      results.forEach(r => {
-        readiness[r.id] = getProductionReadiness(r.scenes, r.crew, r.cast, r.locations, r.days)
-        daysMap[r.id]   = r.days
-        crewMap[r.id]   = r.crew
-      })
-      setProductionReadiness(readiness)
-      setProductionShootingDays(daysMap)
-      setProductionCrew(crewMap)
-    }).finally(() => setReadinessLoading(false))
+    }
+    async function loadAll() {
+      setReadinessLoading(true)
+      try {
+        const results = await Promise.all(userProductions.map(loadOne))
+        if (cancelled) return
+        setProductionReadiness(prev => {
+          const next = { ...prev }
+          results.forEach(r => { next[r.id] = getProductionReadiness(r.scenes, r.crew, r.cast, r.locations, r.days) })
+          return next
+        })
+        setProductionShootingDays(prev => {
+          const next = { ...prev }
+          results.forEach(r => { next[r.id] = r.days })
+          return next
+        })
+        setProductionCrew(prev => {
+          const next = { ...prev }
+          results.forEach(r => { next[r.id] = r.crew })
+          return next
+        })
+      } catch (err) {
+        console.error('[EquipmentBookingPage] readiness load failed:', err)
+      } finally {
+        if (!cancelled) setReadinessLoading(false)
+      }
+    }
+    loadAll()
+    function onVisible() { if (document.visibilityState === 'visible') loadAll() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [userProductions.map(p => p.id).join(',')])   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When the user selects a production, refetch its subcollections so readiness
+  // is fresh even if it changed while this page was open.
+  useEffect(() => {
+    if (!selectedProductionId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [scenesSnap, crewSnap, castSnap, locSnap, daysSnap] = await Promise.all([
+          getDocs(collection(db, `productions/${selectedProductionId}/scenes`)),
+          getDocs(collection(db, `productions/${selectedProductionId}/crew`)),
+          getDocs(collection(db, `productions/${selectedProductionId}/cast`)),
+          getDocs(collection(db, `productions/${selectedProductionId}/locations`)),
+          getDocs(collection(db, `productions/${selectedProductionId}/shootingDays`)),
+        ])
+        if (cancelled) return
+        const scenes = scenesSnap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionSceneDoc))
+        const crew = crewSnap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionCrewAssignmentDoc))
+        const cast = castSnap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionCastDoc))
+        const locations = locSnap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionLocationDoc))
+        const days = daysSnap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionShootingDayDoc))
+        setProductionReadiness(prev => ({ ...prev, [selectedProductionId]: getProductionReadiness(scenes, crew, cast, locations, days) }))
+        setProductionShootingDays(prev => ({ ...prev, [selectedProductionId]: days }))
+        setProductionCrew(prev => ({ ...prev, [selectedProductionId]: crew }))
+      } catch (err) {
+        console.error('[EquipmentBookingPage] selection refetch failed:', err)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [selectedProductionId])
 
   useEffect(() => {
     if (view === 'checkout') window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -413,11 +502,11 @@ export default function EquipmentBookingPage() {
                 <div className="cart-date-row">
                   <div className="cart-date-field">
                     <label>From</label>
-                    <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} />
+                    <input type="date" value={fromDate} min={new Date().toISOString().slice(0, 10)} onChange={e => setFromDate(e.target.value)} />
                   </div>
                   <div className="cart-date-field">
                     <label>To</label>
-                    <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
+                    <input type="date" value={toDate} min={fromDate || new Date().toISOString().slice(0, 10)} onChange={e => setToDate(e.target.value)} />
                   </div>
                 </div>
                 {selectedProductionId && (
@@ -474,10 +563,11 @@ export default function EquipmentBookingPage() {
         <div className="image-modal-overlay" onClick={() => setModalItem(null)}>
           <div className="image-modal" onClick={e => e.stopPropagation()}>
             <button className="image-modal-close" onClick={() => setModalItem(null)}><X size={16} /></button>
-            {modalItem.imageUrl
-              ? <img src={modalItem.imageUrl} alt={modalItem.name} />
-              : <div style={{ width: 400, height: 300, background: '#1a1a25', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6a6a80' }}>No image</div>
-            }
+            <EquipmentImg
+              url={modalItem.imageUrl}
+              name={modalItem.name}
+              fallback={<div style={{ width: 400, height: 300, background: '#1a1a25', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6a6a80' }}>No image</div>}
+            />
             <div className="image-modal-name">{modalItem.name}</div>
             {modalItem.included?.length > 0 && (
               <div className="image-modal-included">
@@ -657,10 +747,11 @@ export default function EquipmentBookingPage() {
                     <div className={`product-card${inCart ? ' card-added' : ''}`} key={item.id}
                       style={{ opacity: locked || budgetBlocked ? 0.55 : 1 }}>
                       <div className="product-image" onClick={() => setModalItem(item)}>
-                        {item.imageUrl
-                          ? <img src={item.imageUrl} alt={item.name} />
-                          : <div className="image-placeholder"><Package size={32} color="#3a3a4a" /><br />{item.name}</div>
-                        }
+                        <EquipmentImg
+                          url={item.imageUrl}
+                          name={item.name}
+                          fallback={<div className="image-placeholder"><Package size={32} color="#3a3a4a" /><br />{item.name}</div>}
+                        />
                         <span className="product-category-tag">{item.category}</span>
                         {locked && (
                           <span className="film-year2-badge"><Lock size={10} /> Restricted</span>
@@ -738,12 +829,12 @@ export default function EquipmentBookingPage() {
                     <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 140 }}>
                         <label style={{ fontSize: '.7rem', color: '#6a6a80', fontWeight: 600 }}>From</label>
-                        <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+                        <input type="date" value={fromDate} min={new Date().toISOString().slice(0, 10)} onChange={e => setFromDate(e.target.value)}
                           style={{ background: '#1a1a28', border: '1px solid #2a2a3a', borderRadius: 8, color: '#f0f0f5', padding: '6px 10px', fontSize: '.85rem', width: '100%' }} />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 140 }}>
                         <label style={{ fontSize: '.7rem', color: '#6a6a80', fontWeight: 600 }}>To</label>
-                        <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+                        <input type="date" value={toDate} min={fromDate || new Date().toISOString().slice(0, 10)} onChange={e => setToDate(e.target.value)}
                           style={{ background: '#1a1a28', border: '1px solid #2a2a3a', borderRadius: 8, color: '#f0f0f5', padding: '6px 10px', fontSize: '.85rem', width: '100%' }} />
                       </div>
                     </div>

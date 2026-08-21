@@ -13,6 +13,16 @@ export function thumbnailUrl(publicId: string): string {
   return `https://res.cloudinary.com/${cloudName}/video/upload/so_0,w_640,h_360,c_fill/${publicId}.jpg`
 }
 
+// Inject `f_auto,q_auto` into a Cloudinary URL so the browser receives the best-supported
+// format (WebP/AVIF/JPG) instead of the raw upload. Fixes cases where PNGs, HEICs, or
+// oversized images from admin uploads fail to render in some browsers.
+export function optimizeImageUrl(url: string | null | undefined): string {
+  if (!url) return ''
+  if (!url.includes('res.cloudinary.com') || !url.includes('/upload/')) return url
+  if (url.includes('/upload/f_auto')) return url
+  return url.replace('/upload/', '/upload/f_auto,q_auto/')
+}
+
 export async function uploadVideo(
   file: File,
   onProgress: (pct: number) => void,

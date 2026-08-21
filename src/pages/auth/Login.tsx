@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -6,8 +6,7 @@ import { z } from 'zod'
 import { motion } from 'framer-motion'
 import { Film, Eye, EyeOff, AlertCircle, ArrowLeft } from 'lucide-react'
 import { sendPasswordResetEmail } from 'firebase/auth'
-import { collection, getDocs, query, where } from 'firebase/firestore'
-import { auth, db } from '@/lib/firebase'
+import { auth } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
 
@@ -33,6 +32,13 @@ export default function Login() {
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
+
+  useEffect(() => {
+    if (sessionStorage.getItem('auth_disabled')) {
+      sessionStorage.removeItem('auth_disabled')
+      setError('Your account has been deactivated. Contact your teacher.')
+    }
+  }, [])
 
   async function onSubmit(data: FormData) {
     setError('')
@@ -60,26 +66,28 @@ export default function Login() {
     setResetMessage('')
     setResetSending(true)
     try {
-      const snap = await getDocs(query(collection(db, 'users'), where('email', '==', email)))
-      if (snap.empty) {
-        setResetError('No account found with that email address.')
-        return
-      }
-      if (snap.docs[0].data().disabled === true) {
-        setResetError('This account has been deactivated. Contact your teacher.')
-        return
-      }
-      await sendPasswordResetEmail(auth, email)
+      await sendPasswordResetEmail(auth, email, {
+        url: `${window.location.origin}/login`,
+      })
       setResetMessage('Reset link sent! Check your email inbox.')
-    } catch {
-      setResetError('Something went wrong. Try again.')
+    } catch (err: any) {
+      console.error('Password reset error:', err)
+      if (err?.code === 'auth/invalid-email') {
+        setResetError('Invalid email address.')
+      } else if (err?.code === 'auth/user-not-found') {
+        setResetError('No account found with that email address.')
+      } else if (err?.code === 'auth/too-many-requests') {
+        setResetError('Too many requests. Please wait a moment and try again.')
+      } else {
+        setResetError(`Something went wrong (${err?.code ?? 'unknown'}). Try again.`)
+      }
     } finally {
       setResetSending(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-brand-900 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-brand-900 to-slate-900 overflow-y-auto flex items-start sm:items-center justify-center px-4 py-8">
       <div className="absolute inset-0 opacity-5 pointer-events-none"
         style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")' }}
       />
@@ -111,6 +119,7 @@ export default function Login() {
                     autoComplete="email"
                     placeholder="you@school.com"
                     className="input"
+                    style={{ fontSize: 16 }}
                   />
                   {errors.email && <p className="text-xs text-rose-500 mt-1">{errors.email.message}</p>}
                 </div>
@@ -124,6 +133,7 @@ export default function Login() {
                       autoComplete="current-password"
                       placeholder="••••••••"
                       className="input pr-10"
+                      style={{ fontSize: 16 }}
                     />
                     <button
                       type="button"
@@ -184,7 +194,9 @@ export default function Login() {
                   onChange={e => setResetEmail(e.target.value)}
                   placeholder="you@school.com"
                   className="input w-full"
+                  autoComplete="email"
                   autoFocus
+                  style={{ fontSize: 16 }}
                   onKeyDown={e => e.key === 'Enter' && handleForgotPassword()}
                 />
               </div>
@@ -211,13 +223,17 @@ export default function Login() {
             </div>
           )}
 
-          <p className="text-center text-xs text-zinc-400 mt-6">
-            No account yet? Your teacher will send you an invite link.
-          </p>
-          <p className="text-center text-xs text-zinc-500 mt-2">
-            New school?{' '}
-            <a href="/signup" className="text-brand-400 hover:underline">Register here</a>
-          </p>
+          {!showForgotPw && (
+            <>
+              <p className="text-center text-xs text-zinc-400 mt-6">
+                No account yet? Your teacher will send you an invite link.
+              </p>
+              <p className="text-center text-xs text-zinc-500 mt-2">
+                Setting up a new school?{' '}
+                <a href="/signup" className="text-brand-400 hover:underline">Register here</a>
+              </p>
+            </>
+          )}
           <p className="text-center text-xs text-zinc-600 mt-3">
             <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-400 transition-colors">
               Privacy Policy

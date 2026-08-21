@@ -75,6 +75,49 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// onUserDocUpdated — keep Auth custom claims in sync when role/cohortId changes
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const onUserDocUpdated = functions.firestore
+  .document('users/{uid}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.data()
+    const after  = change.after.data()
+    const uid    = context.params.uid
+
+    if (before.role === after.role && before.cohortId === after.cohortId) return null
+
+    await admin.auth().setCustomUserClaims(uid, {
+      role:     after.role     ?? null,
+      cohortId: after.cohortId ?? null,
+    })
+
+    return null
+  })
+
+// onUserDocCreated — backup claims setter in case the Auth onCreate trigger fails
+// (e.g. cold start timeout, transient error). Fires when AcceptInvite's setDoc lands.
+export const onUserDocCreated = functions.firestore
+  .document('users/{uid}')
+  .onCreate(async (snap, context) => {
+    const uid  = context.params.uid
+    const data = snap.data()
+    if (!data.role) return null
+    try {
+      const existing = await admin.auth().getUser(uid)
+      const claims   = existing.customClaims ?? {}
+      if (claims.role === data.role && claims.cohortId === (data.cohortId ?? null)) return null
+      await admin.auth().setCustomUserClaims(uid, {
+        role:     data.role     ?? null,
+        cohortId: data.cohortId ?? null,
+      })
+    } catch {
+      // Auth user may not exist yet during seeding — ignore
+    }
+    return null
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
 // getTestQuestions — strips correct answers before sending to students
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -571,6 +614,142 @@ export const submitTestAnswers = functions.https.onCall(async (data, context) =>
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// generatePasswordResetLink — admin gets a reset link to send manually (e.g. paste into email/Teams)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const generatePasswordResetLink = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  if (context.auth.token.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Admin only.')
+  }
+  const { email } = data as { email: string }
+  if (!email) throw new functions.https.HttpsError('invalid-argument', 'email required.')
+  const link = await admin.auth().generatePasswordResetLink(email, {
+    url: 'https://academy-hub-c252f.web.app/login',
+  })
+  return { link }
+})
+
+// sendInviteEmail — create an invitation document and email the invite link via Resend
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const sendInviteEmail = functions
+  .runWith({ secrets: ['RESEND_API_KEY'] })
+  .https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+    if (context.auth.token.role !== 'admin') {
+      throw new functions.https.HttpsError('permission-denied', 'Admin only.')
+    }
+
+    const { email, role, cohortId, appUrl } = data as {
+      email: string
+      role: string
+      cohortId?: string | null
+      appUrl: string
+    }
+    if (!email) throw new functions.https.HttpsError('invalid-argument', 'email required.')
+
+    const expiresAt = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+    const ref = await db.collection('invitations').add({
+      email,
+      role:      role ?? 'student',
+      cohortId:  cohortId ?? null,
+      used:      false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt,
+    })
+
+    const inviteUrl = `${appUrl}/accept-invite?token=${ref.id}`
+
+    const emailCfgSnap = await db.collection('email_config').doc('global').get()
+    const emailCfg     = emailCfgSnap.data()
+    const fromEmail    = emailCfg?.fromEmail
+    const fromName     = emailCfg?.fromName || 'AcademyHub'
+
+    if (fromEmail && fromEmail !== 'onboarding@resend.dev') {
+      await getResend().emails.send({
+        from:    `${fromName} <${fromEmail}>`,
+        to:      email,
+        subject: `You're invited to ${fromName}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px">
+            <h2 style="margin-bottom:8px">You've been invited</h2>
+            <p style="color:#555;margin-bottom:24px">
+              You have been invited to join ${escapeHtml(fromName)} as a <strong>${escapeHtml(role)}</strong>.
+              Click the button below to create your account. This link expires in 7 days.
+            </p>
+            <a href="${inviteUrl}"
+               style="display:inline-block;background:#f97316;color:white;text-decoration:none;
+                      padding:12px 24px;border-radius:8px;font-weight:600;font-size:15px">
+              Accept invitation
+            </a>
+            <p style="color:#999;font-size:12px;margin-top:24px">
+              If you didn't expect this email, you can safely ignore it.
+            </p>
+          </div>
+        `,
+      })
+    }
+
+    return { inviteId: ref.id, inviteUrl, emailSent: !!(fromEmail && fromEmail !== 'onboarding@resend.dev') }
+  })
+
+// sendPasswordResetLink — generate a Firebase reset link and deliver it via Resend
+// Uses the school's verified sender domain instead of Firebase's firebaseapp.com domain,
+// which gets blocked by corporate/government mail servers.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const sendPasswordResetLink = functions
+  .runWith({ secrets: ['RESEND_API_KEY'] })
+  .https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+    if (context.auth.token.role !== 'admin') {
+      throw new functions.https.HttpsError('permission-denied', 'Admin only.')
+    }
+
+    const { email } = data as { email: string }
+    if (!email) throw new functions.https.HttpsError('invalid-argument', 'email required.')
+
+    const emailCfgSnap = await db.collection('email_config').doc('global').get()
+    const emailCfg     = emailCfgSnap.data()
+    const fromEmail    = emailCfg?.fromEmail
+    if (!fromEmail || fromEmail === 'onboarding@resend.dev') {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'No verified sender email configured. Set fromEmail in Admin → Email Settings.'
+      )
+    }
+
+    const resetLink = await admin.auth().generatePasswordResetLink(email, {
+      url: 'https://academy-hub-c252f.web.app/login',
+    })
+
+    await getResend().emails.send({
+      from:    fromEmail,
+      to:      email,
+      subject: 'Reset your CineForge password',
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px">
+          <h2 style="margin-bottom:8px">Reset your password</h2>
+          <p style="color:#555;margin-bottom:24px">
+            An administrator has requested a password reset for your CineForge account.
+            Click the button below to choose a new password.
+          </p>
+          <a href="${resetLink}"
+             style="display:inline-block;background:#f97316;color:white;text-decoration:none;
+                    padding:12px 24px;border-radius:8px;font-weight:600;font-size:15px">
+            Reset password
+          </a>
+          <p style="color:#999;font-size:12px;margin-top:24px">
+            This link expires in 1 hour. If you didn't expect this email, you can ignore it.
+          </p>
+        </div>
+      `,
+    })
+
+    return { success: true }
+  })
+
 // resetPassword — admin sets a new password for any non-admin user
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -599,6 +778,38 @@ export const resetPassword = functions.https.onCall(async (data, context) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
+// dailyFirestoreBackup — export Firestore to Cloud Storage every night at 02:00 Stockholm
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const dailyFirestoreBackup = functions.pubsub
+  .schedule('0 2 * * *')
+  .timeZone('Europe/Stockholm')
+  .onRun(async () => {
+    const projectId  = process.env.GCLOUD_PROJECT ?? 'academy-hub-c252f'
+    const bucket     = `gs://${projectId}.appspot.com`
+    const dateStr    = new Date().toISOString().slice(0, 10)
+    const outputUri  = `${bucket}/firestore-backups/${dateStr}`
+
+    const token = await admin.app().options.credential!.getAccessToken()
+    const res   = await fetch(
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default):exportDocuments`,
+      {
+        method:  'POST',
+        headers: {
+          Authorization:  `Bearer ${token.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ outputUriPrefix: outputUri }),
+      }
+    )
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(`Firestore export failed (${res.status}): ${text}`)
+    }
+    console.log(`Firestore backup started → ${outputUri}`)
+    return null
+  })
+
 // purgeChatMessages — delete messages older than the configured retention window
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -896,6 +1107,47 @@ export const onAssignmentPublished = functions.firestore
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// onSubmissionCreated — push to cohort teachers when a student submits an assignment
+// ─────────────────────────────────────────────────────────────────────────────
+export const onSubmissionCreated = functions.firestore
+  .document('submissions/{submissionId}')
+  .onCreate(async (snap) => {
+    const data = snap.data()
+    if (data.status !== 'submitted') return  // skip auto-graded (status='graded')
+
+    const cohortId    = data.cohortId as string | undefined
+    const studentId   = data.studentId as string | undefined
+    const assignmentId = data.assignmentId as string | undefined
+    if (!cohortId || !studentId) return
+
+    const [cohortSnap, studentSnap, assignmentSnap] = await Promise.all([
+      db.collection('cohorts').doc(cohortId).get(),
+      db.collection('users').doc(studentId).get(),
+      assignmentId ? db.collection('assignments').doc(assignmentId).get() : Promise.resolve(null),
+    ])
+
+    const teacherIds: string[] = cohortSnap.data()?.teacherIds ?? []
+    if (teacherIds.length === 0) return
+
+    const studentName    = studentSnap.data()?.displayName ?? 'A student'
+    const assignmentTitle = assignmentSnap?.data()?.title ?? 'an assignment'
+
+    const teacherSnaps = await Promise.all(teacherIds.map(uid => db.collection('users').doc(uid).get()))
+    const tokens: string[] = []
+    teacherSnaps.forEach(d => tokens.push(...(d.data()?.fcmTokens ?? [])))
+
+    const opts = {
+      title: '📝 Submission ready to grade',
+      body:  `${studentName} submitted "${assignmentTitle}"`,
+      url:   `/teacher/gradebook?submission=${snap.id}`,
+    }
+    await Promise.all([
+      tokens.length > 0 ? sendPush(tokens, { ...opts, tag: 'submission' }) : Promise.resolve(),
+      saveNotifications(teacherIds, opts),
+    ])
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
 // onBookingConfirmed — push to the student who made the booking
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -972,21 +1224,42 @@ export const onChatMessage = functions.firestore
     // Collect FCM tokens — DMs only push to the other member, channels push to all
     const tokens: string[] = []
 
+    const ch = channelDoc.data() ?? {}
+    const isPublic        = ch.isPublic !== false
+    const allowedRoles    = (ch.allowedRoles    ?? []) as string[]
+    const allowedCohortIds = (ch.allowedCohortIds ?? []) as string[]
+    const chMemberIds     = (ch.memberIds        ?? []) as string[]
+
     if (isDM) {
-      const memberIds = (channelDoc.data()?.memberIds ?? []) as string[]
+      // DMs: only notify the other member
       await Promise.all(
-        memberIds.filter(uid => uid !== senderId).map(async uid => {
+        chMemberIds.filter(uid => uid !== senderId).map(async uid => {
           const u = await db.collection('users').doc(uid).get()
           ;(u.data()?.fcmTokens ?? []).forEach((t: string) => { if (t) tokens.push(t) })
         }),
       )
     } else {
+      // Channel: apply same access rules as client-side canAccessChannel()
       const usersSnap = await db.collection('users').get()
       usersSnap.forEach(userDoc => {
         if (userDoc.id === senderId) return
-        const fcmTokens = userDoc.data().fcmTokens
-        if (Array.isArray(fcmTokens)) {
-          fcmTokens.forEach((t: string) => { if (t) tokens.push(t) })
+        const u = userDoc.data()
+        const userRole: string = u.role ?? ''
+        const userRoles: string[] = u.roles?.length ? u.roles : [userRole]
+        const userCohortId: string | null = u.cohortId ?? null
+        const isStaff = userRoles.some((r: string) => r === 'teacher' || r === 'admin')
+
+        const canAccess = isStaff
+          || isPublic && allowedRoles.length === 0 && allowedCohortIds.length === 0 && chMemberIds.length === 0
+          || allowedRoles.some(r => userRoles.includes(r))
+          || chMemberIds.includes(userDoc.id)
+          || (userCohortId !== null && allowedCohortIds.includes(userCohortId))
+
+        if (canAccess) {
+          const fcmTokens = u.fcmTokens
+          if (Array.isArray(fcmTokens)) {
+            fcmTokens.forEach((t: string) => { if (t) tokens.push(t) })
+          }
         }
       })
     }
@@ -996,13 +1269,14 @@ export const onChatMessage = functions.firestore
     // Deduplicate
     const uniqueTokens = [...new Set(tokens)]
 
-    const notifBody = channelName ? `${channelName}\n${messageText}` : messageText
+    const notifBody = channelName ? `#${channelName}\n${messageText}` : messageText
     console.log('onChatMessage: sending', { channelId, isDM, senderName, channelName, tokenCount: uniqueTokens.length })
 
-    // Send in batches of 500 (FCM multicast limit)
+    // Send in batches of 500 (FCM multicast limit), clean up stale tokens
+    const staleTokens: string[] = []
     for (let i = 0; i < uniqueTokens.length; i += 500) {
       const chunk = uniqueTokens.slice(i, i + 500)
-      await admin.messaging().sendEachForMulticast({
+      const resp = await admin.messaging().sendEachForMulticast({
         tokens: chunk,
         // Data-only — service worker's onBackgroundMessage is the sole display path.
         data: {
@@ -1017,6 +1291,27 @@ export const onChatMessage = functions.firestore
           headers: { Urgency: 'high' },
         },
       })
+      resp.responses.forEach((r, idx) => {
+        if (r.error?.code === 'messaging/invalid-registration-token' ||
+            r.error?.code === 'messaging/registration-token-not-registered') {
+          staleTokens.push(chunk[idx])
+        }
+      })
+    }
+
+    // Remove stale tokens from user docs so they don't accumulate
+    if (staleTokens.length > 0) {
+      const staleSet = new Set(staleTokens)
+      const usersWithStale = await db.collection('users')
+        .where('fcmTokens', 'array-contains-any', staleTokens.slice(0, 10))
+        .get()
+      await Promise.all(
+        usersWithStale.docs.map(d =>
+          d.ref.update({
+            fcmTokens: admin.firestore.FieldValue.arrayRemove(...[...staleSet]),
+          }),
+        ),
+      )
     }
 
     return null
@@ -1282,7 +1577,7 @@ function pdfHeatRow(doc: PDFKit.PDFDocument, x: number, y: number, w: number, ca
 const FOOD_BOX_RECIPIENT = 'fredrik.fridlund@regionvarmland.se'
 
 export const sendFoodBoxEmail = functions.runWith({ secrets: ['RESEND_API_KEY'] }).https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  requireTeacherOrAdmin(context)
 
   const d = data as any
   const emailCfg = await getEmailConfig()
@@ -1353,7 +1648,7 @@ export const onPlanComment = functions.firestore
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const sendMinivanEmail = functions.runWith({ secrets: ['RESEND_API_KEY'] }).https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  requireTeacherOrAdmin(context)
 
   const emailCfg = await getEmailConfig()
   if (!emailCfg?.minivanEmail) return { skipped: true }
@@ -1623,8 +1918,54 @@ export const onEquipmentBookingCreated = functions.firestore
       .where('status', '==', 'pending')
       .get()
     if (pendingSnap.size >= 5) {
+      // Notify the student before deleting so they know why it was rejected
+      const studentSnap = await db.collection('users').doc(booking.studentId as string).get()
+      const tokens: string[] = studentSnap.data()?.fcmTokens ?? []
+      await sendPush(tokens, {
+        title: '⚠️ Equipment booking limit reached',
+        body: 'You already have 5 pending requests. Cancel or wait for one to be confirmed before adding more.',
+        url: '/booking/equipment',
+        tag: 'equipment-booking',
+      })
       await snap.ref.delete()
       return null
+    }
+
+    // Enforce equipment access restrictions (filmYear2Only / allowedCohortIds)
+    const studentSnap2 = await db.collection('users').doc(booking.studentId as string).get()
+    const studentData = studentSnap2.data()
+    const items: { equipmentId: string }[] = booking.items ?? []
+    for (const item of items) {
+      if (!item.equipmentId) continue
+      const equipSnap = await db.collection('equipment').doc(item.equipmentId).get()
+      if (!equipSnap.exists) continue
+      const equip = equipSnap.data()!
+      const cohortSnap = studentData?.cohortId
+        ? await db.collection('cohorts').doc(studentData.cohortId).get()
+        : null
+      const programYear: number = cohortSnap?.data()?.programYear ?? 1
+      if (equip.filmYear2Only && programYear !== 2) {
+        await snap.ref.delete()
+        const tokens: string[] = studentData?.fcmTokens ?? []
+        await sendPush(tokens, {
+          title: '🚫 Booking rejected',
+          body: `"${equip.name}" is only available to Year 2 students`,
+          url: '/booking/equipment',
+          tag: 'equipment-booking',
+        })
+        return null
+      }
+      if (equip.allowedCohortIds?.length > 0 && studentData?.cohortId && !equip.allowedCohortIds.includes(studentData.cohortId)) {
+        await snap.ref.delete()
+        const tokens: string[] = studentData?.fcmTokens ?? []
+        await sendPush(tokens, {
+          title: '🚫 Booking rejected',
+          body: `"${equip.name}" is not available for your class`,
+          url: '/booking/equipment',
+          tag: 'equipment-booking',
+        })
+        return null
+      }
     }
 
     await pushToTeachersAndAdmins(
@@ -1651,6 +1992,20 @@ export const onEquipmentBookingUpdated = functions.firestore
       await sendPush(tokens, {
         title: '✅ Equipment booking confirmed',
         body:  `Your equipment for "${after.projectName}" has been confirmed`,
+        url:   '/booking/equipment',
+        tag:   'equipment-booking',
+      })
+    } else if (after.status === 'checked-out') {
+      await sendPush(tokens, {
+        title: '📦 Equipment checked out',
+        body:  `Equipment for "${after.projectName}" has been handed over — remember to return it on time`,
+        url:   '/booking/equipment',
+        tag:   'equipment-booking',
+      })
+    } else if (after.status === 'returned') {
+      await sendPush(tokens, {
+        title: '✅ Equipment returned',
+        body:  `Your equipment for "${after.projectName}" has been marked as returned`,
         url:   '/booking/equipment',
         tag:   'equipment-booking',
       })
@@ -1979,7 +2334,16 @@ export const exportMinivanPdf = functions.https.onCall(async (data, context) => 
 export const sendEventInviteNotifications = functions.https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be signed in')
 
-  const inviteeIds: string[] = data.inviteeIds ?? []
+  // Verify the caller owns the event they are notifying about
+  const eventId: string = data.eventId ?? ''
+  if (!eventId) throw new functions.https.HttpsError('invalid-argument', 'eventId is required')
+  const eventSnap = await db.collection('personal_events').doc(eventId).get()
+  if (!eventSnap.exists) throw new functions.https.HttpsError('not-found', 'Event not found')
+  if (eventSnap.data()!.userId !== context.auth.uid) {
+    throw new functions.https.HttpsError('permission-denied', 'You can only send notifications for events you created')
+  }
+
+  const inviteeIds: string[] = (data.inviteeIds ?? []).slice(0, 50)
   if (!inviteeIds.length) return { sent: 0 }
 
   const organizerName: string = data.organizerName ?? 'Someone'
@@ -2198,8 +2562,12 @@ export const applyAbsencePenalties = functions.pubsub
     for (const lessonDoc of lessonsSnap.docs) {
       const lesson = lessonDoc.data()
 
-      // Skip if already processed
+      // Skip if already processed or doesn't require presence
       if (lesson.penaltiesAppliedAt) continue
+      if (lesson.requiresPresence === false) {
+        await lessonDoc.ref.update({ penaltiesAppliedAt: now })
+        continue
+      }
 
       const lessonId = lessonDoc.id
       const cohortId = lesson.cohortId as string | undefined
@@ -2351,56 +2719,113 @@ export const deleteUserData = functions.https.onCall(async (data, context) => {
 
   const callerDoc = await db.collection('users').doc(context.auth.uid).get()
   const callerRole = callerDoc.data()?.role ?? context.auth.token.role
-  if (uid !== context.auth.uid && callerRole !== 'admin') {
+  const isAdmin    = callerRole === 'admin'
+  if (uid !== context.auth.uid && !isAdmin) {
     throw new functions.https.HttpsError('permission-denied', 'You may only delete your own account.')
   }
 
-  const batch = db.batch()
+  // BulkWriter auto-chunks unlimited writes (Firestore batches cap at 500).
+  const bulk = db.bulkWriter()
+  let stage = 'init'
 
-  // Collections to delete outright
-  const ownedCollections = [
-    db.collection('points_log').where('studentId', '==', uid),
-    db.collection('submissions').where('studentId', '==', uid),
-    db.collection('todos').where('studentId', '==', uid),
-    db.collection('room_bookings').where('studentId', '==', uid),
-    db.collection('absence_reports').where('studentId', '==', uid),
-    db.collection('minivan_bookings').where('studentId', '==', uid),
-    db.collection('food_box_orders').where('studentId', '==', uid),
-    db.collection('prize_claims').where('studentId', '==', uid),
-  ]
+  try {
+    // Simple owned collections — delete outright
+    stage = 'owned-queries'
+    const ownedQueries = [
+      db.collection('points_log').where('studentId', '==', uid),
+      db.collection('submissions').where('studentId', '==', uid),
+      db.collection('todos').where('studentId', '==', uid),
+      db.collection('room_bookings').where('studentId', '==', uid),
+      db.collection('absence_reports').where('studentId', '==', uid),
+      db.collection('minivan_bookings').where('studentId', '==', uid),
+      db.collection('food_box_orders').where('studentId', '==', uid),
+      db.collection('prize_claims').where('studentId', '==', uid),
+      db.collection('notifications').where('uid', '==', uid),
+      db.collection('personal_events').where('userId', '==', uid),
+      db.collection('equipment_bookings').where('studentId', '==', uid),
+      db.collection('teacher_assessments').where('studentId', '==', uid),
+      db.collection('bug_reports').where('uid', '==', uid),
+    ]
+    const snaps = await Promise.all(ownedQueries.map(q => q.get().catch(err => {
+      console.warn('deleteUserData: owned query failed', err?.message)
+      return { docs: [] as FirebaseFirestore.QueryDocumentSnapshot[] }
+    })))
+    for (const snap of snaps) for (const d of snap.docs) bulk.delete(d.ref)
 
-  const snaps = await Promise.all(ownedCollections.map(q => q.get()))
-  for (const snap of snaps) {
-    for (const d of snap.docs) batch.delete(d.ref)
+    // Anonymise attendance records (best-effort — collectionGroup index may be missing)
+    stage = 'attendance'
+    try {
+      const attendanceSnap = await db.collectionGroup('attendance').where('studentId', '==', uid).get()
+      for (const d of attendanceSnap.docs) bulk.update(d.ref, { studentName: 'Deleted User' })
+    } catch (err: any) {
+      console.warn('deleteUserData: attendance anonymise skipped', err?.message)
+    }
+
+    // Remove user from personal_events inviteeIds they were invited to
+    stage = 'personal-events-invitees'
+    const invitedSnap = await db.collection('personal_events').where('inviteeIds', 'array-contains', uid).get()
+    for (const d of invitedSnap.docs) {
+      const ids: string[] = d.data().inviteeIds ?? []
+      bulk.update(d.ref, { inviteeIds: ids.filter(id => id !== uid) })
+    }
+
+    // Remove user from DM chat channels (leave non-DM channels as-is for history)
+    stage = 'dm-channels'
+    const dmSnap = await db.collection('chat_channels')
+      .where('isDM', '==', true)
+      .where('memberIds', 'array-contains', uid)
+      .get()
+    for (const d of dmSnap.docs) {
+      const members: string[] = d.data().memberIds ?? []
+      const remaining = members.filter(id => id !== uid)
+      if (remaining.length === 0) bulk.delete(d.ref)
+      else bulk.update(d.ref, { memberIds: remaining })
+    }
+
+    // Delete development plan and its teacher comments
+    stage = 'plans'
+    bulk.delete(db.collection('development_plans').doc(uid))
+    const planCommentsSnap = await db.collection('plan_comments').where('studentId', '==', uid).get()
+    for (const d of planCommentsSnap.docs) bulk.delete(d.ref)
+
+    // Delete teacher assessments doc keyed by studentId
+    bulk.delete(db.collection('teacher_assessments').doc(uid))
+
+    // Delete user doc
+    bulk.delete(db.collection('users').doc(uid))
+
+    stage = 'bulk-close'
+    await bulk.close()
+  } catch (err: any) {
+    console.error(`deleteUserData failed at stage=${stage}`, err)
+    throw new functions.https.HttpsError('internal', `Delete failed at ${stage}: ${err?.message ?? err}`)
   }
 
-  // Anonymise attendance records (school keeps stats, not PII)
-  const attendanceSnap = await db.collectionGroup('attendance').where('studentId', '==', uid).get()
-  for (const d of attendanceSnap.docs) {
-    batch.update(d.ref, { studentName: 'Deleted User', studentId: uid })
-  }
+  // Delete avatar from Storage (best-effort)
+  try {
+    await admin.storage().bucket().file(`avatars/${uid}`).delete()
+  } catch { /* no avatar or already gone */ }
 
-  // Delete development plan
-  batch.delete(db.collection('development_plans').doc(uid))
-
-  // Delete plan comments authored by or about this user
-  const planCommentsSnap = await db.collection('plan_comments').where('studentId', '==', uid).get()
-  for (const d of planCommentsSnap.docs) batch.delete(d.ref)
-
-  // Delete user doc
-  batch.delete(db.collection('users').doc(uid))
-
-  await batch.commit()
-
-  // Delete Firebase Auth account
+  // Revoke tokens then delete Firebase Auth account
+  try { await admin.auth().revokeRefreshTokens(uid) } catch { /* best-effort */ }
   try {
     await admin.auth().deleteUser(uid)
   } catch (err: any) {
-    // Account may already be deleted — not fatal
     console.warn('deleteUserData: auth delete skipped', err?.message)
   }
 
-  console.log(`deleteUserData: deleted data for uid=${uid}`)
+  // Write GDPR deletion log
+  try {
+    await db.collection('deletion_log').add({
+      uid,
+      deletedBy:  isAdmin ? context.auth.uid : uid,
+      deletedAt:  admin.firestore.FieldValue.serverTimestamp(),
+      method:     isAdmin ? 'admin-panel' : 'self-service',
+    })
+  } catch (err: any) {
+    console.warn('deleteUserData: deletion_log write failed', err?.message)
+  }
+
   return { success: true }
 })
 
@@ -2417,6 +2842,7 @@ export const disableUser = functions.https.onCall(async (data, context) => {
   }
   const { uid } = data as { uid: string }
   await admin.auth().updateUser(uid, { disabled: true })
+  await admin.auth().revokeRefreshTokens(uid)
   await db.collection('users').doc(uid).update({ disabled: true, isActive: false })
   return { success: true }
 })
@@ -2948,6 +3374,42 @@ export const inspectUserClaims = functions.https.onCall(async (data, context) =>
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// setUserRole — admin sets a user's primary role and updates Auth custom claims immediately
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const setUserRole = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  if (context.auth.token.role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'Admin only.')
+
+  const { uid, role, roles } = data as { uid: string; role: string; roles: string[] }
+  if (!uid || !role) throw new functions.https.HttpsError('invalid-argument', 'uid and role required.')
+  if (uid === context.auth.uid) throw new functions.https.HttpsError('permission-denied', 'Admins cannot change their own role.')
+  const allowedRoles = ['student', 'teacher', 'admin']
+  if (!allowedRoles.includes(role)) throw new functions.https.HttpsError('invalid-argument', 'Invalid role.')
+  if (!Array.isArray(roles) || roles.some(r => !allowedRoles.includes(r))) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid roles array.')
+  }
+  // Enforce role combination rules: students can't have staff roles; staff can't have student role
+  const isStaffRole = (r: string) => r === 'teacher' || r === 'admin'
+  if (role === 'student' && roles.some(isStaffRole)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Students cannot have teacher or admin roles.')
+  }
+  if (isStaffRole(role) && roles.includes('student')) {
+    throw new functions.https.HttpsError('invalid-argument', 'Teachers and admins cannot have the student role.')
+  }
+
+  let userRecord: admin.auth.UserRecord
+  try { userRecord = await admin.auth().getUser(uid) } catch {
+    throw new functions.https.HttpsError('not-found', 'User not found in Firebase Auth.')
+  }
+  const existingClaims = userRecord.customClaims ?? {}
+  await admin.auth().setCustomUserClaims(uid, { ...existingClaims, role, cohortId: null })
+  await db.collection('users').doc(uid).update({ role, roles })
+
+  return { success: true }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 // fixAllTeacherClaims — admin: scan all teacher/admin users and clear stale cohortId claims
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2977,6 +3439,51 @@ export const fixAllTeacherClaims = functions.https.onCall(async (data, context) 
   }
 
   return { scanned: results.length, fixed: results.filter(r => r.fixed).length, results }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// findDuplicateUserDocs — finds users/{uid} docs where doc.id !== doc.uid field
+// (orphan docs from old seeding scripts or addDoc creation paths).
+// Pass { merge: true } to merge each orphan into the canonical doc and delete it.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const findDuplicateUserDocs = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  if (context.auth.token.role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'Admin only.')
+
+  const merge = data?.merge === true
+  const snap  = await db.collection('users').get()
+
+  type Result = { docId: string; uid: string | null; email: string | null; action: string }
+  const results: Result[] = []
+
+  for (const d of snap.docs) {
+    const uid: string | null = d.data().uid ?? null
+    if (!uid || uid === d.id) continue  // no uid field or already canonical
+
+    const result: Result = { docId: d.id, uid, email: d.data().email ?? null, action: 'found' }
+
+    if (merge) {
+      // Check if canonical doc (doc.id === uid) already exists
+      const canonicalRef = db.collection('users').doc(uid)
+      const canonical    = await canonicalRef.get()
+
+      if (canonical.exists) {
+        // Canonical doc exists — just delete the orphan
+        await d.ref.delete()
+        result.action = 'deleted-orphan'
+      } else {
+        // No canonical doc — migrate orphan to the correct UID-keyed doc
+        await canonicalRef.set(d.data())
+        await d.ref.delete()
+        result.action = 'migrated-to-canonical'
+      }
+    }
+
+    results.push(result)
+  }
+
+  return { total: snap.size, orphans: results.length, results }
 })
 
 export const receiveOfficeCalendarEvent = functions.https.onRequest(async (req, res) => {
@@ -3048,8 +3555,10 @@ export const receiveOfficeCalendarEvent = functions.https.onRequest(async (req, 
 
     if (isDelete) {
       await eventRef.delete()
-      // Also scan for any docs with same externalId but different syncId prefix (safety net)
+      // Safety net: delete any stale docs for this syncId with the same externalId
+      // (scoped to syncId so duplicated shared events in other calendars are not affected)
       const staleSnap = await db.collection('synced_events')
+        .where('syncId', '==', syncId)
         .where('externalId', '==', body.externalId)
         .get()
       if (!staleSnap.empty) {
@@ -3079,6 +3588,23 @@ export const receiveOfficeCalendarEvent = functions.https.onRequest(async (req, 
         source:     'office365',
         updatedAt:  admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true })
+
+      // Deduplicate: if Outlook changed the externalId (e.g. event moved between calendars),
+      // stale docs with the same syncId + title + startTime will remain. Delete them.
+      const staleByTitle = await db.collection('synced_events')
+        .where('syncId', '==', syncId)
+        .where('startTime', '==', admin.firestore.Timestamp.fromDate(startDate))
+        .get()
+      const newTitleNorm = (body.subject ?? '').trim().toLowerCase()
+      const staleDocs = staleByTitle.docs.filter(d =>
+        d.id !== docId && d.data().title?.trim?.().toLowerCase() === newTitleNorm,
+      )
+      if (staleDocs.length > 0) {
+        const batch = db.batch()
+        staleDocs.forEach(d => batch.delete(d.ref))
+        await batch.commit()
+        console.log('[officeSync] deduped', staleDocs.length, 'stale doc(s) for', body.subject, startDate.toISOString())
+      }
     }
 
     await syncSnap.ref.update({
@@ -3091,4 +3617,89 @@ export const receiveOfficeCalendarEvent = functions.https.onRequest(async (req, 
     console.error('receiveOfficeCalendarEvent failed', err)
     res.status(500).json({ error: err?.message ?? 'Unknown error' })
   }
+})
+
+// ── One-time migration: copy cohorts → classes ───────────────────────────────
+export const migrateCohortsToClasses = functions.https.onCall(async (_data, context) => {
+  if (!context.auth || context.auth.token.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Admin only.')
+  }
+  const snap = await db.collection('cohorts').get()
+  if (snap.empty) return { copied: 0, message: 'No cohorts found.' }
+  const batch = db.batch()
+  snap.docs.forEach(d => batch.set(db.collection('classes').doc(d.id), d.data()))
+  await batch.commit()
+  return { copied: snap.size, message: `Copied ${snap.size} cohorts → classes.` }
+})
+
+// ── sendGuestTeacherBookingEmail ──────────────────────────────────────────────
+export const sendGuestTeacherBookingEmail = functions.runWith({ secrets: ['RESEND_API_KEY'] }).https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+
+  const { guestTeacherId, lessonId } = data as { guestTeacherId: string; lessonId: string }
+
+  const [guestSnap, lessonSnap] = await Promise.all([
+    db.collection('guest_teachers').doc(guestTeacherId).get(),
+    db.collection('lessons').doc(lessonId).get(),
+  ])
+
+  if (!guestSnap.exists) throw new functions.https.HttpsError('not-found', 'Guest teacher not found.')
+  if (!lessonSnap.exists) throw new functions.https.HttpsError('not-found', 'Lesson not found.')
+
+  const guest  = guestSnap.data() as any
+  const lesson = lessonSnap.data() as any
+
+  if (!guest.email) throw new functions.https.HttpsError('failed-precondition', 'No email assigned to this guest teacher.')
+
+  let subjectTitle = ''
+  if (lesson.subjectId) {
+    const subSnap = await db.collection('subjects').doc(lesson.subjectId).get()
+    if (subSnap.exists) subjectTitle = (subSnap.data() as any).title ?? ''
+  }
+
+  const emailCfg  = await getEmailConfig()
+  const fromName  = emailCfg?.fromName  || 'CineForge'
+  const fromEmail = emailCfg?.fromEmail || 'onboarding@resend.dev'
+
+  function fmtDate(d: Date) {
+    const days   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December']
+    return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`
+  }
+  function fmtTime(d: Date) {
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+  }
+
+  const startDate = lesson.startTime?.toDate?.()
+  const endDate   = lesson.endTime?.toDate?.()
+  const dateStr   = startDate ? fmtDate(startDate) : 'TBD'
+  const timeStr   = startDate ? fmtTime(startDate) + (endDate ? `–${fmtTime(endDate)}` : '') : 'TBD'
+  const location  = lesson.isOnline ? (lesson.classroom || 'Online') : (lesson.classroom || 'TBD')
+
+  const row = (label: string, value: string) =>
+    `<tr><td style="padding:10px 16px;font-weight:600;color:#888;width:110px;border-top:1px solid #eee;">${label}</td><td style="padding:10px 16px;border-top:1px solid #eee;">${escapeHtml(value)}</td></tr>`
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#1a1a1a;">
+      <h2 style="color:#1a1a1a;margin-bottom:8px;">Booking Confirmation</h2>
+      <p style="color:#555;margin-bottom:24px;">Hi ${escapeHtml(guest.name)}, you have been booked for the following lesson:</p>
+      <table style="width:100%;border-collapse:collapse;background:#f9f9f9;border-radius:8px;overflow:hidden;">
+        <tr><td style="padding:10px 16px;font-weight:600;color:#888;width:110px;">Lesson</td><td style="padding:10px 16px;">${escapeHtml(lesson.title)}</td></tr>
+        ${subjectTitle ? row('Subject', subjectTitle) : ''}
+        ${row('Date', dateStr)}
+        ${row('Time', timeStr)}
+        ${row('Location', location)}
+      </table>
+      <p style="color:#aaa;font-size:12px;margin-top:24px;">Sent via ${escapeHtml(fromName)}</p>
+    </div>
+  `
+
+  await getResend().emails.send({
+    from:    `${fromName} <${fromEmail}>`,
+    to:      [guest.email],
+    subject: `Booking confirmation: ${lesson.title}`,
+    html,
+  })
+
+  return { ok: true }
 })

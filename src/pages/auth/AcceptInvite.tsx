@@ -125,8 +125,16 @@ export default function AcceptInvite() {
         },
       })
 
+      // Force a token refresh so request.auth.token.email is populated for the invitation rule.
+      // Best-effort — Auth's email uniqueness prevents re-use of the same invite email, so
+      // leaving used:false is harmless if the update rule still rejects (e.g. legacy data).
       stage = 'mark-invite-used'
-      await updateDoc(doc(db, 'invitations', token), { used: true })
+      try {
+        await cred.user.getIdToken(true)
+        await updateDoc(doc(db, 'invitations', token), { used: true })
+      } catch (err) {
+        console.warn('mark-invite-used failed (continuing anyway):', err)
+      }
 
       // For teacher invites with a cohort, add them to the cohort's teacherIds.
       // Best-effort — a fresh teacher account has no admin/teacher claim yet, so the

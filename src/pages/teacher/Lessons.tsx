@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
 import { shortDate, timeStr, toDate } from '@/lib/utils'
 import type { LessonDoc, SubjectDoc, CohortDoc, LessonBlockDoc, SemesterSettingsDoc, LessonCategoryDoc, UserDoc, PersonalEventDoc, SyncedEventDoc, GuestTeacherDoc } from '@/types'
-import { Plus, Pencil, Trash2, CalendarDays, List, X, QrCode, Circle, SlidersHorizontal, ChevronDown, Check, MapPin } from 'lucide-react'
+import { Plus, Pencil, Trash2, CalendarDays, List, X, QrCode, Circle, SlidersHorizontal, ChevronDown, Check, MapPin, Download } from 'lucide-react'
 import { markCalendarInvitesSeen } from '@/hooks/useCalendarInviteBadge'
 import AnnualPlanWheel from '@/components/calendar/AnnualPlanWheel'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
@@ -69,9 +69,10 @@ interface SelectedLesson {
   color: string
   classroom?: string
   isOnline?: boolean
+  requiresPresence?: boolean
 }
 
-function LessonAttendance({ lessonId, cohortId }: { lessonId: string; cohortId?: string }) {
+function LessonAttendance({ lessonId, cohortId, startTime }: { lessonId: string; cohortId?: string; startTime?: Date | null }) {
   const { data: cohortStudents } = useCollection<UserDoc>(
     'users',
     cohortId ? [where('cohortId', '==', cohortId), where('role', '==', 'student')] : [],
@@ -88,7 +89,11 @@ function LessonAttendance({ lessonId, cohortId }: { lessonId: string; cohortId?:
   }, [lessonId])
 
   const checkedInSet = useMemo(() => new Set(attendees.map(a => a.studentId)), [attendees])
-  const absent = useMemo(() => cohortStudents.filter(s => !checkedInSet.has(s.uid)), [cohortStudents, checkedInSet])
+  const isPastLesson = startTime ? startTime <= new Date() : true
+  const absent = useMemo(
+    () => isPastLesson ? cohortStudents.filter(s => !checkedInSet.has(s.uid)) : [],
+    [cohortStudents, checkedInSet, isPastLesson],
+  )
   const sorted = useMemo(
     () => [...attendees].sort((a, b) => (a.checkedInAt?.toMillis?.() ?? 0) - (b.checkedInAt?.toMillis?.() ?? 0)),
     [attendees],
@@ -153,17 +158,26 @@ function isoWeek(date: Date): number {
 interface SchoolDayDoc { id: string; startTime: string; endTime: string }
 
 export default function Lessons() {
-  const { profile } = useAuth()
+  const { profile, role, roles } = useAuth()
+  const isTeacher = (roles ?? []).some(r => r === 'teacher' || r === 'admin') || role === 'teacher' || role === 'admin'
   const navigate    = useNavigate()
   const { startAttendance } = useAttendance()
-  const [showGhostBlocks,       setShowGhostBlocks]       = useState(true)
+  const [showGhostBlocks,       setShowGhostBlocks]       = useState(false)
   const [editingSyncedEvent,      setEditingSyncedEvent]      = useState<SyncedEventDoc | null>(null)
   const [syncedEditTitle,         setSyncedEditTitle]         = useState('')
   const [syncedEditLocation,      setSyncedEditLocation]      = useState('')
   const [syncedEditNotes,         setSyncedEditNotes]         = useState('')
   const [syncedEditTeachers,      setSyncedEditTeachers]      = useState<string[]>([])
   const [syncedEditGuestTeachers, setSyncedEditGuestTeachers] = useState<string[]>([])
-  const [savingSyncedEdit,        setSavingSyncedEdit]        = useState(false)
+  const [syncedEditSubjectId,          setSyncedEditSubjectId]          = useState<string>('')
+  const [syncedEditCategoryId,         setSyncedEditCategoryId]         = useState<string>('')
+  const [syncedEditCoveredCurriculumIds, setSyncedEditCoveredCurriculumIds] = useState<string[]>([])
+  const [syncedEditDescription,   setSyncedEditDescription]   = useState('')
+  const [syncedEditEmoji,         setSyncedEditEmoji]         = useState('')
+  const [syncedEditIsOnline,           setSyncedEditIsOnline]           = useState(false)
+  const [syncedEditRequireAttendance,  setSyncedEditRequireAttendance]  = useState(true)
+  const [syncedEditClassroom,          setSyncedEditClassroom]          = useState('')
+  const [savingSyncedEdit,             setSavingSyncedEdit]             = useState(false)
   const [syncedEditExpanded,      setSyncedEditExpanded]      = useState(false)
   const [view,             setView]             = useState<'calendar' | 'list' | 'wheel'>('calendar')
   const [deleting,         setDeleting]         = useState<string | null>(null)
@@ -193,16 +207,80 @@ export default function Lessons() {
   const [editInviteeIds,   setEditInviteeIds]   = useState<string[]>([])
   const [editInviteeSearch, setEditInviteeSearch] = useState('')
   const [viewingInvitedEvent, setViewingInvitedEvent] = useState<PersonalEventDoc | null>(null)
-  const calendarRef = useRef<FullCalendar>(null)
+  const calendarRef     = useRef<FullCalendar>(null)
+  const calendarCardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (profile?.uid) markCalendarInvitesSeen(profile.uid)
   }, [profile?.uid])
 
+  useEffect(() => {
+    const card = calendarCardRef.current
+    if (!card) return
+
+    let scheduled = false
+    let obs: MutationObserver | null = null
+    function sync() {
+      scheduled = false
+      const card = calendarCardRef.current
+      if (!card) return
+      obs?.disconnect()
+      try {
+        card.querySelectorAll('.x-now-ext').forEach(el => el.remove())
+
+        const body = card.querySelector<HTMLElement>('.fc-timegrid-body')
+        const todayLine = card.querySelector<HTMLElement>(
+          '.fc-timegrid-col.fc-day-today .fc-timegrid-now-indicator-line',
+        )
+        if (!body || !todayLine) return
+
+        const bodyRect = body.getBoundingClientRect()
+        const lineRect = todayLine.getBoundingClientRect()
+        const topPx = lineRect.top - bodyRect.top
+
+        const dayCols = Array.from(card.querySelectorAll<HTMLElement>(
+          '.fc-timegrid-col:not(.fc-timegrid-axis)',
+        ))
+        if (dayCols.length === 0) return
+        const firstRect = dayCols[0].getBoundingClientRect()
+        const lastRect  = dayCols[dayCols.length - 1].getBoundingClientRect()
+        const leftPx  = firstRect.left - bodyRect.left
+        const widthPx = lastRect.right - firstRect.left
+
+        const el = document.createElement('div')
+        el.className = 'x-now-ext'
+        el.style.cssText = `position:absolute;top:${topPx}px;left:${leftPx}px;width:${widthPx}px;height:0;border-top:2px solid #f26419;pointer-events:none;z-index:5;`
+        body.appendChild(el)
+      } finally {
+        obs?.observe(card, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] })
+      }
+    }
+    function schedule() {
+      if (scheduled) return
+      scheduled = true
+      requestAnimationFrame(sync)
+    }
+
+    const t1 = setTimeout(sync, 400)
+    const t2 = setTimeout(sync, 1200)
+    const id = setInterval(sync, 60_000)
+    obs = new MutationObserver(schedule)
+    obs.observe(card, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] })
+    window.addEventListener('resize', schedule)
+    card.addEventListener('scroll', schedule, true)
+
+    return () => {
+      clearTimeout(t1); clearTimeout(t2); clearInterval(id)
+      obs?.disconnect()
+      window.removeEventListener('resize', schedule)
+      card?.removeEventListener('scroll', schedule, true)
+      calendarCardRef.current?.querySelectorAll('.x-now-ext').forEach(el => el.remove())
+    }
+  }, [mobileView])
+
   const { data: rawLessons, loading } = useCollection<LessonDoc>(
     'lessons',
-    profile ? [where('teacherIds', 'array-contains', profile.uid)] : [],
-    !!profile,
+    [],
   )
   const lessons = useMemo(
     () => [...rawLessons].sort((a, b) => (a.startTime?.toMillis?.() ?? 0) - (b.startTime?.toMillis?.() ?? 0)),
@@ -215,6 +293,11 @@ export default function Lessons() {
   const { data: schoolDay   } = useDocument<SchoolDayDoc>('settings', 'schoolDay')
   const { data: semesterDoc } = useDocument<SemesterSettingsDoc>('settings', 'semester')
   const { data: categories  } = useCollection<LessonCategoryDoc>('lessonCategories', [orderBy('order', 'asc')])
+
+  const syncedEditCurriculumItems = useMemo(() => {
+    const subj = subjects.find(s => s.id === syncedEditSubjectId)
+    return [...(subj?.curriculum ?? [])].sort((a, b) => a.title.localeCompare(b.title))
+  }, [subjects, syncedEditSubjectId])
 
   // Other teachers for filter panel — include anyone with teacher in their roles array
   const { data: allTeacherUsers } = useCollection<UserDoc>(
@@ -322,8 +405,9 @@ export default function Lessons() {
         color,
         start:        startDate,
         end:          endDate,
-        classroom:    l.classroom,
-        isOnline:     l.isOnline,
+        classroom:        l.classroom,
+        isOnline:         l.isOnline,
+        requiresPresence: l.requiresPresence !== false,
       },
     }
 
@@ -456,12 +540,13 @@ export default function Lessons() {
 
   const syncedEventInputs: EventInput[] = useMemo(() => {
     return syncedEvents.map(e => {
-      const cohortObj = cohortMap[e.cohortId]
-      const cohortIdx = cohorts.findIndex(c => c.id === e.cohortId)
-      const color = cohortObj?.color ?? (cohortIdx >= 0 ? COHORT_FALLBACK_COLORS[cohortIdx % COHORT_FALLBACK_COLORS.length] : '#0078d4')
+      const cohortObj   = cohortMap[e.cohortId]
+      const cohortIdx   = cohorts.findIndex(c => c.id === e.cohortId)
+      const categoryObj = categories.find(c => c.id === e.categoryId)
+      const color = categoryObj?.color ?? cohortObj?.color ?? (cohortIdx >= 0 ? COHORT_FALLBACK_COLORS[cohortIdx % COHORT_FALLBACK_COLORS.length] : '#0078d4')
       return {
         id:    `synced-${e.id}`,
-        title: `📅 ${e.customTitle || e.title}`,
+        title: `${e.iconEmoji ? e.iconEmoji + ' ' : '📅 '}${e.customTitle || e.title}`,
         start: toDate(e.startTime) ?? undefined,
         end:   e.endTime ? toDate(e.endTime) ?? undefined : undefined,
         allDay: e.allDay,
@@ -470,7 +555,7 @@ export default function Lessons() {
         extendedProps: { isSynced: true, location: e.location, cohortId: e.cohortId },
       }
     })
-  }, [syncedEvents, cohortMap, cohorts])
+  }, [syncedEvents, cohortMap, cohorts, categories])
 
   // Filtered lesson events (by cohort toggle)
   const filteredLessonEvents = useMemo(
@@ -479,8 +564,8 @@ export default function Lessons() {
   )
 
   const allEvents = useMemo(
-    () => [...(showGhostBlocks ? ghostEvents : []), ...filteredLessonEvents, ...semesterEvents, ...personalEventInputs, ...invitedEventInputs, ...syncedEventInputs],
-    [showGhostBlocks, ghostEvents, filteredLessonEvents, semesterEvents, personalEventInputs, invitedEventInputs, syncedEventInputs],
+    () => [...(isTeacher && showGhostBlocks ? ghostEvents : []), ...filteredLessonEvents, ...semesterEvents, ...personalEventInputs, ...invitedEventInputs, ...syncedEventInputs],
+    [isTeacher, showGhostBlocks, ghostEvents, filteredLessonEvents, semesterEvents, personalEventInputs, invitedEventInputs, syncedEventInputs],
   )
 
   const dayDetailLessons = useMemo(() => {
@@ -533,6 +618,153 @@ export default function Lessons() {
     setDeleting(null)
   }
 
+  async function exportWeekPdf() {
+    const api = calendarRef.current?.getApi()
+    let rangeStart: Date
+    let rangeEnd: Date
+    if (api) {
+      rangeStart = new Date(api.view.activeStart)
+      rangeEnd   = new Date(api.view.activeEnd)
+    } else {
+      const today = new Date()
+      const dow   = today.getDay()
+      const mondayOffset = dow === 0 ? -6 : 1 - dow
+      rangeStart = new Date(today); rangeStart.setDate(today.getDate() + mondayOffset); rangeStart.setHours(0,0,0,0)
+      rangeEnd   = new Date(rangeStart); rangeEnd.setDate(rangeStart.getDate() + 7)
+    }
+
+    type Row = { time: string; sortKey: number; title: string; location: string; cohort: string; allDay: boolean }
+    const days: { date: Date; label: string; rows: Row[] }[] = []
+    const cur = new Date(rangeStart)
+    while (cur < rangeEnd) {
+      days.push({
+        date: new Date(cur),
+        label: cur.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' }),
+        rows: [],
+      })
+      cur.setDate(cur.getDate() + 1)
+    }
+
+    function pushRow(dayIdx: number, r: Row) {
+      if (dayIdx < 0 || dayIdx >= days.length) return
+      days[dayIdx].rows.push(r)
+    }
+    function dayIndexOf(d: Date) {
+      const dCopy = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+      const startCopy = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), rangeStart.getDate())
+      return Math.round((dCopy.getTime() - startCopy.getTime()) / 86400000)
+    }
+    function fmtTime(d: Date) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+    }
+    function inRange(d: Date | null | undefined) {
+      return !!d && d >= rangeStart && d < rangeEnd
+    }
+
+    for (const l of lessons) {
+      if (activeCohortIds[l.cohortId] === false) continue
+      const s = toDate(l.startTime)
+      const e = toDate(l.endTime)
+      if (!inRange(s)) continue
+      const cohort = cohortMap[l.cohortId]?.name ?? ''
+      const location = l.isOnline ? 'Online' : (l.classroom ?? '')
+      pushRow(dayIndexOf(s!), {
+        time: e ? `${fmtTime(s!)}–${fmtTime(e)}` : fmtTime(s!),
+        sortKey: s!.getTime(),
+        title: l.title,
+        location,
+        cohort,
+        allDay: false,
+      })
+    }
+    for (const ev of myPersonalEvents) {
+      const s = toDate(ev.startTime)
+      const e = toDate(ev.endTime)
+      if (!inRange(s)) continue
+      pushRow(dayIndexOf(s!), {
+        time: ev.allDay ? 'All day' : (e ? `${fmtTime(s!)}–${fmtTime(e)}` : fmtTime(s!)),
+        sortKey: ev.allDay ? -1 : s!.getTime(),
+        title: ev.title,
+        location: ev.location ?? '',
+        cohort: 'Personal',
+        allDay: !!ev.allDay,
+      })
+    }
+    for (const ev of invitedPersonalEvents) {
+      const s = toDate(ev.startTime)
+      const e = toDate(ev.endTime)
+      if (!inRange(s)) continue
+      pushRow(dayIndexOf(s!), {
+        time: ev.allDay ? 'All day' : (e ? `${fmtTime(s!)}–${fmtTime(e)}` : fmtTime(s!)),
+        sortKey: ev.allDay ? -1 : s!.getTime(),
+        title: `${ev.organizerName ?? 'Invite'}: ${ev.title}`,
+        location: ev.location ?? '',
+        cohort: 'Invited',
+        allDay: !!ev.allDay,
+      })
+    }
+    for (const ev of syncedEvents) {
+      if (activeCohortIds[ev.cohortId] === false) continue
+      const s = toDate(ev.startTime)
+      const e = toDate(ev.endTime)
+      if (!inRange(s)) continue
+      const cohort = cohortMap[ev.cohortId]?.name ?? ''
+      pushRow(dayIndexOf(s!), {
+        time: ev.allDay ? 'All day' : (e ? `${fmtTime(s!)}–${fmtTime(e)}` : fmtTime(s!)),
+        sortKey: ev.allDay ? -1 : s!.getTime(),
+        title: ev.customTitle || ev.title,
+        location: ev.location ?? '',
+        cohort,
+        allDay: !!ev.allDay,
+      })
+    }
+    for (const day of days) day.rows.sort((a, b) => a.sortKey - b.sortKey)
+
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+    const pdf = new jsPDF({ orientation: 'landscape' })
+    const weekNum = isoWeek(rangeStart)
+    const rangeLabel = `${rangeStart.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })} – ${new Date(rangeEnd.getTime() - 86400000).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}`
+    pdf.setFontSize(16)
+    pdf.text(`Weekly Schedule — Week ${weekNum}`, 14, 16)
+    pdf.setFontSize(10)
+    pdf.setTextColor(120)
+    pdf.text(rangeLabel, 14, 22)
+    pdf.text(`Exported ${new Date().toLocaleString('sv-SE')}`, 14, 27)
+
+    let y = 34
+    for (const day of days) {
+      if (day.rows.length === 0) continue
+      if (y > 180) { pdf.addPage(); y = 18 }
+      pdf.setFontSize(12)
+      pdf.setTextColor(30)
+      pdf.text(day.label, 14, y)
+      y += 3
+      autoTable(pdf, {
+        startY: y,
+        head: [['Time', 'Lesson / Event', 'Location', 'Class']],
+        body: day.rows.map(r => [r.time, r.title, r.location || '—', r.cohort || '—']),
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: [60, 60, 80] },
+        columnStyles: {
+          0: { cellWidth: 30 },
+          1: { cellWidth: 'auto' },
+          2: { cellWidth: 60 },
+          3: { cellWidth: 40 },
+        },
+        margin: { left: 14, right: 14 },
+      })
+      y = (pdf as any).lastAutoTable.finalY + 8
+    }
+    if (days.every(d => d.rows.length === 0)) {
+      pdf.setFontSize(11)
+      pdf.setTextColor(80)
+      pdf.text('No lessons or events scheduled for this week.', 14, y)
+    }
+
+    pdf.save(`weekly-schedule-w${weekNum}-${rangeStart.toISOString().slice(0, 10)}.pdf`)
+  }
+
   function openEditEvent(event: PersonalEventDoc) {
     const startDate = event.startTime?.toDate?.()
     const endDate   = event.endTime?.toDate?.()
@@ -582,11 +814,11 @@ export default function Lessons() {
       })
       const fn = httpsCallable(functions, 'sendEventInviteNotifications')
       if (removedIds.length > 0) {
-        fn({ inviteeIds: removedIds, organizerName: profile?.displayName, title: editTitle.trim(), canceled: true })
+        fn({ eventId: editingEvent.id, inviteeIds: removedIds, organizerName: profile?.displayName, title: editTitle.trim(), canceled: true })
           .catch(e => console.error('cancel notify failed', e))
       }
       if (addedIds.length > 0) {
-        fn({ inviteeIds: addedIds, organizerName: profile?.displayName, title: editTitle.trim(),
+        fn({ eventId: editingEvent.id, inviteeIds: addedIds, organizerName: profile?.displayName, title: editTitle.trim(),
           dateStr: editDate, timeStr: editingEvent.allDay ? 'All day' : editStart,
           location: editLocation.trim(),
         }).catch(e => console.error('invite notify failed', e))
@@ -603,7 +835,7 @@ export default function Lessons() {
       await deleteDoc(doc(db, 'personal_events', editingEvent.id))
       if (allInvitees.length > 0) {
         const fn = httpsCallable(functions, 'sendEventInviteNotifications')
-        fn({ inviteeIds: allInvitees, organizerName: profile?.displayName, title: editingEvent.title, canceled: true })
+        fn({ eventId: editingEvent.id, inviteeIds: allInvitees, organizerName: profile?.displayName, title: editingEvent.title, canceled: true })
           .catch(e => console.error('cancel notify failed', e))
       }
       closeEditEvent()
@@ -634,6 +866,14 @@ export default function Lessons() {
     setSyncedEditNotes(e.notes ?? '')
     setSyncedEditTeachers(e.teacherIds ?? [])
     setSyncedEditGuestTeachers(e.guestTeacherIds ?? [])
+    setSyncedEditSubjectId(e.subjectId ?? '')
+    setSyncedEditCategoryId(e.categoryId ?? '')
+    setSyncedEditCoveredCurriculumIds(e.coveredCurriculumIds ?? [])
+    setSyncedEditDescription(e.description ?? '')
+    setSyncedEditEmoji(e.iconEmoji ?? '')
+    setSyncedEditIsOnline(e.isOnline ?? false)
+    setSyncedEditRequireAttendance(e.requireAttendance !== false)
+    setSyncedEditClassroom(e.classroom ?? '')
     setSyncedEditExpanded(false)
   }
 
@@ -647,8 +887,19 @@ export default function Lessons() {
         notes:           syncedEditNotes.trim() || null,
         teacherIds:      syncedEditTeachers,
         guestTeacherIds: syncedEditGuestTeachers,
+        subjectId:              syncedEditSubjectId || null,
+        categoryId:             syncedEditCategoryId || null,
+        coveredCurriculumIds:   syncedEditCoveredCurriculumIds,
+        description:     syncedEditDescription.trim() || null,
+        iconEmoji:       syncedEditEmoji.trim() || null,
+        isOnline:           syncedEditIsOnline || null,
+        requireAttendance:  syncedEditRequireAttendance,
+        classroom:          syncedEditClassroom.trim() || null,
       })
       setEditingSyncedEvent(null)
+    } catch (err) {
+      console.error('Failed to save synced event override:', err)
+      alert('Save failed — check console for details.')
     } finally {
       setSavingSyncedEdit(false)
     }
@@ -666,7 +917,7 @@ export default function Lessons() {
       const title    = newEventTitle.trim()
       const location = newEventLocation.trim()
       const invitees = Object.values(newEventInvitees).flat()
-      await addDoc(collection(db, 'personal_events'), {
+      const eventRef = await addDoc(collection(db, 'personal_events'), {
         userId:        profile.uid,
         organizerName: profile.displayName,
         role:          'teacher',
@@ -683,6 +934,7 @@ export default function Lessons() {
       if (invitees.length > 0) {
         const fn = httpsCallable(functions, 'sendEventInviteNotifications')
         fn({
+          eventId:       eventRef.id,
           inviteeIds:    invitees,
           organizerName: profile.displayName,
           title,
@@ -733,6 +985,13 @@ export default function Lessons() {
             className={`btn-secondary py-2 ${showFilters ? 'bg-brand-500/15 border-brand-500/30 text-brand-400' : ''}`}
           >
             <SlidersHorizontal className="w-4 h-4" /> <span className="hidden sm:inline">Filters</span>
+          </button>
+          <button
+            onClick={exportWeekPdf}
+            className="btn-secondary py-2"
+            title="Download the visible week as PDF"
+          >
+            <Download className="w-4 h-4" /> <span className="hidden sm:inline">Download PDF</span>
           </button>
           <Link to="/teacher/lessons/new" className="btn-primary py-2">
             <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Lesson</span>
@@ -885,8 +1144,8 @@ export default function Lessons() {
             )}
           </div>
 
-        <div className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm overflow-hidden [&_.fc-toolbar]:flex-wrap [&_.fc-toolbar]:gap-y-2 [&_.fc-toolbar]:px-4 [&_.fc-toolbar]:pt-3 [&_.fc-toolbar-title]:text-base [&_.fc-button]:text-xs [&_.fc-button]:px-2 [&_.fc-button]:py-1 sm:[&_.fc-button]:text-sm sm:[&_.fc-button]:px-3 sm:[&_.fc-button]:py-1.5">
-          {blocks.length > 0 && (
+        <div ref={calendarCardRef} className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm overflow-hidden [&_.fc-toolbar]:flex-wrap [&_.fc-toolbar]:gap-y-2 [&_.fc-toolbar]:px-4 [&_.fc-toolbar]:pt-3 [&_.fc-toolbar-title]:text-base [&_.fc-button]:text-xs [&_.fc-button]:px-2 [&_.fc-button]:py-1 sm:[&_.fc-button]:text-sm sm:[&_.fc-button]:px-3 sm:[&_.fc-button]:py-1.5">
+          {isTeacher && blocks.length > 0 && (
             <div className="px-4 pt-3 pb-1 flex items-center gap-2 text-xs text-zinc-400">
               <span className="inline-block w-3 h-3 rounded-sm border border-dashed border-amber-400 bg-amber-950/40" />
               Ghost blocks — click to schedule a lesson in that slot
@@ -998,16 +1257,17 @@ export default function Lessons() {
                 return
               }
               setSelected({
-                id:           info.event.id,
-                title:        info.event.title,
-                subjectTitle: info.event.extendedProps.subjectTitle,
-                className:    info.event.extendedProps.className,
-                cohortId:     info.event.extendedProps.cohortId,
-                start:        info.event.extendedProps.start,
-                end:          info.event.extendedProps.end,
-                color:        info.event.extendedProps.color,
-                classroom:    info.event.extendedProps.classroom,
-                isOnline:     info.event.extendedProps.isOnline,
+                id:               info.event.id,
+                title:            info.event.title,
+                subjectTitle:     info.event.extendedProps.subjectTitle,
+                className:        info.event.extendedProps.className,
+                cohortId:         info.event.extendedProps.cohortId,
+                start:            info.event.extendedProps.start,
+                end:              info.event.extendedProps.end,
+                color:            info.event.extendedProps.color,
+                classroom:        info.event.extendedProps.classroom,
+                isOnline:         info.event.extendedProps.isOnline,
+                requiresPresence: info.event.extendedProps.requiresPresence,
               })
             }}
             eventContent={(arg) => {
@@ -1169,9 +1429,12 @@ export default function Lessons() {
       {editingSyncedEvent && (() => {
         const cohortObj = cohortMap[editingSyncedEvent.cohortId]
         const cohortIdx = cohorts.findIndex(c => c.id === editingSyncedEvent.cohortId)
-        const accentColor = cohortObj?.color ?? (cohortIdx >= 0 ? COHORT_FALLBACK_COLORS[cohortIdx % COHORT_FALLBACK_COLORS.length] : '#0078d4')
-        const displayTitle = editingSyncedEvent.customTitle || editingSyncedEvent.title
-        const displayLocation = editingSyncedEvent.customLocation || editingSyncedEvent.location
+        const subjectObj  = subjects.find(s => s.id === editingSyncedEvent.subjectId)
+        const categoryObj = categories.find(c => c.id === editingSyncedEvent.categoryId)
+        const accentColor = categoryObj?.color ?? subjectObj?.color?.replace(/^bg-/, '') ?? cohortObj?.color ?? (cohortIdx >= 0 ? COHORT_FALLBACK_COLORS[cohortIdx % COHORT_FALLBACK_COLORS.length] : '#0078d4')
+        const displayEmoji = editingSyncedEvent.iconEmoji ?? subjectObj?.iconEmoji ?? ''
+        const displayTitle = (displayEmoji ? `${displayEmoji} ` : '') + (editingSyncedEvent.customTitle || editingSyncedEvent.title)
+        const displayLocation = editingSyncedEvent.classroom || editingSyncedEvent.customLocation || editingSyncedEvent.location
         const startD = editingSyncedEvent.startTime?.toDate?.()
         const endD   = editingSyncedEvent.endTime?.toDate?.()
         return (
@@ -1189,6 +1452,8 @@ export default function Lessons() {
                   <p className="text-base font-bold text-zinc-100">{displayTitle}</p>
                   <p className="text-xs text-zinc-500 mt-0.5">
                     📅 Outlook · {cohortObj?.name ?? editingSyncedEvent.cohortId}
+                    {subjectObj && <span className="text-zinc-600"> · {subjectObj.title}</span>}
+                    {categoryObj && <span className="text-zinc-600"> · {categoryObj.name}</span>}
                   </p>
                 </div>
                 <button onClick={() => setEditingSyncedEvent(null)} className="p-1.5 text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors">
@@ -1208,7 +1473,18 @@ export default function Lessons() {
                   </p>
                 )}
                 {displayLocation && (
-                  <p><span className="font-medium text-zinc-300">Location: </span>{displayLocation}</p>
+                  <p>
+                    <span className="font-medium text-zinc-300">
+                      {editingSyncedEvent.isOnline ? '🌐 Online: ' : '📍 Location: '}
+                    </span>
+                    {displayLocation}
+                  </p>
+                )}
+                {editingSyncedEvent.isOnline && !displayLocation && (
+                  <p className="text-brand-400">🌐 Online class</p>
+                )}
+                {editingSyncedEvent.description && (
+                  <p className="text-zinc-500 leading-relaxed">{editingSyncedEvent.description}</p>
                 )}
                 {syncedEditTeachers.length > 0 && (
                   <p><span className="font-medium text-zinc-300">Teachers: </span>
@@ -1246,28 +1522,109 @@ export default function Lessons() {
 
                 {syncedEditExpanded && (
                   <div className="space-y-3 mt-3">
+                    {/* Subject */}
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">Subject</label>
+                      <select
+                        value={syncedEditSubjectId}
+                        onChange={e => {
+                          setSyncedEditSubjectId(e.target.value)
+                          setSyncedEditCoveredCurriculumIds([])
+                        }}
+                        className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-brand-500"
+                      >
+                        <option value="">— None —</option>
+                        {[...subjects].sort((a, b) => a.title.localeCompare(b.title)).map(s => (
+                          <option key={s.id} value={s.id}>{s.iconEmoji} {s.title}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Course */}
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">Course <span className="text-zinc-600">(optional)</span></label>
+                      <select
+                        value={syncedEditCoveredCurriculumIds[0] ?? ''}
+                        onChange={e => setSyncedEditCoveredCurriculumIds(e.target.value ? [e.target.value] : [])}
+                        disabled={!syncedEditSubjectId}
+                        className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-brand-500 disabled:opacity-40"
+                      >
+                        <option value="">— No course —</option>
+                        {syncedEditCurriculumItems.map(item => (
+                          <option key={item.id} value={item.id}>Sem {item.semester} · {item.title}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Title & emoji */}
+                    <div className="flex gap-2">
+                      <div className="w-16 flex-shrink-0">
+                        <label className="block text-xs text-zinc-400 mb-1">Emoji</label>
+                        <input
+                          value={syncedEditEmoji}
+                          onChange={e => setSyncedEditEmoji(e.target.value)}
+                          placeholder="🎬"
+                          maxLength={4}
+                          className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-brand-500 text-center"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs text-zinc-400 mb-1">
+                          Title <span className="text-zinc-600">(Outlook: {editingSyncedEvent.title})</span>
+                        </label>
+                        <input
+                          value={syncedEditTitle}
+                          onChange={e => setSyncedEditTitle(e.target.value)}
+                          placeholder={editingSyncedEvent.title}
+                          className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-brand-500"
+                        />
+                      </div>
+                    </div>
+                    {/* Description */}
+                    <div>
+                      <label className="block text-xs text-zinc-400 mb-1">Description</label>
+                      <textarea
+                        value={syncedEditDescription}
+                        onChange={e => setSyncedEditDescription(e.target.value)}
+                        placeholder="Lesson description…"
+                        rows={2}
+                        className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-brand-500 resize-none"
+                      />
+                    </div>
+                    {/* Online toggle */}
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setSyncedEditIsOnline(v => !v)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${syncedEditIsOnline ? 'bg-brand-600' : 'bg-zinc-700'}`}
+                      >
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${syncedEditIsOnline ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                      </button>
+                      <span className="text-xs text-zinc-400">Online class {syncedEditIsOnline ? '(on)' : '(off)'}</span>
+                    </div>
+                    {/* Require attendance toggle */}
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setSyncedEditRequireAttendance(v => !v)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${syncedEditRequireAttendance ? 'bg-brand-600' : 'bg-zinc-700'}`}
+                      >
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${syncedEditRequireAttendance ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                      </button>
+                      <span className="text-xs text-zinc-400">Require attendance {syncedEditRequireAttendance ? '(on)' : '(off)'}</span>
+                    </div>
+                    {/* Room / link */}
                     <div>
                       <label className="block text-xs text-zinc-400 mb-1">
-                        Title override <span className="text-zinc-600">(Outlook: {editingSyncedEvent.title})</span>
+                        {syncedEditIsOnline ? 'Meeting link' : 'Room / location'}
+                        {editingSyncedEvent.location && <span className="text-zinc-600"> (Outlook: {editingSyncedEvent.location})</span>}
                       </label>
                       <input
-                        value={syncedEditTitle}
-                        onChange={e => setSyncedEditTitle(e.target.value)}
-                        placeholder={editingSyncedEvent.title}
+                        value={syncedEditIsOnline ? syncedEditClassroom : syncedEditLocation}
+                        onChange={e => syncedEditIsOnline ? setSyncedEditClassroom(e.target.value) : setSyncedEditLocation(e.target.value)}
+                        placeholder={syncedEditIsOnline ? 'https://…' : (editingSyncedEvent.location ?? 'Room…')}
                         className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-brand-500"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs text-zinc-400 mb-1">
-                        Location override <span className="text-zinc-600">{editingSyncedEvent.location ? `(Outlook: ${editingSyncedEvent.location})` : ''}</span>
-                      </label>
-                      <input
-                        value={syncedEditLocation}
-                        onChange={e => setSyncedEditLocation(e.target.value)}
-                        placeholder={editingSyncedEvent.location ?? 'Add location…'}
-                        className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-brand-500"
-                      />
-                    </div>
+                    {/* Teachers */}
                     <div>
                       <label className="block text-xs text-zinc-400 mb-1">Assign teachers</label>
                       <div className="flex flex-wrap gap-1.5 mb-1.5">
@@ -1292,30 +1649,7 @@ export default function Lessons() {
                         ))}
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-xs text-zinc-400 mb-1">Assign guest teachers</label>
-                      <div className="flex flex-wrap gap-1.5 mb-1.5">
-                        {syncedEditGuestTeachers.map(gid => {
-                          const g = guestTeachers.find(gt => gt.id === gid)
-                          return (
-                            <span key={gid} className="flex items-center gap-1 bg-zinc-700 text-xs text-zinc-200 px-2 py-0.5 rounded-full">
-                              {g?.name ?? gid}
-                              <button onClick={() => setSyncedEditGuestTeachers(prev => prev.filter(id => id !== gid))} className="text-zinc-400 hover:text-zinc-200"><X className="w-3 h-3" /></button>
-                            </span>
-                          )
-                        })}
-                      </div>
-                      <select
-                        className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-brand-500"
-                        value=""
-                        onChange={e => { if (e.target.value && !syncedEditGuestTeachers.includes(e.target.value)) setSyncedEditGuestTeachers(prev => [...prev, e.target.value]) }}
-                      >
-                        <option value="">+ Add guest teacher…</option>
-                        {[...guestTeachers].sort((a, b) => a.name.localeCompare(b.name)).filter(g => !syncedEditGuestTeachers.includes(g.id)).map(g => (
-                          <option key={g.id} value={g.id}>{g.name}</option>
-                        ))}
-                      </select>
-                    </div>
+                    {/* Notes */}
                     <div>
                       <label className="block text-xs text-zinc-400 mb-1">Notes</label>
                       <textarea
@@ -1394,17 +1728,23 @@ export default function Lessons() {
                 </p>
               )}
             </div>
-            <LessonAttendance lessonId={selected.id} cohortId={selected.cohortId} />
+            {selected.requiresPresence !== false && (
+              <LessonAttendance lessonId={selected.id} cohortId={selected.cohortId} startTime={selected.start} />
+            )}
 
-            <button
-              onClick={() => {
-                startAttendance(selected.id, selected.title)
-                setSelected(null)
-              }}
-              className="w-full btn-primary py-2.5 text-sm"
-            >
-              <QrCode className="w-4 h-4" /> Start Attendance
-            </button>
+            {selected.requiresPresence !== false ? (
+              <button
+                onClick={() => {
+                  startAttendance(selected.id, selected.title)
+                  setSelected(null)
+                }}
+                className="w-full btn-primary py-2.5 text-sm"
+              >
+                <QrCode className="w-4 h-4" /> Start Attendance
+              </button>
+            ) : (
+              <p className="text-xs text-zinc-500 text-center py-1">No attendance tracking for this lesson</p>
+            )}
             <div className="flex gap-2">
               <button
                 onClick={() => { navigate(`/teacher/lessons/${selected.id}/edit`); setSelected(null) }}

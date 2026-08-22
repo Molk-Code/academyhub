@@ -433,40 +433,72 @@ export default function UserManager() {
         )}
       </div>
 
-      {/* Pending invites */}
-      {activeInvites.length > 0 && (
-        <div>
-          <h2 className="text-base font-semibold text-zinc-100 mb-3 flex items-center gap-2">
-            <Mail className="w-4 h-4 text-amber-500" /> Pending Invites ({activeInvites.length})
-          </h2>
-          <div className="space-y-2">
-            {activeInvites.map(inv => (
-              <div key={inv.id} className="flex items-center gap-3 p-3 bg-zinc-900 border border-white/10 rounded-xl">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-zinc-100">{inv.email}</p>
-                  <p className="text-xs text-zinc-500">{inv.role} {inv.cohortId ? `· ${cohorts.find(c => c.id === inv.cohortId)?.name}` : ''}</p>
-                </div>
-                <button
-                  onClick={() => copyInviteLink(inv.id)}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
-                >
-                  {copiedToken === inv.id
-                    ? <><Check className="w-3.5 h-3.5 text-emerald-600" /> Copied!</>
-                    : <><Copy className="w-3.5 h-3.5" /> Copy link</>
-                  }
-                </button>
-                <button
-                  onClick={() => deleteInvite(inv.id)}
-                  className="p-1.5 text-zinc-400 hover:text-rose-600 transition-colors"
-                  title="Delete invite"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
+      {/* Pending invites — grouped by cohort / role, sorted alphabetically */}
+      {activeInvites.length > 0 && (() => {
+        const sorted = [...activeInvites].sort((a, b) => a.email.localeCompare(b.email))
+
+        // Build ordered group keys: cohorts (by name) first, then Teachers, Admins, Unassigned
+        const cohortGroups = cohorts
+          .slice()
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(c => ({ key: c.id, label: c.name }))
+        const allGroups = [
+          ...cohortGroups,
+          { key: '__teacher__', label: 'Teachers' },
+          { key: '__admin__',   label: 'Admins' },
+          { key: '__none__',    label: 'Unassigned' },
+        ]
+
+        function groupKey(inv: Invitation) {
+          if (inv.role === 'teacher') return '__teacher__'
+          if (inv.role === 'admin')   return '__admin__'
+          return inv.cohortId ?? '__none__'
+        }
+
+        return (
+          <div>
+            <h2 className="text-base font-semibold text-zinc-100 mb-4 flex items-center gap-2">
+              <Mail className="w-4 h-4 text-amber-500" /> Pending Invites ({activeInvites.length})
+            </h2>
+            <div className="space-y-5">
+              {allGroups.map(group => {
+                const invs = sorted.filter(i => groupKey(i) === group.key)
+                if (invs.length === 0) return null
+                return (
+                  <div key={group.key}>
+                    <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">{group.label}</p>
+                    <div className="space-y-2">
+                      {invs.map(inv => (
+                        <div key={inv.id} className="flex items-center gap-3 p-3 bg-zinc-900 border border-white/10 rounded-xl">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-zinc-100 truncate">{inv.email}</p>
+                          </div>
+                          <button
+                            onClick={() => copyInviteLink(inv.id)}
+                            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors flex-shrink-0"
+                          >
+                            {copiedToken === inv.id
+                              ? <><Check className="w-3.5 h-3.5 text-emerald-600" /> Copied!</>
+                              : <><Copy className="w-3.5 h-3.5" /> Copy link</>
+                            }
+                          </button>
+                          <button
+                            onClick={() => deleteInvite(inv.id)}
+                            className="p-1.5 text-zinc-400 hover:text-rose-600 transition-colors flex-shrink-0"
+                            title="Delete invite"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* User list */}
       <div>

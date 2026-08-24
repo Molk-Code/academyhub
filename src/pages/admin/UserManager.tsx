@@ -500,157 +500,158 @@ export default function UserManager() {
         )
       })()}
 
-      {/* User list */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-zinc-100">All Users ({users.length})</h2>
-          <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer select-none">
+      {/* User list — grouped by class / role, sorted alphabetically */}
+      {(() => {
+        const sorted = [...users].sort((a, b) =>
+          (a.displayName ?? a.email ?? '').localeCompare(b.displayName ?? b.email ?? ''))
+
+        const cohortGroups = cohorts
+          .slice()
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(c => ({ key: c.id, label: c.name }))
+        const allGroups = [
+          ...cohortGroups,
+          { key: '__teacher__', label: 'Teachers' },
+          { key: '__admin__',   label: 'Admins' },
+          { key: '__none__',    label: 'Unassigned' },
+        ]
+
+        function userGroupKey(u: UserDoc) {
+          if (u.role === 'admin')    return '__admin__'
+          if (u.role === 'teacher')  return '__teacher__'
+          return u.cohortId ?? '__none__'
+        }
+
+        const totalCount = users.length
+
+        const renderUser = (user: UserDoc) => (
+          <div key={user.id} className={`bg-zinc-900 border rounded-xl px-4 py-3 flex items-center gap-3 ${selectedIds.has(user.id) ? 'border-orange-500/40 bg-orange-500/5' : user.disabled ? 'border-rose-900/50 opacity-60' : 'border-white/10'}`}>
             <input
               type="checkbox"
-              checked={selectedIds.size === users.length && users.length > 0}
-              onChange={e => e.target.checked ? selectAll() : clearAll()}
-              className="w-4 h-4 rounded accent-orange-500"
+              checked={selectedIds.has(user.id)}
+              onChange={() => toggleSelect(user.id)}
+              className="w-4 h-4 rounded accent-orange-500 flex-shrink-0 cursor-pointer"
             />
-            Select all
-          </label>
-        </div>
-
-        {/* Bulk action bar */}
-        {selectedIds.size > 0 && (
-          <div className="sticky top-2 z-20 bg-zinc-900 border border-orange-500/30 rounded-2xl p-4 mb-4 flex items-center gap-4 flex-wrap shadow-lg">
-            <span className="text-sm font-semibold text-orange-400">{selectedIds.size} selected</span>
-            <div className="flex items-center gap-2 flex-1 min-w-[220px]">
-              <select
-                value={assignCohort}
-                onChange={e => setAssignCohort(e.target.value)}
-                className="flex-1 bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none"
-              >
-                <option value="">Assign to class…</option>
-                {cohorts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              <button
-                onClick={handleBulkAssignCohort}
-                disabled={!assignCohort || assigning}
-                className="bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors whitespace-nowrap"
-              >
-                {assigning ? 'Assigning…' : 'Assign'}
-              </button>
-            </div>
-            {assignedMsg && <span className="text-xs text-emerald-400 font-medium">{assignedMsg}</span>}
-            <button onClick={clearAll} className="text-xs text-zinc-400 hover:text-white transition-colors">
-              Clear
-            </button>
-          </div>
-        )}
-
-        <div className="space-y-2">
-          {users.map(user => (
-            <div key={user.id} className={`bg-zinc-900 border rounded-xl px-4 py-3 flex items-center gap-3 ${selectedIds.has(user.id) ? 'border-orange-500/40 bg-orange-500/5' : user.disabled ? 'border-rose-900/50 opacity-60' : 'border-white/10'}`}>
-              <input
-                type="checkbox"
-                checked={selectedIds.has(user.id)}
-                onChange={() => toggleSelect(user.id)}
-                className="w-4 h-4 rounded accent-orange-500 flex-shrink-0 cursor-pointer"
-              />
-              <Avatar uid={user.id} name={user.displayName} avatarUrl={user.avatarUrl} size="sm" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-sm font-medium text-zinc-100 truncate">{user.displayName}</p>
-                  {user.disabled
-                    ? <span className="badge badge-rose text-[10px] py-0">Disabled</span>
-                    : user.isActive
-                      ? <span className="badge badge-green text-[10px] py-0">Active</span>
-                      : <span className="badge badge-slate text-[10px] py-0">Inactive</span>
-                  }
-                </div>
-                <p className="text-xs text-zinc-500 truncate">{user.email}</p>
-                <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                  {(user.roles?.length ? user.roles : [user.role]).map(r => (
-                    <span key={r} className={`badge text-[10px] py-0 ${
-                      r === 'admin' ? 'badge-rose' : r === 'teacher' ? 'badge-blue' : 'badge-indigo'
-                    }`}>{r}</span>
-                  ))}
-                  <button
-                    onClick={() => switchPrimaryRole(user, user.role === 'student' ? 'teacher' : 'student')}
-                    title={`Switch to ${user.role === 'student' ? 'teacher' : 'student'}`}
-                    className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 text-zinc-500 hover:text-zinc-300 hover:border-white/20 transition-colors"
-                  >
-                    → {user.role === 'student' ? 'teacher' : 'student'}
-                  </button>
-                  {user.role !== 'student' && (
-                    <button
-                      onClick={() => toggleSecondaryRole(user, user.role === 'admin' ? 'teacher' : 'admin')}
-                      title={(user.roles ?? [user.role]).includes(user.role === 'admin' ? 'teacher' : 'admin')
-                        ? `Remove ${user.role === 'admin' ? 'teacher' : 'admin'} role`
-                        : `Also ${user.role === 'admin' ? 'teacher' : 'admin'}`}
-                      className="p-0.5 text-zinc-400 hover:text-brand-600 transition-colors"
-                    >
-                      <ShieldCheck className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
+            <Avatar uid={user.id} name={user.displayName} avatarUrl={user.avatarUrl} size="sm" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-sm font-medium text-zinc-100 truncate">{user.displayName}</p>
+                {user.disabled
+                  ? <span className="badge badge-rose text-[10px] py-0">Disabled</span>
+                  : user.isActive
+                    ? <span className="badge badge-green text-[10px] py-0">Active</span>
+                    : <span className="badge badge-slate text-[10px] py-0">Inactive</span>
+                }
               </div>
-              <div className="flex items-center gap-0.5 flex-shrink-0">
-                {user.disabled ? (
-                  <>
-                    <button
-                      onClick={() => restoreUser(user)}
-                      className="p-2 text-zinc-400 hover:text-emerald-500 transition-colors rounded-lg hover:bg-white/5"
-                      title="Restore account"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => permanentlyDeleteUser(user)}
-                      className="p-2 text-zinc-400 hover:text-rose-600 transition-colors rounded-lg hover:bg-white/5"
-                      title="Permanently delete account and all data"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => sendResetEmail(user)}
-                      className="p-2 transition-colors rounded-lg hover:bg-white/5"
-                      title="Send password reset email"
-                    >
-                      {resetEmailSent === user.id
-                        ? <Check className="w-4 h-4 text-emerald-500" />
-                        : <KeyRound className="w-4 h-4 text-zinc-400 hover:text-brand-400" />
-                      }
-                    </button>
-                    <button
-                      onClick={() => copyResetLink(user)}
-                      className="p-2 transition-colors rounded-lg hover:bg-white/5"
-                      title="Copy reset link (send manually)"
-                    >
-                      {copiedResetLink === user.id
-                        ? <Check className="w-4 h-4 text-emerald-500" />
-                        : <Link className="w-4 h-4 text-zinc-400 hover:text-brand-400" />
-                      }
-                    </button>
-                    <button
-                      onClick={() => disableUser(user)}
-                      className="p-2 text-zinc-400 hover:text-amber-500 transition-colors rounded-lg hover:bg-white/5"
-                      title="Deactivate account (reversible)"
-                    >
-                      <UserX className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => permanentlyDeleteUser(user)}
-                      className="p-2 text-zinc-400 hover:text-rose-600 transition-colors rounded-lg hover:bg-white/5"
-                      title="Permanently delete account and all data"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </>
+              <p className="text-xs text-zinc-500 truncate">{user.email}</p>
+              <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                {(user.roles?.length ? user.roles : [user.role]).map(r => (
+                  <span key={r} className={`badge text-[10px] py-0 ${
+                    r === 'admin' ? 'badge-rose' : r === 'teacher' ? 'badge-blue' : 'badge-indigo'
+                  }`}>{r}</span>
+                ))}
+                <button
+                  onClick={() => switchPrimaryRole(user, user.role === 'student' ? 'teacher' : 'student')}
+                  title={`Switch to ${user.role === 'student' ? 'teacher' : 'student'}`}
+                  className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 text-zinc-500 hover:text-zinc-300 hover:border-white/20 transition-colors"
+                >
+                  → {user.role === 'student' ? 'teacher' : 'student'}
+                </button>
+                {user.role !== 'student' && (
+                  <button
+                    onClick={() => toggleSecondaryRole(user, user.role === 'admin' ? 'teacher' : 'admin')}
+                    title={(user.roles ?? [user.role]).includes(user.role === 'admin' ? 'teacher' : 'admin')
+                      ? `Remove ${user.role === 'admin' ? 'teacher' : 'admin'} role`
+                      : `Also ${user.role === 'admin' ? 'teacher' : 'admin'}`}
+                    className="p-0.5 text-zinc-400 hover:text-brand-600 transition-colors"
+                  >
+                    <ShieldCheck className="w-3 h-3" />
+                  </button>
                 )}
               </div>
             </div>
-          ))}
-        </div>
-      </div>
+            <div className="flex items-center gap-0.5 flex-shrink-0">
+              {user.disabled ? (
+                <>
+                  <button onClick={() => restoreUser(user)} className="p-2 text-zinc-400 hover:text-emerald-500 transition-colors rounded-lg hover:bg-white/5" title="Restore account">
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => permanentlyDeleteUser(user)} className="p-2 text-zinc-400 hover:text-rose-600 transition-colors rounded-lg hover:bg-white/5" title="Permanently delete account and all data">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => sendResetEmail(user)} className="p-2 transition-colors rounded-lg hover:bg-white/5" title="Send password reset email">
+                    {resetEmailSent === user.id ? <Check className="w-4 h-4 text-emerald-500" /> : <KeyRound className="w-4 h-4 text-zinc-400 hover:text-brand-400" />}
+                  </button>
+                  <button onClick={() => copyResetLink(user)} className="p-2 transition-colors rounded-lg hover:bg-white/5" title="Copy reset link (send manually)">
+                    {copiedResetLink === user.id ? <Check className="w-4 h-4 text-emerald-500" /> : <Link className="w-4 h-4 text-zinc-400 hover:text-brand-400" />}
+                  </button>
+                  <button onClick={() => disableUser(user)} className="p-2 text-zinc-400 hover:text-amber-500 transition-colors rounded-lg hover:bg-white/5" title="Deactivate account (reversible)">
+                    <UserX className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => permanentlyDeleteUser(user)} className="p-2 text-zinc-400 hover:text-rose-600 transition-colors rounded-lg hover:bg-white/5" title="Permanently delete account and all data">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )
+
+        return (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold text-zinc-100">All Users ({totalCount})</h2>
+              <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size === users.length && users.length > 0}
+                  onChange={e => e.target.checked ? selectAll() : clearAll()}
+                  className="w-4 h-4 rounded accent-orange-500"
+                />
+                Select all
+              </label>
+            </div>
+
+            {/* Bulk action bar */}
+            {selectedIds.size > 0 && (
+              <div className="sticky top-2 z-20 bg-zinc-900 border border-orange-500/30 rounded-2xl p-4 mb-4 flex items-center gap-4 flex-wrap shadow-lg">
+                <span className="text-sm font-semibold text-orange-400">{selectedIds.size} selected</span>
+                <div className="flex items-center gap-2 flex-1 min-w-[220px]">
+                  <select value={assignCohort} onChange={e => setAssignCohort(e.target.value)} className="flex-1 bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none">
+                    <option value="">Assign to class…</option>
+                    {cohorts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                  <button onClick={handleBulkAssignCohort} disabled={!assignCohort || assigning} className="bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors whitespace-nowrap">
+                    {assigning ? 'Assigning…' : 'Assign'}
+                  </button>
+                </div>
+                {assignedMsg && <span className="text-xs text-emerald-400 font-medium">{assignedMsg}</span>}
+                <button onClick={clearAll} className="text-xs text-zinc-400 hover:text-white transition-colors">Clear</button>
+              </div>
+            )}
+
+            <div className="space-y-6">
+              {allGroups.map(group => {
+                const groupUsers = sorted.filter(u => userGroupKey(u) === group.key)
+                if (groupUsers.length === 0) return null
+                return (
+                  <div key={group.key}>
+                    <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                      {group.label} ({groupUsers.length})
+                    </p>
+                    <div className="space-y-2">
+                      {groupUsers.map(renderUser)}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Toast */}
       {toastMsg && (

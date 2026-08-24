@@ -92,6 +92,17 @@ export default function StudentCalendar() {
   const calendarRef    = useRef<FullCalendar>(null)
   const calendarCardRef = useRef<HTMLDivElement>(null)
 
+  const [isLandscape, setIsLandscape] = useState(
+    typeof window !== 'undefined' ? window.innerWidth > window.innerHeight && window.innerHeight < 600 : false
+  )
+  useEffect(() => {
+    const update = () => setIsLandscape(window.innerWidth > window.innerHeight && window.innerHeight < 600)
+    window.addEventListener('resize', update)
+    window.addEventListener('orientationchange', update)
+    return () => { window.removeEventListener('resize', update); window.removeEventListener('orientationchange', update) }
+  }, [])
+  const isMobileDim = typeof window !== 'undefined' ? Math.min(window.innerWidth, window.innerHeight) < 600 : false
+
   // Extend the native now-indicator line across ALL day columns (not just today's)
   useEffect(() => {
     const card = calendarCardRef.current
@@ -698,8 +709,8 @@ export default function StudentCalendar() {
         )}
       </div>
 
-      {/* ── Mobile compact toolbar (hidden on desktop) ───────────────────── */}
-      <div className="sm:hidden flex items-center justify-between gap-2">
+      {/* ── Mobile compact toolbar (hidden on desktop and landscape) ──────── */}
+      <div className="sm:hidden landscape:hidden flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h1 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Calendar</h1>
           {hasSemester && (
@@ -830,8 +841,10 @@ export default function StudentCalendar() {
               weekNumbers={true}
               weekNumberContent={(arg) => `W${arg.num}`}
               headerToolbar={
-                typeof window !== 'undefined' && window.innerWidth < 768
-                  ? { left: 'prev,next', center: 'title', right: '' }
+                isMobileDim
+                  ? isLandscape
+                    ? { left: 'prev,next', center: 'title', right: 'timeGridDay,timeGridWeek' }
+                    : { left: 'prev,next', center: 'title', right: '' }
                   : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridWorkWeek,timeGridDay' }
               }
               views={{
@@ -853,9 +866,12 @@ export default function StudentCalendar() {
               }}
               eventContent={renderEventContent}
               events={allEvents}
-              height={typeof window !== 'undefined' && window.innerWidth < 768
-                ? 'calc(100dvh - 13.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
-                : 'calc(100vh - 180px)'
+              height={
+                isMobileDim
+                  ? isLandscape
+                    ? 'calc(100dvh - 5.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
+                    : 'calc(100dvh - 13.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
+                  : 'calc(100vh - 180px)'
               }
               slotMinTime="00:00:00"
               slotMaxTime="24:00:00"

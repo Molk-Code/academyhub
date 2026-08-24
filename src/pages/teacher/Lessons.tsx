@@ -211,6 +211,17 @@ export default function Lessons() {
   const calendarRef     = useRef<FullCalendar>(null)
   const calendarCardRef = useRef<HTMLDivElement>(null)
 
+  const [isLandscape, setIsLandscape] = useState(
+    typeof window !== 'undefined' ? window.innerWidth > window.innerHeight && window.innerHeight < 600 : false
+  )
+  useEffect(() => {
+    const update = () => setIsLandscape(window.innerWidth > window.innerHeight && window.innerHeight < 600)
+    window.addEventListener('resize', update)
+    window.addEventListener('orientationchange', update)
+    return () => { window.removeEventListener('resize', update); window.removeEventListener('orientationchange', update) }
+  }, [])
+  const isMobileDim = typeof window !== 'undefined' ? Math.min(window.innerWidth, window.innerHeight) < 600 : false
+
   useEffect(() => {
     if (profile?.uid) markCalendarInvitesSeen(profile.uid)
   }, [profile?.uid])
@@ -1127,8 +1138,8 @@ export default function Lessons() {
             )}
           </div>
 
-          {/* Mobile view switcher dropdown */}
-          <div className="relative sm:hidden flex justify-end">
+          {/* Mobile view switcher dropdown (hidden in landscape — FC header handles it there) */}
+          <div className="relative sm:hidden landscape:hidden flex justify-end">
             <button
               onClick={() => setViewDropdownOpen(v => !v)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium border transition-all"
@@ -1182,8 +1193,10 @@ export default function Lessons() {
             weekNumbers={true}
             weekNumberContent={(arg) => `W${arg.num}`}
             headerToolbar={
-              typeof window !== 'undefined' && window.innerWidth < 768
-                ? { left: 'prev,next', center: 'title', right: '' }
+              isMobileDim
+                ? isLandscape
+                  ? { left: 'prev,next', center: 'title', right: 'timeGridDay,timeGridWorkWeek' }
+                  : { left: 'prev,next', center: 'title', right: '' }
                 : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridWorkWeek,timeGridDay' }
             }
             views={{
@@ -1195,7 +1208,13 @@ export default function Lessons() {
               },
             }}
             events={allEvents}
-            height={typeof window !== 'undefined' && window.innerWidth < 768 ? 'calc(100vh - 130px)' : 'calc(100vh - 180px)'}
+            height={
+              isMobileDim
+                ? isLandscape
+                  ? 'calc(100dvh - 5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
+                  : 'calc(100dvh - 130px)'
+                : 'calc(100vh - 180px)'
+            }
             slotMinTime="00:00:00"
             slotMaxTime="24:00:00"
             scrollTime={scrollTime}

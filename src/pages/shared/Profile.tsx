@@ -2,15 +2,18 @@ import { useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { doc, updateDoc, collectionGroup, query, where, getDocs, writeBatch } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
-import { db, functions } from '@/lib/firebase'
+import { db, functions, auth } from '@/lib/firebase'
+import { updateEmail } from 'firebase/auth'
 import { uploadWithQuota } from '@/lib/uploadWithQuota'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn, initials, avatarColor, toDate } from '@/lib/utils'
-import { Camera, Loader2, CheckCircle2, Star, CalendarCheck, ClipboardList, ChevronRight, Download, Trash2, Shield, TrendingUp, Lightbulb } from 'lucide-react'
+import { Camera, Loader2, CheckCircle2, Star, CalendarCheck, ClipboardList, ChevronRight, Download, Trash2, Shield, TrendingUp, Lightbulb, Image } from 'lucide-react'
 import { useCollection, useDocument, where as fsWhere, orderBy } from '@/hooks/useFirestore'
 import type { PointsLogDoc, AbsenceReportDoc, CohortDoc, TeacherAssessment } from '@/types'
 import { format } from 'date-fns'
 import { useAttendanceStats } from '@/hooks/useAttendanceStats'
+import { QRCodeCanvas } from 'qrcode.react'
+import { jsPDF } from 'jspdf'
 
 function getLevel(points: number) {
   return Math.floor(points / 100) + 1
@@ -105,8 +108,8 @@ function PointsHistorySection({ uid }: { uid: string }) {
 }
 
 
-function AttendanceSection({ uid, cohortId }: { uid: string; cohortId: string | null }) {
-  const stats = useAttendanceStats(uid, cohortId)
+function AttendanceSection({ uid, cohortId, enrolledAt }: { uid: string; cohortId: string | null; enrolledAt?: { toDate(): Date } | null }) {
+  const stats = useAttendanceStats(uid, cohortId, enrolledAt)
   const { data: absenceReports } = useCollection<AbsenceReportDoc>(
     'absence_reports',
     uid ? [fsWhere('studentId', '==', uid)] : [],
@@ -183,27 +186,65 @@ function AttendanceSection({ uid, cohortId }: { uid: string; cohortId: string | 
 export default function Profile() {
   const { profile, refreshProfile } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const qrCanvasRef  = useRef<HTMLCanvasElement>(null)
 
   const isStudent = profile?.role === 'student'
   const isTeacherOrAdmin = profile?.role === 'teacher' || profile?.role === 'admin'
+
+  const appUrl = window.location.origin
+
+  function downloadQRImage() {
+    const canvas = qrCanvasRef.current
+    if (!canvas) return
+    const link = document.createElement('a')
+    link.download = 'cineforge-qr.png'
+    link.href = canvas.toDataURL('image/png')
+    link.click()
+  }
+
+  function downloadQRPdf() {
+    const canvas = qrCanvasRef.current
+    if (!canvas) return
+    const imgData = canvas.toDataURL('image/png')
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+    const pw = pdf.internal.pageSize.getWidth()
+    const size = 80
+    const x = (pw - size) / 2
+    pdf.setFontSize(18)
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('CineForge', pw / 2, 30, { align: 'center' })
+    pdf.setFontSize(11)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text('Scan to access the platform', pw / 2, 38, { align: 'center' })
+    pdf.addImage(imgData, 'PNG', x, 48, size, size)
+    pdf.setFontSize(9)
+    pdf.text(appUrl, pw / 2, 48 + size + 8, { align: 'center' })
+    pdf.save('cineforge-qr.pdf')
+  }
 
   const { data: cohort }      = useDocument<CohortDoc>('cohorts', profile?.cohortId ?? '')
   const { data: assessment }  = useDocument<TeacherAssessment>('teacher_assessments', isStudent ? (profile?.uid ?? '') : '')
 
   const [name,       setName]       = useState(profile?.displayName ?? '')
   const [phone,      setPhone]      = useState(profile?.phoneNumber ?? '')
-  const [schoolEmail, setSchoolEmail] = useState(profile?.schoolEmail ?? '')
+  const [email,      setEmail]      = useState(profile?.email ?? '')
   const [bio,        setBio]        = useState((profile as any)?.bio ?? '')
   const [portfolio,  setPortfolio]  = useState((profile as any)?.portfolioUrl ?? '')
   const [uploading,    setUploading]    = useState(false)
   const [saving,       setSaving]       = useState(false)
   const [saved,        setSaved]        = useState(false)
   const [uploadError,  setUploadError]  = useState<string | null>(null)
+  const [emailError,   setEmailError]   = useState<string | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(profile?.avatarUrl ?? null)
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file || !profile) return
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('Image is too large. Maximum size is 5 MB.')
+      e.target.value = ''
+      return
+    }
     const previewUrl = URL.createObjectURL(file)
     setAvatarPreview(previewUrl)
     setUploading(true)
@@ -235,11 +276,26 @@ export default function Profile() {
     if (!profile || !name.trim()) return
     setSaving(true)
     setSaved(false)
+    setEmailError(null)
     try {
+      const newEmail = email.trim()
+      if (newEmail && newEmail !== profile.email) {
+        if (!auth.currentUser) throw new Error('Not authenticated')
+        try {
+          await updateEmail(auth.currentUser, newEmail)
+        } catch (err: any) {
+          if (err?.code === 'auth/requires-recent-login') {
+            setEmailError('Please sign out and sign back in before changing your email.')
+          } else {
+            setEmailError(err?.message ?? 'Failed to update email.')
+          }
+          return
+        }
+      }
       const update: Record<string, string> = {
         displayName: name.trim(),
         phoneNumber: phone.trim(),
-        schoolEmail: schoolEmail.trim(),
+        email: newEmail || profile.email,
       }
       if (isTeacherOrAdmin) {
         update.bio = bio.trim()
@@ -285,7 +341,7 @@ export default function Profile() {
 
       {/* ── Header ── */}
       <div className="flex items-center gap-5">
-        <div className="relative group">
+        <div className="relative group flex-shrink-0">
           {avatarPreview ? (
             <img src={avatarPreview} alt={profile.displayName} className="w-20 h-20 rounded-full object-cover ring-4 ring-white shadow-md" />
           ) : (
@@ -303,7 +359,8 @@ export default function Profile() {
           </button>
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
         </div>
-        <div>
+
+        <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold text-zinc-100">{profile.displayName}</h1>
           {uploadError && (
             <p className="text-xs text-rose-400 mt-1">{uploadError}</p>
@@ -321,6 +378,34 @@ export default function Profile() {
           >
             {uploading ? 'Uploading…' : 'Change photo'}
           </button>
+        </div>
+
+        {/* ── App QR code ── */}
+        <div className="flex-shrink-0 flex flex-col items-center gap-1.5">
+          {/* Hidden canvas used for downloads */}
+          <QRCodeCanvas ref={qrCanvasRef} value={appUrl} size={200} className="hidden" />
+          {/* Visible QR */}
+          <div className="bg-white p-1.5 rounded-xl shadow">
+            <QRCodeCanvas value={appUrl} size={72} />
+          </div>
+          {isTeacherOrAdmin && (
+            <div className="flex gap-1">
+              <button
+                onClick={downloadQRImage}
+                title="Download as image"
+                className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors px-1.5 py-0.5 rounded hover:bg-white/5"
+              >
+                <Image className="w-3 h-3" /> PNG
+              </button>
+              <button
+                onClick={downloadQRPdf}
+                title="Download as PDF"
+                className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors px-1.5 py-0.5 rounded hover:bg-white/5"
+              >
+                <Download className="w-3 h-3" /> PDF
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -365,7 +450,7 @@ export default function Profile() {
             <CalendarCheck className="w-5 h-5 text-emerald-500" />
             <h2 className="font-semibold text-zinc-200">Attendance</h2>
           </div>
-          <AttendanceSection uid={profile.uid} cohortId={profile.cohortId ?? null} />
+          <AttendanceSection uid={profile.uid} cohortId={profile.cohortId ?? null} enrolledAt={profile.enrolledAt} />
         </div>
       )}
 
@@ -427,16 +512,12 @@ export default function Profile() {
         </div>
         <div>
           <label className="label">Email</label>
-          <input value={profile.email} disabled className="input bg-zinc-900/50 text-zinc-400 cursor-not-allowed" />
-          <p className="text-xs text-zinc-400 mt-1">Email cannot be changed here.</p>
+          <input type="email" value={email} onChange={e => { setEmail(e.target.value); setSaved(false); setEmailError(null) }} className="input" placeholder="your@email.com" />
+          {emailError && <p className="text-xs text-red-400 mt-1">{emailError}</p>}
         </div>
         <div>
           <label className="label">Phone number</label>
           <input type="tel" value={phone} onChange={e => { setPhone(e.target.value); setSaved(false) }} className="input" placeholder="+46 70 000 00 00" />
-        </div>
-        <div>
-          <label className="label">School email</label>
-          <input type="email" value={schoolEmail} onChange={e => { setSchoolEmail(e.target.value); setSaved(false) }} className="input" placeholder="firstname.lastname@school.se" />
         </div>
         {isTeacherOrAdmin && (
           <>

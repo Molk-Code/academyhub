@@ -1,8 +1,9 @@
 import { useState, useRef, useMemo, useEffect, useCallback } from 'react'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { NotFoundException } from '@zxing/library'
-import { collection, query, where, getDocs, getDoc, doc, setDoc, addDoc, updateDoc, increment, serverTimestamp, deleteDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { collection, doc, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore'
+import { httpsCallable } from 'firebase/functions'
+import { db, functions } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, where as collectionWhere, orderBy } from '@/hooks/useFirestore'
 import type { LessonDoc, AbsenceReportDoc, CohortDoc, PointsLogDoc } from '@/types'
@@ -55,10 +56,11 @@ export default function CheckIn() {
     [cohorts, effectiveCohortId],
   )
 
-  const absenceStats = useAttendanceStats(profile?.uid ?? null, effectiveCohortId ?? null)
+  const absenceStats = useAttendanceStats(profile?.uid ?? null, effectiveCohortId ?? null, profile?.enrolledAt)
 
   const lessonsOnDate = useMemo(() => {
     return allLessons.filter(l => {
+      if (l.requiresPresence === false) return false
       const d = l.startTime?.toDate?.()
       if (!d) return false
       return format(d, 'yyyy-MM-dd') === absenceDate
@@ -66,6 +68,7 @@ export default function CheckIn() {
   }, [allLessons, absenceDate])
 
   useEffect(() => { profileRef.current = profile }, [profile])
+  useEffect(() => { document.querySelector('main')?.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
   const handleCheckIn = useCallback(async (token: string) => {
     setPhase('loading')
@@ -73,66 +76,12 @@ export default function CheckIn() {
       const uid = profileRef.current?.uid
       if (!uid) throw new Error('Not logged in')
 
-      // 1. Find active session
-      const sessionQuery = query(
-        collection(db, 'attendance_sessions'),
-        where('token', '==', token),
-        where('isActive', '==', true)
-      )
-      const sessionSnap = await getDocs(sessionQuery)
-      if (sessionSnap.empty) throw new Error('Invalid QR code. Ask your teacher to refresh it.')
-
-      const sessionDoc = sessionSnap.docs[0]
-      const session = sessionDoc.data()
-
-      // 2. Check expiry
-      if (session.expiresAt.toMillis() < Date.now()) {
-        throw new Error('QR code expired. Ask your teacher to refresh it.')
-      }
-
-      const lessonId = session.lessonId as string
-
-      // 3. Check duplicate
-      const attendanceRef = doc(db, 'lessons', lessonId, 'attendance', uid)
-      const existing = await getDoc(attendanceRef)
-      if (existing.exists()) throw new Error('You have already checked in to this lesson.')
-
-      // 4. Get points setting
-      const settingsSnap = await getDoc(doc(db, 'settings', 'attendance'))
-      const pointsPerCheckIn: number = settingsSnap.exists()
-        ? (settingsSnap.data()?.pointsPerCheckIn ?? 5)
-        : 5
-
-      // 5. Record attendance
-      await setDoc(attendanceRef, {
-        studentId:     uid,
-        displayName:   profileRef.current?.displayName ?? 'Student',
-        checkedInAt:   serverTimestamp(),
-        sessionId:     sessionDoc.id,
-        pointsAwarded: pointsPerCheckIn,
-      })
-
-      // 6. Award points + log
-      if (pointsPerCheckIn > 0) {
-        await Promise.all([
-          updateDoc(doc(db, 'users', uid), {
-            totalPoints: increment(pointsPerCheckIn),
-          }),
-          addDoc(collection(db, 'points_log'), {
-            studentId:   uid,
-            points:      pointsPerCheckIn,
-            reason:      'attendance',
-            referenceId: lessonId,
-            awardedBy:   null,
-            createdAt:   serverTimestamp(),
-          }),
-        ])
-      }
+      const checkIn = httpsCallable<{ token: string }, { pointsAwarded: number }>(functions, 'checkInAttendance')
+      const result = await checkIn({ token })
 
       setScannerActive(false)
       setPhase('success')
-      setMessage(`You're checked in! +${pointsPerCheckIn} pts ⭐`)
-
+      setMessage(`You're checked in! +${result.data.pointsAwarded} pts ⭐`)
     } catch (err: any) {
       setScannerActive(false)
       setPhase('error')
@@ -158,7 +107,6 @@ export default function CheckIn() {
           (result, error) => {
             if (result && !stopped) {
               stopped = true
-              console.log('QR scanned:', result.getText())
               controls?.stop()
               handleCheckIn(result.getText())
             }

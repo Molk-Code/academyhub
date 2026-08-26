@@ -9,7 +9,7 @@ import { useCollection, orderBy } from '@/hooks/useFirestore'
 import type { GuideSectionDoc, GuideArticleDoc, GuideContactDoc } from '@/types'
 import {
   Plus, Trash2, Check, X, Pencil, Eye, EyeOff,
-  BookOpen, Users, ChevronDown, ChevronUp, Loader2,
+  BookOpen, Users, ChevronDown, ChevronUp, Loader2, FolderInput,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GUIDE_SEED_DATA } from '@/data/guideSeedData'
@@ -272,6 +272,7 @@ function ArticlesPanel({ sections, articles }: { sections: GuideSectionDoc[]; ar
   const [editTitle, setEditTitle] = useState('')
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
+  const [movingId, setMovingId] = useState<string | null>(null)
 
   const sectionArticles = useMemo(
     () => articles.filter(a => a.sectionId === selectedSectionId),
@@ -319,6 +320,16 @@ function ArticlesPanel({ sections, articles }: { sections: GuideSectionDoc[]; ar
     if (!confirm('Delete this article?')) return
     await deleteDoc(doc(db, 'guide_articles', id))
     if (editingId === id) setEditingId(null)
+  }
+
+  async function moveToSection(articleId: string, targetSectionId: string) {
+    if (!targetSectionId || targetSectionId === selectedSectionId) { setMovingId(null); return }
+    const destArticles = articles.filter(a => a.sectionId === targetSectionId)
+    await updateDoc(doc(db, 'guide_articles', articleId), {
+      sectionId: targetSectionId,
+      order: destArticles.length,
+    })
+    setMovingId(null)
   }
 
   if (editingId) {
@@ -375,16 +386,40 @@ function ArticlesPanel({ sections, articles }: { sections: GuideSectionDoc[]; ar
             <div key={a.id} className="bg-zinc-900 rounded-2xl border border-white/10 px-4 py-3 flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-zinc-100 truncate">{a.title}</p>
-                <p className="text-xs text-zinc-400 truncate">
-                  {a.content.trimStart().startsWith('<')
-                    ? a.content.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80)
-                    : a.content.slice(0, 80)
-                  || 'No content yet'}
-                </p>
+                {movingId === a.id ? (
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <select
+                      autoFocus
+                      defaultValue=""
+                      onChange={e => moveToSection(a.id, e.target.value)}
+                      className="input py-1 text-xs flex-1"
+                    >
+                      <option value="" disabled>Move to section…</option>
+                      {sections.filter(s => s.id !== selectedSectionId).map(s => (
+                        <option key={s.id} value={s.id}>{s.icon} {s.title}</option>
+                      ))}
+                    </select>
+                    <button onClick={() => setMovingId(null)} className="p-1 text-zinc-500 hover:text-zinc-300"><X className="w-3.5 h-3.5" /></button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-zinc-400 truncate">
+                    {a.content.trimStart().startsWith('<')
+                      ? a.content.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80)
+                      : a.content.slice(0, 80)
+                    || 'No content yet'}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <button onClick={() => moveArticle(a.id, -1)} disabled={idx === 0} className="p-1 text-zinc-400 hover:text-zinc-400 disabled:opacity-30"><ChevronUp className="w-4 h-4" /></button>
                 <button onClick={() => moveArticle(a.id, 1)} disabled={idx === sectionArticles.length - 1} className="p-1 text-zinc-400 hover:text-zinc-400 disabled:opacity-30"><ChevronDown className="w-4 h-4" /></button>
+                <button
+                  onClick={() => setMovingId(movingId === a.id ? null : a.id)}
+                  title="Move to another section"
+                  className={cn('p-1.5 rounded-lg transition-colors', movingId === a.id ? 'text-brand-400 bg-brand-500/10' : 'text-zinc-400 hover:text-brand-400')}
+                >
+                  <FolderInput className="w-4 h-4" />
+                </button>
                 <button onClick={() => togglePublished(a)} className={cn('p-1.5 rounded-lg', a.isPublished ? 'text-emerald-500' : 'text-zinc-300')}>{a.isPublished ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
                 <button onClick={() => { setEditingId(a.id); setEditTitle(a.title); setEditContent(a.content) }} className="p-1.5 text-zinc-400 hover:text-brand-600"><Pencil className="w-3.5 h-3.5" /></button>
                 <button onClick={() => deleteArticle(a.id)} className="p-1.5 text-zinc-400 hover:text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button>

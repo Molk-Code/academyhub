@@ -548,6 +548,22 @@ export default function StudentDashboard() {
 
   if (progressLoading) return <LoadingSpinner />
 
+  if (!cohortId) {
+    const firstName = profile?.displayName?.split(' ')[0] ?? profile?.email?.split('@')[0] ?? 'there'
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
+        <div className="text-5xl">🎬</div>
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-100 mb-2">Welcome, {firstName}!</h1>
+          <p className="text-zinc-400 text-sm max-w-xs leading-relaxed">
+            Your account is set up but you haven't been assigned to a class yet.
+            Contact your teacher and they'll get you sorted.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   if (navVis?.student?.['dashboard'] === false) {
     const firstName = profile?.displayName?.split(' ')[0] ?? profile?.email?.split('@')[0] ?? 'Student'
     return (
@@ -673,8 +689,8 @@ export default function StudentDashboard() {
       )}
 
 
-      {/* ── Week at a glance ───────────────────────────────────────────────── */}
-      <WeekAtAGlance lessons={lessons} assignments={assignments} />
+      {/* ── To-Do widget ───────────────────────────────────────────────────── */}
+      {profile && <DashboardTodoWidget uid={profile.uid} rawTodos={myTodos} />}
 
       {/* ── Class leaderboard ──────────────────────────────────────────────── */}
       {showLeaderboard && cohortId && profile?.uid && (
@@ -913,53 +929,10 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* ── To-Do widget ─────────────────────────────────────────────────── */}
-      {profile && <DashboardTodoWidget uid={profile.uid} rawTodos={myTodos} />}
 
       {/* ── Equipment widget ───────────────────────────────────────────────── */}
       <StudentEquipmentWidget uid={profile?.uid ?? ''} />
 
-      {/* ── Progress row ───────────────────────────────────────────────────── */}
-      <div className={navVis?.student?.['subjects'] !== false ? "grid grid-cols-1 md:grid-cols-3 gap-6" : "flex justify-center"}>
-        {/* Overall ring */}
-        <Link to="/assignments" className="card flex flex-col items-center justify-center gap-4 hover:border-brand-500/40 transition-colors">
-          <ProgressRing
-            percentage={progress?.overallPercentage ?? 0}
-            label="Complete"
-            sublabel="Overall"
-          />
-          <div className="text-center">
-            <p className="text-sm font-semibold text-zinc-300">Course Progress</p>
-            <p className="text-xs text-zinc-400">
-              {progress?.completedAssignments ?? 0} of {progress?.totalAssignments ?? 0} assignments done
-            </p>
-          </div>
-        </Link>
-
-        {/* Subject bars */}
-        {navVis?.student?.['subjects'] !== false && (
-          <div className="card col-span-2 space-y-4">
-            <h2 className="section-title">Progress by Subject</h2>
-            {subjects.length === 0 ? (
-              <p className="text-sm text-zinc-400">No subjects added yet.</p>
-            ) : (
-              subjects.map(subject => {
-                const sp = progress?.subjectProgress?.[subject.id]
-                return (
-                  <Link key={subject.id} to={`/subjects/${subject.id}`} className="block hover:opacity-80 transition-opacity">
-                    <XPBar
-                      label={`${subject.iconEmoji} ${subject.title}`}
-                      current={sp?.completed ?? 0}
-                      max={sp?.total ?? 1}
-                      color={subject.color ?? 'bg-brand-500'}
-                    />
-                  </Link>
-                )
-              })
-            )}
-          </div>
-        )}
-      </div>
     </div>
   )
 }

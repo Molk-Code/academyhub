@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useDocument, useCollection, orderBy, where } from '@/hooks/useFirestore'
 import { useAuth } from '@/contexts/AuthContext'
-import type { SubjectDoc, SubjectTeacherDoc, LessonDoc, VideoLabDoc, AbsenceReportDoc } from '@/types'
+import type { SubjectDoc, SubjectTeacherDoc, LessonDoc, VideoLabDoc, AbsenceReportDoc, AssignmentDoc } from '@/types'
 import { thumbnailUrl } from '@/lib/cloudinary'
 import { Link2, FileText, ExternalLink, UserRound, CheckCircle2, XCircle, Globe, Play, Clock } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
@@ -33,6 +33,19 @@ export default function StudentSubjectDetail() {
     `videos-${id}`,
   )
 
+  const { data: subjectAssignments } = useCollection<AssignmentDoc>(
+    'assignments',
+    effectiveCohortId && id
+      ? [where('subjectId', '==', id), where('cohortId', '==', effectiveCohortId), where('isPublished', '==', true)]
+      : [],
+    !!(effectiveCohortId && id),
+    `assignments-${id}-${effectiveCohortId}`,
+  )
+  const assignmentMap = useMemo(
+    () => Object.fromEntries(subjectAssignments.map(a => [a.id, a])),
+    [subjectAssignments],
+  )
+
   // Student's absence reports for lessons in this subject
   const { data: myAbsences } = useCollection<AbsenceReportDoc>(
     'absence_reports',
@@ -54,18 +67,26 @@ export default function StudentSubjectDetail() {
     return set
   }, [curriculum])
 
-  // coveredIds: curriculum IDs covered in past lessons
-  // absentCoveredIds: curriculum IDs the student missed (was absent)
+  // coveredIds: curriculum IDs where ALL covering lessons are in the past
+  // absentCoveredIds: completed items where student missed at least one covering lesson
   const { coveredIds, absentCoveredIds } = useMemo(() => {
     const now = new Date()
-    const covered = new Set<string>()
-    const absentCovered = new Set<string>()
+    const grouped: Record<string, { id: string; isPast: boolean }[]> = {}
     for (const l of lessons) {
       const lessonDate = l.startTime?.toDate?.()
-      if (!lessonDate || lessonDate > now) continue
+      if (!lessonDate) continue
+      const isPast = lessonDate <= now
       for (const cid of (l.coveredCurriculumIds ?? [])) {
+        if (!grouped[cid]) grouped[cid] = []
+        grouped[cid].push({ id: l.id, isPast })
+      }
+    }
+    const covered = new Set<string>()
+    const absentCovered = new Set<string>()
+    for (const [cid, ls] of Object.entries(grouped)) {
+      if (ls.every(l => l.isPast)) {
         covered.add(cid)
-        if (absentLessonIds.has(l.id)) absentCovered.add(cid)
+        if (ls.some(l => absentLessonIds.has(l.id))) absentCovered.add(cid)
       }
     }
     return { coveredIds: covered, absentCoveredIds: absentCovered }
@@ -149,7 +170,16 @@ export default function StudentSubjectDetail() {
                           <td className={`px-4 py-3 text-sm font-medium ${wasAbsent ? 'text-rose-300' : covered ? 'text-emerald-300' : 'text-zinc-100'}`}>{item.title}</td>
                           <td className="px-4 py-3 text-sm text-zinc-400">{item.content}</td>
                           <td className="px-4 py-3">
-                            <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">{item.method}</span>
+                            {item.method === 'Assignment' && item.assignmentId && assignmentMap[item.assignmentId] ? (
+                              <Link
+                                to={`/assignments/${item.assignmentId}`}
+                                className="text-xs bg-violet-900/40 text-violet-300 border border-violet-700/40 px-2 py-0.5 rounded-full hover:bg-violet-800/40 transition-colors"
+                              >
+                                📋 {assignmentMap[item.assignmentId].title}
+                              </Link>
+                            ) : (
+                              <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">{item.method}</span>
+                            )}
                           </td>
                         </tr>
                       )

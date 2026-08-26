@@ -25,7 +25,7 @@ export default function CohortManager() {
   const [saving,   setSaving]   = useState(false)
 
   const { data: cohorts  } = useCollection<CohortDoc>('cohorts')
-  const { data: teachers } = useCollection<UserDoc>('users', [where('roles', 'array-contains', 'teacher')])
+  const { data: teachers } = useCollection<UserDoc>('users', [where('role', 'in', ['teacher', 'admin'])])
   const { data: students } = useCollection<UserDoc>('users', [where('role', '==', 'student')])
   const { data: semesterDoc } = useDocument<SemesterSettingsDoc>('settings', 'semester')
 
@@ -144,15 +144,15 @@ export default function CohortManager() {
               <div>
                 <p className="text-xs font-medium text-zinc-400 mb-2">Teachers</p>
                 <div className="flex flex-wrap gap-2">
-                  {teachers.filter(t => cohort.teacherIds?.includes(t.uid)).map(teacher => (
+                  {teachers.filter(t => cohort.teacherIds?.includes(t.id)).map(teacher => (
                     <span
-                      key={teacher.uid}
+                      key={teacher.id}
                       className="text-xs px-2.5 py-1 rounded-full font-medium bg-brand-600 text-white"
                     >
                       {teacher.displayName}
                     </span>
                   ))}
-                  {!cohort.teacherIds?.some(id => teachers.find(t => t.uid === id)) && (
+                  {!cohort.teacherIds?.some(tid => teachers.find(t => t.id === tid)) && (
                     <span className="text-xs text-zinc-500">No teachers assigned.</span>
                   )}
                 </div>

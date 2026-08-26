@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from 'react'
 import { addDoc, collection, updateDoc, deleteDoc, doc, serverTimestamp, collectionGroup, query, where, getDocs, writeBatch } from 'firebase/firestore'
+import { getFunctions, httpsCallable } from 'firebase/functions'
 import { db } from '@/lib/firebase'
 import { uploadWithQuota, deleteWithTracking } from '@/lib/uploadWithQuota'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
@@ -10,7 +11,7 @@ import {
 } from 'lucide-react'
 import { cn, initials, avatarColor } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import { format } from 'date-fns'
+import { format, isToday, isTomorrow, startOfDay } from 'date-fns'
 import { nanoid } from 'nanoid'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 
@@ -66,6 +67,7 @@ export default function GuestTeacherBank() {
   const [lessonPanelFor, setLessonPanelFor]   = useState<string | null>(null)
   const [selectedLessonId, setSelectedLessonId] = useState('')
   const [bookingLesson, setBookingLesson]     = useState(false)
+  const [bookingError, setBookingError]       = useState<string | null>(null)
 
   // Notes expand state
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set())
@@ -278,7 +280,12 @@ export default function GuestTeacherBank() {
     if (!selectedLessonId) return
     const lesson = lessons.find(l => l.id === selectedLessonId)
     if (!lesson) return
-    setBookingLesson(true)
+    const guest = guests.find(g => g.id === guestId)
+    if (!guest?.email) {
+      setBookingError('No email assigned to this guest teacher. Add an email in their profile before booking.')
+      return
+    }
+    setBookingLesson(true); setBookingError(null)
     try {
       await addDoc(collection(db, 'guest_teacher_bookings'), {
         guestTeacherId: guestId, type: 'lesson',
@@ -286,8 +293,19 @@ export default function GuestTeacherBank() {
         lessonStart: lesson.startTime, lessonEnd: lesson.endTime,
         createdAt: serverTimestamp(),
       })
-      setLessonPanelFor(null); setSelectedLessonId('')
-    } catch (e: any) { console.error(e) } finally { setBookingLesson(false) }
+      // Send confirmation email
+      try {
+        const fn = httpsCallable(getFunctions(), 'sendGuestTeacherBookingEmail')
+        await fn({ guestTeacherId: guestId, lessonId: selectedLessonId })
+      } catch (emailErr: any) {
+        console.warn('Email send failed:', emailErr)
+      }
+      setLessonPanelFor(null); setSelectedLessonId(''); setBookingError(null)
+    } catch (e: any) {
+      setBookingError(e?.message ?? 'Booking failed')
+    } finally {
+      setBookingLesson(false)
+    }
   }
 
   async function removeBooking(bookingId: string) {
@@ -337,11 +355,13 @@ export default function GuestTeacherBank() {
       {/* Profile overlay */}
       {viewingProfile && (() => {
         const g = viewingProfile
-        const guestBookings   = bookingMap[g.id] ?? []
-        const isBooked        = guestBookings.length > 0 || syncedEvents.some(e => e.guestTeacherIds?.includes(g.id))
-        const subjectBookings = guestBookings.filter(b => b.type === 'subject')
-        const lessonBookings  = guestBookings.filter(b => b.type === 'lesson')
-        const docs            = g.documents ?? []
+        const guestBookings    = bookingMap[g.id] ?? []
+        const subjectBookings  = guestBookings.filter(b => b.type === 'subject')
+        const lessonBookings   = guestBookings.filter(b => b.type === 'lesson')
+        const hasLessonBooking = lessonBookings.length > 0
+        const hasSubjectOnly   = subjectBookings.length > 0 && !hasLessonBooking
+        const isBooked         = hasLessonBooking || syncedEvents.some(e => e.guestTeacherIds?.includes(g.id))
+        const docs             = g.documents ?? []
         return (
           <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 backdrop-blur-sm overflow-y-auto py-8 px-4">
             <div className="relative w-full max-w-lg bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl">
@@ -386,13 +406,19 @@ export default function GuestTeacherBank() {
                   {g.price && <span>{g.price} {currencySymbol}</span>}
                 </div>
                 {/* Booking badge */}
-                <span className={cn(
-                  'mt-3 inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full',
-                  isBooked ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400',
-                )}>
-                  <span className={cn('w-1.5 h-1.5 rounded-full', isBooked ? 'bg-emerald-400' : 'bg-rose-400')} />
-                  {isBooked ? 'Booked' : 'Not booked'}
-                </span>
+                {isBooked ? (
+                  <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />Booked
+                  </span>
+                ) : hasSubjectOnly ? (
+                  <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />Added to subject — not booked for lesson
+                  </span>
+                ) : (
+                  <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />Not booked
+                  </span>
+                )}
               </div>
 
               <div className="p-6 space-y-5">
@@ -786,12 +812,16 @@ export default function GuestTeacherBank() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {filtered.map(g => {
-                  const guestBookings = bookingMap[g.id] ?? []
-                  const isBooked      = guestBookings.length > 0 || syncedEvents.some(e => e.guestTeacherIds?.includes(g.id))
-                  const exps          = toExpertiseArray(g.expertise)
-                  const visibleExps   = exps.slice(0, 2)
-                  const extraExps     = exps.length - visibleExps.length
-                  const docs          = g.documents ?? []
+                  const guestBookings    = bookingMap[g.id] ?? []
+                  const listSubjectBkgs  = guestBookings.filter(b => b.type === 'subject')
+                  const listLessonBkgs   = guestBookings.filter(b => b.type === 'lesson')
+                  const listHasLesson    = listLessonBkgs.length > 0
+                  const listSubjectOnly  = listSubjectBkgs.length > 0 && !listHasLesson
+                  const isBooked         = listHasLesson || syncedEvents.some(e => e.guestTeacherIds?.includes(g.id))
+                  const exps             = toExpertiseArray(g.expertise)
+                  const visibleExps      = exps.slice(0, 2)
+                  const extraExps        = exps.length - visibleExps.length
+                  const docs             = g.documents ?? []
                   return (
                     <tr key={g.id} className="hover:bg-white/3 transition-colors group align-middle">
                       {/* Name + photo */}
@@ -826,13 +856,19 @@ export default function GuestTeacherBank() {
                       <td className="px-4 py-3 text-zinc-400 text-xs whitespace-nowrap">{g.price}{g.price ? ` ${currencySymbol}` : ''}</td>
                       {/* Status */}
                       <td className="px-4 py-3">
-                        <span className={cn(
-                          'inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap',
-                          isBooked ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400',
-                        )}>
-                          <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', isBooked ? 'bg-emerald-400' : 'bg-rose-400')} />
-                          {isBooked ? 'Booked' : 'Not booked'}
-                        </span>
+                        {isBooked ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-emerald-500/20 text-emerald-400">
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-emerald-400" />Booked
+                          </span>
+                        ) : listSubjectOnly ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-amber-500/20 text-amber-400">
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-amber-400" />Subject only
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-rose-500/20 text-rose-400">
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-rose-400" />Not booked
+                          </span>
+                        )}
                       </td>
                       {/* Contact */}
                       <td className="px-4 py-3">
@@ -878,13 +914,15 @@ export default function GuestTeacherBank() {
         /* ── Card grid view ── */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map(g => {
-            const guestBookings   = bookingMap[g.id] ?? []
-            const isBooked        = guestBookings.length > 0 || syncedEvents.some(e => e.guestTeacherIds?.includes(g.id))
-            const subjectBookings = guestBookings.filter(b => b.type === 'subject')
-            const lessonBookings  = guestBookings.filter(b => b.type === 'lesson')
-            const showLessonPanel = lessonPanelFor === g.id
-            const notesExpanded   = expandedNotes.has(g.id)
-            const docs            = g.documents ?? []
+            const guestBookings    = bookingMap[g.id] ?? []
+            const subjectBookings  = guestBookings.filter(b => b.type === 'subject')
+            const lessonBookings   = guestBookings.filter(b => b.type === 'lesson')
+            const hasLessonBooking = lessonBookings.length > 0
+            const hasSubjectOnly   = subjectBookings.length > 0 && !hasLessonBooking
+            const isBooked         = hasLessonBooking || syncedEvents.some(e => e.guestTeacherIds?.includes(g.id))
+            const showLessonPanel  = lessonPanelFor === g.id
+            const notesExpanded    = expandedNotes.has(g.id)
+            const docs             = g.documents ?? []
 
             return (
               <div key={g.id} className="group relative flex flex-col gap-3 bg-zinc-900 rounded-2xl border border-white/10 p-4 hover:border-white/20 transition-colors">
@@ -961,13 +999,19 @@ export default function GuestTeacherBank() {
 
                 {/* Booking status */}
                 <div className="flex items-center gap-2">
-                  <span className={cn(
-                    'inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full',
-                    isBooked ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400',
-                  )}>
-                    <span className={cn('w-1.5 h-1.5 rounded-full', isBooked ? 'bg-emerald-400' : 'bg-rose-400')} />
-                    {isBooked ? 'Booked' : 'Not booked'}
-                  </span>
+                  {isBooked ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />Booked
+                    </span>
+                  ) : hasSubjectOnly ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />Added to subject — not booked for lesson
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />Not booked
+                    </span>
+                  )}
                 </div>
 
                 {/* Booking info */}
@@ -1031,26 +1075,74 @@ export default function GuestTeacherBank() {
                 {/* Book for lesson */}
                 {!showLessonPanel ? (
                   <button
-                    onClick={() => { setLessonPanelFor(g.id); setSelectedLessonId('') }}
+                    onClick={() => { setLessonPanelFor(g.id); setSelectedLessonId(''); setBookingError(null) }}
                     className="text-xs text-zinc-500 hover:text-brand-400 transition-colors text-left mt-auto"
                   >
                     + Book for a lesson
                   </button>
                 ) : (
                   <div className="border-t border-white/5 pt-3 space-y-2">
-                    <p className="text-xs font-medium text-zinc-300">Select lesson to book</p>
-                    <select value={selectedLessonId} onChange={e => setSelectedLessonId(e.target.value)} className="input py-1.5 text-xs">
-                      <option value="">Choose a lesson…</option>
-                      {upcomingLessons.map(l => {
-                        const d = l.startTime?.toDate?.()
-                        return <option key={l.id} value={l.id}>{l.title}{d ? ` — ${format(d, 'dd MMM HH:mm')}` : ''}</option>
-                      })}
-                    </select>
+                    <p className="text-xs font-medium text-zinc-300">Select a lesson</p>
+                    {/* Calendar-style grouped lesson list */}
+                    <div className="max-h-52 overflow-y-auto space-y-2 pr-0.5">
+                      {(() => {
+                        const grouped: Record<string, LessonDoc[]> = {}
+                        for (const l of upcomingLessons) {
+                          const d = l.startTime?.toDate?.()
+                          if (!d) continue
+                          const key = format(startOfDay(d), 'yyyy-MM-dd')
+                          if (!grouped[key]) grouped[key] = []
+                          grouped[key].push(l)
+                        }
+                        const days = Object.keys(grouped).sort()
+                        if (days.length === 0) return <p className="text-[11px] text-zinc-600">No upcoming lessons.</p>
+                        return days.map(day => {
+                          const dayDate = new Date(day + 'T00:00:00')
+                          const label = isToday(dayDate) ? 'Today' : isTomorrow(dayDate) ? 'Tomorrow' : format(dayDate, 'EEE d MMM')
+                          return (
+                            <div key={day}>
+                              <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">{label}</p>
+                              <div className="space-y-1">
+                                {grouped[day].map(l => {
+                                  const st = l.startTime?.toDate?.()
+                                  const et = l.endTime?.toDate?.()
+                                  const isSelected = selectedLessonId === l.id
+                                  return (
+                                    <button
+                                      key={l.id}
+                                      onClick={() => setSelectedLessonId(isSelected ? '' : l.id)}
+                                      className={cn(
+                                        'w-full text-left rounded-lg px-2.5 py-2 text-xs transition-colors border',
+                                        isSelected
+                                          ? 'bg-brand-600/20 border-brand-500/40 text-brand-300'
+                                          : 'bg-zinc-800/50 border-white/5 text-zinc-300 hover:bg-zinc-800',
+                                      )}
+                                    >
+                                      <p className="font-medium truncate">{l.title}</p>
+                                      {st && (
+                                        <p className="text-zinc-500 flex items-center gap-1 mt-0.5">
+                                          <Clock className="w-2.5 h-2.5" />
+                                          {format(st, 'HH:mm')}{et ? `–${format(et, 'HH:mm')}` : ''}
+                                          {l.classroom && <><MapPin className="w-2.5 h-2.5 ml-1" />{l.classroom}</>}
+                                        </p>
+                                      )}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })
+                      })()}
+                    </div>
+                    {bookingError && lessonPanelFor === g.id && (
+                      <p className="text-xs text-rose-400">{bookingError}</p>
+                    )}
                     <div className="flex gap-2">
                       <button onClick={() => bookForLesson(g.id)} disabled={!selectedLessonId || bookingLesson} className="btn-primary py-1.5 text-xs">
-                        {bookingLesson ? 'Saving…' : 'Book'}
+                        {bookingLesson ? 'Booking…' : 'Confirm booking & send email'}
                       </button>
-                      <button onClick={() => setLessonPanelFor(null)} className="btn-ghost py-1.5 text-xs">Cancel</button>
+                      <button onClick={() => { setLessonPanelFor(null); setBookingError(null) }} className="btn-ghost py-1.5 text-xs">Cancel</button>
                     </div>
                   </div>
                 )}

@@ -133,6 +133,7 @@ export interface CurriculumItem {
   title: string      // topic / module name
   content: string    // what is covered
   method: string     // how it's delivered – free text, e.g. "Lecture + Workshop"
+  assignmentId?: string  // linked AssignmentDoc when method === 'Assignment'
 }
 
 export interface SubjectDoc {
@@ -182,6 +183,7 @@ export interface LessonDoc {
   isOnline: boolean
   resources: ResourceEmbed[]
   coveredCurriculumIds?: string[]   // curriculum item IDs covered in this lesson
+  requiresPresence?: boolean        // false = no attendance scanning or absence penalty
   createdAt: Timestamp
   penaltiesAppliedAt?: Timestamp
 }
@@ -342,7 +344,14 @@ export interface ProgressDoc {
 
 // ── Equipment Booking System ──────────────────────────────────────────────────
 
-export type EquipmentCategory = 'CAMERA' | 'GRIP' | 'LIGHTS' | 'SOUND' | 'LOCATION' | 'BOOKS' | 'OTHER'
+export type EquipmentCategory = string
+
+export interface EquipmentCategoryDoc {
+  id: string
+  name: string       // uppercase, e.g. "CAMERA"
+  color: string      // tailwind-like color key, e.g. "blue"
+  order: number
+}
 export type EquipmentBookingStatus = 'pending' | 'confirmed' | 'checked-out' | 'returned' | 'cancelled'
 export type InventoryProjectStatus = 'active' | 'checked-out' | 'returned' | 'archived'
 export type InventoryItemStatus = 'checked-out' | 'returned' | 'damaged' | 'missing'
@@ -461,8 +470,9 @@ export interface RoomAvailabilityWindow {
   days: number[]      // JS weekday numbers: 0=Sun, 1=Mon … 6=Sat
   startTime: string   // "HH:MM"
   endTime: string     // "HH:MM"
-  startDate: string   // "YYYY-MM-DD" — period start (inclusive)
-  endDate: string     // "YYYY-MM-DD" — period end (inclusive)
+  startDate: string   // "YYYY-MM-DD" — period start (inclusive); ignored when useSemesterDates=true
+  endDate: string     // "YYYY-MM-DD" — period end (inclusive); ignored when useSemesterDates=true
+  useSemesterDates?: boolean  // when true, startDate/endDate are replaced by the active semester dates
 }
 
 export interface RoomDoc {
@@ -954,6 +964,14 @@ export interface SyncedEventDoc {
   teacherIds?: string[]
   guestTeacherIds?: string[]
   notes?: string | null
+  subjectId?: string | null
+  categoryId?: string | null
+  description?: string | null
+  iconEmoji?: string | null
+  isOnline?: boolean | null
+  requireAttendance?: boolean
+  classroom?: string | null
+  coveredCurriculumIds?: string[]
 }
 
 // ── Production Planning ───────────────────────────────────────────────────────
@@ -1019,6 +1037,17 @@ export interface ProductionShotDoc {
   size: string
   angle: string
   movement: string
+  notes: string
+}
+
+export interface ProductionCostumeDoc {
+  id: string
+  order: number
+  characterName: string
+  description: string
+  scenes: string        // comma-separated scene numbers or free text
+  status: 'planned' | 'sourced' | 'ready' | 'on_set'
+  responsible: string
   notes: string
 }
 

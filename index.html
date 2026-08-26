@@ -19,6 +19,40 @@
   <body>
     <div id="root"><div id="boot-msg" style="min-height:100vh;background:#030712;color:#9ca3af;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:sans-serif;font-size:18px;gap:12px">Starting CineForge…</div></div>
     <script>
+      // Set --real-vh synchronously so flex layouts using it are correct on first paint.
+      // On iOS PWA cold-start, 100dvh can be briefly wrong before the viewport settles.
+      (function() {
+        function setVh() {
+          document.documentElement.style.setProperty('--real-vh', window.innerHeight + 'px');
+        }
+        setVh();
+        window.addEventListener('resize', setVh);
+      })();
+    </script>
+    <script>
+      // Detect stale iOS PWA cache: compare build-id.txt (always fetched from network)
+      // against the last known value in localStorage. If different, the browser has a
+      // stale index.html → force reload once so it picks up the new build.
+      (function() {
+        if (sessionStorage.getItem('_brel')) return; // already reloaded this session
+        var stored = localStorage.getItem('_sbid');
+        fetch('/build-id.txt?_=' + Date.now(), { cache: 'no-store' })
+          .then(function(r) { return r.ok ? r.text() : null; })
+          .then(function(id) {
+            if (!id) return;
+            id = id.trim();
+            if (stored && stored !== id) {
+              localStorage.setItem('_sbid', id);
+              sessionStorage.setItem('_brel', '1');
+              location.reload();
+            } else {
+              localStorage.setItem('_sbid', id);
+            }
+          })
+          .catch(function() {});
+      })();
+    </script>
+    <script>
       // Polyfills for Safari < 15.4
       if (!Object.hasOwn) {
         Object.hasOwn = function(o, k) { return Object.prototype.hasOwnProperty.call(o, k); };

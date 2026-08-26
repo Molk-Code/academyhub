@@ -10,7 +10,7 @@ export default function PrivacyPolicy() {
           <Shield className="w-8 h-8 text-brand-400 flex-shrink-0" />
           <div>
             <h1 className="text-3xl font-bold text-white">Privacy Policy</h1>
-            <p className="text-sm text-zinc-500 mt-0.5">CineForge — last updated May 2025</p>
+            <p className="text-sm text-zinc-500 mt-0.5">CineForge — last updated August 2026</p>
           </div>
         </div>
 
@@ -70,13 +70,13 @@ export default function PrivacyPolicy() {
                 </thead>
                 <tbody className="text-zinc-400 divide-y divide-white/5">
                   {[
-                    ['Account profile', 'Until deletion request'],
-                    ['Attendance records', '3 years after course end'],
-                    ['Assignment submissions & grades', '3 years after course end'],
-                    ['Chat messages', '1 year'],
-                    ['Room bookings', '1 year'],
-                    ['Points log', '3 years after course end'],
-                    ['Development plans (NOPRA)', 'Until deletion request'],
+                    ['Account profile', '1 year after course end'],
+                    ['Attendance records', '1 year after course end'],
+                    ['Assignment submissions & grades', '1 year after course end'],
+                    ['Chat messages', '1 year after course end'],
+                    ['Room bookings', '1 year after course end'],
+                    ['Points log', '1 year after course end'],
+                    ['Development plans (NOPRA)', '1 year after course end'],
                     ['Push notification tokens', 'Cleaned automatically when device is no longer active'],
                     ['Deletion logs', '5 years (legal obligation)'],
                   ].map(([type, period]) => (
@@ -94,7 +94,7 @@ export default function PrivacyPolicy() {
             <h2 className="text-lg font-semibold text-white mb-3">5. Who can see your data</h2>
             <ul className="list-disc pl-5 space-y-1.5 text-zinc-300">
               <li><strong>You</strong> — can see all your own data</li>
-              <li><strong>Teachers</strong> — can see attendance, submissions, grades, development plans, and booking requests for students in their cohort</li>
+              <li><strong>Teachers</strong> — can see attendance, submissions, grades, development plans, and booking requests for students in their class</li>
               <li><strong>Administrators</strong> — can see all of the above for all students</li>
               <li><strong>Other students</strong> — can see your name and profile photo; room bookings show your first name on the public display</li>
               <li><strong>Google Firebase</strong> — processes data as our infrastructure provider; does not use it for advertising</li>

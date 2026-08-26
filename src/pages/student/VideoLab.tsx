@@ -17,7 +17,7 @@ function formatDuration(secs: number): string {
 type UploadPhase = 'idle' | 'uploading' | 'metadata' | 'saving'
 
 export default function VideoLab() {
-  const { profile, role } = useAuth()
+  const { profile, role, roles } = useAuth()
   const navigate = useNavigate()
 
   const { data: videos } = useCollection<VideoLabDoc>('video_lab', [orderBy('createdAt', 'desc')])
@@ -126,7 +126,7 @@ export default function VideoLab() {
       })
       setModalOpen(false)
       // Navigate to the player based on current layout
-      const basePath = role === 'teacher' || role === 'admin' ? '/teacher/video-lab' : '/video-lab'
+      const basePath = isStaff ? '/teacher/video-lab' : '/video-lab'
       navigate(`${basePath}/${ref.id}`)
     } catch (e: any) {
       setUploadError(e.message ?? 'Save failed')
@@ -141,8 +141,9 @@ export default function VideoLab() {
     await deleteDoc(doc(db, 'video_lab', videoId))
   }
 
-  const canDeleteAny = role === 'teacher' || role === 'admin'
-  const playerBase = role === 'teacher' || role === 'admin' ? '/teacher/video-lab' : '/video-lab'
+  const isStaff     = roles.some(r => r === 'teacher' || r === 'admin') || (role ?? profile?.role) === 'teacher' || (role ?? profile?.role) === 'admin'
+  const canDeleteAny = isStaff
+  const playerBase   = isStaff ? '/teacher/video-lab' : '/video-lab'
 
   return (
     <div className="space-y-6">

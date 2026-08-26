@@ -4,7 +4,7 @@ import { doc, updateDoc, addDoc, deleteDoc, collection, serverTimestamp } from '
 import { db } from '@/lib/firebase'
 import { uploadWithQuota, deleteWithTracking } from '@/lib/uploadWithQuota'
 import { useDocument, useCollection, orderBy, where } from '@/hooks/useFirestore'
-import type { SubjectDoc, CurriculumItem, SubjectResource, SubjectTeacherDoc, UserDoc, LessonDoc, VideoLabDoc, AbsenceReportDoc, GuestTeacherDoc, GuestTeacherBookingDoc } from '@/types'
+import type { SubjectDoc, CurriculumItem, SubjectResource, SubjectTeacherDoc, UserDoc, LessonDoc, VideoLabDoc, AbsenceReportDoc, GuestTeacherDoc, GuestTeacherBookingDoc, AssignmentDoc } from '@/types'
 import { thumbnailUrl } from '@/lib/cloudinary'
 import {
   ArrowLeft, Plus, Pencil, Trash2, Check, X,
@@ -15,14 +15,10 @@ import SharePointBrowser from '@/components/sharepoint/SharePointBrowser'
 import { nanoid } from 'nanoid'
 import { cn, initials, avatarColor } from '@/lib/utils'
 
-const METHOD_SUGGESTIONS = [
-  'Lecture', 'Workshop', 'Lecture + Workshop',
-  'Theory test', 'Practical', 'Equipment rundown',
-  'Field work', 'Critique',
-]
+const METHOD_OPTIONS = ['Lesson', 'Workshop', 'Assignment'] as const
 
 const EMPTY_ITEM: Omit<CurriculumItem, 'id' | 'order'> = {
-  semester: 1, title: '', content: '', method: 'Lecture',
+  semester: 1, title: '', content: '', method: 'Lesson',
 }
 
 const EMPTY_TEACHER_FORM = { name: '', title: '', description: '', portfolioUrl: '', expertise: '' }
@@ -54,6 +50,12 @@ export default function SubjectDetail() {
   )
   const { data: absenceReports } = useCollection<AbsenceReportDoc>('absence_reports')
   const { data: guestTeachers } = useCollection<GuestTeacherDoc>('guest_teachers')
+  const { data: subjectAssignments } = useCollection<AssignmentDoc>(
+    'assignments',
+    id ? [where('subjectId', '==', id)] : [],
+    !!id,
+    `assignments-${id}`,
+  )
 
   // Map: lessonId → [studentName, ...]
   const absenceByLesson = useMemo(() => {
@@ -116,23 +118,24 @@ export default function SubjectDetail() {
     return set.length ? set : [1]
   }, [curriculum])
 
-  // For each curriculum item: which lessons cover it, split by past/future
+  // For each curriculum item: completed only when ALL covering lessons are in the past
   const itemLessonMap = useMemo(() => {
     const now = new Date()
-    const map: Record<string, { completed: boolean; plannedDate: Date | null }> = {}
+    const grouped: Record<string, { date: Date; isPast: boolean }[]> = {}
     for (const l of lessons) {
       const d = l.startTime?.toDate?.()
       if (!d) continue
       const isPast = d <= now
       for (const cid of (l.coveredCurriculumIds ?? [])) {
-        const existing = map[cid]
-        if (!existing) {
-          map[cid] = { completed: isPast, plannedDate: isPast ? null : d }
-        } else {
-          if (isPast) existing.completed = true
-          else if (!existing.plannedDate || d < existing.plannedDate) existing.plannedDate = d
-        }
+        if (!grouped[cid]) grouped[cid] = []
+        grouped[cid].push({ date: d, isPast })
       }
+    }
+    const map: Record<string, { completed: boolean; plannedDate: Date | null }> = {}
+    for (const [cid, ls] of Object.entries(grouped)) {
+      const allPast = ls.every(l => l.isPast)
+      const futureDates = ls.filter(l => !l.isPast).map(l => l.date).sort((a, b) => a.getTime() - b.getTime())
+      map[cid] = { completed: allPast, plannedDate: futureDates[0] ?? null }
     }
     return map
   }, [lessons])
@@ -145,8 +148,17 @@ export default function SubjectDetail() {
   async function saveCurriculum(next: CurriculumItem[]) {
     if (!id) return
     setSaving(true)
-    await updateDoc(doc(db, 'subjects', id), { curriculum: next })
-    setSaving(false)
+    try {
+      // Strip undefined fields — Firestore rejects them
+      const sanitized = next.map(item => {
+        const out: Record<string, unknown> = { ...item }
+        if (out.assignmentId === undefined) delete out.assignmentId
+        return out
+      })
+      await updateDoc(doc(db, 'subjects', id), { curriculum: sanitized })
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function saveResources(next: SubjectResource[]) {
@@ -172,20 +184,36 @@ export default function SubjectDetail() {
     const newItem: CurriculumItem = {
       id: nanoid(),
       order: forSem.length ? Math.max(...forSem.map(i => i.order)) + 1 : curriculum.length,
-      ...itemForm,
+      semester: itemForm.semester,
+      title: itemForm.title,
+      content: itemForm.content,
+      method: itemForm.method,
+      ...(itemForm.assignmentId ? { assignmentId: itemForm.assignmentId } : {}),
     }
     await saveCurriculum([...curriculum, newItem])
     setAddingSem(null)
   }
 
+  function normaliseMethod(m: string): string {
+    return m === 'Lecture' || m === 'Lecture + Workshop' ? 'Lesson' : METHOD_OPTIONS.includes(m as any) ? m : 'Lesson'
+  }
+
   function startEdit(item: CurriculumItem) {
     setEditingId(item.id); setAddingSem(null)
-    setItemForm({ semester: item.semester, title: item.title, content: item.content, method: item.method })
+    const form: Omit<CurriculumItem, 'id' | 'order'> = { semester: item.semester, title: item.title, content: item.content, method: normaliseMethod(item.method) }
+    if (item.assignmentId) form.assignmentId = item.assignmentId
+    setItemForm(form)
   }
 
   async function confirmEdit() {
     if (!editingId || !itemForm.title.trim()) return
-    await saveCurriculum(curriculum.map(i => i.id === editingId ? { ...i, ...itemForm } : i))
+    await saveCurriculum(curriculum.map(i => {
+      if (i.id !== editingId) return i
+      const updated: CurriculumItem = { ...i, semester: itemForm.semester, title: itemForm.title, content: itemForm.content, method: itemForm.method }
+      if (itemForm.assignmentId) updated.assignmentId = itemForm.assignmentId
+      else delete updated.assignmentId
+      return updated
+    }))
     setEditingId(null)
   }
 
@@ -508,7 +536,17 @@ export default function SubjectDetail() {
                       <td className="px-4 py-2" />
                       <td className="px-4 py-2"><input autoFocus className="input py-1.5 text-sm" value={itemForm.title} onChange={e => setItemForm(f => ({ ...f, title: e.target.value }))} placeholder="Topic name" /></td>
                       <td className="px-4 py-2"><input className="input py-1.5 text-sm" value={itemForm.content} onChange={e => setItemForm(f => ({ ...f, content: e.target.value }))} placeholder="What is covered" /></td>
-                      <td className="px-4 py-2"><input className="input py-1.5 text-sm" value={itemForm.method} onChange={e => setItemForm(f => ({ ...f, method: e.target.value }))} list="method-options" placeholder="Lecture" /></td>
+                      <td className="px-4 py-2 space-y-1">
+                        <select className="input py-1.5 text-sm" value={itemForm.method} onChange={e => setItemForm(f => ({ ...f, method: e.target.value, assignmentId: undefined }))}>
+                          {METHOD_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                        {itemForm.method === 'Assignment' && (
+                          <select className="input py-1 text-sm" value={itemForm.assignmentId ?? ''} onChange={e => setItemForm(f => ({ ...f, assignmentId: e.target.value || undefined }))}>
+                            <option value="">— pick assignment —</option>
+                            {subjectAssignments.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
+                          </select>
+                        )}
+                      </td>
                       <td className="px-4 py-2"><div className="flex gap-1">
                         <button onClick={confirmEdit} disabled={saving} className="p-1.5 text-emerald-500 hover:text-emerald-600 transition-colors"><Check className="w-4 h-4" /></button>
                         <button onClick={() => setEditingId(null)} className="p-1.5 text-zinc-400 hover:text-zinc-400 transition-colors"><X className="w-4 h-4" /></button>
@@ -533,7 +571,15 @@ export default function SubjectDetail() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm text-zinc-400">{item.content}</td>
-                      <td className="px-4 py-3"><span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">{item.method}</span></td>
+                      <td className="px-4 py-3">
+                        {item.method === 'Assignment' && item.assignmentId ? (
+                          <Link to={`/teacher/assignments`} className="text-xs bg-violet-900/40 text-violet-300 border border-violet-700/40 px-2 py-0.5 rounded-full hover:bg-violet-800/40 transition-colors">
+                            📋 {subjectAssignments.find(a => a.id === item.assignmentId)?.title ?? 'Assignment'}
+                          </Link>
+                        ) : (
+                          <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">{item.method}</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3"><div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         {completed && (
                           <button
@@ -556,7 +602,17 @@ export default function SubjectDetail() {
                     <td className="px-4 py-2" />
                     <td className="px-4 py-2"><input autoFocus className="input py-1.5 text-sm" value={itemForm.title} onChange={e => setItemForm(f => ({ ...f, title: e.target.value }))} placeholder="Topic name" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
                     <td className="px-4 py-2"><input className="input py-1.5 text-sm" value={itemForm.content} onChange={e => setItemForm(f => ({ ...f, content: e.target.value }))} placeholder="What is covered" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
-                    <td className="px-4 py-2"><input className="input py-1.5 text-sm" value={itemForm.method} onChange={e => setItemForm(f => ({ ...f, method: e.target.value }))} list="method-options" placeholder="Lecture" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
+                    <td className="px-4 py-2 space-y-1">
+                      <select className="input py-1.5 text-sm" value={itemForm.method} onChange={e => setItemForm(f => ({ ...f, method: e.target.value, assignmentId: undefined }))}>
+                        {METHOD_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                      {itemForm.method === 'Assignment' && (
+                        <select className="input py-1 text-sm" value={itemForm.assignmentId ?? ''} onChange={e => setItemForm(f => ({ ...f, assignmentId: e.target.value || undefined }))}>
+                          <option value="">— pick assignment —</option>
+                          {subjectAssignments.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
+                        </select>
+                      )}
+                    </td>
                     <td className="px-4 py-2"><div className="flex gap-1">
                       <button onClick={confirmAdd} disabled={saving || !itemForm.title.trim()} className="p-1.5 text-emerald-500 hover:text-emerald-600 transition-colors"><Check className="w-4 h-4" /></button>
                       <button onClick={() => setAddingSem(null)} className="p-1.5 text-zinc-400 hover:text-zinc-400 transition-colors"><X className="w-4 h-4" /></button>
@@ -593,7 +649,17 @@ export default function SubjectDetail() {
                 <td className="px-4 py-2" />
                 <td className="px-4 py-2"><input autoFocus className="input py-1.5 text-sm" value={itemForm.title} onChange={e => setItemForm(f => ({ ...f, title: e.target.value }))} placeholder="Topic name" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
                 <td className="px-4 py-2"><input className="input py-1.5 text-sm" value={itemForm.content} onChange={e => setItemForm(f => ({ ...f, content: e.target.value }))} placeholder="What is covered" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
-                <td className="px-4 py-2"><input className="input py-1.5 text-sm" value={itemForm.method} onChange={e => setItemForm(f => ({ ...f, method: e.target.value }))} list="method-options" placeholder="Lecture" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
+                <td className="px-4 py-2 space-y-1">
+                  <select className="input py-1.5 text-sm" value={itemForm.method} onChange={e => setItemForm(f => ({ ...f, method: e.target.value, assignmentId: undefined }))}>
+                    {METHOD_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                  {itemForm.method === 'Assignment' && (
+                    <select className="input py-1 text-sm" value={itemForm.assignmentId ?? ''} onChange={e => setItemForm(f => ({ ...f, assignmentId: e.target.value || undefined }))}>
+                      <option value="">— pick assignment —</option>
+                      {subjectAssignments.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
+                    </select>
+                  )}
+                </td>
                 <td className="px-4 py-2"><div className="flex gap-1">
                   <button onClick={confirmAdd} disabled={saving || !itemForm.title.trim()} className="p-1.5 text-emerald-500 hover:text-emerald-600 transition-colors"><Check className="w-4 h-4" /></button>
                   <button onClick={() => setAddingSem(null)} className="p-1.5 text-zinc-400 hover:text-zinc-400 transition-colors"><X className="w-4 h-4" /></button>
@@ -943,9 +1009,7 @@ export default function SubjectDetail() {
         />
       </div>
 
-      <datalist id="method-options">
-        {METHOD_SUGGESTIONS.map(m => <option key={m} value={m} />)}
-      </datalist>
+
 
       {/* Absent students modal */}
       {absentModal && (

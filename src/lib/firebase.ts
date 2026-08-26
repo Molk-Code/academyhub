@@ -3,6 +3,7 @@ import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 import { getFunctions } from 'firebase/functions'
+import { getPerformance } from 'firebase/performance'
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -19,7 +20,7 @@ export const auth      = getAuth(app)
 export const db        = getFirestore(app)
 export const storage   = getStorage(app)
 export const functions = getFunctions(app, 'us-central1')
-console.log('Firebase functions initialized for region: us-central1')
+export const perf      = getPerformance(app)
 
 // Persist auth across browser sessions (survives tab/window close)
 setPersistence(auth, browserLocalPersistence).catch(() => {})

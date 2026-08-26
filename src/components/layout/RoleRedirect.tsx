@@ -11,5 +11,5 @@ export default function RoleRedirect() {
 
   if (role === 'admin')   return <Navigate to="/admin/users"  replace />
   if (role === 'teacher') return <Navigate to="/teacher"      replace />
-  return                         <Navigate to="/my-plan"      replace />
+  return                         <Navigate to="/dashboard"    replace />
 }

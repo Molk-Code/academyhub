@@ -40,8 +40,11 @@ service firebase.storage {
     match /productions/{productionId}/{fileName} {
       allow read: if isSignedIn();
       allow write: if isSignedIn()
-        && request.resource.size < 50 * 1024 * 1024   // 50 MB max
-        && request.resource.contentType == 'application/pdf';
+        && request.resource.size < 50 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf'
+        && (isTeacherOrAdmin()
+            || firestore.get(/databases/(default)/documents/productions/$(productionId)).data.createdBy == request.auth.uid
+            || request.auth.uid in firestore.get(/databases/(default)/documents/productions/$(productionId)).data.get('collaborators', []));
     }
 
     // ── Guest teacher profile pictures and documents ─────────────────────

@@ -40,6 +40,7 @@ export function useCollection<T extends { id: string }>(
         setLoading(false)
       },
       (err) => {
+        console.error(`[useCollection] ${collectionPath} (key=${queryKey}):`, err)
         setError(err)
         setLoading(false)
       },

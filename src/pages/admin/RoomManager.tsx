@@ -3,15 +3,15 @@ import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from '
 import { Plus, Pencil, Trash2, Check, X, ToggleLeft, ToggleRight, Building2, ChevronDown, ChevronUp } from 'lucide-react'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/firebase'
-import { useCollection } from '@/hooks/useFirestore'
-import type { RoomDoc, RoomAvailabilityWindow } from '@/types'
+import { useCollection, useDocument } from '@/hooks/useFirestore'
+import type { RoomDoc, RoomAvailabilityWindow, SemesterSettingsDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 
 const DAY_LABELS: Record<number, string> = { 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 0: 'Sun' }
 const DAYS_ORDER = [1, 2, 3, 4, 5, 6, 0]
 
-function blankWindow(): RoomAvailabilityWindow {
+function blankWindow(semStart?: string, semEnd?: string): RoomAvailabilityWindow {
   const today = new Date().toISOString().slice(0, 10)
   const nextYear = `${new Date().getFullYear() + 1}-12-31`
   return {
@@ -19,8 +19,8 @@ function blankWindow(): RoomAvailabilityWindow {
     days:      [1, 2, 3, 4, 5],
     startTime: '08:00',
     endTime:   '17:00',
-    startDate: today,
-    endDate:   nextYear,
+    startDate: semStart ?? today,
+    endDate:   semEnd   ?? nextYear,
   }
 }
 
@@ -38,10 +38,14 @@ function WindowRow({
   w,
   onChange,
   onRemove,
+  semStart,
+  semEnd,
 }: {
   w: RoomAvailabilityWindow
   onChange: (patch: Partial<RoomAvailabilityWindow>) => void
   onRemove: () => void
+  semStart?: string
+  semEnd?: string
 }) {
   function toggleDay(d: number) {
     const next = w.days.includes(d) ? w.days.filter(x => x !== d) : [...w.days, d]
@@ -100,27 +104,55 @@ function WindowRow({
         </div>
       </div>
 
-      {/* Date range */}
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="text-xs text-zinc-500 font-medium block mb-1">Period start</label>
-          <input
-            type="date"
-            value={w.startDate}
-            onChange={e => onChange({ startDate: e.target.value })}
-            className="input text-sm py-1.5"
-          />
+      {/* Use semester dates toggle — defaults to ON (undefined treated as true) */}
+      <label className="flex items-center gap-2 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={w.useSemesterDates !== false}
+          onChange={e => onChange({ useSemesterDates: e.target.checked })}
+          className="rounded border-white/20 bg-zinc-800 text-brand-500 focus:ring-brand-500"
+        />
+        <span className="text-xs text-zinc-400">
+          Use semester dates automatically
+          {w.useSemesterDates !== false && semStart && semEnd && (
+            <span className="ml-1 text-zinc-600">({semStart} → {semEnd})</span>
+          )}
+        </span>
+      </label>
+
+      {/* Date range — only shown when NOT using semester dates */}
+      {w.useSemesterDates === false && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs text-zinc-500 font-medium block mb-1">
+              Period start
+              {semStart && <span className="ml-1 text-zinc-600">(semester: {semStart})</span>}
+            </label>
+            <input
+              type="date"
+              value={w.startDate}
+              min={semStart}
+              max={semEnd}
+              onChange={e => onChange({ startDate: e.target.value })}
+              className="input text-sm py-1.5"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500 font-medium block mb-1">
+              Period end
+              {semEnd && <span className="ml-1 text-zinc-600">(semester: {semEnd})</span>}
+            </label>
+            <input
+              type="date"
+              value={w.endDate}
+              min={semStart}
+              max={semEnd}
+              onChange={e => onChange({ endDate: e.target.value })}
+              className="input text-sm py-1.5"
+            />
+          </div>
         </div>
-        <div>
-          <label className="text-xs text-zinc-500 font-medium block mb-1">Period end</label>
-          <input
-            type="date"
-            value={w.endDate}
-            onChange={e => onChange({ endDate: e.target.value })}
-            className="input text-sm py-1.5"
-          />
-        </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -130,6 +162,10 @@ function WindowRow({
 export default function RoomManager() {
   const { data: rooms, loading } = useCollection<RoomDoc>('rooms')
   const sorted = [...rooms].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name))
+  const { data: semester } = useDocument<SemesterSettingsDoc>('settings', 'semester')
+
+  const semStart = semester?.startDate
+  const semEnd   = semester?.sem2End ?? semester?.endDate
 
   const [modal, setModal]       = useState<'add' | { room: RoomDoc } | null>(null)
   const [form, setForm]         = useState<RoomForm>(BLANK_FORM)
@@ -159,7 +195,7 @@ export default function RoomManager() {
   function close() { setModal(null); setSaveError('') }
 
   function addWindow() {
-    setForm(f => ({ ...f, availability: [...f.availability, blankWindow()] }))
+    setForm(f => ({ ...f, availability: [...f.availability, blankWindow(semStart, semEnd)] }))
     setAvailOpen(true)
   }
 
@@ -376,6 +412,8 @@ export default function RoomManager() {
                       w={w}
                       onChange={patch => updateWindow(w.id, patch)}
                       onRemove={() => removeWindow(w.id)}
+                      semStart={semStart}
+                      semEnd={semEnd}
                     />
                   ))}
                   <button

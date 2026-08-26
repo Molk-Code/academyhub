@@ -253,6 +253,9 @@ function CheckoutForm({ items, profile, cohortId, onSuccess, onBack }: {
       setError('Please fill in all required fields')
       return
     }
+    const today = new Date().toISOString().slice(0, 10)
+    if (checkoutDate < today) { setError('Checkout date cannot be in the past'); return }
+    if (returnDate < checkoutDate) { setError('Return date must be on or after the checkout date'); return }
     if (!profile?.uid) { setError('Not authenticated'); return }
     setSubmitting(true); setError(null)
     try {
@@ -314,11 +317,11 @@ function CheckoutForm({ items, profile, cohortId, onSuccess, onBack }: {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">Checkout Date *</label>
-            <input type="date" value={checkoutDate} onChange={e => setCheckoutDate(e.target.value)} className="input [color-scheme:dark]" />
+            <input type="date" value={checkoutDate} min={new Date().toISOString().slice(0, 10)} onChange={e => setCheckoutDate(e.target.value)} className="input [color-scheme:dark]" />
           </div>
           <div>
             <label className="label">Return Date *</label>
-            <input type="date" value={returnDate} onChange={e => setReturnDate(e.target.value)} className="input [color-scheme:dark]" />
+            <input type="date" value={returnDate} min={checkoutDate || new Date().toISOString().slice(0, 10)} onChange={e => setReturnDate(e.target.value)} className="input [color-scheme:dark]" />
           </div>
         </div>
         <div>

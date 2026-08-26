@@ -3,8 +3,10 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { PrizeClaimDoc } from '@/types'
 
 export function usePrizeClaimBadge(): number {
-  const { role } = useAuth()
-  const isStaff = role === 'teacher' || role === 'admin'
+  const { role, roles, profile } = useAuth()
+  const isStaff = roles.some(r => r === 'teacher' || r === 'admin')
+    || (role ?? profile?.role) === 'teacher'
+    || (role ?? profile?.role) === 'admin'
 
   const { data: pending } = useCollection<PrizeClaimDoc>(
     'prize_claims',

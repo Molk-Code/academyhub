@@ -382,14 +382,21 @@ function ResourceFormPanel({ form, setForm, saving, onSave, folders }: {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function TeacherResources() {
-  const { profile } = useAuth()
+  const { profile, role, roles } = useAuth()
+  const isAdmin = roles.includes('admin') || role === 'admin'
   const [activeTab,        setActiveTab]        = useState<'class' | 'course'>('class')
   const [selectedCohortId, setSelectedCohortId] = useState<string>('')
   const [preview,          setPreview]          = useState<{ url: string; type: string; title: string; sourceName: string } | null>(null)
 
   const { data: allResources } = useCollection<TeamResourceDoc>('team_resources')
   const { data: folders }      = useCollection<ResourceFolderDoc>('resource_folders')
-  const { data: allCohorts }   = useCollection<CohortDoc>('cohorts', profile ? [where('teacherIds', 'array-contains', profile.uid)] : [], !!profile)
+  // Admins see all cohorts; teachers only see their own via teacherIds
+  const { data: allCohorts }   = useCollection<CohortDoc>(
+    'cohorts',
+    isAdmin || !profile ? [] : [where('teacherIds', 'array-contains', profile.uid)],
+    !!profile,
+    isAdmin ? 'all' : (profile?.uid ?? ''),
+  )
 
   // Default to first cohort
   const cohortId = selectedCohortId || allCohorts[0]?.id || null

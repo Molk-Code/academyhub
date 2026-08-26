@@ -8,27 +8,48 @@ import { useCollection, orderBy, where } from '@/hooks/useFirestore'
 import { useCurrency } from '@/hooks/useCurrency'
 import { cn } from '@/lib/utils'
 import { uploadFile } from '@/lib/cloudinary'
-import type { EquipmentDoc, EquipmentCategory, EquipmentBookingDoc } from '@/types'
+import type { EquipmentDoc, EquipmentCategory, EquipmentCategoryDoc, EquipmentBookingDoc } from '@/types'
 import {
   Plus, X, Search, Pencil, Trash2, Package, QrCode, Printer,
   Upload, Camera, Loader2, ChevronDown, ChevronUp, AlertTriangle,
-  ToggleLeft, ToggleRight, Check, Image as ImageIcon,
+  ToggleLeft, ToggleRight, Check, Image as ImageIcon, Tag, GripVertical,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Category helpers ──────────────────────────────────────────────────────────
 
-const CATEGORIES: EquipmentCategory[] = ['CAMERA', 'GRIP', 'LIGHTS', 'SOUND', 'LOCATION', 'BOOKS', 'OTHER']
+const COLOR_STYLES: Record<string, string> = {
+  blue:    'text-blue-300 bg-blue-900/30 border-blue-700/40',
+  orange:  'text-orange-300 bg-orange-900/30 border-orange-700/40',
+  yellow:  'text-yellow-300 bg-yellow-900/30 border-yellow-700/40',
+  green:   'text-green-300 bg-green-900/30 border-green-700/40',
+  purple:  'text-purple-300 bg-purple-900/30 border-purple-700/40',
+  pink:    'text-pink-300 bg-pink-900/30 border-pink-700/40',
+  red:     'text-red-300 bg-red-900/30 border-red-700/40',
+  cyan:    'text-cyan-300 bg-cyan-900/30 border-cyan-700/40',
+  emerald: 'text-emerald-300 bg-emerald-900/30 border-emerald-700/40',
+  amber:   'text-amber-300 bg-amber-900/30 border-amber-700/40',
+  indigo:  'text-indigo-300 bg-indigo-900/30 border-indigo-700/40',
+  teal:    'text-teal-300 bg-teal-900/30 border-teal-700/40',
+  zinc:    'text-zinc-300 bg-zinc-700/30 border-zinc-600/40',
+}
 
-const CATEGORY_STYLE: Record<EquipmentCategory, string> = {
-  CAMERA:   'text-blue-300 bg-blue-900/30 border-blue-700/40',
-  GRIP:     'text-orange-300 bg-orange-900/30 border-orange-700/40',
-  LIGHTS:   'text-yellow-300 bg-yellow-900/30 border-yellow-700/40',
-  SOUND:    'text-green-300 bg-green-900/30 border-green-700/40',
-  LOCATION: 'text-purple-300 bg-purple-900/30 border-purple-700/40',
-  BOOKS:    'text-pink-300 bg-pink-900/30 border-pink-700/40',
-  OTHER:    'text-zinc-300 bg-zinc-700/30 border-zinc-600/40',
+const COLOR_OPTIONS = Object.keys(COLOR_STYLES)
+
+const DEFAULT_CATEGORIES: Omit<EquipmentCategoryDoc, 'id'>[] = [
+  { name: 'CAMERA',   color: 'blue',   order: 0 },
+  { name: 'GRIP',     color: 'orange', order: 1 },
+  { name: 'LIGHTS',   color: 'yellow', order: 2 },
+  { name: 'SOUND',    color: 'green',  order: 3 },
+  { name: 'LOCATION', color: 'purple', order: 4 },
+  { name: 'BOOKS',    color: 'pink',   order: 5 },
+  { name: 'OTHER',    color: 'zinc',   order: 6 },
+]
+
+function categoryStyle(cat: EquipmentCategory, cats: EquipmentCategoryDoc[]): string {
+  const found = cats.find(c => c.name === cat)
+  return COLOR_STYLES[found?.color ?? 'zinc'] ?? COLOR_STYLES.zinc
 }
 
 const BOOKING_STATUS_STYLE: Record<string, string> = {
@@ -114,9 +135,10 @@ const EMPTY_FORM: FormState = {
   included: [], filmYear2Only: false, isActive: true,
 }
 
-function EquipmentForm({ existing, onClose }: {
+function EquipmentForm({ existing, onClose, categories }: {
   existing: EquipmentDoc | null
   onClose: () => void
+  categories: EquipmentCategoryDoc[]
 }) {
   const [form, setForm] = useState<FormState>(() => existing ? {
     name: existing.name,
@@ -224,7 +246,7 @@ function EquipmentForm({ existing, onClose }: {
             <div>
               <label className="label">Category</label>
               <select value={form.category} onChange={e => set('category', e.target.value as EquipmentCategory)} className="input">
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                {categories.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
               </select>
             </div>
           </div>
@@ -442,11 +464,12 @@ function QRCodePanel({ equipment, onClose }: { equipment: EquipmentDoc; onClose:
 
 // ── EquipmentCard ─────────────────────────────────────────────────────────────
 
-function EquipmentCard({ item, onEdit, onDelete, onQR }: {
+function EquipmentCard({ item, onEdit, onDelete, onQR, categories }: {
   item: EquipmentDoc
   onEdit: () => void
   onDelete: () => void
   onQR: () => void
+  categories: EquipmentCategoryDoc[]
 }) {
   const { symbol } = useCurrency()
   const [deleting, setDeleting] = useState(false)
@@ -477,7 +500,7 @@ function EquipmentCard({ item, onEdit, onDelete, onQR }: {
         {/* Category badge */}
         <span className={cn(
           'absolute top-2 left-2 text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full border',
-          CATEGORY_STYLE[item.category],
+          categoryStyle(item.category, categories),
         )}>
           {item.category}
         </span>
@@ -533,13 +556,18 @@ function EquipmentCard({ item, onEdit, onDelete, onQR }: {
 
 // ── CatalogTab ────────────────────────────────────────────────────────────────
 
-function CatalogTab() {
+function CatalogTab({ categories }: { categories: EquipmentCategoryDoc[] }) {
   const { data: equipment, loading } = useCollection<EquipmentDoc>('equipment', [orderBy('name', 'asc')])
   const [search, setSearch] = useState('')
-  const [catFilter, setCatFilter] = useState<'ALL' | EquipmentCategory>('ALL')
+  const [catFilter, setCatFilter] = useState<string>('ALL')
   const [editItem, setEditItem] = useState<EquipmentDoc | null | 'new'>('new' as never)
   const [showForm, setShowForm] = useState(false)
   const [qrItem, setQrItem] = useState<EquipmentDoc | null>(null)
+
+  const sortedCats = useMemo(
+    () => [...categories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name)),
+    [categories],
+  )
 
   const filtered = useMemo(() => {
     return equipment.filter(e => {
@@ -572,18 +600,25 @@ function CatalogTab() {
 
       {/* Category filters */}
       <div className="flex flex-wrap gap-1.5">
-        {(['ALL', ...CATEGORIES] as const).map(cat => (
+        <button
+          onClick={() => setCatFilter('ALL')}
+          className={cn(
+            'px-3 py-1 text-xs font-semibold rounded-full border transition-colors',
+            catFilter === 'ALL' ? 'bg-brand-600 text-white border-brand-500' : 'text-zinc-300 bg-zinc-800 border-white/10 hover:bg-zinc-700',
+          )}
+        >
+          ALL
+        </button>
+        {sortedCats.map(cat => (
           <button
-            key={cat}
-            onClick={() => setCatFilter(cat)}
+            key={cat.name}
+            onClick={() => setCatFilter(cat.name)}
             className={cn(
               'px-3 py-1 text-xs font-semibold rounded-full border transition-colors',
-              catFilter === cat
-                ? 'bg-brand-600 text-white border-brand-500'
-                : cat === 'ALL' ? 'text-zinc-300 bg-zinc-800 border-white/10 hover:bg-zinc-700' : cn('border', CATEGORY_STYLE[cat as EquipmentCategory], 'hover:opacity-80'),
+              catFilter === cat.name ? 'bg-brand-600 text-white border-brand-500' : cn(categoryStyle(cat.name, categories), 'hover:opacity-80'),
             )}
           >
-            {cat}
+            {cat.name}
           </button>
         ))}
         <span className="ml-auto text-xs text-zinc-500 self-center">{filtered.length} items</span>
@@ -607,6 +642,7 @@ function CatalogTab() {
               onEdit={() => { setEditItem(item); setShowForm(true) }}
               onDelete={() => {}}
               onQR={() => setQrItem(item)}
+              categories={categories}
             />
           ))}
         </div>
@@ -616,6 +652,7 @@ function CatalogTab() {
         <EquipmentForm
           existing={editItem as EquipmentDoc | null}
           onClose={() => setShowForm(false)}
+          categories={categories}
         />
       )}
       {qrItem && <QRCodePanel equipment={qrItem} onClose={() => setQrItem(null)} />}
@@ -740,10 +777,128 @@ function InventoryTab() {
   )
 }
 
+// ── CategoriesTab ─────────────────────────────────────────────────────────────
+
+function CategoriesTab({ categories }: { categories: EquipmentCategoryDoc[] }) {
+  const [newName, setNewName]   = useState('')
+  const [newColor, setNewColor] = useState('blue')
+  const [saving, setSaving]     = useState(false)
+  const [error, setError]       = useState<string | null>(null)
+
+  const sorted = useMemo(
+    () => [...categories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name)),
+    [categories],
+  )
+
+  async function handleAdd() {
+    const name = newName.trim().toUpperCase()
+    if (!name) { setError('Name is required'); return }
+    if (categories.some(c => c.name === name)) { setError('Category already exists'); return }
+    setSaving(true); setError(null)
+    try {
+      await addDoc(collection(db, 'equipment_categories'), {
+        name,
+        color: newColor,
+        order: categories.length,
+        createdAt: serverTimestamp(),
+      })
+      setNewName('')
+    } catch (e: any) {
+      setError(e?.message ?? 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete(cat: EquipmentCategoryDoc) {
+    if (!confirm(`Delete category "${cat.name}"? Equipment items using this category will keep their value.`)) return
+    await deleteDoc(doc(db, 'equipment_categories', cat.id))
+  }
+
+  async function handleColorChange(cat: EquipmentCategoryDoc, color: string) {
+    await updateDoc(doc(db, 'equipment_categories', cat.id), { color })
+  }
+
+  return (
+    <div className="space-y-5 max-w-xl">
+      <div className="bg-zinc-900 border border-white/10 rounded-2xl p-5 space-y-4">
+        <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
+          <Tag className="w-4 h-4 text-brand-400" /> Add Category
+        </h3>
+        <div className="flex gap-2 flex-wrap">
+          <input
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            className="input flex-1 min-w-[150px] uppercase placeholder:normal-case"
+            placeholder="e.g. DRONE"
+          />
+          <select
+            value={newColor}
+            onChange={e => setNewColor(e.target.value)}
+            className={cn('input w-32 text-xs font-semibold capitalize', COLOR_STYLES[newColor])}
+          >
+            {COLOR_OPTIONS.map(c => (
+              <option key={c} value={c} className="bg-zinc-900 text-zinc-100">{c}</option>
+            ))}
+          </select>
+          <button
+            onClick={handleAdd}
+            disabled={saving}
+            className="flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            Add
+          </button>
+        </div>
+        {error && <p className="text-xs text-rose-400">{error}</p>}
+      </div>
+
+      <div className="space-y-2">
+        {sorted.map(cat => (
+          <div key={cat.id} className="bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3">
+            <span className={cn('text-xs font-bold tracking-wider px-2.5 py-1 rounded-full border min-w-[80px] text-center', categoryStyle(cat.name, categories))}>
+              {cat.name}
+            </span>
+            <select
+              value={cat.color}
+              onChange={e => handleColorChange(cat, e.target.value)}
+              className={cn('input text-xs font-semibold capitalize flex-1', COLOR_STYLES[cat.color])}
+            >
+              {COLOR_OPTIONS.map(c => (
+                <option key={c} value={c} className="bg-zinc-900 text-zinc-100">{c}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => handleDelete(cat)}
+              className="p-2 text-zinc-500 hover:text-rose-400 transition-colors rounded-lg"
+              title="Delete category"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+        {sorted.length === 0 && (
+          <p className="text-sm text-zinc-500 text-center py-8">No categories yet. Add one above.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Equipment page ─────────────────────────────────────────────────────────────
 
 export default function EquipmentAdmin() {
-  const [tab, setTab] = useState<'catalog' | 'inventory'>('catalog')
+  const [tab, setTab] = useState<'catalog' | 'inventory' | 'categories'>('catalog')
+  const { data: categories, loading: catsLoading } = useCollection<EquipmentCategoryDoc>(
+    'equipment_categories', [orderBy('order', 'asc')],
+  )
+
+  const resolvedCats = useMemo(() => {
+    if (catsLoading) return []
+    if (categories.length > 0) return categories
+    return DEFAULT_CATEGORIES.map((c, i) => ({ ...c, id: `default-${i}` }))
+  }, [categories, catsLoading])
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
@@ -755,7 +910,7 @@ export default function EquipmentAdmin() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-zinc-900 border border-white/10 rounded-xl p-1 w-fit">
-        {([['catalog', 'Catalog'], ['inventory', 'Bookings']] as const).map(([id, label]) => (
+        {([['catalog', 'Catalog'], ['inventory', 'Bookings'], ['categories', 'Categories']] as const).map(([id, label]) => (
           <button
             key={id}
             onClick={() => setTab(id)}
@@ -769,8 +924,9 @@ export default function EquipmentAdmin() {
         ))}
       </div>
 
-      {tab === 'catalog'   && <CatalogTab />}
-      {tab === 'inventory' && <InventoryTab />}
+      {tab === 'catalog'    && <CatalogTab categories={resolvedCats} />}
+      {tab === 'inventory'  && <InventoryTab />}
+      {tab === 'categories' && <CategoriesTab categories={categories} />}
     </div>
   )
 }

@@ -18,9 +18,11 @@ export function markMinivanSeen(uid: string) {
 }
 
 function useBookingData() {
-  const { profile, role } = useAuth()
+  const { profile, role, roles } = useAuth()
   const uid = profile?.uid
-  const isStaff = role === 'teacher' || role === 'admin'
+  const isStaff = roles.some(r => r === 'teacher' || r === 'admin')
+    || (role ?? profile?.role) === 'teacher'
+    || (role ?? profile?.role) === 'admin'
   const seenRev = useSeenRevision()
 
   const { data: pendingFood } = useCollection<FoodBoxOrderDoc>(

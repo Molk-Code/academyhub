@@ -5,18 +5,19 @@ import {
   LayoutDashboard, Calendar, BookOpen,
   Trophy, LogOut, ArrowLeft, QrCode, ClipboardList, DoorOpen,
   MessageSquare, Clapperboard, Film, FolderOpen, Menu, X, ListChecks, User, ChevronDown, CalendarRange, Package,
-  Car, UtensilsCrossed,
+  Car, UtensilsCrossed, RefreshCw, ArrowDown,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
 import { useFeature } from '@/hooks/useFeature'
 import { useDocument, useCollection, where, orderBy } from '@/hooks/useFirestore'
-import { doc, updateDoc, writeBatch } from 'firebase/firestore'
+import { doc, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { NotificationDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import Avatar from '@/components/common/Avatar'
 import { useChatUnreadCount } from '@/hooks/useChatUnread'
+import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { useBookingBadge } from '@/hooks/useBookingBadge'
 import { useCalendarInviteBadge } from '@/hooks/useCalendarInviteBadge'
 import type { Feature } from '@/lib/features'
@@ -29,6 +30,7 @@ import WelcomeModal from '@/components/WelcomeModal'
 import NotificationPermissionBanner from '@/components/NotificationPermissionBanner'
 import OfflineBanner from '@/components/OfflineBanner'
 import NotificationInbox from '@/components/NotificationInbox'
+import BugReportButton from '@/components/BugReportButton'
 import InstallPrompt from '@/components/InstallPrompt'
 
 interface NavItem {
@@ -48,7 +50,6 @@ const PRIMARY_NAV: NavItem[] = [
   { to: '/checkin',     icon: QrCode,          label: 'Check In',    featureId: 'checkin'                                                          },
   { to: '/calendar',    icon: Calendar,        label: 'Calendar',    featureId: 'calendar',    showCalendarBadge: true, tierFeature: 'calendar'    },
   { to: '/my-plan',     icon: ListChecks,      label: 'To-Do List',  featureId: 'myPlan',                               tierFeature: 'development_plan' },
-  { to: '/semester',    icon: CalendarRange,   label: 'Semester',    featureId: 'semester',                             tierFeature: 'semester'    },
   { to: '/chat',        icon: MessageSquare,   label: 'Chat',        featureId: 'chat',        showUnread: true,        tierFeature: 'chat'        },
   { to: '/assignments', icon: ClipboardList,   label: 'Assignments', featureId: 'assignments',                          tierFeature: 'assignments' },
   { to: '/resources',   icon: FolderOpen,      label: 'Resources',   featureId: 'resources',                            tierFeature: 'resources'   },
@@ -127,7 +128,7 @@ function StudentContentSkeleton() {
 }
 
 export default function StudentLayout() {
-  const { profile, role, signOut } = useAuth()
+  const { profile, role, roles, signOut } = useAuth()
   const { shortName } = useSchool()
   const canProduction   = useFeature('production')
   const canEquipment    = useFeature('equipment')
@@ -157,19 +158,25 @@ export default function StudentLayout() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [drawerOpen,    setDrawerOpen]    = useState(false)
+  const { mainRef, indicatorRef: pullIndicatorRef } = usePullToRefresh(
+    () => window.location.reload(),
+  )
   const isChatPage     = pathname.endsWith('/chat')
   const isVideoPage    = /\/videos\/[^/]+$/.test(pathname)
   const isFullPage     = pathname === '/booking/equipment'
   const isGuidePage    = pathname.endsWith('/guide')
-  const isAdminPreview = role === 'admin'
+  const isAdminPreview = role === 'admin' || roles.includes('admin')
+  const { data: navVis, loading: navVisLoading } = useDocument<{ id: string; student: Record<string, boolean>; customLinks?: { id: string; label: string; url: string; roles: string[] }[] }>('settings', 'nav_visibility')
+
   const chatUnread     = useChatUnreadCount()
   const bookingBadge   = useBookingBadge()
   const calendarBadge  = useCalendarInviteBadge()
-  const totalBadge     = chatUnread + bookingBadge + calendarBadge
+  const showChat     = navVis?.student?.chat     !== false
+  const showBooking  = navVis?.student?.booking  !== false
+  const showCalendar = navVis?.student?.calendar !== false
+  const totalBadge   = (showChat ? chatUnread : 0) + (showBooking ? bookingBadge : 0) + (showCalendar ? calendarBadge : 0)
   useAppBadge(totalBadge)
   const { canInstall, install } = usePwaInstall()
-
-  const { data: navVis } = useDocument<{ id: string; student: Record<string, boolean>; customLinks?: { id: string; label: string; url: string; roles: string[] }[] }>('settings', 'nav_visibility')
   const { data: schoolDoc } = useDocument<{ id: string; name?: string }>('settings', 'school')
   const schoolName = schoolDoc?.name ?? ''
 
@@ -215,12 +222,11 @@ export default function StudentLayout() {
 
   const videoLabEnabled = videoLabSchool && navVis?.student?.['videoLab'] !== false
 
-  const showCalendar = navVis?.student?.calendar !== false
-  const showChat     = navVis?.student?.chat     !== false
-  const showBooking  = navVis?.student?.booking  !== false
+  useEffect(() => {
+    setDrawerOpen(false)
+    mainRef.current?.scrollTo({ top: 0, behavior: 'instant' })
+  }, [pathname])
 
-
-  useEffect(() => { setDrawerOpen(false) }, [pathname])
 
   async function handleSignOut() {
     await signOut()
@@ -296,12 +302,12 @@ export default function StudentLayout() {
         ) : null}
 
         {/* Booking group — only render if at least one item is visible */}
-        {(canBooking && vis?.['booking'] !== false) || (canEquipment && vis?.['equipment'] !== false) || (canVehicles && vis?.['vehicles'] !== false) || (canFoodBox && vis?.['foodBoxes'] !== false) ? (
+        {(canBooking && vis?.['booking'] !== false) || (canEquipment && vis?.['equipment'] !== false) || (canVehicles && vis?.['vehicle'] !== false) || (canFoodBox && vis?.['foodBox'] !== false) ? (
           <SidebarGroup label="Booking" icon="📦" defaultOpen={false}>
             {canBooking   && vis?.['booking']   !== false && <NavItem to="/booking"           icon={DoorOpen}       label="Room Booking" showBooking end onNavigate={onNavigate} />}
             {canEquipment && vis?.['equipment'] !== false && <NavItem to="/booking/equipment" icon={Package}         label="Equipment"    onNavigate={onNavigate} />}
-            {canVehicles  && vis?.['vehicles']  !== false && <NavItem to="/vehicles"          icon={Car}             label="Vehicles"     onNavigate={onNavigate} />}
-            {canFoodBox   && vis?.['foodBoxes'] !== false && <NavItem to="/food-boxes"        icon={UtensilsCrossed} label="Food Boxes"   onNavigate={onNavigate} />}
+            {canVehicles  && vis?.['vehicle']   !== false && <NavItem to="/vehicles"          icon={Car}             label="Vehicles"     onNavigate={onNavigate} />}
+            {canFoodBox   && vis?.['foodBox']   !== false && <NavItem to="/food-boxes"        icon={UtensilsCrossed} label="Food Boxes"   onNavigate={onNavigate} />}
           </SidebarGroup>
         ) : null}
 
@@ -374,9 +380,62 @@ export default function StudentLayout() {
     )
   }
 
+  const gdprAccepted = (profile as any)?.gdprConsent?.given === true
+  const [gdprSaving, setGdprSaving] = useState(false)
+
+  async function acceptGdpr() {
+    if (!profile) return
+    setGdprSaving(true)
+    try {
+      await updateDoc(doc(db, 'users', profile.uid), {
+        gdprConsent: {
+          given: true,
+          timestamp: serverTimestamp(),
+          version: '1.0',
+          method: 'in-app-explicit',
+          ipHash: null,
+        },
+      })
+    } finally {
+      setGdprSaving(false)
+    }
+  }
+
+  if (!gdprAccepted) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'var(--bg-primary)' }}>
+        <div className="w-full max-w-lg rounded-2xl border p-8 space-y-6" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+          <div className="space-y-1">
+            <h1 className="text-xl font-bold text-zinc-100">Privacy &amp; data consent</h1>
+            <p className="text-sm text-zinc-400">Before you continue, please read and accept how we handle your data.</p>
+          </div>
+          <div className="text-sm text-zinc-300 space-y-3">
+            <p>We store your name, email, attendance records, assignment submissions, and points to provide the academy platform. Your data is stored securely on servers in the EU.</p>
+            <p className="font-semibold text-zinc-200">Your rights (GDPR)</p>
+            <ul className="list-disc pl-5 space-y-1 text-zinc-400">
+              <li>Right to access your data</li>
+              <li>Right to correct inaccurate data</li>
+              <li>Right to have your data deleted (contact your teacher)</li>
+              <li>Right to object to processing</li>
+            </ul>
+            <p>By clicking <strong>I accept</strong> you agree to the processing of your personal data for educational purposes as described in our <a href="/privacy" target="_blank" className="text-brand-400 underline">privacy policy</a>.</p>
+          </div>
+          <button
+            onClick={acceptGdpr}
+            disabled={gdprSaving}
+            className="btn-primary w-full"
+          >
+            {gdprSaving ? 'Saving…' : 'I accept'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <CompleteProfileGate>
-    <div className="flex overflow-hidden" style={{ height: '100dvh', background: 'var(--bg-primary)' }}>
+    <>
+    <div className="flex flex-col lg:flex-row" style={{ height: '100dvh', background: 'var(--bg-primary)' }}>
       <OfflineBanner />
 
       {/* ── Mobile top header ──────────────────────────────────────────────── */}
@@ -390,6 +449,7 @@ export default function StudentLayout() {
             </div>
           </Link>
           <div className="flex items-center gap-1">
+            <BugReportButton />
             <NotificationInbox />
             <button
               onClick={() => setDrawerOpen(true)}
@@ -442,6 +502,7 @@ export default function StudentLayout() {
               {schoolName && <p className="text-[9px] text-zinc-500 tracking-tight mt-[3px] leading-none whitespace-nowrap overflow-hidden text-ellipsis">{schoolName}</p>}
             </div>
           </Link>
+          <BugReportButton />
           <NotificationInbox />
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
@@ -450,10 +511,12 @@ export default function StudentLayout() {
         <UserFooter />
       </aside>
 
-      {/* ── Main content ───────────────────────────────────────────────────── */}
+      {/* ── Content column: main + bottom nav ────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-h-0">
       <main
+        ref={mainRef}
         className={cn(
-          'flex-1 overflow-y-auto pt-header lg:pt-0',
+          'flex-1 overflow-y-auto min-h-0 pt-header lg:pt-0',
           (isChatPage || isVideoPage) && 'overflow-hidden flex flex-col',
         )}
       >
@@ -497,16 +560,16 @@ export default function StudentLayout() {
         )}
         <Suspense fallback={<StudentContentSkeleton />}>
           {(isChatPage || isVideoPage) ? (
-            <Outlet />
+            <Outlet key={pathname} />
           ) : isFullPage ? (
-            <Outlet />
+            <Outlet key={pathname} />
           ) : (
             <motion.div
               key={pathname}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
-              className="max-w-6xl mx-auto px-4 py-5 pb-bottomnav lg:pb-8 sm:px-6 lg:px-8 lg:py-8"
+              className="max-w-6xl mx-auto px-4 py-5 lg:pb-8 sm:px-6 lg:px-8 lg:py-8"
             >
               <Outlet />
             </motion.div>
@@ -514,13 +577,13 @@ export default function StudentLayout() {
         </Suspense>
       </main>
 
-      {/* ── Mobile bottom tab bar ──────────────────────────────────────────── */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <div className="flex items-stretch h-12">
+      {/* ── Mobile bottom tab bar — NOT fixed, natural flex child ─────────── */}
+      <nav className="lg:hidden flex-shrink-0 border-t" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <div className={cn('flex', navVisLoading && 'opacity-0 pointer-events-none')}>
           {/* Home */}
           {navVis?.student?.['dashboard'] !== false && (
           <NavLink to="/dashboard" className={({ isActive }) => cn(
-            'flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors',
+            'flex-1 flex flex-col items-center justify-center gap-0.5 py-3 text-[10px] font-medium transition-colors',
             isActive ? 'text-brand-400' : 'text-zinc-500',
           )}>
             {({ isActive }) => (<>
@@ -532,7 +595,7 @@ export default function StudentLayout() {
           {/* Calendar */}
           {navVis?.student?.['calendar'] !== false && (
             <NavLink to="/calendar" className={({ isActive }) => cn(
-              'flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors',
+              'flex-1 flex flex-col items-center justify-center gap-0.5 py-3 text-[10px] font-medium transition-colors',
               isActive ? 'text-brand-400' : 'text-zinc-500',
             )}>
               {({ isActive }) => (<>
@@ -551,7 +614,7 @@ export default function StudentLayout() {
           {/* Check In */}
           {navVis?.student?.['checkin'] !== false && (
             <NavLink to="/checkin" className={({ isActive }) => cn(
-              'flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors',
+              'flex-1 flex flex-col items-center justify-center gap-0.5 py-3 text-[10px] font-medium transition-colors',
               isActive ? 'text-brand-400' : 'text-zinc-500',
             )}>
               {({ isActive }) => (<>
@@ -563,7 +626,7 @@ export default function StudentLayout() {
           {/* Chat */}
           {navVis?.student?.['chat'] !== false && (
             <NavLink to="/chat" className={({ isActive }) => cn(
-              'flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors relative',
+              'flex-1 flex flex-col items-center justify-center gap-0.5 py-3 text-[10px] font-medium transition-colors relative',
               isActive ? 'text-brand-400' : 'text-zinc-500',
             )}>
               {({ isActive }) => (<>
@@ -582,7 +645,7 @@ export default function StudentLayout() {
           {/* Profile */}
           {navVis?.student?.['profile'] !== false && (
           <NavLink to="/profile" className={({ isActive }) => cn(
-            'flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors',
+            'flex-1 flex flex-col items-center justify-center gap-0.5 py-3 text-[10px] font-medium transition-colors',
             isActive ? 'text-brand-400' : 'text-zinc-500',
           )}>
             {({ isActive }) => (<>
@@ -593,8 +656,24 @@ export default function StudentLayout() {
           )}
         </div>
       </nav>
+      </div>{/* end content column */}
+    </div>{/* end outer shell */}
+
+      {/* ── Pull-to-refresh indicator ─────────────────────────────────────── */}
+      <div
+        ref={pullIndicatorRef}
+        className="lg:hidden fixed left-0 right-0 z-30 items-center justify-center pointer-events-none"
+        style={{ top: 'calc(4rem + env(safe-area-inset-top, 0px))', display: 'none', opacity: 0, height: '52px' }}
+      >
+        <div
+          data-pull-circle
+          className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-zinc-700 bg-zinc-800 transition-colors"
+        >
+          <ArrowDown data-pull-arrow className="w-5 h-5 text-zinc-300" style={{ transition: 'transform 80ms linear' }} />
+        </div>
+      </div>
       <WelcomeModal />
-    </div>
+    </>
     </CompleteProfileGate>
   )
 }

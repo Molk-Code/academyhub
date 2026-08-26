@@ -20,7 +20,7 @@ function relTime(ts: any): string {
 }
 
 export default function StudentProduction() {
-  const { profile, cohortId: ctxCohortId, previewCohortId } = useAuth()
+  const { profile, cohortId: ctxCohortId, previewCohortId, loading: authLoading } = useAuth()
   const cohortId = ctxCohortId ?? previewCohortId ?? profile?.cohortId ?? null
   const navigate = useNavigate()
   const [showNew,         setShowNew]         = useState(false)
@@ -39,12 +39,35 @@ export default function StudentProduction() {
 
   const { data: allUsers } = useCollection<UserDoc>('users')
 
-  const { data: productions, loading: prodsLoading } = useCollection<ProductionDoc>(
+  // Firestore rules require queries to match one of the canReadProd() branches, so
+  // fetch each accessible slice separately and merge below.
+  const { data: myProds, loading: myProdsLoading } = useCollection<ProductionDoc>(
     'productions',
-    cohortId ? [where('cohortId', '==', cohortId)] : [],
-    !!cohortId,
-    cohortId ?? '',
+    profile?.uid ? [where('createdBy', '==', profile.uid)] : [],
+    !!profile?.uid && !authLoading,
+    profile?.uid ?? '',
   )
+  const { data: collabProds } = useCollection<ProductionDoc>(
+    'productions',
+    profile?.uid ? [where('collaborators', 'array-contains', profile.uid)] : [],
+    !!profile?.uid && !authLoading,
+    `collab:${profile?.uid ?? ''}`,
+  )
+  const { data: publicProds } = useCollection<ProductionDoc>(
+    'productions',
+    cohortId ? [where('cohortId', '==', cohortId), where('isPublic', '==', true)] : [],
+    !!cohortId && !authLoading,
+    `pub:${cohortId ?? ''}`,
+  )
+  const productions = useMemo(() => {
+    const seen = new Set<string>()
+    return [...myProds, ...collabProds, ...publicProds].filter(p => {
+      if (seen.has(p.id)) return false
+      seen.add(p.id)
+      return true
+    })
+  }, [myProds, collabProds, publicProds])
+  const prodsLoading = myProdsLoading
 
   const { data: periods } = useCollection<ProductionPeriodDoc>(
     'production_periods',
@@ -100,6 +123,17 @@ export default function StudentProduction() {
     [sortedProds, profile, teamMemberIds],
   )
 
+  // All other cohort productions (e.g. created by teachers)
+  const classProductions = useMemo(
+    () => sortedProds.filter(p => {
+      const uid = profile?.uid ?? ''
+      return p.createdBy !== uid &&
+        !p.collaborators?.includes(uid) &&
+        !teamMemberIds.includes(p.createdBy)
+    }),
+    [sortedProds, profile, teamMemberIds],
+  )
+
   async function createProduction() {
     if (!newTitle.trim() || !profile || !cohortId) return
     setCreating(true)
@@ -131,7 +165,7 @@ export default function StudentProduction() {
     }
   }
 
-  if (teamsLoading || prodsLoading) return <LoadingSpinner />
+  if (authLoading || teamsLoading || prodsLoading) return <LoadingSpinner />
 
   const sortedCommandments = myTeam ? [...myTeam.commandments].sort((a, b) => a.order - b.order) : []
 
@@ -323,7 +357,17 @@ export default function StudentProduction() {
           </div>
         )}
 
-        {myProductions.length === 0 && teamProductions.length === 0 && (
+        {/* Class productions (teacher-created or other cohort) */}
+        {classProductions.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Class</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {classProductions.map(p => <ProductionCard key={p.id} prod={p} />)}
+            </div>
+          </div>
+        )}
+
+        {myProductions.length === 0 && teamProductions.length === 0 && classProductions.length === 0 && (
           <div className="bg-zinc-900 border border-white/10 rounded-2xl p-10 text-center">
             <span className="text-4xl block mb-3">🎬</span>
             <p className="text-zinc-400 text-sm">No productions yet — start planning your film!</p>

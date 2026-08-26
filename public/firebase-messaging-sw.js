@@ -1,5 +1,19 @@
 // CineForge Firebase Messaging Service Worker
-// This SW handles ONLY push notifications — nothing else
+// Handles push notifications + forces navigation requests fresh from network
+// to prevent iOS PWA from serving stale cached app shells after deploys.
+
+self.addEventListener('install', () => self.skipWaiting())
+self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
+
+self.addEventListener('fetch', (event) => {
+  // Only intercept same-origin navigation requests (the HTML page itself)
+  if (event.request.mode === 'navigate' && event.request.url.startsWith(self.location.origin)) {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' })
+        .catch(() => caches.match(event.request).then(r => r ?? fetch(event.request)))
+    )
+  }
+})
 
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js')
@@ -18,10 +32,6 @@ const messaging = firebase.messaging()
 messaging.onBackgroundMessage((payload) => {
   const { title, body, icon } = payload.data || {}
   if (!title) return
-  // Set app icon badge when a push arrives while the app is in the background
-  if (self.navigator?.setAppBadge) {
-    self.navigator.setAppBadge().catch(() => {})
-  }
   return self.registration.showNotification(title, {
     body: body || '',
     icon: icon || '/icons/icon-192.png',

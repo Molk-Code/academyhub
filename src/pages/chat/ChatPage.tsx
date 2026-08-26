@@ -539,6 +539,7 @@ export default function ChatPage() {
   const [newChannelDesc,     setNewChannelDesc]     = useState('')
   const [globalSettingsOpen, setGlobalSettingsOpen] = useState(false)
   const [dmPickerOpen,       setDmPickerOpen]       = useState(false)
+  const [dmSearch,           setDmSearch]           = useState('')
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef   = useRef<HTMLInputElement>(null)
@@ -838,7 +839,7 @@ export default function ChatPage() {
             <div className="pt-3 pb-1 px-2 flex items-center justify-between">
               <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Direct Messages</p>
               <button
-                onClick={() => setDmPickerOpen(true)}
+                onClick={() => { setDmPickerOpen(true); setDmSearch('') }}
                 className="p-0.5 rounded text-zinc-500 hover:text-slate-200 transition-colors"
                 title="New direct message"
               >
@@ -874,7 +875,7 @@ export default function ChatPage() {
             })}
             {dmChannels.length === 0 && (
               <button
-                onClick={() => setDmPickerOpen(true)}
+                onClick={() => { setDmPickerOpen(true); setDmSearch('') }}
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700/50 transition-colors"
               >
                 <MessageSquare className="w-3.5 h-3.5" />
@@ -1312,13 +1313,24 @@ export default function ChatPage() {
           <div className="bg-zinc-900 rounded-2xl shadow-2xl border border-white/10 w-full max-w-sm overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
               <h2 className="text-base font-semibold text-zinc-100">New Direct Message</h2>
-              <button onClick={() => setDmPickerOpen(false)} className="p-1.5 text-zinc-400 hover:text-zinc-300 rounded-lg hover:bg-zinc-800 transition-colors">
+              <button onClick={() => { setDmPickerOpen(false); setDmSearch('') }} className="p-1.5 text-zinc-400 hover:text-zinc-300 rounded-lg hover:bg-zinc-800 transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="py-2 max-h-80 overflow-y-auto">
+            <div className="px-4 py-2 border-b border-white/10">
+              <input
+                type="text"
+                value={dmSearch}
+                onChange={e => setDmSearch(e.target.value)}
+                placeholder="Search people…"
+                autoFocus
+                className="w-full bg-zinc-800 text-zinc-100 placeholder-zinc-500 text-sm rounded-lg px-3 py-2 outline-none border border-white/10 focus:border-brand-500"
+              />
+            </div>
+            <div className="py-2 max-h-72 overflow-y-auto">
               {allUsers
-                .filter(u => u.id !== profile?.uid)
+                .filter(u => u.id !== profile?.uid && !u.disabled)
+                .filter(u => !dmSearch.trim() || u.displayName.toLowerCase().includes(dmSearch.toLowerCase()))
                 .sort((a, b) => a.displayName.localeCompare(b.displayName))
                 .map(user => (
                   <button

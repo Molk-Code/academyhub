@@ -400,12 +400,14 @@ export default function SuperAdmin() {
   const [showForm,  setShowForm]  = useState(false)
   const [createdMsg, setCreatedMsg] = useState(false)
 
-  const { data: schools,     loading: schoolsLoading } = useCollection<SchoolDoc>('schools')
-  const { data: users }                                 = useCollection<UserDoc>('users')
-  const { data: productions }                           = useCollection<ProductionDoc>('productions')
-  const { data: equipment }                             = useCollection<EquipmentDoc>('equipment')
+  const isSuperAdmin = !!profile?.email && SUPER_ADMIN_EMAILS.includes(profile.email)
 
-  if (!profile?.email || !SUPER_ADMIN_EMAILS.includes(profile.email)) {
+  const { data: schools,     loading: schoolsLoading } = useCollection<SchoolDoc>('schools',     [], isSuperAdmin)
+  const { data: users }                                 = useCollection<UserDoc>('users',         [], isSuperAdmin)
+  const { data: productions }                           = useCollection<ProductionDoc>('productions', [], isSuperAdmin)
+  const { data: equipment }                             = useCollection<EquipmentDoc>('equipment', [], isSuperAdmin)
+
+  if (!isSuperAdmin) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <p className="text-zinc-400">Access denied.</p>

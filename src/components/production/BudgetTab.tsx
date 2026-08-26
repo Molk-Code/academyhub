@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { doc, updateDoc, getDocs, collection } from 'firebase/firestore'
+import { getDocs, collection } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { cn } from '@/lib/utils'
 import { useSchool } from '@/contexts/SchoolContext'
@@ -12,7 +12,7 @@ interface BudgetTabProps {
   budgetLimit?: number
   budgetCurrency?: string
   productionType?: 'period' | 'side'
-  canEdit: boolean
+  canEdit?: boolean
 }
 
 function ProgressBar({ value, max, color }: { value: number; max: number; color: string }) {
@@ -25,18 +25,15 @@ function ProgressBar({ value, max, color }: { value: number; max: number; color:
 }
 
 export function BudgetTab({
-  productionId,
+  productionId: _productionId,
   crewAssignments,
   shootingDays,
   budgetLimit,
   budgetCurrency,
-  canEdit,
 }: BudgetTabProps) {
   const { currency: schoolCurrency } = useSchool()
   const activeCurrency = budgetCurrency || schoolCurrency
   const [crewRoles, setCrewRoles] = useState<CrewRoleDoc[]>([])
-  const [overrides, setOverrides] = useState<Record<string, string>>({})
-  const [saving,    setSaving]    = useState<string | null>(null)
 
   useEffect(() => {
     getDocs(collection(db, 'crew_roles')).then(snap =>
@@ -57,23 +54,13 @@ export function BudgetTab({
       })
   }, [crewAssignments, crewRoles, shootingDayCount])
 
+  /* Rate overrides intentionally not available here — edit rates in Admin → Production Settings */
+
   const salaryCost    = useMemo(() => rows.reduce((sum, r) => sum + r.total, 0), [rows])
   const equipmentLeft = budgetLimit != null ? budgetLimit - salaryCost : null
   const overSalary    = budgetLimit != null && salaryCost > budgetLimit
 
   const fmt = (n: number) => n.toLocaleString('sv-SE')
-
-  async function saveOverride(roleId: string, value: string) {
-    const rate = Number(value)
-    if (isNaN(rate)) return
-    setSaving(roleId)
-    try {
-      await updateDoc(doc(db, `productions/${productionId}/crew`, roleId), { dayRateOverride: rate })
-      setOverrides(prev => ({ ...prev, [roleId]: value }))
-    } finally {
-      setSaving(null)
-    }
-  }
 
   return (
     <div className="space-y-5">
@@ -132,38 +119,19 @@ export function BudgetTab({
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {rows.map(({ assignment: a, role, dayRate, total }) => {
-                const key      = a.roleId
-                const localVal = overrides[key] ?? (dayRate > 0 ? String(dayRate) : '')
-                return (
-                  <tr key={a.roleId} className="hover:bg-white/3 transition-colors">
-                    <td className="px-4 py-3 text-zinc-200 font-medium">{a.assignedName}</td>
-                    <td className="px-4 py-3 text-zinc-400">{a.roleName}</td>
-                    <td className="px-4 py-3 text-right">
-                      {canEdit ? (
-                        <div className="flex items-center justify-end gap-1">
-                          <input
-                            type="number" min={0}
-                            className="w-20 bg-zinc-800 border border-white/10 rounded-lg px-2 py-1 text-xs text-right text-zinc-200 focus:outline-none focus:ring-1 focus:ring-brand-500/30"
-                            value={localVal}
-                            placeholder={role?.dayRate != null ? String(role.dayRate) : '0'}
-                            onChange={e => setOverrides(prev => ({ ...prev, [key]: e.target.value }))}
-                            onBlur={e => saveOverride(key, e.target.value)}
-                          />
-                          <span className="text-xs text-zinc-500">{activeCurrency}</span>
-                          {saving === key && <span className="text-[10px] text-brand-400">saving…</span>}
-                        </div>
-                      ) : (
-                        <span className="text-zinc-300">{dayRate.toLocaleString('sv-SE')} {activeCurrency}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right text-zinc-400">{shootingDayCount}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-zinc-200">
-                      {total.toLocaleString('sv-SE')} {activeCurrency}
-                    </td>
-                  </tr>
-                )
-              })}
+              {rows.map(({ assignment: a, dayRate, total }) => (
+                <tr key={a.roleId} className="hover:bg-white/3 transition-colors">
+                  <td className="px-4 py-3 text-zinc-200 font-medium">{a.assignedName}</td>
+                  <td className="px-4 py-3 text-zinc-400">{a.roleName}</td>
+                  <td className="px-4 py-3 text-right">
+                    <span className="text-zinc-300">{dayRate.toLocaleString('sv-SE')} {activeCurrency}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right text-zinc-400">{shootingDayCount}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-zinc-200">
+                    {total.toLocaleString('sv-SE')} {activeCurrency}
+                  </td>
+                </tr>
+              ))}
             </tbody>
             <tfoot>
               <tr className="border-t border-white/10 bg-zinc-950/40">
@@ -177,9 +145,9 @@ export function BudgetTab({
         </div>
       )}
 
-      {crewRoles.every(r => !r.dayRate) && rows.length > 0 && (
+      {rows.length > 0 && (
         <p className="text-xs text-zinc-500 text-center">
-          Day rates are set per crew role in Admin → Production Settings.
+          Day rates are managed by your admin in Admin → Production Settings.
         </p>
       )}
     </div>

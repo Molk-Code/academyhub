@@ -21,7 +21,11 @@ export interface AttendanceStats {
   lessons: AttendanceLessonRow[]
 }
 
-export function useAttendanceStats(uid: string | null, cohortId: string | null): AttendanceStats | null {
+export function useAttendanceStats(
+  uid: string | null,
+  cohortId: string | null,
+  enrolledAt?: { toDate(): Date } | null,
+): AttendanceStats | null {
   const { data: lessons } = useCollection<LessonDoc>(
     'lessons',
     cohortId ? [where('cohortId', '==', cohortId)] : [],
@@ -42,14 +46,19 @@ export function useAttendanceStats(uid: string | null, cohortId: string | null):
   return useMemo(() => {
     if (!myCohort?.startDate) return null
     const today = startOfDay(new Date())
-    const yearStart = myCohort.startDate.toDate()
+    const cohortStart = myCohort.startDate.toDate()
     const yearEnd = myCohort.endDate
       ? myCohort.endDate.toDate()
-      : new Date(yearStart.getFullYear() + 1, yearStart.getMonth(), yearStart.getDate())
+      : new Date(cohortStart.getFullYear() + 1, cohortStart.getMonth(), cohortStart.getDate())
+
+    // Only count lessons from when the student actually enrolled
+    const studentStart = enrolledAt?.toDate?.() ?? cohortStart
+    const yearStart = isAfter(studentStart, cohortStart) ? startOfDay(studentStart) : cohortStart
 
     const effectiveEnd = isAfter(today, yearEnd) ? yearEnd : today
 
     const scheduledLessons = lessons.filter(l => {
+      if (l.requiresPresence === false) return false
       const d = l.startTime?.toDate?.()
       if (!d) return false
       return !isBefore(d, yearStart) && !isAfter(d, effectiveEnd)

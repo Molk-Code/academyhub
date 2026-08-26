@@ -64,8 +64,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         const tokenResult = await u.getIdTokenResult()
-        const primaryRole = (tokenResult.claims.role as UserRole) ?? null
-        setRole(primaryRole)
+        const claimRole = (tokenResult.claims.role as UserRole) ?? null
+        setRole(claimRole)
 
         // One-time fetch to get initial cohortId for the claims check
         const snap = await getDoc(doc(db, 'users', u.uid))
@@ -73,30 +73,76 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (snap.exists()) {
           const data = snap.data() as UserDoc
           if (data.disabled === true) {
+            sessionStorage.setItem('auth_disabled', '1')
             await firebaseSignOut(auth)
             return
           }
           const profileDoc = { ...data, uid: snap.id }
           setProfile(profileDoc)
-          setRoles(profileDoc.roles?.length ? profileDoc.roles : (primaryRole ? [primaryRole] : []))
+          // Fall back to Firestore role when custom claims haven't propagated yet
+          // (e.g. right after account creation before onUserCreate Cloud Function finishes)
+          const effectiveRole = claimRole ?? ((data.role as UserRole) || null)
+          setRole(effectiveRole)
+          // Always include the primary role in the roles array so switch buttons appear correctly.
+          // Multi-role users (e.g. teacher+admin) have a roles[] in Firestore; single-role users just get [primaryRole].
+          const firestoreRoles: UserRole[] = profileDoc.roles?.length ? profileDoc.roles as UserRole[] : []
+          const mergedRoles = effectiveRole && !firestoreRoles.includes(effectiveRole)
+            ? [effectiveRole, ...firestoreRoles]
+            : firestoreRoles.length ? firestoreRoles : (effectiveRole ? [effectiveRole] : [])
+          setRoles(mergedRoles)
           // Teachers and admins are never bound to a cohort — always use Firestore doc
-          // (ignores any stale cohortId claim left over from before a role switch)
-          const isStaff = primaryRole === 'teacher' || primaryRole === 'admin'
+          const isStaff = effectiveRole === 'teacher' || effectiveRole === 'admin'
           setCohortId(isStaff ? (profileDoc.cohortId ?? null) : (claimCohortId ?? profileDoc.cohortId ?? null))
-        } else if (primaryRole) {
-          setRoles([primaryRole])
+        } else if (claimRole) {
+          setRoles([claimRole])
         }
 
-        // Live listener so totalPoints and other fields stay current
+        // Track last-seen values so the listener can detect permission changes
+        const lastSeen = {
+          role:     (snap.exists() ? snap.data()?.role : null) ?? null,
+          cohortId: (snap.exists() ? snap.data()?.cohortId : null) ?? null,
+        }
+
+        // Live listener — keeps profile/role/cohortId current and forces a token
+        // refresh when role or cohortId changes so Firestore rules pick up new claims.
         profileUnsub = onSnapshot(
           doc(db, 'users', u.uid),
           (s) => {
             if (s.exists()) {
-              setProfile(prev => {
-                const updated = { ...s.data() as UserDoc, uid: s.id }
-                if (!prev) return updated
-                return updated
+              const updated = { ...s.data() as UserDoc, uid: s.id }
+
+              // Admin deactivated this account — sign out immediately on all devices
+              if (updated.disabled === true) {
+                sessionStorage.setItem('auth_disabled', '1')
+                firebaseSignOut(auth)
+                return
+              }
+
+              setProfile(updated)
+
+              // Keep primary role and cohortId in sync with Firestore immediately
+              const updatedRole = (updated.role as UserRole) ?? null
+              setRole(updatedRole)
+              setCohortId(updated.cohortId ?? null)
+
+              // Keep roles array in sync, always including the primary role
+              setRoles(prev => {
+                const base: UserRole[] = updated.roles?.length ? updated.roles as UserRole[] : []
+                const primary = prev.find(r => r === updated.role) ?? updated.role as UserRole ?? null
+                if (primary && !base.includes(primary)) return [primary, ...base]
+                return base.length ? base : prev
               })
+
+              // When role or cohortId changed, force a token refresh so Auth claims
+              // match Firestore (the onUserDocUpdated Cloud Function syncs them server-
+              // side; we give it 2 s to finish before invalidating the cached token).
+              const newRole     = updated.role     ?? null
+              const newCohortId = updated.cohortId ?? null
+              if (newRole !== lastSeen.role || newCohortId !== lastSeen.cohortId) {
+                lastSeen.role     = newRole
+                lastSeen.cohortId = newCohortId
+                setTimeout(() => auth.currentUser?.getIdToken(true), 2000)
+              }
             }
           },
           (err) => { console.warn('Profile listener error:', err) },
@@ -134,6 +180,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await auth.currentUser.getIdToken(true)
     }
   }
+
+  // Refresh token when the tab becomes visible again — prevents stale-token
+  // permission errors on iOS/Safari after the app is backgrounded.
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible' && auth.currentUser) {
+        auth.currentUser.getIdToken(true).catch(() => {})
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [])
 
   async function refreshProfile() {
     if (!auth.currentUser) return

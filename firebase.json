@@ -2,25 +2,14 @@
   "hosting": {
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "predeploy": ["npm run build", "node scripts/gen-build-id.mjs"],
     "headers": [
       {
-        "source": "/index.html",
+        "source": "**",
         "headers": [
           { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
           { "key": "Pragma", "value": "no-cache" },
           { "key": "Expires", "value": "0" }
-        ]
-      },
-      {
-        "source": "/firebase-messaging-sw.js",
-        "headers": [
-          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
-        ]
-      },
-      {
-        "source": "/manifest.webmanifest",
-        "headers": [
-          { "key": "Cache-Control", "value": "no-cache" }
         ]
       },
       {

@@ -14,73 +14,6 @@ import { Link2, Trash2, Video, FileText } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import EmojiPicker    from '@/components/common/EmojiPicker'
 
-// ── Title combobox ────────────────────────────────────────────────────────────
-
-function TitlePicker({
-  subject,
-  curriculum,
-  value,
-  onChange,
-  onSelectItem,
-}: {
-  subject: SubjectDoc | null
-  curriculum: CurriculumItem[]
-  value: string
-  onChange: (v: string) => void
-  onSelectItem: (itemId: string | null) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  const filtered = curriculum.filter(item =>
-    !value || item.title.toLowerCase().includes(value.toLowerCase()),
-  )
-
-  useEffect(() => {
-    function onDown(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [])
-
-  return (
-    <div ref={containerRef} className="relative">
-      <input
-        type="text"
-        value={value}
-        onChange={e => { onChange(e.target.value); onSelectItem(null); setOpen(true) }}
-        onFocus={() => setOpen(true)}
-        className="input w-full"
-        placeholder="Choose from curriculum or type a custom title…"
-        autoComplete="off"
-      />
-      {open && subject && filtered.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-white/10 rounded-xl shadow-lg z-20 overflow-hidden max-h-72 overflow-y-auto">
-          <div className="px-3 py-2 bg-zinc-900/50 border-b border-white/8 flex items-center gap-2">
-            <span>{subject.iconEmoji}</span>
-            <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">{subject.title}</span>
-          </div>
-          {filtered.map(item => (
-            <button
-              key={item.id}
-              type="button"
-              onMouseDown={() => { onChange(item.title); onSelectItem(item.id); setOpen(false) }}
-              className="w-full text-left px-4 py-2.5 hover:bg-brand-50 transition-colors border-b border-slate-50 last:border-0"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-medium text-zinc-200">{item.title}</span>
-                <span className="text-xs text-zinc-400 flex-shrink-0">Sem {item.semester}</span>
-              </div>
-              {item.content && <p className="text-xs text-zinc-400 mt-0.5 truncate">{item.content}</p>}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── Classroom combobox ────────────────────────────────────────────────────────
 
 function ClassroomPicker({
@@ -192,7 +125,8 @@ const schema = z.object({
   endDate:     z.string().min(1, 'End date required'),
   startTime:   z.string().min(1, 'Start time required'),
   endTime:     z.string().min(1, 'End time required'),
-  isOnline:    z.boolean(),
+  isOnline:         z.boolean(),
+  requiresPresence: z.boolean(),
   teacherIds:      z.array(z.string()),
   guestTeacherIds: z.array(z.string()),
   resources:   z.array(resourceSchema),
@@ -223,9 +157,10 @@ export default function LessonBuilder() {
   const { register, handleSubmit, control, setValue, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      resources:       [],
-      isOnline:        false,
-      teacherIds:      profile ? [profile.uid] : [],
+      resources:        [],
+      isOnline:         false,
+      requiresPresence: true,
+      teacherIds:       profile ? [profile.uid] : [],
       guestTeacherIds: [],
       date:       searchParams.get('date')  ?? '',
       endDate:    searchParams.get('date')  ?? '',
@@ -249,9 +184,18 @@ export default function LessonBuilder() {
     [subjects, selectedSubjectId],
   )
   const curriculumItems: CurriculumItem[] = useMemo(
-    () => [...(selectedSubject?.curriculum ?? [])].sort((a, b) => a.order - b.order),
+    () => [...(selectedSubject?.curriculum ?? [])].sort((a, b) => a.title.localeCompare(b.title)),
     [selectedSubject],
   )
+
+  // Clear course when subject changes (but not on initial mount/edit load)
+  const prevSubjectIdRef = useRef('')
+  useEffect(() => {
+    if (prevSubjectIdRef.current && prevSubjectIdRef.current !== (selectedSubjectId ?? '')) {
+      setCoveredCurriculumIds([])
+    }
+    prevSubjectIdRef.current = selectedSubjectId ?? ''
+  }, [selectedSubjectId])
 
   function toggleTeacher(uid: string) {
     const current = teacherIds ?? []
@@ -284,7 +228,8 @@ export default function LessonBuilder() {
       setValue('iconEmoji',   d.iconEmoji ?? '')
       setValue('description', d.description ?? '')
       setValue('classroom',   d.classroom)
-      setValue('isOnline',    d.isOnline)
+      setValue('isOnline',         d.isOnline)
+      setValue('requiresPresence', d.requiresPresence !== false)
       setValue('teacherIds',      d.teacherIds ?? (d.teacherId ? [d.teacherId] : []))
       setValue('guestTeacherIds', d.guestTeacherIds ?? [])
       setValue('date',        toDateStr(d.startTime))
@@ -311,8 +256,9 @@ export default function LessonBuilder() {
       iconEmoji:   data.iconEmoji ?? '',
       description: data.description ?? '',
       classroom:   data.classroom,
-      isOnline:    data.isOnline,
-      resources:   data.resources,
+      isOnline:         data.isOnline,
+      requiresPresence: data.requiresPresence,
+      resources:        data.resources,
       teacherId:   profile.uid,
       teacherIds:      tIds,
       guestTeacherIds: data.guestTeacherIds,
@@ -353,7 +299,7 @@ export default function LessonBuilder() {
             <label className="label">Subject</label>
             <select {...register('subjectId')} className="input">
               <option value="">Select subject…</option>
-              {[...subjects].sort((a,b) => a.order - b.order).map(s =>
+              {[...subjects].sort((a, b) => a.title.localeCompare(b.title)).map(s =>
                 <option key={s.id} value={s.id}>{s.iconEmoji} {s.title}</option>
               )}
             </select>
@@ -368,6 +314,22 @@ export default function LessonBuilder() {
               </select>
             </div>
           )}
+          <div>
+            <label className="label">Course <span className="text-zinc-400 font-normal">(optional)</span></label>
+            <select
+              value={coveredCurriculumIds[0] ?? ''}
+              onChange={e => setCoveredCurriculumIds(e.target.value ? [e.target.value] : [])}
+              className="input"
+              disabled={!selectedSubjectId}
+            >
+              <option value="">No course selected…</option>
+              {curriculumItems.map(item => (
+                <option key={item.id} value={item.id}>
+                  Sem {item.semester} · {item.title}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="label">Class</label>
             <select {...register('cohortId')} className="input">
@@ -390,19 +352,7 @@ export default function LessonBuilder() {
               )}
             />
             <div className="flex-1">
-              <Controller
-                control={control}
-                name="title"
-                render={({ field }) => (
-                  <TitlePicker
-                    subject={selectedSubject}
-                    curriculum={curriculumItems}
-                    value={field.value ?? ''}
-                    onChange={field.onChange}
-                    onSelectItem={itemId => setCoveredCurriculumIds(itemId ? [itemId] : [])}
-                  />
-                )}
-              />
+              <input {...register('title')} className="input w-full" placeholder="Lesson title…" autoComplete="off" />
               {errors.title && <p className="text-xs text-rose-500 mt-1">{errors.title.message}</p>}
             </div>
           </div>
@@ -497,10 +447,17 @@ export default function LessonBuilder() {
 
         {/* Location */}
         <div>
-          <label className="flex items-center gap-2 cursor-pointer mb-2">
-            <input {...register('isOnline')} type="checkbox" className="rounded border-white/15 text-brand-500 focus:ring-brand-500" />
-            <span className="text-sm text-zinc-300 font-medium">Online class</span>
-          </label>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 mb-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input {...register('isOnline')} type="checkbox" className="rounded border-white/15 text-brand-500 focus:ring-brand-500" />
+              <span className="text-sm text-zinc-300 font-medium">Online class</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input {...register('requiresPresence')} type="checkbox" className="rounded border-white/15 text-brand-500 focus:ring-brand-500" />
+              <span className="text-sm text-zinc-300 font-medium">Requires attendance</span>
+              <span className="text-xs text-zinc-500">(QR check-in &amp; absence tracking)</span>
+            </label>
+          </div>
           <Controller
             control={control}
             name="classroom"

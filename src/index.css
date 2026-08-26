@@ -51,10 +51,10 @@
     padding-top: calc(4rem + max(env(safe-area-inset-top, 0px), 12px));
   }
   .pb-bottomnav {
-    padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
   }
   .h-bottomnav {
-    height: calc(4rem + env(safe-area-inset-bottom, 0px));
+    height: calc(3.5rem + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -257,6 +257,15 @@ select.input-dark:focus {
 .fc .fc-timegrid-all-day-bg .fc-highlight,
 .fc .fc-daygrid-bg-harness .fc-highlight { background: transparent !important; }
 .fc .fc-timegrid-now-indicator-container ~ .fc-timegrid-col-bg .fc-highlight { background: rgba(242,100,25,0.08) !important; }
+.fc .fc-timegrid-now-indicator-line {
+  border-color: rgba(242,100,25,0.55) !important;
+  border-top-width: 1.5px !important;
+}
+.fc .fc-timegrid-now-indicator-arrow {
+  border-left-color: rgba(242,100,25,0.7) !important;
+  border-top-color: transparent !important;
+  border-bottom-color: transparent !important;
+}
 
 .fc-block-ghost .fc-event-main {
   cursor: pointer;
@@ -293,6 +302,15 @@ select.input-dark:focus {
 .fc td.fc-timegrid-col.fc-day.fc-timegrid-allday-events {
   background: rgba(134,187,216,0.04) !important;
 }
+/* Horizontal swipe: let JS handle horizontal touches, browser handles vertical scroll */
+.fc .fc-view-harness, .fc .fc-view-harness * { touch-action: pan-y !important; }
+
+/* Compact all-day events — smaller row height */
+.fc .fc-timegrid .fc-daygrid-body .fc-scrollgrid-sync-table { max-height: 28px; }
+.fc .fc-timegrid .fc-daygrid-body tr { height: 26px !important; }
+.fc-daygrid-block-event .fc-event-main { padding: 1px 4px !important; font-size: 10px !important; line-height: 1.2 !important; }
+.fc .fc-daygrid-body .fc-daygrid-day-events { padding-bottom: 1px !important; min-height: 0 !important; }
+
 /* Scrollbar styling */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

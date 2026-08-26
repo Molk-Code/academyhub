@@ -21,10 +21,11 @@ import { CastTab }       from './production/CastTab'
 import { ShotListTab }   from './production/ShotListTab'
 import { ScheduleTab }   from './production/ScheduleTab'
 import { LocationsTab }  from './production/LocationsTab'
+import { CostumeTab }    from './production/CostumeTab'
 import ShotLogTab        from '@/components/production/ShotLogTab'
 import { BudgetTab }     from '@/components/production/BudgetTab'
 
-type Tab = 'script' | 'breakdown' | 'crew' | 'cast' | 'shots' | 'locations' | 'schedule' | 'shotlog' | 'budget'
+type Tab = 'script' | 'breakdown' | 'crew' | 'cast' | 'shots' | 'locations' | 'schedule' | 'costume' | 'shotlog' | 'budget'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'script',    label: 'Script' },
@@ -34,6 +35,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'shots',     label: 'Shot List' },
   { id: 'locations', label: 'Locations' },
   { id: 'schedule',  label: 'Schedule' },
+  { id: 'costume',   label: 'Costume' },
   { id: 'budget',    label: 'Budget' },
   { id: 'shotlog',   label: 'Shot Log' },
 ]
@@ -1158,6 +1160,7 @@ export default function ProductionEditor() {
         {activeTab === 'shots'     && <ShotListTab  productionId={id!} canEdit={canEdit} />}
         {activeTab === 'locations' && <LocationsTab productionId={id!} canEdit={canEdit} />}
         {activeTab === 'schedule'  && <ScheduleTab  productionId={id!} canEdit={canEdit} productionTitle={production.title} />}
+        {activeTab === 'costume'   && <CostumeTab   productionId={id!} canEdit={canEdit} />}
         {activeTab === 'shotlog'   && (
           <ShotLogTab
             productionId={id!}
@@ -1175,7 +1178,6 @@ export default function ProductionEditor() {
             shootingDays={shootingDays}
             budgetLimit={production.budgetLimit}
             productionType={production.productionType}
-            canEdit={canEdit}
           />
         )}
       </div>

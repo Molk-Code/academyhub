@@ -98,14 +98,16 @@ function EquipmentWidget() {
 }
 
 export default function TeacherDashboard() {
-  const { profile } = useAuth()
+  const { profile, role, roles } = useAuth()
+  const isAdmin = roles.includes('admin') || role === 'admin'
   const now = new Date()
 
-  // Load cohorts this teacher manages
+  // Admins see all cohorts; teachers only see their own
   const { data: cohorts, loading: cohortsLoading } = useCollection<CohortDoc>(
     'cohorts',
-    profile ? [where('teacherIds', 'array-contains', profile.uid)] : [],
+    isAdmin || !profile ? [] : [where('teacherIds', 'array-contains', profile.uid)],
     !!profile,
+    isAdmin ? 'all' : (profile?.uid ?? ''),
   )
 
   // Students in those cohorts

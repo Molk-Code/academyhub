@@ -16,16 +16,32 @@ function slotKey(slot: TimeSlot, date: string, roomId: string) {
   return `${slot.startTime}_${slot.endTime}_${date}_${roomId}`
 }
 
-function isRoomAvailableForSlot(room: RoomDoc, dateStr: string, dayNum: number, slot: TimeSlot): boolean {
+function isRoomAvailableForSlot(
+  room: RoomDoc,
+  dateStr: string,
+  dayNum: number,
+  slot: TimeSlot,
+  semDates?: { start: string; end: string },
+): boolean {
   const windows: RoomAvailabilityWindow[] = room.availability ?? []
-  if (windows.length === 0) return true
-  return windows.some(w =>
-    dateStr >= w.startDate &&
-    dateStr <= w.endDate &&
-    w.days.includes(dayNum) &&
-    w.startTime === slot.startTime &&
-    w.endTime === slot.endTime,
-  )
+  if (windows.length === 0) {
+    if (semDates) return dateStr >= semDates.start && dateStr <= semDates.end
+    return true
+  }
+  return windows.some(w => {
+    const useSem = w.useSemesterDates !== false
+    // If using semester dates but data not yet loaded, be optimistic (don't block)
+    if (useSem && !semDates) return w.days.includes(dayNum) && w.startTime === slot.startTime && w.endTime === slot.endTime
+    const start = useSem ? semDates!.start : w.startDate
+    const end   = useSem ? semDates!.end   : w.endDate
+    return (
+      dateStr >= start &&
+      dateStr <= end &&
+      w.days.includes(dayNum) &&
+      w.startTime === slot.startTime &&
+      w.endTime === slot.endTime
+    )
+  })
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -102,16 +118,27 @@ function WindowRow({ w, onChange, onRemove }: {
           <input type="time" value={w.endTime} onChange={e => onChange({ endTime: e.target.value })} className="input text-sm py-1.5" />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="text-xs text-zinc-500 font-medium block mb-1">Period start</label>
-          <input type="date" value={w.startDate} onChange={e => onChange({ startDate: e.target.value })} className="input text-sm py-1.5" />
+      <label className="flex items-center gap-2 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={w.useSemesterDates !== false}
+          onChange={e => onChange({ useSemesterDates: e.target.checked })}
+          className="rounded border-white/20 bg-zinc-800 text-brand-500 focus:ring-brand-500"
+        />
+        <span className="text-xs text-zinc-400">Use semester dates automatically</span>
+      </label>
+      {w.useSemesterDates === false && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs text-zinc-500 font-medium block mb-1">Period start</label>
+            <input type="date" value={w.startDate} onChange={e => onChange({ startDate: e.target.value })} className="input text-sm py-1.5" />
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500 font-medium block mb-1">Period end</label>
+            <input type="date" value={w.endDate} onChange={e => onChange({ endDate: e.target.value })} className="input text-sm py-1.5" />
+          </div>
         </div>
-        <div>
-          <label className="text-xs text-zinc-500 font-medium block mb-1">Period end</label>
-          <input type="date" value={w.endDate} onChange={e => onChange({ endDate: e.target.value })} className="input text-sm py-1.5" />
-        </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -265,14 +292,34 @@ export default function BookingHub() {
     [allSortedRooms, filterRoom],
   )
 
+  // Must be declared before timeSlots useMemo to avoid TDZ error
+  const { data: semesterSettings } = useDocument<SemesterSettingsDoc>('settings', 'semester')
+  const semester = semesterSettings?.startDate
+    ? {
+        startDate: semesterSettings.startDate,
+        endDate: semesterSettings.sem2End ?? semesterSettings.endDate ?? '',
+      }
+    : null
+  const semDatesForCheck = semester ? { start: semester.startDate, end: semester.endDate } : undefined
+
   const timeSlots = useMemo((): TimeSlot[] => {
     const seen = new Map<string, TimeSlot>()
     for (const room of allSortedRooms) {
       for (const w of (room.availability ?? []) as RoomAvailabilityWindow[]) {
+        const useSem = w.useSemesterDates !== false
+        if (useSem && !semDatesForCheck) {
+          if (w.days.includes(selectedDayNum)) {
+            const k = `${w.startTime}_${w.endTime}`
+            if (!seen.has(k)) seen.set(k, { startTime: w.startTime, endTime: w.endTime })
+          }
+          continue
+        }
+        const start = useSem ? semDatesForCheck!.start : w.startDate
+        const end   = useSem ? semDatesForCheck!.end   : w.endDate
         if (
           w.days.includes(selectedDayNum) &&
-          selectedDateStr >= w.startDate &&
-          selectedDateStr <= w.endDate
+          selectedDateStr >= start &&
+          selectedDateStr <= end
         ) {
           const k = `${w.startTime}_${w.endTime}`
           if (!seen.has(k)) seen.set(k, { startTime: w.startTime, endTime: w.endTime })
@@ -280,7 +327,7 @@ export default function BookingHub() {
       }
     }
     return [...seen.values()].sort((a, b) => a.startTime.localeCompare(b.startTime))
-  }, [allSortedRooms, selectedDayNum, selectedDateStr])
+  }, [allSortedRooms, selectedDayNum, selectedDateStr, semDatesForCheck])
 
   const bookingMap = useMemo(() => {
     const m = new Map<string, RoomBookingDoc>()
@@ -320,10 +367,6 @@ export default function BookingHub() {
 
   // ── Settings state ────────────────────────────────────────────────────────
   const { data: bookingSettings } = useDocument<BookingSettingsDoc>('settings', 'booking')
-  const { data: semesterSettings } = useDocument<SemesterSettingsDoc>('settings', 'semester')
-  const semester = semesterSettings?.startDate && semesterSettings?.endDate
-    ? { startDate: semesterSettings.startDate, endDate: semesterSettings.endDate }
-    : null
   const [maxWeeklyInput, setMaxWeeklyInput] = useState<string>('')
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [settingsEditing, setSettingsEditing] = useState(false)
@@ -363,7 +406,7 @@ export default function BookingHub() {
     const rows = timeSlots.map(slot => {
       const cells = sortedRooms.map(room => {
         const booking = bookingMap.get(slotKey(slot, selectedDateStr, room.id))
-        const unavailable = !isRoomAvailableForSlot(room, selectedDateStr, selectedDayNum, slot)
+        const unavailable = !isRoomAvailableForSlot(room, selectedDateStr, selectedDayNum, slot, semDatesForCheck)
         if (unavailable) return '<td style="color:#999;text-align:center">—</td>'
         if (booking) return `<td style="background:#ef4444;color:#fff;text-align:center;font-weight:600">${booking.studentName}</td>`
         return '<td style="background:#10b981;color:#fff;text-align:center;font-weight:600">Free</td>'
@@ -641,9 +684,18 @@ export default function BookingHub() {
                                 </span>
                               </div>
                               <div className="flex items-center gap-1 text-[11px] text-zinc-400">
-                                <span className="bg-zinc-800 rounded px-1.5 py-0.5">{format(parseISO(w.startDate), 'd MMM yyyy')}</span>
-                                <span>→</span>
-                                <span className="bg-zinc-800 rounded px-1.5 py-0.5">{format(parseISO(w.endDate), 'd MMM yyyy')}</span>
+                                {w.useSemesterDates !== false ? (
+                                  <span className="bg-brand-600/20 text-brand-400 rounded px-1.5 py-0.5">
+                                    Semester dates
+                                    {semester && ` (${semester.startDate} → ${semester.endDate})`}
+                                  </span>
+                                ) : (
+                                  <>
+                                    <span className="bg-zinc-800 rounded px-1.5 py-0.5">{format(parseISO(w.startDate), 'd MMM yyyy')}</span>
+                                    <span>→</span>
+                                    <span className="bg-zinc-800 rounded px-1.5 py-0.5">{format(parseISO(w.endDate), 'd MMM yyyy')}</span>
+                                  </>
+                                )}
                               </div>
                             </div>
                           )

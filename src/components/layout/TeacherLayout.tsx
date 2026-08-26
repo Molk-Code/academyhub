@@ -1,11 +1,11 @@
-import { useState, useMemo, Suspense } from 'react'
+import { useState, useMemo, useEffect, Suspense } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard, Users, CalendarDays, ClipboardList, BookMarked,
   Gift, LogOut, Film, Menu, X, MessageSquare, BookOpen,
   Clapperboard, Video, DoorOpen, ArrowLeftRight, User, CircleDot, CalendarRange,
-  Package, ArchiveRestore, ExternalLink, UserRound,
+  Package, ArchiveRestore, ExternalLink, UserRound, RefreshCw, ArrowDown,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
@@ -16,11 +16,13 @@ import { cn } from '@/lib/utils'
 import Avatar from '@/components/common/Avatar'
 import firePng from '@/assets/fire.png'
 import { useChatUnreadCount } from '@/hooks/useChatUnread'
+import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { useBookingBadge, useBookingBadgeDetail } from '@/hooks/useBookingBadge'
 import { useCalendarInviteBadge } from '@/hooks/useCalendarInviteBadge'
 import { useAppBadge } from '@/hooks/useAppBadge'
 import NotificationPermissionBanner from '@/components/NotificationPermissionBanner'
 import NotificationInbox from '@/components/NotificationInbox'
+import BugReportButton from '@/components/BugReportButton'
 import CompleteProfileGate from '@/components/CompleteProfileGate'
 import { AttendanceProvider, useAttendance } from '@/contexts/AttendanceContext'
 import AttendancePanel from '@/components/attendance/AttendancePanel'
@@ -91,7 +93,7 @@ function AttendanceOverlay() {
 }
 
 export default function TeacherLayout() {
-  const { profile, role, signOut } = useAuth()
+  const { profile, role, roles, refreshToken, signOut } = useAuth()
   const { shortName } = useSchool()
   const videoLabEnabled    = useFeature('video_lab')
   const canProduction      = useFeature('production')
@@ -120,6 +122,9 @@ export default function TeacherLayout() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const { mainRef, indicatorRef } = usePullToRefresh(
+    () => window.location.reload(),
+  )
 
   const { data: navVis } = useDocument<{ id: string; teacher: Record<string, boolean>; customLinks?: { id: string; label: string; url: string; roles: string[] }[] }>('settings', 'nav_visibility')
   const filteredNav = useMemo(
@@ -144,7 +149,11 @@ export default function TeacherLayout() {
   const totalBadge      = chatUnread + bookingBadge + calendarBadge
   useAppBadge(totalBadge)
 
-  const canSwitchToAdmin = role === 'admin'
+  const canSwitchToAdmin = roles.includes('admin') || role === 'admin'
+
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, behavior: 'instant' })
+  }, [pathname])
 
   async function handleSignOut() {
     await signOut()
@@ -239,7 +248,7 @@ export default function TeacherLayout() {
     <div className="p-3 border-t space-y-1" style={{ borderColor: 'var(--border)' }}>
       {canSwitchToAdmin && (
         <button
-          onClick={() => { navigate('/admin'); onNavigate?.() }}
+          onClick={() => { navigate('/admin/users'); onNavigate?.() }}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-zinc-400 hover:text-zinc-100 hover:bg-white/5 transition-all"
         >
           <ArrowLeftRight className="w-4 h-4" />
@@ -270,7 +279,8 @@ export default function TeacherLayout() {
   return (
     <AttendanceProvider>
     <CompleteProfileGate>
-    <div className="flex overflow-hidden" style={{ height: '100dvh', background: 'var(--bg-primary)' }}>
+    <>
+    <div className="flex" style={{ height: '100dvh', background: 'var(--bg-primary)', overflow: 'clip' }}>
 
       {/* ── Mobile top header ──────────────────────────────────────────────── */}
       <header className="mobile-header lg:hidden fixed top-0 left-0 right-0 z-40 border-b" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
@@ -283,6 +293,7 @@ export default function TeacherLayout() {
             </div>
           </Link>
           <div className="flex items-center gap-1">
+            <BugReportButton />
             <NotificationInbox />
             <button
               onClick={() => setDrawerOpen(true)}
@@ -340,6 +351,7 @@ export default function TeacherLayout() {
               <span className="block text-xs text-zinc-400 -mt-0.5">Teacher Portal</span>
             </div>
           </Link>
+          <BugReportButton />
           <NotificationInbox />
         </div>
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
@@ -350,6 +362,7 @@ export default function TeacherLayout() {
 
       {/* ── Main content ───────────────────────────────────────────────────── */}
       <main
+        ref={mainRef}
         className={cn(
           'flex-1 pt-header lg:pt-0',
           (isChatPage || isVideoPage) ? 'overflow-hidden flex flex-col' : 'overflow-y-auto',
@@ -366,7 +379,7 @@ export default function TeacherLayout() {
           </div>
         }>
           {(isChatPage || isVideoPage) ? (
-            <Outlet />
+            <Outlet key={pathname} />
           ) : (
             <motion.div
               key={pathname}
@@ -382,6 +395,18 @@ export default function TeacherLayout() {
       </main>
       <AttendanceOverlay />
     </div>
+
+      {/* ── Pull-to-refresh indicator ─────────────────────────────────────── */}
+      <div
+        ref={indicatorRef}
+        className="lg:hidden fixed left-0 right-0 z-30 items-center justify-center pointer-events-none"
+        style={{ top: 'calc(4rem + env(safe-area-inset-top, 0px))', display: 'none', opacity: 0, height: '52px' }}
+      >
+        <div data-pull-circle className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-zinc-700 bg-zinc-800 transition-colors">
+          <ArrowDown data-pull-arrow className="w-5 h-5 text-zinc-300" style={{ transition: 'transform 80ms linear' }} />
+        </div>
+      </div>
+    </>
     </CompleteProfileGate>
     </AttendanceProvider>
   )

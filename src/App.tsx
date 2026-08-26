@@ -102,6 +102,7 @@ const ProductionRoles   = lazy(() => import('@/pages/admin/ProductionRoles'))
 const SemesterEvents    = lazy(() => import('@/pages/admin/SemesterEvents'))
 const QrDevices         = lazy(() => import('@/pages/admin/QrDevices'))
 const GdprDashboard     = lazy(() => import('@/pages/admin/Gdpr'))
+const BugReportsPage    = lazy(() => import('@/pages/admin/BugReports'))
 const AdminVideoLab     = lazy(() => import('@/pages/admin/VideoLab'))
 const ExperienceLevels  = lazy(() => import('@/pages/admin/ExperienceLevels'))
 
@@ -155,7 +156,7 @@ export default function App() {
             <Route path="/video-lab/:id"    element={<FeatureGate feature="video_lab"><VideoLabPlayer /></FeatureGate>} />
             <Route path="/my-plan"          element={<MyPlan />} />
             <Route path="/production-period" element={<StudentProductionPeriod />} />
-            <Route path="/semester"          element={<SemesterOverview />} />
+            <Route path="/semester"          element={<Navigate to="/dashboard" replace />} />
             <Route path="/food-boxes"        element={<FeatureGate feature="food_box"><FoodBoxOrder standalone /></FeatureGate>} />
             <Route path="/vehicles"          element={<FeatureGate feature="vehicles"><VehicleBooking /></FeatureGate>} />
           </Route>
@@ -225,6 +226,7 @@ export default function App() {
             <Route path="/admin/semester-events"    element={<SemesterEvents />} />
             <Route path="/admin/qr-devices"         element={<FeatureGate feature="checkin_devices" redirectTo="/admin/users"><QrDevices /></FeatureGate>} />
             <Route path="/admin/gdpr"               element={<GdprDashboard />} />
+            <Route path="/admin/bug-reports"        element={<BugReportsPage />} />
             <Route path="/admin/experience-levels" element={<ExperienceLevels />} />
             <Route path="/admin/equipment"           element={<FeatureGate feature="equipment" redirectTo="/admin/users"><AdminEquipmentPage /></FeatureGate>} />
             <Route path="/admin/inventory"           element={<FeatureGate feature="inventory" redirectTo="/admin/users"><InventoryPage /></FeatureGate>} />

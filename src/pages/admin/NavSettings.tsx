@@ -48,7 +48,7 @@ const FEATURES: Feature[] = [
   { id: 'dashboard',        label: 'Dashboard',           icon: LayoutDashboard, student: true,  teacher: false },
   { id: 'profile',          label: 'Profile',             icon: User,            student: true,  teacher: false },
   { id: 'checkin',          label: 'Check In',            icon: QrCode,          student: true,  teacher: false },
-  { id: 'semester',         label: 'Semester',            icon: CalendarRange,   student: true,  teacher: false },
+  { id: 'semester',         label: 'Semester',            icon: CalendarRange,   student: false, teacher: false },
   { id: 'equipment',        label: 'Equipment Booking',   icon: Package,         student: true,  teacher: false },
   { id: 'myPlan',           label: 'My Plan',             icon: ListChecks,      student: true,  teacher: false },
   { id: 'points',           label: 'Points',              icon: Trophy,          student: true,  teacher: false },

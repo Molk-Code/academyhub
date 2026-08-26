@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '@/lib/firebase'
 import { useCollection, where, orderBy } from '@/hooks/useFirestore'
+import { useAuth } from '@/contexts/AuthContext'
 import { fullDateTime } from '@/lib/utils'
-import type { SubmissionDoc, UserDoc, AssignmentDoc } from '@/types'
+import type { SubmissionDoc, UserDoc, AssignmentDoc, CohortDoc } from '@/types'
 import Avatar from '@/components/common/Avatar'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import EmptyState from '@/components/common/EmptyState'
@@ -26,13 +27,26 @@ export default function GradeBook() {
   const [grading,  setGrading]  = useState(false)
   const [message,  setMessage]  = useState('')
 
-  const { data: submissions, loading } = useCollection<SubmissionDoc>(
+  const { profile } = useAuth()
+
+  const { data: allSubmissions, loading } = useCollection<SubmissionDoc>(
     'submissions',
     [where('status', '==', 'submitted'), orderBy('submittedAt', 'asc')],
   )
-
+  const { data: cohorts } = useCollection<CohortDoc>('cohorts')
   const { data: students } = useCollection<UserDoc>('users', [where('role', '==', 'student')])
   const { data: assignments } = useCollection<AssignmentDoc>('assignments')
+
+  // Filter to only submissions from this teacher's cohorts
+  const myCohortIds = useMemo(() => {
+    if (!profile?.uid) return null
+    const ids = cohorts.filter(c => c.teacherIds?.includes(profile.uid)).map(c => c.id)
+    return ids.length > 0 ? new Set(ids) : null
+  }, [cohorts, profile?.uid])
+
+  const submissions = useMemo(() =>
+    myCohortIds ? allSubmissions.filter(s => myCohortIds.has(s.cohortId)) : allSubmissions,
+  [allSubmissions, myCohortIds])
 
   const studentMap    = Object.fromEntries(students.map(s => [s.uid, s]))
   const assignmentMap = Object.fromEntries(assignments.map(a => [a.id, a]))
@@ -123,15 +137,31 @@ export default function GradeBook() {
                 </div>
               </div>
 
+              {/* Assignment description */}
+              {assignment?.description && (
+                <div className="bg-zinc-700/50 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1">Assignment</p>
+                  <p className="text-sm text-zinc-300 whitespace-pre-wrap">{assignment.description}</p>
+                </div>
+              )}
+
+              {/* Student notes */}
+              {selected.feedback && (
+                <div className="bg-zinc-700/50 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1">Student's note</p>
+                  <p className="text-sm text-zinc-200 whitespace-pre-wrap">{selected.feedback}</p>
+                </div>
+              )}
+
               {/* Student uploads */}
               {selected.resources.length > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-zinc-400 mb-1">Submitted files</p>
+                  <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1">Submitted files</p>
                   <div className="space-y-1">
                     {selected.resources.map((r, i) => (
                       <a key={i} href={r.url} target="_blank" rel="noreferrer"
-                        className="flex items-center gap-2 text-sm text-brand-400 hover:text-brand-300 underline">
-                        {r.label}
+                        className="flex items-center gap-2 text-sm text-brand-400 hover:text-brand-300 hover:underline">
+                        📎 {r.label}
                       </a>
                     ))}
                   </div>

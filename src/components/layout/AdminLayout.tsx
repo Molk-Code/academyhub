@@ -1,10 +1,10 @@
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useRef, useState, Suspense } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Users, GraduationCap, Eye, LogOut, ArrowLeftRight, Clock,
   CalendarCheck, MessageSquare, BookOpen, Share2, BookMarked, Film, Menu, X,
-  UtensilsCrossed, Car, Mail, SlidersHorizontal, ChevronDown, CircleDot, Tv, Shield, Package, ArchiveRestore, ClipboardList, BarChart2, RefreshCw,
+  UtensilsCrossed, Car, Mail, SlidersHorizontal, ChevronDown, CircleDot, Tv, Shield, Package, ArchiveRestore, ClipboardList, BarChart2, RefreshCw, ArrowDown, Bug as BugIcon,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
@@ -14,10 +14,12 @@ import Avatar from '@/components/common/Avatar'
 import firePng from '@/assets/fire.png'
 import { useBookingBadge, useBookingBadgeDetail } from '@/hooks/useBookingBadge'
 import { useChatUnreadCount } from '@/hooks/useChatUnread'
+import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { useAppBadge } from '@/hooks/useAppBadge'
 import NotificationPermissionBanner from '@/components/NotificationPermissionBanner'
 import OfflineBanner from '@/components/OfflineBanner'
 import NotificationInbox from '@/components/NotificationInbox'
+import BugReportButton from '@/components/BugReportButton'
 
 interface NavItem { to: string; icon: React.ComponentType<{ className?: string }>; label: string; showBadge?: boolean; showUnread?: boolean }
 interface NavGroup { id: string; label: string; icon: string; items: NavItem[]; defaultOpen?: boolean }
@@ -26,8 +28,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: 'school', label: 'School', icon: '🏫', defaultOpen: true,
     items: [
-      { to: '/admin/school-info', icon: Clock,        label: 'School Info'               },
-      { to: '/admin/chat',        icon: MessageSquare, label: 'Chat', showUnread: true   },
+      { to: '/admin/school-info', icon: Clock,        label: 'School Info'             },
+      { to: '/admin/guide',       icon: BookMarked,   label: 'School Guide'            },
+      { to: '/admin/chat',        icon: MessageSquare, label: 'Chat', showUnread: true  },
     ],
   },
   {
@@ -41,7 +44,6 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'academic', label: 'Academic', icon: '📚', defaultOpen: true,
     items: [
       { to: '/admin/lessons',           icon: BookOpen,    label: 'Lessons'          },
-      { to: '/admin/guide',             icon: BookMarked,  label: 'School Guide'     },
       { to: '/admin/semester-events',   icon: CircleDot,   label: 'Semester Wheel'   },
       { to: '/admin/qr-devices',        icon: Tv,          label: 'Check-in Devices' },
       { to: '/admin/production-roles',   icon: Film,        label: 'Production'        },
@@ -66,6 +68,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/admin/calendar-sync', icon: RefreshCw,       label: 'Calendar Sync' },
       { to: '/admin/nav-settings', icon: SlidersHorizontal, label: 'Nav Settings' },
       { to: '/admin/gdpr',         icon: Shield,           label: 'GDPR'         },
+      { to: '/admin/bug-reports',  icon: BugIcon,          label: 'Bug Reports'  },
     ],
   },
 ]
@@ -129,6 +132,9 @@ export default function AdminLayout() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const { mainRef, indicatorRef } = usePullToRefresh(
+    () => window.location.reload(),
+  )
   const isChatPage          = pathname.endsWith('/chat')
   const isFullPage          = pathname === '/admin/equipment' || pathname === '/admin/inventory'
   const canSwitchToTeacher  = roles.includes('teacher')
@@ -140,7 +146,10 @@ export default function AdminLayout() {
   useAppBadge(totalBadge)
 
   useEffect(() => { setPreviewCohortId(null) }, [])
-  useEffect(() => { setDrawerOpen(false) }, [pathname])
+  useEffect(() => {
+    setDrawerOpen(false)
+    mainRef.current?.scrollTo({ top: 0, behavior: 'instant' })
+  }, [pathname])
 
   async function handleSignOut() {
     await signOut()
@@ -319,7 +328,8 @@ export default function AdminLayout() {
   }
 
   return (
-    <div className="flex overflow-hidden" style={{ height: '100dvh', background: 'var(--bg-primary)' }}>
+    <>
+    <div className="flex" style={{ height: '100dvh', background: 'var(--bg-primary)', overflow: 'clip' }}>
       <OfflineBanner />
 
       {/* ── Mobile top header ──────────────────────────────────────────────── */}
@@ -333,6 +343,7 @@ export default function AdminLayout() {
             </div>
           </Link>
           <div className="flex items-center gap-1">
+            <BugReportButton />
             <NotificationInbox />
             <button
               onClick={() => setDrawerOpen(true)}
@@ -390,6 +401,7 @@ export default function AdminLayout() {
               <span className="block text-xs text-rose-400 -mt-0.5">Admin Portal</span>
             </div>
           </Link>
+          <BugReportButton />
           <NotificationInbox />
         </div>
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
@@ -400,6 +412,7 @@ export default function AdminLayout() {
 
       {/* ── Main content ───────────────────────────────────────────────────── */}
       <main
+        ref={mainRef}
         className={cn(
           'flex-1 pt-header lg:pt-0',
           isChatPage ? 'overflow-hidden flex flex-col' : 'overflow-y-auto',
@@ -408,9 +421,9 @@ export default function AdminLayout() {
         <NotificationPermissionBanner />
         <Suspense fallback={<AdminContentSkeleton />}>
           {isChatPage ? (
-            <Outlet />
+            <Outlet key={pathname} />
           ) : isFullPage ? (
-            <Outlet />
+            <Outlet key={pathname} />
           ) : (
             <motion.div
               key={pathname}
@@ -425,5 +438,17 @@ export default function AdminLayout() {
         </Suspense>
       </main>
     </div>
+
+      {/* ── Pull-to-refresh indicator ─────────────────────────────────────── */}
+      <div
+        ref={indicatorRef}
+        className="lg:hidden fixed left-0 right-0 z-30 items-center justify-center pointer-events-none"
+        style={{ top: 'calc(4rem + env(safe-area-inset-top, 0px))', display: 'none', opacity: 0, height: '52px' }}
+      >
+        <div data-pull-circle className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-zinc-700 bg-zinc-800 transition-colors">
+          <ArrowDown data-pull-arrow className="w-5 h-5 text-zinc-300" style={{ transition: 'transform 80ms linear' }} />
+        </div>
+      </div>
+    </>
   )
 }

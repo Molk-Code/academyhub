@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where } from '@/hooks/useFirestore'
-import type { RoomDoc, RoomBookingDoc, RoomAvailabilityWindow, BookingSettingsDoc } from '@/types'
+import type { RoomDoc, RoomBookingDoc, RoomAvailabilityWindow, BookingSettingsDoc, SemesterSettingsDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 
@@ -15,16 +15,32 @@ function slotKey(slot: TimeSlot, date: string, roomId: string) {
   return `${slot.startTime}_${slot.endTime}_${date}_${roomId}`
 }
 
-function isRoomAvailableForSlot(room: RoomDoc, dateStr: string, dayNum: number, slot: TimeSlot): boolean {
+function isRoomAvailableForSlot(
+  room: RoomDoc,
+  dateStr: string,
+  dayNum: number,
+  slot: TimeSlot,
+  semDates?: { start: string; end: string },
+): boolean {
   const windows: RoomAvailabilityWindow[] = room.availability ?? []
-  if (windows.length === 0) return true
-  return windows.some(w =>
-    dateStr >= w.startDate &&
-    dateStr <= w.endDate &&
-    w.days.includes(dayNum) &&
-    w.startTime === slot.startTime &&
-    w.endTime === slot.endTime,
-  )
+  if (windows.length === 0) {
+    // No windows configured — fall back to semester dates if known
+    if (semDates) return dateStr >= semDates.start && dateStr <= semDates.end
+    return true
+  }
+  return windows.some(w => {
+    const useSem = w.useSemesterDates !== false
+    if (useSem && !semDates) return w.days.includes(dayNum) && w.startTime === slot.startTime && w.endTime === slot.endTime
+    const start = useSem ? semDates!.start : w.startDate
+    const end   = useSem ? semDates!.end   : w.endDate
+    return (
+      dateStr >= start &&
+      dateStr <= end &&
+      w.days.includes(dayNum) &&
+      w.startTime === slot.startTime &&
+      w.endTime === slot.endTime
+    )
+  })
 }
 
 export default function RoomBooking({ standalone = false }: { standalone?: boolean }) {
@@ -62,21 +78,37 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
     `${weekStartStr}_${weekEndStr}`,
   )
   const { data: bookingSettings } = useDocument<BookingSettingsDoc>('settings', 'booking')
+  const { data: semester }        = useDocument<SemesterSettingsDoc>('settings', 'semester')
 
   const sortedRooms = useMemo(
     () => [...rooms].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name)),
     [rooms],
   )
 
+  // Declare semester dates early so timeSlots useMemo can use them
+  const semStartStr = semester?.startDate ?? null
+  const semEndStr   = semester?.sem2End ?? semester?.endDate ?? null
+  const semDates    = semStartStr && semEndStr ? { start: semStartStr, end: semEndStr } : undefined
+
   // Derive unique time slots from all rooms' availability windows for the selected day/date
   const timeSlots = useMemo((): TimeSlot[] => {
     const seen = new Map<string, TimeSlot>()
     for (const room of sortedRooms) {
       for (const w of (room.availability ?? [])) {
+        const useSem = w.useSemesterDates !== false
+        if (useSem && !semDates) {
+          if (w.days.includes(selectedDayNum)) {
+            const k = `${w.startTime}_${w.endTime}`
+            if (!seen.has(k)) seen.set(k, { startTime: w.startTime, endTime: w.endTime })
+          }
+          continue
+        }
+        const start = useSem ? semDates!.start : w.startDate
+        const end   = useSem ? semDates!.end   : w.endDate
         if (
           w.days.includes(selectedDayNum) &&
-          selectedDateStr >= w.startDate &&
-          selectedDateStr <= w.endDate
+          selectedDateStr >= start &&
+          selectedDateStr <= end
         ) {
           const k = `${w.startTime}_${w.endTime}`
           if (!seen.has(k)) seen.set(k, { startTime: w.startTime, endTime: w.endTime })
@@ -84,7 +116,7 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
       }
     }
     return [...seen.values()].sort((a, b) => a.startTime.localeCompare(b.startTime))
-  }, [sortedRooms, selectedDayNum, selectedDateStr])
+  }, [sortedRooms, selectedDayNum, selectedDateStr, semDates])
 
   const bookingMap = useMemo(() => {
     const m = new Map<string, RoomBookingDoc>()
@@ -154,6 +186,9 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
 
   const isCurrentWeek = weekOffset === 0
 
+  const canGoPrev = semStartStr ? weekEndStr > semStartStr : true
+  const canGoNext = semEndStr   ? weekStartStr < semEndStr : true
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -180,13 +215,21 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
       <div className="space-y-2">
         {/* Row 1: arrows + week label */}
         <div className="flex items-center gap-2">
-          <button onClick={() => setWeekOffset(w => w - 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
+          <button
+            onClick={() => canGoPrev && setWeekOffset(w => w - 1)}
+            disabled={!canGoPrev}
+            className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
             <ChevronLeft className="w-4 h-4 text-zinc-500" />
           </button>
           <span className="flex-1 text-sm text-zinc-400 text-center">
             {format(weekStart, 'd MMM')} – {format(addDays(weekStart, 6), 'd MMM yyyy')}
           </span>
-          <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
+          <button
+            onClick={() => canGoNext && setWeekOffset(w => w + 1)}
+            disabled={!canGoNext}
+            className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
             <ChevronRight className="w-4 h-4 text-zinc-500" />
           </button>
           {!isCurrentWeek && (
@@ -259,7 +302,7 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
                     const booking        = bookingMap.get(slotKey(slot, selectedDateStr, room.id))
                     const isBooked      = !!booking
                     const isMine        = booking?.studentId === profile?.uid
-                    const isUnavailable = !isRoomAvailableForSlot(room, selectedDateStr, selectedDayNum, slot)
+                    const isUnavailable = !isRoomAvailableForSlot(room, selectedDateStr, selectedDayNum, slot, semDates)
                     const isPast        = isSlotExpired(slot)
                     const isLimitHit    = !isBooked && !isMine && weeklyLimitReached
 

@@ -136,12 +136,9 @@ export default function AssignmentDetail() {
           <Trophy className="w-4 h-4" />
           {assignment.pointsValue} points
         </div>
-        <span className={cn(
-          'badge',
-          assignment.type === 'test' ? 'badge-indigo' : 'bg-zinc-800 text-zinc-400',
-        )}>
-          {assignment.type === 'test' ? 'Test' : 'Practical'}
-        </span>
+        {assignment.type === 'test' && (
+          <span className="badge badge-indigo">Test</span>
+        )}
       </div>
 
       {/* Description */}

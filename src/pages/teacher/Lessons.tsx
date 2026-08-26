@@ -1321,19 +1321,21 @@ export default function Lessons() {
               const e = arg.event.end
               const fmt = (d: Date) => d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
               if (arg.isMirror && s && e) {
+                const mirrorTitle = arg.event.title.replace(/\p{Emoji_Presentation}/gu, '').replace(/\s+/g, ' ').trim()
                 return (
                   <div className="px-1 py-0.5 overflow-hidden">
                     <p className="text-[11px] font-bold truncate mb-0.5 bg-white/25 rounded px-1 inline-block">{fmt(s)} – {fmt(e)}</p>
-                    <p className="text-xs font-semibold truncate">{arg.event.title}</p>
+                    <p className="text-xs font-semibold truncate">{mirrorTitle}</p>
                     {arg.event.extendedProps.className && (
                       <p className="text-xs opacity-80 truncate">{arg.event.extendedProps.className}</p>
                     )}
                   </div>
                 )
               }
+              const title = arg.event.title.replace(/\p{Emoji_Presentation}/gu, '').replace(/\s+/g, ' ').trim()
               return (
                 <div className="px-1 py-0.5 h-full overflow-hidden">
-                  <p className="text-xs font-semibold leading-tight line-clamp-3">{arg.event.title}</p>
+                  <p className="text-xs font-semibold leading-tight line-clamp-3">{title}</p>
                   {arg.event.extendedProps.className && (
                     <p className="text-xs opacity-80 truncate">{arg.event.extendedProps.className}</p>
                   )}

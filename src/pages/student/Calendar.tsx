@@ -208,17 +208,21 @@ export default function StudentCalendar() {
       )
     }
 
+    const location = event.extendedProps.classroom || event.extendedProps.location || ''
+
     if (durationMin <= 100) {
       return (
-        <div style={{ display: 'flex', alignItems: 'flex-start', width: '100%', height: '100%', overflow: 'hidden', padding: '3px 2px 2px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 600, lineHeight: '1.3', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical' }}>{title}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden', padding: '3px 2px 2px' }}>
+          <span style={{ fontSize: '11px', fontWeight: 600, lineHeight: '1.3', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{title}</span>
+          {location && <span style={{ fontSize: '9px', opacity: 0.75, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>{location}</span>}
         </div>
       )
     }
 
     return (
-      <div style={{ display: 'flex', alignItems: 'flex-start', width: '100%', height: '100%', overflow: 'hidden', padding: '4px 2px 2px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden', padding: '4px 2px 2px' }}>
         <span style={{ fontSize: '12px', fontWeight: 600, lineHeight: '1.35', overflow: 'hidden' }}>{title}</span>
+        {location && <span style={{ fontSize: '10px', opacity: 0.75, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>{location}</span>}
       </div>
     )
   }

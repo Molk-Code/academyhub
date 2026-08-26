@@ -1333,12 +1333,14 @@ export default function Lessons() {
                 )
               }
               const title = arg.event.title.replace(/\p{Emoji_Presentation}/gu, '').replace(/\s+/g, ' ').trim()
+              const loc = arg.event.extendedProps.classroom || arg.event.extendedProps.location || ''
               return (
                 <div className="px-1 py-0.5 h-full overflow-hidden">
                   <p className="text-xs font-semibold leading-tight line-clamp-3">{title}</p>
                   {arg.event.extendedProps.className && (
                     <p className="text-xs opacity-80 truncate">{arg.event.extendedProps.className}</p>
                   )}
+                  {loc && <p className="text-xs opacity-70 truncate">{loc}</p>}
                 </div>
               )
             }}

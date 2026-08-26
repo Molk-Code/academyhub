@@ -195,6 +195,44 @@ export async function checkLevelUp(uid: string, newTotal: number) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// awardPoints — teacher/admin adjusts a student's points and writes the log entry
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const awardPoints = functions.https.onCall(async (data, context) => {
+  requireTeacherOrAdmin(context)
+
+  const { studentId, points, reason, referenceId } = data as {
+    studentId: string
+    points: number
+    reason: string
+    referenceId?: string
+  }
+
+  if (!studentId || typeof points !== 'number') {
+    throw new functions.https.HttpsError('invalid-argument', 'studentId and points are required.')
+  }
+
+  await db.runTransaction(async tx => {
+    const userRef = db.collection('users').doc(studentId)
+    const logRef  = db.collection('points_log').doc()
+    tx.update(userRef, { totalPoints: admin.firestore.FieldValue.increment(points) })
+    tx.set(logRef, {
+      studentId,
+      points,
+      reason,
+      referenceId: referenceId ?? null,
+      awardedBy:   context.auth!.uid,
+      createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+    })
+  })
+
+  const newTotal = ((await db.collection('users').doc(studentId).get()).data()?.totalPoints ?? 0) as number
+  await checkLevelUp(studentId, newTotal)
+
+  return { success: true }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 // onPrizeClaimed — push teachers/admins when a student claims a prize
 // ─────────────────────────────────────────────────────────────────────────────
 

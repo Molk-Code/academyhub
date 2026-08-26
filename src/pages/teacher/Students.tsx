@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { collection, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, increment, deleteDoc, writeBatch } from 'firebase/firestore'
+import { collection, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, deleteDoc, writeBatch } from 'firebase/firestore'
+import { httpsCallable } from 'firebase/functions'
 import { isToday, format } from 'date-fns'
 import { Search, ChevronRight, UserCheck, UserX, AlertTriangle, Check, CalendarPlus, X, Trash2, BookOpen, Download } from 'lucide-react'
-import { db } from '@/lib/firebase'
+import { db, functions } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
 import { toDate } from '@/lib/utils'
@@ -114,6 +115,7 @@ export default function Students() {
   async function submitTeacherAbsence() {
     if (!addAbsence || !addAbsence.reason.trim()) return
     if (addAbsence.type === 'lesson' && !addAbsence.lessonId) return
+    if (addAbsence.date > format(new Date(), 'yyyy-MM-dd')) return
     setAddAbsence(prev => prev ? { ...prev, submitting: true } : null)
     try {
       const lesson = addAbsence.type === 'lesson'
@@ -137,19 +139,13 @@ export default function Students() {
         status: 'reviewed',
       })
       setAddAbsence(null)
-      // Points update is best-effort; failure should not block closing the modal
       if (absencePenalty !== 0) {
-        Promise.all([
-          addDoc(collection(db, 'points_log'), {
-            studentId: studentUid,
-            points: absencePenalty,
-            reason: 'absence_penalty',
-            referenceId: lesson?.id ?? addAbsence.date,
-            awardedBy: teacherProfile?.uid ?? null,
-            createdAt: serverTimestamp(),
-          }),
-          updateDoc(doc(db, 'users', studentUid), { totalPoints: increment(absencePenalty) }),
-        ]).catch(() => {})
+        httpsCallable(functions, 'awardPoints')({
+          studentId: studentUid,
+          points: absencePenalty,
+          reason: 'absence_penalty',
+          referenceId: lesson?.id ?? addAbsence.date,
+        }).catch(() => {})
       }
     } catch {
       setAddAbsence(prev => prev ? { ...prev, submitting: false } : null)
@@ -762,11 +758,12 @@ export default function Students() {
                   disabled={
                     addAbsence.submitting ||
                     !addAbsence.reason.trim() ||
-                    (addAbsence.type === 'lesson' && !addAbsence.lessonId)
+                    (addAbsence.type === 'lesson' && !addAbsence.lessonId) ||
+                    addAbsence.date > format(new Date(), 'yyyy-MM-dd')
                   }
                   className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-medium text-sm transition-colors"
                 >
-                  {addAbsence.submitting ? 'Saving…' : 'Log Absence'}
+                  {addAbsence.date > format(new Date(), 'yyyy-MM-dd') ? 'Future date' : addAbsence.submitting ? 'Saving…' : 'Log Absence'}
                 </button>
               </div>
             </div>

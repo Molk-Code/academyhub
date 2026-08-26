@@ -352,8 +352,8 @@ service cloud.firestore {
         || (isStudent() && resource.data.studentId == request.auth.uid);
       allow list: if isTeacherOrAdmin()
         || (isStudent() && resource.data.studentId == request.auth.uid);
-      allow create: if isStudent()
-        && request.resource.data.studentId == request.auth.uid;
+      allow create: if (isStudent() && request.resource.data.studentId == request.auth.uid)
+        || isTeacherOrAdmin();
       allow update: if isTeacherOrAdmin();
       allow delete: if isTeacherOrAdmin()
         || (isStudent() && resource.data.studentId == request.auth.uid);

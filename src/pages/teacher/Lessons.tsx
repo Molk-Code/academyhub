@@ -1337,14 +1337,6 @@ export default function Lessons() {
                   {arg.event.extendedProps.className && (
                     <p className="text-xs opacity-80 truncate">{arg.event.extendedProps.className}</p>
                   )}
-                  {arg.event.extendedProps.classroom && (
-                    <p className="text-xs opacity-70 truncate">
-                      {arg.event.extendedProps.isOnline ? '🌐' : '📍'} {arg.event.extendedProps.classroom}
-                    </p>
-                  )}
-                  {arg.event.extendedProps.isSynced && arg.event.extendedProps.location && (
-                    <p className="text-xs opacity-70 truncate">📍 {arg.event.extendedProps.location}</p>
-                  )}
                 </div>
               )
             }}

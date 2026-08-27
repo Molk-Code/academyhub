@@ -157,6 +157,31 @@ export async function pushToTeachersAndAdmins(title: string, body: string, url: 
   ])
 }
 
+export async function pushToTeachersAndAdminsSplit(
+  title: string,
+  body: string,
+  teacherUrl: string,
+  adminUrl: string,
+) {
+  const snap = await db.collection('users')
+    .where('role', 'in', ['teacher', 'admin'])
+    .get()
+  const teacherTokens: string[] = []; const teacherUids: string[] = []
+  const adminTokens:   string[] = []; const adminUids:   string[] = []
+  snap.docs.forEach(d => {
+    const role = d.data().role
+    const tokens: string[] = d.data().fcmTokens ?? []
+    if (role === 'admin') { adminTokens.push(...tokens); adminUids.push(d.id) }
+    else                  { teacherTokens.push(...tokens); teacherUids.push(d.id) }
+  })
+  await Promise.all([
+    sendPush(teacherTokens, { title, body, url: teacherUrl, tag: 'booking' }),
+    saveNotifications(teacherUids, { title, body, url: teacherUrl }),
+    sendPush(adminTokens,   { title, body, url: adminUrl,   tag: 'booking' }),
+    saveNotifications(adminUids,   { title, body, url: adminUrl }),
+  ])
+}
+
 export async function pushToStudent(studentId: string, title: string, body: string) {
   const snap = await db.collection('users').doc(studentId).get()
   const tokens: string[] = snap.data()?.fcmTokens ?? []

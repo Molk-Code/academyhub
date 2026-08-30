@@ -869,7 +869,7 @@ export interface PlanComment {
 // ── Schools (multi-tenant registry) ──────────────────────────────────────────
 
 export type SchoolStatus = 'active' | 'trial' | 'suspended'
-export type SchoolTier   = 'studio' | 'academy' | 'campus'
+export type SchoolTier   = 'studio' | 'academy' | 'campus' | 'rental'
 
 export interface SchoolDoc {
   id: string              // = schoolId slug

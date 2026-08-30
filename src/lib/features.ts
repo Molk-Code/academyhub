@@ -39,6 +39,7 @@ export const TIER_FEATURES: Record<SchoolTier, Feature[]> = {
     'chat', 'calendar', 'assignments', 'lessons', 'development_plan',
     'semester', 'faq',
   ],
+  rental: ['equipment', 'inventory'],
 }
 
 export function hasFeature(tier: SchoolTier | undefined | null, feature: Feature): boolean {

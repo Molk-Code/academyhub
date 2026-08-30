@@ -5,7 +5,6 @@ import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection } from '@/hooks/useFirestore'
 import type { SchoolDoc, SchoolStatus, SchoolTier, UserDoc, ProductionDoc, EquipmentDoc } from '@/types'
-import type { ProductType } from '@/lib/features'
 import { format } from 'date-fns'
 import {
   Building2, Users, Clapperboard, Boxes, Plus, X, ChevronDown, ChevronUp,
@@ -40,6 +39,7 @@ const TIER_PILL: Record<SchoolTier, string> = {
   studio:  'bg-violet-900/50 text-violet-400 border border-violet-800/50',
   academy: 'bg-sky-900/50 text-sky-400 border border-sky-800/50',
   campus:  'bg-orange-900/50 text-orange-400 border border-orange-800/50',
+  rental:  'bg-teal-900/50 text-teal-400 border border-teal-800/50',
 }
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
@@ -68,9 +68,8 @@ function SchoolRow({ school }: { school: SchoolDoc }) {
   const [saved,     setSaved]     = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   // Local optimistic state — keeps UI responsive; reverts to prop if save fails
-  const [localTier,        setLocalTier]        = useState<SchoolTier | null>(null)
-  const [localStatus,      setLocalStatus]      = useState<SchoolStatus | null>(null)
-  const [localProductType, setLocalProductType] = useState<ProductType | null>(null)
+  const [localTier,   setLocalTier]   = useState<SchoolTier | null>(null)
+  const [localStatus, setLocalStatus] = useState<SchoolStatus | null>(null)
 
   async function patch(field: string, value: unknown) {
     setSaving(true)
@@ -90,9 +89,8 @@ function SchoolRow({ school }: { school: SchoolDoc }) {
     }
   }
 
-  const status      = localStatus      ?? school.status      ?? 'trial'
-  const tier        = localTier        ?? school.tier        ?? 'studio'
-  const productType = localProductType ?? (school as any).productType ?? 'education'
+  const status = localStatus ?? school.status ?? 'trial'
+  const tier   = localTier   ?? school.tier   ?? 'studio'
 
   return (
     <>
@@ -153,16 +151,22 @@ function SchoolRow({ school }: { school: SchoolDoc }) {
                 </div>
 
                 <div>
-                  <label className="label">Tier</label>
+                  <label className="label">Tier / Product</label>
                   <select
                     value={tier}
-                    onChange={e => { setLocalTier(e.target.value as SchoolTier); patch('tier', e.target.value) }}
+                    onChange={async e => {
+                      const t = e.target.value as SchoolTier
+                      setLocalTier(t)
+                      await patch('tier', t)
+                      await patch('productType', t === 'rental' ? 'rental' : 'education')
+                    }}
                     className="input w-full"
                     onClick={e => e.stopPropagation()}
                   >
                     <option value="studio">Studio</option>
                     <option value="academy">Academy</option>
                     <option value="campus">Campus</option>
+                    <option value="rental">CineRental</option>
                   </select>
                 </div>
 
@@ -171,28 +175,9 @@ function SchoolRow({ school }: { school: SchoolDoc }) {
                   <button
                     type="button"
                     onClick={e => { e.stopPropagation(); patch('isBeta', !school.isBeta) }}
-                    className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${school.isBeta ? 'bg-brand-500' : 'bg-zinc-700'}`}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${school.isBeta ? 'bg-brand-500' : 'bg-zinc-700'}`}
                   >
-                    <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${school.isBeta ? 'translate-x-5' : 'translate-x-1'}`} />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="label mb-0">CineRental</span>
-                    <p className="text-xs text-zinc-500 mt-0.5">Rental platform mode</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={e => {
-                      e.stopPropagation()
-                      const next: ProductType = productType === 'rental' ? 'education' : 'rental'
-                      setLocalProductType(next)
-                      patch('productType', next)
-                    }}
-                    className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${productType === 'rental' ? 'bg-brand-500' : 'bg-zinc-700'}`}
-                  >
-                    <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${productType === 'rental' ? 'translate-x-5' : 'translate-x-1'}`} />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${school.isBeta ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
 

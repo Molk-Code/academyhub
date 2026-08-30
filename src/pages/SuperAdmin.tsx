@@ -5,6 +5,7 @@ import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection } from '@/hooks/useFirestore'
 import type { SchoolDoc, SchoolStatus, SchoolTier, UserDoc, ProductionDoc, EquipmentDoc } from '@/types'
+import type { ProductType } from '@/lib/features'
 import { format } from 'date-fns'
 import {
   Building2, Users, Clapperboard, Boxes, Plus, X, ChevronDown, ChevronUp,
@@ -67,8 +68,9 @@ function SchoolRow({ school }: { school: SchoolDoc }) {
   const [saved,     setSaved]     = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   // Local optimistic state — keeps UI responsive; reverts to prop if save fails
-  const [localTier,   setLocalTier]   = useState<SchoolTier | null>(null)
-  const [localStatus, setLocalStatus] = useState<SchoolStatus | null>(null)
+  const [localTier,        setLocalTier]        = useState<SchoolTier | null>(null)
+  const [localStatus,      setLocalStatus]      = useState<SchoolStatus | null>(null)
+  const [localProductType, setLocalProductType] = useState<ProductType | null>(null)
 
   async function patch(field: string, value: unknown) {
     setSaving(true)
@@ -88,8 +90,9 @@ function SchoolRow({ school }: { school: SchoolDoc }) {
     }
   }
 
-  const status = localStatus ?? school.status ?? 'trial'
-  const tier   = localTier   ?? school.tier   ?? 'studio'
+  const status      = localStatus      ?? school.status      ?? 'trial'
+  const tier        = localTier        ?? school.tier        ?? 'studio'
+  const productType = localProductType ?? (school as any).productType ?? 'education'
 
   return (
     <>
@@ -171,6 +174,25 @@ function SchoolRow({ school }: { school: SchoolDoc }) {
                     className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${school.isBeta ? 'bg-brand-500' : 'bg-zinc-700'}`}
                   >
                     <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${school.isBeta ? 'translate-x-5' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="label mb-0">CineRental</span>
+                    <p className="text-xs text-zinc-500 mt-0.5">Rental platform mode</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={e => {
+                      e.stopPropagation()
+                      const next: ProductType = productType === 'rental' ? 'education' : 'rental'
+                      setLocalProductType(next)
+                      patch('productType', next)
+                    }}
+                    className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${productType === 'rental' ? 'bg-brand-500' : 'bg-zinc-700'}`}
+                  >
+                    <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${productType === 'rental' ? 'translate-x-5' : 'translate-x-1'}`} />
                   </button>
                 </div>
 

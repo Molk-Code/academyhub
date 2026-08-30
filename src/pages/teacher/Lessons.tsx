@@ -10,6 +10,7 @@ import type { LessonDoc, SubjectDoc, CohortDoc, LessonBlockDoc, SemesterSettings
 import { Plus, Pencil, Trash2, CalendarDays, List, X, QrCode, Circle, SlidersHorizontal, ChevronDown, Check, MapPin, Download } from 'lucide-react'
 import { markCalendarInvitesSeen } from '@/hooks/useCalendarInviteBadge'
 import AnnualPlanWheel from '@/components/calendar/AnnualPlanWheel'
+import MobileAgendaView from '@/components/calendar/MobileAgendaView'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import EmptyState     from '@/components/common/EmptyState'
 import { useAttendance } from '@/contexts/AttendanceContext'
@@ -978,6 +979,40 @@ export default function Lessons() {
 
   if (loading) return <LoadingSpinner />
 
+  function handleMobileEventClick(ev: EventInput) {
+    const ep = ev.extendedProps ?? {}
+    if (ep.isSemesterMarker || ep.isBlock) return
+    if (ep.isSynced) {
+      const docId = String(ev.id).replace(/^synced-/, '')
+      const syncedEv = syncedEvents.find(e => e.id === docId)
+      if (syncedEv) openSyncedEventEdit(syncedEv)
+      return
+    }
+    if (ep.isPersonal) {
+      const docId = String(ep.docId)
+      if (ep.isInvited) {
+        setViewingInvitedEvent(invitedPersonalEvents.find(e => e.id === docId) ?? null)
+      } else if (ep.isOwn) {
+        const e = myPersonalEvents.find(e => e.id === docId)
+        if (e) openEditEvent(e)
+      }
+      return
+    }
+    setSelected({
+      id:               String(ev.id),
+      title:            String(ev.title),
+      subjectTitle:     ep.subjectTitle,
+      className:        ep.className,
+      cohortId:         ep.cohortId,
+      start:            ep.start,
+      end:              ep.end,
+      color:            ep.color,
+      classroom:        ep.classroom,
+      isOnline:         ep.isOnline,
+      requiresPresence: ep.requiresPresence,
+    })
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start gap-3">
@@ -1138,41 +1173,15 @@ export default function Lessons() {
             )}
           </div>
 
-          {/* Mobile view switcher dropdown (hidden in landscape — FC header handles it there) */}
-          <div className="relative sm:hidden landscape:hidden flex justify-end">
-            <button
-              onClick={() => setViewDropdownOpen(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium border transition-all"
-              style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-            >
-              {MOBILE_VIEWS.find(v => v.id === mobileView)?.label}
-              <ChevronDown className="w-3.5 h-3.5 opacity-60" />
-            </button>
-            {viewDropdownOpen && (
-              <div
-                className="absolute top-full right-0 mt-1 z-20 rounded-xl shadow-lg overflow-hidden min-w-[140px]"
-                style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)' }}
-              >
-                {MOBILE_VIEWS.map(v => (
-                  <button
-                    key={v.id}
-                    onClick={() => {
-                      setMobileView(v.id)
-                      calendarRef.current?.getApi().changeView(v.id)
-                      setViewDropdownOpen(false)
-                    }}
-                    className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-white/5"
-                    style={{ color: v.id === mobileView ? 'var(--brand)' : 'var(--text-primary)' }}
-                  >
-                    {v.label}
-                    {v.id === mobileView && <Check className="w-3.5 h-3.5 flex-shrink-0" />}
-                  </button>
-                ))}
-              </div>
-            )}
+          {/* Mobile: agenda view — replaces FullCalendar on small screens */}
+          <div className="sm:hidden card p-0 overflow-hidden">
+            <MobileAgendaView
+              events={allEvents}
+              onEventClick={handleMobileEventClick}
+            />
           </div>
 
-        <div ref={calendarCardRef} className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm overflow-hidden [&_.fc-toolbar]:flex-wrap [&_.fc-toolbar]:gap-y-2 [&_.fc-toolbar]:px-4 [&_.fc-toolbar]:pt-3 [&_.fc-toolbar-title]:text-base [&_.fc-button]:text-xs [&_.fc-button]:px-2 [&_.fc-button]:py-1 sm:[&_.fc-button]:text-sm sm:[&_.fc-button]:px-3 sm:[&_.fc-button]:py-1.5">
+        <div ref={calendarCardRef} className="hidden sm:block bg-zinc-900 rounded-2xl border border-white/10 shadow-sm overflow-hidden [&_.fc-toolbar]:flex-wrap [&_.fc-toolbar]:gap-y-2 [&_.fc-toolbar]:px-4 [&_.fc-toolbar]:pt-3 [&_.fc-toolbar-title]:text-base [&_.fc-button]:text-xs [&_.fc-button]:px-2 [&_.fc-button]:py-1 sm:[&_.fc-button]:text-sm sm:[&_.fc-button]:px-3 sm:[&_.fc-button]:py-1.5">
           {isTeacher && blocks.length > 0 && (
             <div className="px-4 pt-3 pb-1 flex items-center gap-2 text-xs text-zinc-400">
               <span className="inline-block w-3 h-3 rounded-sm border border-dashed border-amber-400 bg-amber-950/40" />

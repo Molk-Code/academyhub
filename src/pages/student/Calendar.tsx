@@ -32,6 +32,7 @@ function semesterMarkers(dates: {
 }
 import AnnualPlanWheel from '@/components/calendar/AnnualPlanWheel'
 import LessonAttendancePanel from '@/components/calendar/LessonAttendancePanel'
+import MobileAgendaView from '@/components/calendar/MobileAgendaView'
 import { Circle, X, CalendarDays, BookOpen, Clock, ChevronDown, Check, MapPin, Trash2 } from 'lucide-react'
 import { markCalendarInvitesSeen } from '@/hooks/useCalendarInviteBadge'
 import { format } from 'date-fns'
@@ -685,6 +686,70 @@ export default function StudentCalendar() {
 
   const hasSemester = !!(semesterDoc?.startDate && semesterDoc?.endDate)
 
+  function eiDate(v: EventInput['start'] | EventInput['end']): Date | undefined {
+    if (!v) return undefined
+    if (v instanceof Date) return v
+    if (typeof v === 'number') return new Date(v)
+    if (typeof v === 'string') return new Date(v)
+    return undefined
+  }
+
+  function handleMobileEventClick(ev: EventInput) {
+    const ep = ev.extendedProps ?? {}
+    if (ep.isSynced) {
+      const subj = ep.subjectId ? subjects.find(s => s.id === ep.subjectId) : undefined
+      const teachers = ((ep.teacherIds as string[]) ?? [])
+        .map(tid => allUsers.find(u => u.uid === tid || u.id === tid)?.displayName)
+        .filter(Boolean) as string[]
+      setSelectedEvent({
+        type: 'synced',
+        title: String(ev.title).replace(/^📅 /, ''),
+        startTime: eiDate(ev.start),
+        endTime:   eiDate(ev.end),
+        location:  ep.location,
+        subjectTitle: subj?.title,
+        subjectId: ep.subjectId ?? undefined,
+        overrideTeachers: teachers.length > 0 ? teachers : undefined,
+        overrideNotes: ep.notes ?? undefined,
+      }); return
+    }
+    if (ep.isSemesterMarker) {
+      setSelectedEvent({ type: 'semesterMarker', title: String(ev.title), startTime: eiDate(ev.start) }); return
+    }
+    if (ep.isPersonal) {
+      const docId = String(ep.docId)
+      if (ep.isInvited) {
+        setViewingInvitedEvent(invitedPersonalEvents.find(e => e.id === docId) ?? null)
+      } else {
+        const e = myPersonalEvents.find(e => e.id === docId)
+        if (e) openEditEvent(e)
+      }
+      return
+    }
+    if (ep.type === 'lesson') {
+      const rawId   = String(ev.id)
+      const lessonId = rawId.startsWith('lesson-') ? rawId.slice(7) : rawId
+      const lesson   = lessons.find(l => l.id === lessonId)
+      const subject  = lesson ? subjects.find(s => s.id === lesson.subjectId) : undefined
+      setSelectedEvent({
+        type: 'lesson', lessonId,
+        title:     String(ev.title),
+        classroom: ep.classroom, isOnline: ep.isOnline,
+        startTime: lesson ? toDate(lesson.startTime) ?? undefined : undefined,
+        endTime:   lesson ? toDate(lesson.endTime) ?? undefined : undefined,
+        subjectId:    subject?.id ?? ep.subjectId ?? undefined,
+        subjectTitle: subject?.title ?? ep.subjectTitle ?? undefined,
+      })
+    } else if (ep.type === 'assignment') {
+      setSelectedEvent({
+        type: 'assignment',
+        title: String(ev.title).replace(/^📋 Due: /, ''),
+        description: ep.description, pointsValue: ep.pointsValue,
+        subjectTitle: ep.subjectTitle, dueDate: ep.dueDate,
+      })
+    }
+  }
+
   return (
     <div className="space-y-4">
 
@@ -713,8 +778,8 @@ export default function StudentCalendar() {
         )}
       </div>
 
-      {/* ── Mobile compact toolbar (hidden on desktop and landscape) ──────── */}
-      <div className="sm:hidden landscape:hidden flex items-center justify-between gap-2">
+      {/* ── Mobile compact toolbar (hidden on desktop) ──────────────────────── */}
+      <div className="sm:hidden flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h1 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Calendar</h1>
           {hasSemester && (
@@ -736,45 +801,7 @@ export default function StudentCalendar() {
           )}
         </div>
 
-        {/* View dropdown — only shown when in calendar mode */}
-        {!showWheel && (
-          <div className="relative">
-            <button
-              onClick={() => setViewDropdownOpen(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium border transition-all"
-              style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-            >
-              {MOBILE_VIEWS.find(v => v.id === mobileView)?.label}
-              <ChevronDown className="w-3.5 h-3.5 opacity-60" />
-            </button>
-            {viewDropdownOpen && (
-              <div
-                className="absolute top-full right-0 mt-1 z-20 rounded-xl shadow-lg overflow-hidden min-w-[140px]"
-                style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)' }}
-              >
-                {MOBILE_VIEWS.map(v => (
-                  <button
-                    key={v.id}
-                    onClick={() => {
-                      setMobileView(v.id)
-                      const api = calendarRef.current?.getApi()
-                      if (api) {
-                        if (v.id === 'timeGridDay') api.gotoDate(new Date())
-                        api.changeView(v.id)
-                      }
-                      setViewDropdownOpen(false)
-                    }}
-                    className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-white/5"
-                    style={{ color: v.id === mobileView ? 'var(--brand)' : 'var(--text-primary)' }}
-                  >
-                    {v.label}
-                    {v.id === mobileView && <Check className="w-3.5 h-3.5 flex-shrink-0" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {/* No view dropdown on mobile — agenda view is the mobile calendar */}
       </div>
 
       {showWheel && hasSemester ? (
@@ -832,10 +859,22 @@ export default function StudentCalendar() {
             })()}
           </div>
 
+          {/* ── Mobile: agenda view ───────────────────────────────────────── */}
+          <div className="sm:hidden card p-0 overflow-hidden">
+            <MobileAgendaView
+              events={allEvents}
+              onEventClick={handleMobileEventClick}
+              onAddClick={(dateStr, timeStr) => {
+                setAddEventModal({ date: dateStr, start: timeStr, end: '10:00', allDay: false })
+              }}
+            />
+          </div>
+
+          {/* ── Desktop: FullCalendar ─────────────────────────────────────── */}
           <div
             ref={calendarCardRef}
             style={{ touchAction: 'pan-y' }}
-            className="card p-0 overflow-hidden [&_.fc-toolbar]:flex-wrap [&_.fc-toolbar]:gap-y-2 [&_.fc-toolbar-title]:text-base [&_.fc-button]:text-xs [&_.fc-button]:px-2 [&_.fc-button]:py-1 sm:[&_.fc-button]:text-sm sm:[&_.fc-button]:px-3 sm:[&_.fc-button]:py-1.5 [&_.fc-timegrid-slot-label-cushion]:text-[10px] [&_.fc-timegrid-axis-cushion]:text-[10px] [&_.fc-timegrid-axis]:w-8 [&_.fc-col-header-cell-cushion]:text-xs [&_.fc-timegrid-axis-frame]:items-start [&_.fc-timegrid-axis-frame]:pt-1 [&_.fc-daygrid-week-number]:text-[9px] [&_.fc-daygrid-week-number]:leading-tight [&_.fc-daygrid-week-number]:p-0.5 [&_.fc-week-number]:w-5 [&_.fc-view-harness]:overflow-visible"
+            className="hidden sm:block card p-0 overflow-hidden [&_.fc-toolbar]:flex-wrap [&_.fc-toolbar]:gap-y-2 [&_.fc-toolbar-title]:text-base [&_.fc-button]:text-xs [&_.fc-button]:px-2 [&_.fc-button]:py-1 sm:[&_.fc-button]:text-sm sm:[&_.fc-button]:px-3 sm:[&_.fc-button]:py-1.5 [&_.fc-timegrid-slot-label-cushion]:text-[10px] [&_.fc-timegrid-axis-cushion]:text-[10px] [&_.fc-timegrid-axis]:w-8 [&_.fc-col-header-cell-cushion]:text-xs [&_.fc-timegrid-axis-frame]:items-start [&_.fc-timegrid-axis-frame]:pt-1 [&_.fc-daygrid-week-number]:text-[9px] [&_.fc-daygrid-week-number]:leading-tight [&_.fc-daygrid-week-number]:p-0.5 [&_.fc-week-number]:w-5 [&_.fc-view-harness]:overflow-visible"
           >
             <FullCalendar
               ref={calendarRef}

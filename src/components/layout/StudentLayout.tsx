@@ -575,11 +575,13 @@ export default function StudentLayout() {
             </motion.div>
           )}
         </Suspense>
+        {/* Spacer so content clears the fixed bottom nav on mobile */}
+        <div className="h-bottomnav lg:hidden flex-shrink-0" />
       </main>
 
-      {/* ── Mobile bottom tab bar — NOT fixed, natural flex child ─────────── */}
-      <nav className="lg:hidden flex-shrink-0 border-t" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <div className={cn('flex', navVisLoading && 'opacity-0 pointer-events-none')}>
+      {/* ── Mobile bottom tab bar — fixed to viewport bottom ───────────────── */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 border-t" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <div className={cn('flex justify-around', navVisLoading && 'opacity-0 pointer-events-none')}>
           {/* Home */}
           {navVis?.student?.['dashboard'] !== false && (
           <NavLink to="/dashboard" className={({ isActive }) => cn(

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Package, AlertTriangle, ChevronDown, ChevronUp, Plus } from 'lucide-react'
+import { Package, AlertTriangle, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
+import { collection, deleteDoc, doc, getDocs } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 import { useCollection } from '@/hooks/useFirestore'
 import type { InventoryProjectDoc } from '@/types'
 import { cn } from '@/lib/utils'
@@ -26,9 +28,24 @@ function statusChip(status: InventoryProjectDoc['status']) {
 
 export default function InventoryDashboard() {
   const navigate = useNavigate()
-  const [archivedOpen, setArchivedOpen] = useState(false)
+  const [archivedOpen,   setArchivedOpen]   = useState(false)
+  const [deletingId,     setDeletingId]     = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const { data: projects, loading } = useCollection<InventoryProjectDoc>('inventory_projects', [])
+
+  async function deleteProject(id: string) {
+    setDeletingId(id)
+    try {
+      // Delete subcollection items first
+      const itemsSnap = await getDocs(collection(db, `inventory_projects/${id}/items`))
+      await Promise.all(itemsSnap.docs.map(d => deleteDoc(d.ref)))
+      await deleteDoc(doc(db, 'inventory_projects', id))
+    } finally {
+      setDeletingId(null)
+      setConfirmDeleteId(null)
+    }
+  }
 
   const todayStr = today()
 
@@ -97,11 +114,13 @@ export default function InventoryDashboard() {
           activeProjects.map(project => {
             const isOverdue = project.returnDate < todayStr && project.status !== 'returned' && project.status !== 'archived'
             const overdueDays = isOverdue ? daysDiff(project.returnDate) : 0
+            const isConfirming = confirmDeleteId === project.id
+            const isDeleting   = deletingId === project.id
             return (
-              <button
+              <div
                 key={project.id}
+                className="group w-full text-left bg-zinc-900 hover:bg-zinc-800/70 rounded-2xl border border-white/8 p-4 transition-colors cursor-pointer"
                 onClick={() => navigate(`/teacher/inventory/project/${project.id}`)}
-                className="w-full text-left bg-zinc-900 hover:bg-zinc-800/70 rounded-2xl border border-white/8 p-4 transition-colors"
               >
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex-1 min-w-0">
@@ -121,11 +140,38 @@ export default function InventoryDashboard() {
                       {project.equipmentManagerName && ` · Manager: ${project.equipmentManagerName}`}
                     </p>
                   </div>
-                  <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full border capitalize', statusChip(project.status))}>
-                    {project.status}
-                  </span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full border capitalize', statusChip(project.status))}>
+                      {project.status}
+                    </span>
+                    {isConfirming ? (
+                      <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                        <button
+                          disabled={isDeleting}
+                          onClick={() => deleteProject(project.id)}
+                          className="text-xs font-semibold bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {isDeleting ? 'Deleting…' : 'Confirm'}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="text-xs text-zinc-400 hover:text-zinc-100 px-2 py-1 rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={e => { e.stopPropagation(); setConfirmDeleteId(project.id) }}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-950/30 transition-all"
+                        title="Delete project"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </button>
+              </div>
             )
           })
         )}
@@ -143,25 +189,56 @@ export default function InventoryDashboard() {
           </button>
           {archivedOpen && (
             <div className="space-y-2">
-              {archivedProjects.map(project => (
-                <button
-                  key={project.id}
-                  onClick={() => navigate(`/teacher/inventory/project/${project.id}`)}
-                  className="w-full text-left bg-zinc-900/60 hover:bg-zinc-800/50 rounded-xl border border-white/6 p-4 transition-colors opacity-60 hover:opacity-80"
-                >
-                  <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div>
-                      <span className="font-medium text-zinc-300">{project.name}</span>
-                      <p className="text-xs text-zinc-500 mt-0.5">
-                        {project.borrowers.join(', ')} · {project.checkoutDate} → {project.returnDate}
-                      </p>
+              {archivedProjects.map(project => {
+                const isConfirming = confirmDeleteId === project.id
+                const isDeleting   = deletingId === project.id
+                return (
+                  <div
+                    key={project.id}
+                    className="group w-full text-left bg-zinc-900/60 hover:bg-zinc-800/50 rounded-xl border border-white/6 p-4 transition-colors opacity-60 hover:opacity-80 cursor-pointer"
+                    onClick={() => navigate(`/teacher/inventory/project/${project.id}`)}
+                  >
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div>
+                        <span className="font-medium text-zinc-300">{project.name}</span>
+                        <p className="text-xs text-zinc-500 mt-0.5">
+                          {project.borrowers.join(', ')} · {project.checkoutDate} → {project.returnDate}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full border', statusChip(project.status))}>
+                          archived
+                        </span>
+                        {isConfirming ? (
+                          <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                            <button
+                              disabled={isDeleting}
+                              onClick={() => deleteProject(project.id)}
+                              className="text-xs font-semibold bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              {isDeleting ? 'Deleting…' : 'Confirm'}
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="text-xs text-zinc-400 hover:text-zinc-100 px-2 py-1 rounded-lg transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={e => { e.stopPropagation(); setConfirmDeleteId(project.id) }}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-950/30 transition-all"
+                            title="Delete project"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full border', statusChip(project.status))}>
-                      archived
-                    </span>
                   </div>
-                </button>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

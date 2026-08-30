@@ -2,6 +2,8 @@ import type { SchoolTier } from '@/types'
 
 export type { SchoolTier }
 
+export type ProductType = 'education' | 'rental'
+
 export type Feature =
   | 'production'
   | 'equipment'

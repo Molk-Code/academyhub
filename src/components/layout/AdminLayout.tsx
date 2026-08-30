@@ -9,6 +9,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
 import { useFeature, useTier } from '@/hooks/useFeature'
+import { useProductType } from '@/hooks/useProductType'
 import { cn } from '@/lib/utils'
 import Avatar from '@/components/common/Avatar'
 import firePng from '@/assets/fire.png'
@@ -129,6 +130,7 @@ export default function AdminLayout() {
   const canVehicles         = useFeature('vehicles')
   const canFoodBox          = useFeature('food_box')
   const { tier }            = useTier()
+  const productType         = useProductType()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -179,6 +181,36 @@ export default function AdminLayout() {
       '/admin/bookings':          canBooking,
       '/admin/minivan':           canVehicles,
       '/admin/food-box-orders':   canFoodBox,
+    }
+
+    // Rental mode: show only equipment-related nav items
+    if (productType === 'rental') {
+      const rentalNavItems = [
+        { to: '/admin/equipment', icon: Package, label: 'Equipment' },
+        { to: '/admin/inventory', icon: ArchiveRestore, label: 'Inventory' },
+      ]
+      return (
+        <div className="space-y-0.5">
+          {rentalNavItems.map(({ to, icon: Icon, label }) => (
+            <NavLink
+              key={to}
+              to={to}
+              onClick={onNavigate}
+              className={({ isActive }) => cn(
+                'flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all',
+                isActive ? 'bg-rose-700 text-white' : 'text-zinc-400 hover:bg-[var(--bg-elevated)] hover:text-white',
+              )}
+            >
+              {({ isActive }) => (
+                <>
+                  <Icon className={cn('w-4 h-4 flex-shrink-0', isActive ? 'text-white' : 'text-zinc-500')} />
+                  <span className="flex-1">{label}</span>
+                </>
+              )}
+            </NavLink>
+          ))}
+        </div>
+      )
     }
 
     return (

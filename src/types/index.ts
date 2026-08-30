@@ -400,6 +400,10 @@ export interface EquipmentBookingDoc {
   productionTitle?: string
   productionReadiness?: { score: number; hasBreakdown: boolean; hasCrew: boolean; hasCast: boolean; hasLocations: boolean; hasSchedule: boolean }
   createdAt?: Timestamp
+  guestName?: string
+  guestEmail?: string
+  guestPhone?: string
+  isGuest?: boolean
 }
 
 export interface InventoryProjectDoc {
@@ -886,6 +890,8 @@ export interface SchoolDoc {
   storageQuotaGB?: number
   storageUsedBytes?: number
   roomDisplayUrl?: string
+  productType?: 'education' | 'rental'
+  shopPassword?: string
 }
 
 export interface TeacherAssessment {

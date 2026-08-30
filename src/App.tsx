@@ -111,6 +111,7 @@ const EquipmentBookingPage = lazy(() => import('@/pages/equipment/EquipmentBooki
 const AdminEquipmentPage   = lazy(() => import('@/pages/equipment/AdminEquipmentPage'))
 const InventoryPage        = lazy(() => import('@/pages/equipment/InventoryPage'))
 const ScanPage             = lazy(() => import('@/pages/equipment/ScanPage'))
+const PublicShopPage       = lazy(() => import('@/pages/equipment/PublicShopPage'))
 
 export default function App() {
   return (
@@ -241,6 +242,7 @@ export default function App() {
           <Route path="/privacy"      element={<PrivacyPolicy />} />
           <Route path="/superadmin"   element={<SuperAdmin />} />
           <Route path="/upgrade"      element={<UpgradePage />} />
+          <Route path="/shop"         element={<PublicShopPage />} />
 
           {/* ── Fallback ────────────────────────────────────────────────── */}
           <Route path="*" element={<Navigate to="/login" replace />} />

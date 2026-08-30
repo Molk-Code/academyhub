@@ -63,6 +63,10 @@ service cloud.firestore {
              false;
     }
 
+    function isRentalMode() {
+      return get(/databases/$(database)/documents/schools/molkom).data.get('productType', null) == 'rental';
+    }
+
     // ── Users ─────────────────────────────────────────────────────────────────
 
     match /users/{userId} {
@@ -435,20 +439,24 @@ service cloud.firestore {
     // ── Equipment Booking System ───────────────────────────────────────────────
 
     match /equipment_categories/{catId} {
-      allow read: if isSignedIn() && (isAdmin() || tierHasFeature('equipment'));
+      allow read: if (isSignedIn() && (isAdmin() || tierHasFeature('equipment')))
+        || isRentalMode();
       allow write: if isAdmin();
     }
 
     match /equipment/{itemId} {
-      allow read: if isSignedIn() && (isAdmin() || tierHasFeature('equipment'));
+      allow read: if (isSignedIn() && (isAdmin() || tierHasFeature('equipment')))
+        || isRentalMode();
       allow write: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'));
     }
 
     match /equipment_bookings/{bookingId} {
       allow read: if (isAdmin() || tierHasFeature('equipment'))
         && (isTeacherOrAdmin() || (isSignedIn() && resource.data.studentId == request.auth.uid));
-      allow create: if isSignedIn() && tierHasFeature('equipment')
-        && request.resource.data.studentId == request.auth.uid;
+      allow create: if (isSignedIn() && tierHasFeature('equipment')
+        && request.resource.data.studentId == request.auth.uid)
+        || (isRentalMode() && request.resource.data.get('guestEmail', '') != ''
+            && request.resource.data.get('isGuest', false) == true);
       allow update: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'));
     }
 

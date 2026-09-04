@@ -1,6 +1,7 @@
 // Shared HTML template for the printable/downloadable equipment loan contract.
-// Layout mirrors the school's official "Equipment Contract" paper form
-// (Region Värmland / Molkom Folk High School).
+// Layout mirrors the school's official "Equipment Contract" paper form.
+
+import cineforgeLogo from '@/assets/fire.png'
 
 export interface EquipmentContractItem {
   product: string
@@ -55,7 +56,8 @@ export function buildEquipmentContractHtml(opts: EquipmentContractOptions): stri
   .ec-label { width: 160px; font-weight: 700; background: #fafafa; }
   .ec-logo-cell { width: 160px; text-align: center; }
   .ec-logo { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-  .ec-logo span { font-size: 10px; font-weight: 700; line-height: 1.15; color: #444; }
+  .ec-logo img { width: 30px; height: 30px; object-fit: contain; }
+  .ec-logo span { font-size: 11px; font-weight: 700; line-height: 1.15; color: #444; }
   .ec-title { font-size: 26px; text-align: center; padding: 18px 14px; }
   .ec-value-centered { text-align: center; }
   .ec-bold { font-weight: 700; }
@@ -74,16 +76,8 @@ export function buildEquipmentContractHtml(opts: EquipmentContractOptions): stri
     <tr>
       <td class="ec-logo-cell">
         <div class="ec-logo">
-          <svg width="30" height="30" viewBox="0 0 32 32">
-            <g fill="#e8794f">
-              <circle cx="16" cy="8" r="7" />
-              <circle cx="16" cy="24" r="7" />
-              <circle cx="8" cy="16" r="7" />
-              <circle cx="24" cy="16" r="7" />
-            </g>
-            <circle cx="16" cy="16" r="5" fill="#fff" />
-          </svg>
-          <span>Region<br />Värmland</span>
+          <img src="${cineforgeLogo}" alt="Cineforge" />
+          <span>Cineforge</span>
         </div>
       </td>
       <td class="ec-title">Equipment Contract</td>

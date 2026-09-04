@@ -13,6 +13,7 @@ import { db } from '@/lib/firebase'
 import { useDocument, useCollection } from '@/hooks/useFirestore'
 import type { InventoryProjectDoc, InventoryItemDoc, EquipmentDoc } from '@/types'
 import { cn } from '@/lib/utils'
+import { buildEquipmentContractHtml } from '@/lib/equipmentContract'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import {
   Package,
@@ -325,41 +326,18 @@ export default function InventoryProject() {
 
   function printContract() {
     if (!project) return
-    const rows = items
-      .map(
-        i =>
-          `<tr>
-            <td style="border:1px solid #ccc;padding:6px 10px">${i.equipmentName}</td>
-            <td style="border:1px solid #ccc;padding:6px 10px">${i.status}</td>
-            <td style="border:1px solid #ccc;padding:6px 10px">${fmtTs(i.checkoutTimestamp)}</td>
-            <td style="border:1px solid #ccc;padding:6px 10px">${fmtTs(i.checkinTimestamp)}</td>
-          </tr>`,
-      )
-      .join('')
-
     const win = window.open('', '_blank')
     if (!win) return
-    win.document.write(`
-      <html><head><title>${project.name} — Equipment Contract</title></head>
-      <body style="font-family:sans-serif;padding:32px;color:#111">
-        <h1 style="margin-bottom:4px">${project.name}</h1>
-        <p style="color:#555;margin:0 0 4px">Borrowers: ${project.borrowers.join(', ') || '—'}</p>
-        <p style="color:#555;margin:0 0 4px">Manager: ${project.equipmentManagerName}</p>
-        <p style="color:#555;margin:0 0 20px">Period: ${project.checkoutDate} → ${project.returnDate}</p>
-        <table style="width:100%;border-collapse:collapse">
-          <thead>
-            <tr style="background:#f0f0f0">
-              <th style="border:1px solid #ccc;padding:6px 10px;text-align:left">Equipment</th>
-              <th style="border:1px solid #ccc;padding:6px 10px;text-align:left">Status</th>
-              <th style="border:1px solid #ccc;padding:6px 10px;text-align:left">Checkout</th>
-              <th style="border:1px solid #ccc;padding:6px 10px;text-align:left">Return</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-        <p style="margin-top:40px;color:#888;font-size:12px">Generated ${new Date().toLocaleString()}</p>
-      </body></html>
-    `)
+    win.document.write(buildEquipmentContractHtml({
+      projectName: project.name,
+      borrowerName: project.borrowers.join(', '),
+      dateFrom: project.checkoutDate,
+      dateTo: project.returnDate,
+      items: items.map(i => ({
+        product: i.equipmentName,
+        time: i.checkoutTimestamp ? fmtTs(i.checkoutTimestamp) : '',
+      })),
+    }))
     win.document.close()
     win.print()
   }

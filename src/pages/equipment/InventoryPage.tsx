@@ -17,6 +17,7 @@ import { BrowserMultiFormatReader } from '@zxing/browser'
 import { NotFoundException } from '@zxing/library'
 import { QRCodeSVG } from 'qrcode.react'
 import { optimizeImageUrl } from '@/lib/cloudinary'
+import { buildEquipmentContractHtml } from '@/lib/equipmentContract'
 import './molkom.css'
 
 function EquipmentImg({ url, name, fallback }: { url: string | undefined | null; name: string; fallback: React.ReactNode }) {
@@ -143,11 +144,15 @@ function ProjectCard({
   project,
   items = [],
   onClick,
+  onDelete,
 }: {
   project: InventoryProjectDoc
   items?: InventoryItemDoc[]
   onClick: () => void
+  onDelete: () => Promise<void>
 }) {
+  const [confirming, setConfirming] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const overdue = isOverdue(project.returnDate) && ['active', 'checked-out'].includes(project.status)
   const od = overdueDays(project.returnDate)
 
@@ -201,11 +206,41 @@ function ProjectCard({
           {damaged    > 0 && <span style={{ fontSize: '.7rem', fontWeight: 700, color: '#ffa502' }}>⚠ {damaged} damaged</span>}
         </div>
       )}
-      <div className="project-card-footer">
+      <div className="project-card-footer" style={{ alignItems: 'center' }}>
         {overdue
           ? <span style={{ color: '#ff4757', fontWeight: 700, fontSize: '.75rem' }}>{od} day{od !== 1 ? 's' : ''} overdue</span>
           : <span style={{ fontSize: '.7rem', color: '#4a4a60' }}>{total} item{total !== 1 ? 's' : ''}</span>
         }
+        {confirming ? (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+            <span style={{ fontSize: '.7rem', color: '#ff4757' }}>Delete?</span>
+            <button
+              className="danger-btn"
+              style={{ padding: '2px 8px', fontSize: '.7rem', borderRadius: 6 }}
+              disabled={deleting}
+              onClick={async () => { setDeleting(true); await onDelete() }}
+            >
+              {deleting ? '…' : 'Yes'}
+            </button>
+            <button
+              className="secondary-btn"
+              style={{ padding: '2px 8px', fontSize: '.7rem', borderRadius: 6 }}
+              onClick={() => setConfirming(false)}
+            >
+              No
+            </button>
+          </div>
+        ) : (
+          <button
+            title="Delete project"
+            onClick={e => { e.stopPropagation(); setConfirming(true) }}
+            style={{ background: 'none', border: 'none', color: '#6a6a80', cursor: 'pointer', padding: 4, display: 'flex' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#ff4757')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#6a6a80')}
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -217,10 +252,12 @@ function ProjectDetail({
   project,
   onBack,
   onUpdate,
+  onDelete,
 }: {
   project: InventoryProjectDoc
   onBack: () => void
   onUpdate: (data: Partial<InventoryProjectDoc>) => Promise<void>
+  onDelete: () => Promise<void>
 }) {
   const { data: items } = useCollection<InventoryItemDoc>(`inventory_projects/${project.id}/items`)
   const { data: equipmentAll } = useCollection<EquipmentDoc>('equipment')
@@ -228,6 +265,8 @@ function ProjectDetail({
   const [scanMode, setScanMode] = useState<'checkout' | 'checkin'>('checkout')
   const [scanActive, setScanActive] = useState(false)
   const [scanEntries, setScanEntries] = useState<{ name: string; time: string }[]>([])
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [manualInput, setManualInput] = useState('')
   const [showPicker, setShowPicker] = useState(false)
   const [inlineDamage, setInlineDamage] = useState<Record<string, string>>({})
@@ -451,16 +490,17 @@ function ProjectDetail({
   function generateContract() {
     const win = window.open('', '_blank')
     if (!win) return
-    win.document.write(`<html><head><title>Equipment Contract — ${project.name}</title></head><body>
-      <h1>Equipment Contract</h1>
-      <h2>${project.name}</h2>
-      <p>Borrowers: ${project.borrowers?.join(', ')}</p>
-      <p>Checkout: ${formatDate(project.checkoutDate)}</p>
-      <p>Return: ${formatDate(project.returnDate)}</p>
-      <h3>Items</h3>
-      <ul>${items.map(i => `<li>${i.equipmentName} — ${i.status}</li>`).join('')}</ul>
-      <p style="margin-top:40px">Signature: _______________________________</p>
-    </body></html>`)
+    win.document.write(buildEquipmentContractHtml({
+      projectName: project.name,
+      borrowerName: project.borrowers?.join(', ') ?? '',
+      dateFrom: formatDate(project.checkoutDate),
+      dateTo: formatDate(project.returnDate),
+      items: items.map(i => ({
+        product: i.equipmentName,
+        time: i.checkoutTimestamp ? new Date(i.checkoutTimestamp).toLocaleString() : '',
+      })),
+    }))
+    win.document.close()
     win.print()
   }
 
@@ -544,6 +584,23 @@ function ProjectDetail({
         {['returned', 'archived'].includes(project.status) && (
           <button className="secondary-btn" onClick={archiveProject}>
             <ArchiveRestore size={16} /> Archive
+          </button>
+        )}
+        {confirmDelete ? (
+          <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+            <span style={{ fontSize: '.85rem', color: '#ff4757' }}>Delete this project permanently?</span>
+            <button
+              className="danger-btn"
+              disabled={deleting}
+              onClick={async () => { setDeleting(true); await onDelete() }}
+            >
+              {deleting ? 'Deleting…' : 'Yes, delete'}
+            </button>
+            <button className="secondary-btn" onClick={() => setConfirmDelete(false)}>Cancel</button>
+          </div>
+        ) : (
+          <button className="secondary-btn danger-btn" onClick={() => setConfirmDelete(true)}>
+            <Trash2 size={16} /> Delete
           </button>
         )}
       </div>
@@ -959,6 +1016,13 @@ export default function InventoryPage() {
     await updateDoc(doc(db, 'inventory_projects', id), { ...data, updatedAt: serverTimestamp() })
   }
 
+  async function deleteProjectFully(id: string) {
+    const itemsSnap = await getDocs(collection(db, `inventory_projects/${id}/items`))
+    await Promise.all(itemsSnap.docs.map(d => deleteDoc(d.ref)))
+    await deleteDoc(doc(db, 'inventory_projects', id))
+    if (selectedProjectId === id) setSelectedProjectId(null)
+  }
+
   const selectedProject = selectedProjectId ? projects.find(p => p.id === selectedProjectId) : null
 
   if (createProject) {
@@ -979,6 +1043,7 @@ export default function InventoryPage() {
           project={selectedProject}
           onBack={() => setSelectedProjectId(null)}
           onUpdate={(data) => updateProject(selectedProject.id, data)}
+          onDelete={() => deleteProjectFully(selectedProject.id)}
         />
       </div>
     )
@@ -1073,7 +1138,7 @@ export default function InventoryPage() {
                 <div className="project-grid">
                   {activeProjects.map(p => {
                     const pItems = allItems.filter(i => i.projectId === p.id)
-                    return <ProjectCard key={p.id} project={p} items={pItems} onClick={() => setSelectedProjectId(p.id)} />
+                    return <ProjectCard key={p.id} project={p} items={pItems} onClick={() => setSelectedProjectId(p.id)} onDelete={() => deleteProjectFully(p.id)} />
                   })}
                 </div>
               )}
@@ -1089,7 +1154,7 @@ export default function InventoryPage() {
                   <div className="project-grid">
                     {archivedProjects.map(p => {
                       const pItems = allItems.filter(i => i.projectId === p.id)
-                      return <ProjectCard key={p.id} project={p} items={pItems} onClick={() => setSelectedProjectId(p.id)} />
+                      return <ProjectCard key={p.id} project={p} items={pItems} onClick={() => setSelectedProjectId(p.id)} onDelete={() => deleteProjectFully(p.id)} />
                     })}
                   </div>
                 )}
@@ -1110,7 +1175,7 @@ export default function InventoryPage() {
                   .sort((a, b) => (b.createdAt as any)?.seconds - (a.createdAt as any)?.seconds || 0)
                   .map(p => {
                     const pItems = allItems.filter(i => i.projectId === p.id)
-                    return <ProjectCard key={p.id} project={p} items={pItems} onClick={() => setSelectedProjectId(p.id)} />
+                    return <ProjectCard key={p.id} project={p} items={pItems} onClick={() => setSelectedProjectId(p.id)} onDelete={() => deleteProjectFully(p.id)} />
                   })}
               </div>
             )}

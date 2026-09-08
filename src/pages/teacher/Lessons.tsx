@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
 import { shortDate, timeStr, toDate } from '@/lib/utils'
 import type { LessonDoc, SubjectDoc, CohortDoc, LessonBlockDoc, SemesterSettingsDoc, LessonCategoryDoc, UserDoc, PersonalEventDoc, SyncedEventDoc, GuestTeacherDoc, GuestTeacherBookingDoc } from '@/types'
-import { Plus, Pencil, Trash2, CalendarDays, List, X, QrCode, Circle, SlidersHorizontal, ChevronDown, Check, MapPin, Download } from 'lucide-react'
+import { Plus, Pencil, Trash2, CalendarDays, LayoutGrid, X, QrCode, Circle, SlidersHorizontal, ChevronDown, Check, MapPin, Download } from 'lucide-react'
 import { markCalendarInvitesSeen } from '@/hooks/useCalendarInviteBadge'
 import AnnualPlanWheel from '@/components/calendar/AnnualPlanWheel'
 import MobileAgendaView from '@/components/calendar/MobileAgendaView'
@@ -180,7 +180,8 @@ export default function Lessons() {
   const [syncedEditClassroom,          setSyncedEditClassroom]          = useState('')
   const [savingSyncedEdit,             setSavingSyncedEdit]             = useState(false)
   const [syncedEditExpanded,      setSyncedEditExpanded]      = useState(false)
-  const [view,             setView]             = useState<'calendar' | 'list' | 'wheel'>('calendar')
+  const [view,                  setView]                  = useState<'calendar' | 'month' | 'wheel'>('calendar')
+  const [pendingCalendarDate,   setPendingCalendarDate]   = useState<Date | null>(null)
   const [deleting,         setDeleting]         = useState<string | null>(null)
   const [selected,         setSelected]         = useState<SelectedLesson | null>(null)
   const [dayDetail,        setDayDetail]        = useState<DayDetail | null>(null)
@@ -1021,7 +1022,45 @@ export default function Lessons() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start gap-3">
+      {/* ── Mobile header (agenda mode) ───────────────────────────────────── */}
+      <div className="sm:hidden flex items-center justify-end gap-2">
+        <div className="flex items-center gap-1.5">
+          <div className="flex rounded-xl border border-white/10 overflow-hidden">
+            <button
+              onClick={() => setView('calendar')}
+              className={`flex items-center px-3 py-2 text-sm font-medium transition-colors ${view === 'calendar' ? 'bg-brand-600 text-white' : 'text-zinc-400 hover:bg-white/5'}`}
+            >
+              <CalendarDays className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setView('month')}
+              className={`flex items-center px-3 py-2 text-sm font-medium transition-colors border-l border-white/10 ${view === 'month' ? 'bg-brand-600 text-white' : 'text-zinc-400 hover:bg-white/5'}`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            {semesterDoc?.startDate && (
+              <button
+                onClick={() => setView('wheel')}
+                className={`flex items-center px-3 py-2 text-sm font-medium transition-colors border-l border-white/10 ${view === 'wheel' ? 'bg-brand-600 text-white' : 'text-zinc-400 hover:bg-white/5'}`}
+              >
+                <Circle className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => setShowFilters(v => !v)}
+            className={`btn-secondary py-2 px-2.5 ${showFilters ? 'bg-brand-500/15 border-brand-500/30 text-brand-400' : ''}`}
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+          </button>
+          <Link to="/teacher/lessons/new" className="btn-primary py-2 px-2.5">
+            <Plus className="w-4 h-4" />
+          </Link>
+        </div>
+      </div>
+
+      {/* ── Desktop header ────────────────────────────────────────────────── */}
+      <div className="hidden sm:flex flex-wrap items-start gap-3">
         <div className="flex-1 min-w-0">
           <h1 className="page-title">Calendar</h1>
           <p className="text-zinc-500 text-sm mt-1">Schedule and manage your lessons.</p>
@@ -1032,20 +1071,20 @@ export default function Lessons() {
               onClick={() => setView('calendar')}
               className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${view === 'calendar' ? 'bg-brand-600 text-white' : 'text-zinc-400 hover:bg-white/5'}`}
             >
-              <CalendarDays className="w-4 h-4" /> <span className="hidden sm:inline">Calendar</span>
+              <CalendarDays className="w-4 h-4" /> <span>Calendar</span>
             </button>
             <button
-              onClick={() => setView('list')}
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors border-l border-white/10 ${view === 'list' ? 'bg-brand-600 text-white' : 'text-zinc-400 hover:bg-white/5'}`}
+              onClick={() => setView('month')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors border-l border-white/10 ${view === 'month' ? 'bg-brand-600 text-white' : 'text-zinc-400 hover:bg-white/5'}`}
             >
-              <List className="w-4 h-4" /> <span className="hidden sm:inline">List</span>
+              <LayoutGrid className="w-4 h-4" /> <span>Month</span>
             </button>
             {semesterDoc?.startDate && (
               <button
                 onClick={() => setView('wheel')}
                 className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors border-l border-white/10 ${view === 'wheel' ? 'bg-brand-600 text-white' : 'text-zinc-400 hover:bg-white/5'}`}
               >
-                <Circle className="w-4 h-4" /> <span className="hidden sm:inline">Annual Plan</span>
+                <Circle className="w-4 h-4" /> <span>Annual Plan</span>
               </button>
             )}
           </div>
@@ -1053,17 +1092,17 @@ export default function Lessons() {
             onClick={() => setShowFilters(v => !v)}
             className={`btn-secondary py-2 ${showFilters ? 'bg-brand-500/15 border-brand-500/30 text-brand-400' : ''}`}
           >
-            <SlidersHorizontal className="w-4 h-4" /> <span className="hidden sm:inline">Filters</span>
+            <SlidersHorizontal className="w-4 h-4" /> Filters
           </button>
           <button
             onClick={() => setPdfPickerOpen(true)}
             className="btn-secondary py-2"
             title="Download the visible week as PDF"
           >
-            <Download className="w-4 h-4" /> <span className="hidden sm:inline">Download PDF</span>
+            <Download className="w-4 h-4" /> Download PDF
           </button>
           <Link to="/teacher/lessons/new" className="btn-primary py-2">
-            <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Lesson</span>
+            <Plus className="w-4 h-4" /> New Lesson
           </Link>
         </div>
       </div>
@@ -1161,7 +1200,7 @@ export default function Lessons() {
       {view === 'calendar' && (
         <>
           {/* Legend */}
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="hidden sm:flex items-center gap-3 flex-wrap">
             {cohorts.map((c, idx) => {
               const color = c.color ?? COHORT_FALLBACK_COLORS[idx % COHORT_FALLBACK_COLORS.length]
               return (
@@ -1182,8 +1221,10 @@ export default function Lessons() {
           {/* Mobile: agenda view — replaces FullCalendar on small screens */}
           <div className="sm:hidden card p-0 overflow-hidden">
             <MobileAgendaView
+              key={pendingCalendarDate?.getTime() ?? 0}
               events={allEvents}
               onEventClick={handleMobileEventClick}
+              initialDate={pendingCalendarDate ?? undefined}
             />
           </div>
 
@@ -1381,94 +1422,84 @@ export default function Lessons() {
         </div>
       )}
 
-      {/* ── List view ────────────────────────────────────────────────────── */}
-      {view === 'list' && (
-        <div className="space-y-6">
-          {lessons.length === 0 ? (
-            <EmptyState
-              icon={CalendarDays}
-              title="No lessons yet"
-              description="Click New Lesson or tap an empty slot in the calendar to get started."
-            />
-          ) : (
-            <div className="space-y-3">
-              {lessons.map(lesson => {
-                const subj   = subjectMap[lesson.subjectId]
-                const cohort = cohortMap[lesson.cohortId]
-                return (
-                  <div key={lesson.id} className="bg-zinc-900 rounded-2xl border border-white/10 p-4 flex items-center gap-4 shadow-sm">
-                    <div className={`w-1 self-stretch rounded-full flex-shrink-0 ${subj?.color ?? 'bg-brand-500'}`} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold text-zinc-100">{lesson.iconEmoji ? `${lesson.iconEmoji} ` : ''}{lesson.title}</p>
-                        {lesson.isOnline && <span className="badge badge-blue">Online</span>}
-                      </div>
-                      <p className="text-xs text-zinc-500 mt-0.5">
-                        {subj ? `${subj.iconEmoji} ${subj.title}` : '—'}
-                        {cohort ? ` · ${cohort.name}` : ''}
-                        {' · '}
-                        {shortDate(lesson.startTime)} {timeStr(lesson.startTime)}–{timeStr(lesson.endTime)}
-                        {lesson.classroom ? ` · ${lesson.classroom}` : ''}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <Link
-                        to={`/teacher/lessons/${lesson.id}/edit`}
-                        className="p-2 text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(lesson.id)}
-                        disabled={deleting === lesson.id}
-                        className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-zinc-800 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+      {/* ── Month view ───────────────────────────────────────────────────── */}
+      {view === 'month' && (
+        <div className="card p-0 overflow-hidden fc-month-ios">
+          <style>{`
+            .fc-month-ios .fc-daygrid-event { border: none !important; border-radius: 5px !important; padding: 1px 5px !important; margin: 1px 2px !important; }
+            .fc-month-ios .fc-event-title { font-size: 11px !important; font-weight: 600 !important; }
+            .fc-month-ios .fc-daygrid-day-number { font-size: 13px !important; font-weight: 500 !important; padding: 4px 6px !important; }
+            .fc-month-ios .fc-col-header-cell-cushion { font-size: 11px !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.06em !important; }
+            .fc-month-ios .fc-daygrid-more-link { font-size: 10px !important; font-weight: 600 !important; }
+            .fc-month-ios .fc-daygrid-week-number { font-size: 10px !important; opacity: 0.45 !important; padding: 3px 4px !important; }
+            .fc-month-ios .fc-daygrid-day.fc-day-today .fc-daygrid-day-number { background: var(--brand) !important; color: #fff !important; border-radius: 50% !important; width: 24px !important; height: 24px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin: 2px !important; }
+            .fc-month-ios .fc-daygrid-day-top { justify-content: center !important; }
+          `}</style>
+          <FullCalendar
+            plugins={[dayGridPlugin, interactionPlugin]}
+            initialView="dayGridMonth"
+            locale="en-GB"
+            firstDay={1}
+            weekNumbers={true}
+            weekText=""
+            events={allEvents.filter(ev => !ev.extendedProps?.isBlock && !ev.extendedProps?.isSemesterMarker)}
+            height="calc(100vh - 180px)"
+            headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
+            displayEventTime={false}
+            dayMaxEvents={3}
+            moreLinkClick={(arg) => {
+              arg.jsEvent.preventDefault()
+              arg.jsEvent.stopPropagation()
+              setPendingCalendarDate(arg.date)
+              setView('calendar')
+              return 'stop' as const
+            }}
+            eventContent={(arg) => {
+              const title = arg.event.title.replace(/\p{Emoji_Presentation}/gu, '').replace(/\s+/g, ' ').trim()
+              return (
+                <div className="fc-event-main-frame" style={{ overflow: 'hidden' }}>
+                  <div className="fc-event-title-container">
+                    <div className="fc-event-title fc-sticky" style={{ fontSize: '11px', fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
                   </div>
-                )
-              })}
-            </div>
-          )}
-
-          {syncedEvents.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider px-1">📅 Outlook Calendar Events</p>
-              {[...syncedEvents]
-                .sort((a, b) => (a.startTime?.toMillis?.() ?? 0) - (b.startTime?.toMillis?.() ?? 0))
-                .map(e => {
-                  const cohortObj = cohortMap[e.cohortId]
-                  const cohortIdx = cohorts.findIndex(c => c.id === e.cohortId)
-                  const color = cohortObj?.color ?? (cohortIdx >= 0 ? COHORT_FALLBACK_COLORS[cohortIdx % COHORT_FALLBACK_COLORS.length] : '#0078d4')
-                  const location = e.customLocation ?? e.location
-                  return (
-                    <div key={e.id} className="bg-zinc-900 rounded-2xl border border-white/10 p-4 flex items-center gap-4 shadow-sm">
-                      <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-zinc-100">{e.customTitle || e.title}</p>
-                        <p className="text-xs text-zinc-500 mt-0.5">
-                          {cohortObj?.name ?? e.cohortId}
-                          {' · '}
-                          {e.allDay
-                            ? toDate(e.startTime)?.toLocaleDateString('sv-SE', { weekday: 'short', month: 'short', day: 'numeric' })
-                            : `${shortDate(e.startTime)} ${timeStr(e.startTime)}${e.endTime ? `–${timeStr(e.endTime)}` : ''}`
-                          }
-                          {location ? ` · ${location}` : ''}
-                        </p>
-                        {e.notes && <p className="text-xs text-zinc-500 mt-0.5 italic">{e.notes}</p>}
-                      </div>
-                      <button
-                        onClick={() => openSyncedEventEdit(e)}
-                        className="p-2 text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors flex-shrink-0"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )
-                })}
-            </div>
-          )}
+                </div>
+              )
+            }}
+            dateClick={(info) => {
+              setDayDetail({ date: info.date, dateStr: localDateStr(info.date) })
+            }}
+            eventClick={(info) => {
+              if (info.event.extendedProps.isSemesterMarker) return
+              if (info.event.extendedProps.isSynced) {
+                const docId = info.event.id.replace(/^synced-/, '')
+                const ev = syncedEvents.find(e => e.id === docId)
+                if (ev) openSyncedEventEdit(ev)
+                return
+              }
+              if (info.event.extendedProps.isPersonal) {
+                const docId: string = info.event.extendedProps.docId
+                if (info.event.extendedProps.isInvited) {
+                  setViewingInvitedEvent(invitedPersonalEvents.find(e => e.id === docId) ?? null)
+                } else if (info.event.extendedProps.isOwn) {
+                  const ev = myPersonalEvents.find(e => e.id === docId)
+                  if (ev) openEditEvent(ev)
+                }
+                return
+              }
+              setSelected({
+                id:               info.event.id,
+                title:            info.event.title,
+                subjectTitle:     info.event.extendedProps.subjectTitle,
+                className:        info.event.extendedProps.className,
+                cohortId:         info.event.extendedProps.cohortId,
+                start:            info.event.extendedProps.start,
+                end:              info.event.extendedProps.end,
+                color:            info.event.extendedProps.color,
+                classroom:        info.event.extendedProps.classroom,
+                isOnline:         info.event.extendedProps.isOnline,
+                requiresPresence: info.event.extendedProps.requiresPresence,
+              })
+            }}
+          />
         </div>
       )}
 
@@ -1541,21 +1572,23 @@ export default function Lessons() {
               </div>
 
               {/* Attendance */}
-              <LessonAttendance
-                lessonId={editingSyncedEvent.id}
-                cohortId={editingSyncedEvent.cohortId !== 'all' ? editingSyncedEvent.cohortId : undefined}
-              />
-
-              {/* Start attendance */}
-              <button
-                onClick={() => {
-                  startAttendance(editingSyncedEvent.id, displayTitle)
-                  setEditingSyncedEvent(null)
-                }}
-                className="w-full btn-primary py-2.5 text-sm"
-              >
-                <QrCode className="w-4 h-4" /> Start Attendance
-              </button>
+              {syncedEditRequireAttendance && (
+                <>
+                  <LessonAttendance
+                    lessonId={editingSyncedEvent.id}
+                    cohortId={editingSyncedEvent.cohortId !== 'all' ? editingSyncedEvent.cohortId : undefined}
+                  />
+                  <button
+                    onClick={() => {
+                      startAttendance(editingSyncedEvent.id, displayTitle)
+                      setEditingSyncedEvent(null)
+                    }}
+                    className="w-full btn-primary py-2.5 text-sm"
+                  >
+                    <QrCode className="w-4 h-4" /> Start Attendance
+                  </button>
+                </>
+              )}
 
               {/* Edit overrides */}
               <div className="border-t border-white/8 pt-3">

@@ -1,6 +1,7 @@
 import { Component, type ReactNode, type ErrorInfo } from 'react'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { db, auth } from '@/lib/firebase'
+import { reloadOnceForStaleChunk } from '@/lib/staleChunk'
 
 async function reportError(message: string, stack: string | undefined, context: string) {
   try {
@@ -25,15 +26,9 @@ export default class ErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, error: null }
 
   static getDerivedStateFromError(error: Error): State {
-    // Stale chunk after a new deploy — auto-reload once instead of showing error
-    const isChunkError = error.message?.includes('Failed to fetch dynamically imported module')
-      || error.message?.includes('Importing a module script failed')
-      || error.message?.includes('is not a valid JavaScript MIME type')
-      || error.message?.includes('text/html')
-      || error.name === 'ChunkLoadError'
-    if (isChunkError && !sessionStorage.getItem('chunkReloaded')) {
-      sessionStorage.setItem('chunkReloaded', '1')
-      window.location.reload()
+    // Stale chunk after a new deploy — auto-reload once per failing chunk instead of showing error
+    const msg = error.name === 'ChunkLoadError' ? 'Failed to fetch dynamically imported module' : (error.message ?? '')
+    if (reloadOnceForStaleChunk(msg)) {
       return { hasError: false, error: null }
     }
     return { hasError: true, error }

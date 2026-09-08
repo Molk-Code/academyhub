@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Bell } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { doc, updateDoc, writeBatch, collection } from 'firebase/firestore'
@@ -11,6 +11,18 @@ import type { NotificationDoc } from '@/types'
 export default function NotificationInbox() {
   const { profile } = useAuth()
   const [open, setOpen] = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [pos, setPos] = useState<{ top: number; left: number; width: number }>({ top: 56, left: 8, width: 320 })
+
+  function toggleOpen() {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      const width = Math.min(320, window.innerWidth - 16)
+      const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8))
+      setPos({ top: rect.bottom + 8, left, width })
+    }
+    setOpen(o => !o)
+  }
 
   const { data: notifications } = useCollection<NotificationDoc>(
     'notifications',
@@ -35,7 +47,8 @@ export default function NotificationInbox() {
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen(o => !o)}
+        ref={btnRef}
+        onClick={toggleOpen}
         className="relative p-2 rounded-xl text-zinc-400 hover:bg-white/10 transition-colors"
         aria-label="Notifications"
       >
@@ -53,10 +66,10 @@ export default function NotificationInbox() {
           <div
             className="fixed z-50 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
             style={{
-              top: 56,
-              right: 8,
-              width: 'min(320px, calc(100vw - 16px))',
-              maxHeight: 'calc(100dvh - 72px)',
+              top: pos.top,
+              left: pos.left,
+              width: pos.width,
+              maxHeight: `calc(100dvh - ${pos.top + 16}px)`,
             }}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/8 flex-shrink-0">

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import ErrorBoundary from './components/common/ErrorBoundary'
+import { reloadOnceForStaleChunk } from '@/lib/staleChunk'
 import './index.css'
 import '@vidstack/react/player/styles/base.css'
 
@@ -21,18 +22,10 @@ async function reportClientError(message: string, stack: string | undefined, con
   } catch { /* never crash on reporting */ }
 }
 
-// Auto-reload once on stale chunk / MIME errors; report everything else
+// Auto-reload on stale chunk / MIME errors; report everything else.
 window.addEventListener('unhandledrejection', (event) => {
   const msg = event.reason?.message ?? String(event.reason ?? '')
-  const isStaleChunk = msg.includes('Failed to fetch dynamically imported module')
-    || msg.includes('Importing a module script failed')
-    || msg.includes('is not a valid JavaScript MIME type')
-    || msg.includes('text/html')
-  if (isStaleChunk && !sessionStorage.getItem('chunkReloaded')) {
-    sessionStorage.setItem('chunkReloaded', '1')
-    window.location.reload()
-    return
-  }
+  if (reloadOnceForStaleChunk(msg)) return
   if (msg) reportClientError(msg, event.reason?.stack, 'unhandledrejection')
 })
 

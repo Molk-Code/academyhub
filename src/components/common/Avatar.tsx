@@ -19,7 +19,7 @@ const sizes = {
   lg: 'w-12 h-12 text-base',
 }
 
-export default function Avatar({ uid, name, avatarUrl, size = 'md', className, enlargeable }: Props) {
+export default function Avatar({ uid, name, avatarUrl, size = 'md', className, enlargeable = true }: Props) {
   const [open, setOpen] = useState(false)
 
   if (avatarUrl) {

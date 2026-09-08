@@ -7,7 +7,7 @@ import {
   Clapperboard, Trophy, FolderOpen, BookMarked, Film,
   QrCode, ListChecks, FlaskConical, Users, SlidersHorizontal,
   LayoutDashboard, User, UtensilsCrossed, Car, CalendarRange,
-  Video, CircleDot, Package, Plus, Trash2, ExternalLink, Pencil, X, Check, UserRound,
+  Video, CircleDot, Package, Plus, Trash2, ExternalLink, Pencil, X, Check, UserRound, ClipboardCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
@@ -55,6 +55,7 @@ const FEATURES: Feature[] = [
   { id: 'roomBooking',      label: 'Booking – Room',      icon: DoorOpen,        student: true,  teacher: false },
   { id: 'foodBox',          label: 'Booking – Food Box',  icon: UtensilsCrossed, student: true,  teacher: false },
   { id: 'vehicle',          label: 'Booking – Vehicle',   icon: Car,             student: true,  teacher: false },
+  { id: 'myBookings',       label: 'My Bookings',         icon: ClipboardCheck, student: true,  teacher: false },
 ]
 
 // ── Toggle ─────────────────────────────────────────────────────────────────────

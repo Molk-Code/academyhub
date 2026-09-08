@@ -1,5 +1,5 @@
 import { admin, functions, db } from './lib'
-import { sendPush, sendFcmToTokens, pushToTeachersAndAdmins } from './notifications-core'
+import { sendPush, sendFcmToTokens, pushToTeachersAndAdmins, saveNotifications } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // purgeChatMessages — delete messages older than the configured retention window
@@ -28,6 +28,56 @@ export const purgeChatMessages = functions.pubsub.schedule('every 24 hours').onR
   }
   return null
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// sendInventoryReturnReminders — daily reminder to borrowers of equipment due
+// today or overdue
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const sendInventoryReturnReminders = functions.pubsub
+  .schedule('0 8 * * *')
+  .timeZone('Europe/Stockholm')
+  .onRun(async () => {
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const activeStatuses = new Set(['active', 'checked-out'])
+
+    async function notify(doc: FirebaseFirestore.QueryDocumentSnapshot, title: string, body: string, tag: string) {
+      const project = doc.data()
+      const borrowerIds: string[] = project.borrowerIds ?? []
+      if (borrowerIds.length === 0) return
+      const usersSnaps = await Promise.all(borrowerIds.map(uid => db.collection('users').doc(uid).get()))
+      const tokens = usersSnaps.flatMap(s => (s.data()?.fcmTokens ?? []) as string[])
+      const opts = { title, body, url: '/my-bookings' }
+      await Promise.all([
+        sendPush(tokens, { ...opts, tag: `${tag}-${doc.id}` }),
+        saveNotifications(borrowerIds, opts),
+      ])
+    }
+
+    const [dueSnap, overdueSnap] = await Promise.all([
+      db.collection('inventory_projects').where('returnDate', '==', todayStr).get(),
+      db.collection('inventory_projects').where('returnDate', '<', todayStr).get(),
+    ])
+
+    for (const doc of dueSnap.docs) {
+      const status = doc.data().status
+      if (!activeStatuses.has(status)) continue
+      await notify(doc, '⏰ Equipment due today', `"${doc.data().name}" is due back today`, 'inventory-due')
+    }
+
+    for (const doc of overdueSnap.docs) {
+      const status = doc.data().status
+      if (!activeStatuses.has(status)) continue
+      const overdueDays = Math.round((Date.parse(todayStr) - Date.parse(doc.data().returnDate)) / 86400000)
+      await notify(
+        doc,
+        '🚨 Equipment overdue',
+        `"${doc.data().name}" is ${overdueDays} day${overdueDays === 1 ? '' : 's'} overdue — please return it`,
+        'inventory-overdue',
+      )
+    }
+    return null
+  })
 
 // ─────────────────────────────────────────────────────────────────────────────
 // sendEventInviteNotifications — callable: send invite push to invitees

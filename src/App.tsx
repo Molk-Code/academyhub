@@ -54,6 +54,7 @@ const Booking               = lazy(() => import('@/pages/student/Booking'))
 const SemesterOverview      = lazy(() => import('@/pages/student/SemesterOverview'))
 const FoodBoxOrder          = lazy(() => import('@/pages/student/FoodBoxOrder'))
 const VehicleBooking        = lazy(() => import('@/pages/student/VehicleBooking'))
+const MyBookings            = lazy(() => import('@/pages/student/MyBookings'))
 
 // ── Teacher lazy ─────────────────────────────────────────────────────────────
 const TeacherDashboard           = lazy(() => import('@/pages/teacher/Dashboard'))
@@ -145,6 +146,7 @@ export default function App() {
             <Route path="/room-booking" element={<RoomBooking standalone />} />
             <Route path="/booking"           element={<FeatureGate feature="booking"><Booking /></FeatureGate>} />
             <Route path="/booking/equipment" element={<FeatureGate feature="equipment"><EquipmentBookingPage /></FeatureGate>} />
+            <Route path="/my-bookings"       element={<MyBookings />} />
             <Route path="/resources"    element={<FeatureGate feature="resources"><StudentResources /></FeatureGate>} />
             <Route path="/chat"         element={<ChatPage />} />
             <Route path="/production"            element={<FeatureGate feature="production"><StudentProduction /></FeatureGate>} />

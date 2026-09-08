@@ -1,5 +1,5 @@
 import { functions, db } from './lib'
-import { sendPush, pushToTeachersAndAdminsSplit } from './notifications-core'
+import { sendPush, saveNotifications, pushToTeachersAndAdminsSplit } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // onEquipmentBookingCreated — notify teachers/admins of new equipment requests
@@ -120,6 +120,30 @@ export const onEquipmentBookingUpdated = functions.firestore
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// onInventoryProjectCreated — notify borrowers when a project is set up for them
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const onInventoryProjectCreated = functions.firestore
+  .document('inventory_projects/{projectId}')
+  .onCreate(async (snap) => {
+    const project = snap.data()
+    const borrowerIds: string[] = project.borrowerIds ?? []
+    if (borrowerIds.length === 0) return null
+    const usersSnaps = await Promise.all(borrowerIds.map(uid => db.collection('users').doc(uid).get()))
+    const tokens = usersSnaps.flatMap(s => (s.data()?.fcmTokens ?? []) as string[])
+    const opts = {
+      title: '📦 Equipment project created',
+      body:  `"${project.name}" — return by ${project.returnDate}`,
+      url:   '/my-bookings',
+    }
+    await Promise.all([
+      sendPush(tokens, { ...opts, tag: 'inventory' }),
+      saveNotifications(borrowerIds, opts),
+    ])
+    return null
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
 // onInventoryProjectUpdated — notify borrowers when project status changes
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -131,16 +155,17 @@ export const onInventoryProjectUpdated = functions.firestore
     if (before.status === after.status) return null
     if (after.status !== 'returned') return null
     const borrowerIds: string[] = after.borrowerIds ?? []
-    for (const uid of borrowerIds) {
-      const userSnap = await db.collection('users').doc(uid).get()
-      const tokens: string[] = userSnap.data()?.fcmTokens ?? []
-      if (tokens.length === 0) continue
-      await sendPush(tokens, {
-        title: '✅ Equipment returned',
-        body:  `Project "${after.name}" has been marked as returned`,
-        url:   '/booking/equipment',
-        tag:   'inventory',
-      })
+    if (borrowerIds.length === 0) return null
+    const usersSnaps = await Promise.all(borrowerIds.map(uid => db.collection('users').doc(uid).get()))
+    const tokens = usersSnaps.flatMap(s => (s.data()?.fcmTokens ?? []) as string[])
+    const opts = {
+      title: '✅ Equipment returned',
+      body:  `Project "${after.name}" has been marked as returned`,
+      url:   '/my-bookings',
     }
+    await Promise.all([
+      sendPush(tokens, { ...opts, tag: 'inventory' }),
+      saveNotifications(borrowerIds, opts),
+    ])
     return null
   })

@@ -69,9 +69,11 @@ function beep(freq: number) {
 function EquipmentPicker({
   onClose,
   onPick,
+  pickedCounts,
 }: {
   onClose: () => void
   onPick: (item: { id: string; name: string }) => void
+  pickedCounts?: Record<string, number>
 }) {
   const { data: equipment } = useCollection<EquipmentDoc>('equipment')
   const active = equipment.filter(e => e.isActive).sort((a, b) => a.name.localeCompare(b.name))
@@ -79,6 +81,7 @@ function EquipmentPicker({
   const [cat, setCat] = useState('ALL')
 
   const cats = ['ALL', 'CAMERA', 'GRIP', 'LIGHTS', 'SOUND', 'LOCATION', 'BOOKS', 'OTHER']
+  const totalPicked = pickedCounts ? Object.values(pickedCounts).reduce((s, n) => s + n, 0) : 0
 
   const filtered = active.filter(e => {
     if (cat !== 'ALL' && e.category !== cat) return false
@@ -91,7 +94,15 @@ function EquipmentPicker({
       <div className="equip-picker-modal">
         <div className="equip-picker-header">
           <h3>Add Equipment</h3>
-          <button className="equip-picker-close" onClick={onClose}><X size={20} /></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+            {pickedCounts && totalPicked > 0 && (
+              <span className="active-filter">{totalPicked} added</span>
+            )}
+            {pickedCounts && (
+              <button className="manual-add-btn" onClick={onClose}>Done</button>
+            )}
+            <button className="equip-picker-close" onClick={onClose}><X size={20} /></button>
+          </div>
         </div>
         <div className="equip-picker-search">
           <Search size={16} />
@@ -114,24 +125,34 @@ function EquipmentPicker({
           ))}
         </div>
         <div className="equip-picker-grid">
-          {filtered.map(e => (
-            <button key={e.id} className="equip-picker-card" onClick={() => onPick({ id: e.id, name: e.name })}>
-              <div className="equip-picker-img">
-                <EquipmentImg
-                  url={e.imageUrl}
-                  name={e.name}
-                  fallback={<div className="equip-picker-placeholder">{e.name}</div>}
-                />
-                <span className="equip-picker-cat-tag">{e.category}</span>
-                {e.priceInclVat > 0 && (
-                  <span className="equip-picker-price-tag">{e.priceInclVat} kr/day</span>
-                )}
-              </div>
-              <div className="equip-picker-info">
-                <div className="equip-picker-name">{e.name}</div>
-              </div>
-            </button>
-          ))}
+          {filtered.map(e => {
+            const pickedQty = pickedCounts?.[e.id] ?? 0
+            return (
+              <button
+                key={e.id}
+                className={`equip-picker-card${pickedQty > 0 ? ' picked' : ''}`}
+                onClick={() => onPick({ id: e.id, name: e.name })}
+              >
+                <div className="equip-picker-img">
+                  <EquipmentImg
+                    url={e.imageUrl}
+                    name={e.name}
+                    fallback={<div className="equip-picker-placeholder">{e.name}</div>}
+                  />
+                  <span className="equip-picker-cat-tag">{e.category}</span>
+                  {e.priceInclVat > 0 && (
+                    <span className="equip-picker-price-tag">{e.priceInclVat} kr/day</span>
+                  )}
+                  {pickedQty > 0 && (
+                    <span className="equip-picker-picked-badge"><Check size={12} /> {pickedQty > 1 ? `×${pickedQty}` : ''}</span>
+                  )}
+                </div>
+                <div className="equip-picker-info">
+                  <div className="equip-picker-name">{e.name}</div>
+                </div>
+              </button>
+            )
+          })}
         </div>
       </div>
     </div>
@@ -925,7 +946,7 @@ function CreateProjectForm({
       <div className="inv-form">
         {sortedPresets.length > 0 && (
           <div className="form-group">
-            <label>Start from Preset (optional)</label>
+            <label>Start from Project Preset (optional)</label>
             <select
               className="form-select"
               value={selectedPresetId}
@@ -1133,7 +1154,11 @@ function PresetsManager() {
       {isEditing && (
         <div className="inv-form" style={{ maxWidth: 600, marginBottom: '1.5rem' }}>
           {showPicker && (
-            <EquipmentPicker onClose={() => setShowPicker(false)} onPick={item => addPickedItem(item)} />
+            <EquipmentPicker
+              onClose={() => setShowPicker(false)}
+              onPick={item => addPickedItem(item)}
+              pickedCounts={Object.fromEntries(items.map(i => [i.equipmentId, i.quantity]))}
+            />
           )}
           <div className="form-group">
             <label>Preset Name</label>
@@ -1322,7 +1347,7 @@ export default function InventoryPage() {
             ['equipment-status', 'Equipment Status'],
             ['borrower-stats', 'Borrower Stats'],
             ['statistics', 'Statistics'],
-            ['presets', 'Presets'],
+            ['presets', 'Project Presets'],
           ] as [InvTab, string][]).map(([id, label]) => (
             <button
               key={id}

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { collection, addDoc, serverTimestamp, query, where, orderBy, getDocs, getDoc, doc } from 'firebase/firestore'
+import { collection, addDoc, updateDoc, serverTimestamp, query, where, orderBy, getDocs, getDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument } from '@/hooks/useFirestore'
@@ -7,7 +7,7 @@ import type { EquipmentDoc, EquipmentBookingDoc, CohortDoc, ProductionDoc, Produ
 import { Link } from 'react-router-dom'
 import {
   ShoppingCart, X, Search, Package, Calendar, Check,
-  AlertTriangle, ChevronDown, ChevronRight, CheckCircle2, Clock, Truck, RotateCcw, XCircle, Lock,
+  AlertTriangle, ChevronDown, ChevronRight, CheckCircle2, Clock, Truck, RotateCcw, XCircle, Lock, Trash2,
 } from 'lucide-react'
 import { optimizeImageUrl } from '@/lib/cloudinary'
 import './molkom.css'
@@ -149,6 +149,17 @@ export default function EquipmentBookingPage() {
 
   const [cart, setCart] = useState<Map<string, CartEntry>>(new Map())
   const [view, setView] = useState<ViewMode>('browse')
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
+
+  async function cancelBooking(id: string) {
+    if (!window.confirm('Remove this booking? This cannot be undone.')) return
+    setCancellingId(id)
+    try {
+      await updateDoc(doc(db, 'equipment_bookings', id), { status: 'cancelled' })
+    } finally {
+      setCancellingId(null)
+    }
+  }
   const [cartOpen, setCartOpen] = useState(false)
   const [fromDate, setFromDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [toDate, setToDate] = useState('')
@@ -979,6 +990,20 @@ export default function EquipmentBookingPage() {
                           </span>
                         ))}
                       </div>
+                      {(b.status === 'pending' || b.status === 'confirmed') && (
+                        <button
+                          onClick={() => cancelBooking(b.id)}
+                          disabled={cancellingId === b.id}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 5, marginTop: 10, padding: '5px 10px',
+                            background: 'rgba(255,71,87,.1)', border: '1px solid rgba(255,71,87,.3)', borderRadius: 8,
+                            color: '#ff4757', fontSize: '.75rem', fontWeight: 600, cursor: cancellingId === b.id ? 'default' : 'pointer',
+                            opacity: cancellingId === b.id ? .6 : 1,
+                          }}
+                        >
+                          <Trash2 size={12} /> {cancellingId === b.id ? 'Removing…' : 'Remove Booking'}
+                        </button>
+                      )}
                     </div>
                   )
                 })}

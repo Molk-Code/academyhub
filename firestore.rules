@@ -462,7 +462,11 @@ service cloud.firestore {
         && request.resource.data.studentId == request.auth.uid)
         || (isRentalMode() && request.resource.data.get('guestEmail', '') != ''
             && request.resource.data.get('isGuest', false) == true);
-      allow update: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'));
+      allow update: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))
+        || (isSignedIn() && resource.data.studentId == request.auth.uid
+            && resource.data.status in ['pending', 'confirmed']
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+            && request.resource.data.status == 'cancelled');
     }
 
     match /inventory_projects/{projectId} {

@@ -26,7 +26,7 @@ function EquipmentImg({ url, name, fallback }: { url: string | undefined | null;
   return <img src={optimizeImageUrl(url)} alt={name} onError={() => setFailed(true)} />
 }
 
-type InvTab = 'dashboard' | 'all-projects' | 'borrower-stats' | 'statistics' | 'presets'
+type InvTab = 'dashboard' | 'all-projects' | 'statistics' | 'presets'
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -1340,7 +1340,6 @@ export default function InventoryPage() {
           {([
             ['dashboard', 'Dashboard'],
             ['all-projects', 'All Projects'],
-            ['borrower-stats', 'Borrower Stats'],
             ['statistics', 'Statistics'],
             ['presets', 'Project Presets'],
           ] as [InvTab, string][]).map(([id, label]) => (
@@ -1454,84 +1453,11 @@ export default function InventoryPage() {
           </div>
         )}
 
-        {/* Borrower Stats tab */}
-        {tab === 'borrower-stats' && <BorrowerStats projects={projects} allItems={allItems} />}
-
         {/* Statistics tab */}
         {tab === 'statistics' && <StatsContent equipment={equipment} projects={projects} allItems={allItems} onOpenProject={setSelectedProjectId} />}
 
         {/* Presets tab */}
         {tab === 'presets' && <PresetsManager />}
-      </div>
-    </div>
-  )
-}
-
-function BorrowerStats({ projects, allItems }: { projects: InventoryProjectDoc[]; allItems: (InventoryItemDoc & { projectId: string })[] }) {
-  const [students, setStudents] = useState<UserDoc[]>([])
-
-  useEffect(() => {
-    getDocs(query(collection(db, 'users'), where('role', '==', 'student')))
-      .then(snap => setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserDoc))))
-  }, [])
-
-  // Only show borrowers who have at least one project
-  const rows = useMemo(() => {
-    const all = [...students, ...projects.flatMap(p =>
-      (p.borrowers ?? []).filter(name => !students.find(s => s.displayName === name))
-        .map(name => ({ id: '', displayName: name } as UserDoc))
-    )]
-    const seen = new Set<string>()
-    return all.filter(s => {
-      const key = s.id || s.displayName
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-  }, [students, projects])
-
-  return (
-    <div className="inv-section">
-      <div className="inv-section-title"><Users size={18} /> Borrower Stats</div>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid #2a2a3a' }}>
-              {['Borrower', 'Projects', 'Active', 'Items Out', 'Returned', 'Missing', 'Damaged'].map(h => (
-                <th key={h} style={{ textAlign: 'left', padding: '.5rem .75rem', color: '#6a6a80', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((s, idx) => {
-              const userProjects = projects.filter(p =>
-                (s.id && p.borrowerIds?.includes(s.id)) || p.borrowers?.includes(s.displayName),
-              )
-              if (userProjects.length === 0) return null
-              const active    = userProjects.filter(p => ['active', 'checked-out'].includes(p.status))
-              const projIds   = new Set(userProjects.map(p => p.id))
-              const userItems = allItems.filter(i => projIds.has(i.projectId))
-              const out       = userItems.filter(i => i.status === 'checked-out').length
-              const returned  = userItems.filter(i => i.status === 'returned').length
-              const missing   = userItems.filter(i => i.status === 'missing').length
-              const damaged   = userItems.filter(i => i.status === 'damaged').length
-              return (
-                <tr key={s.id || idx} style={{ borderBottom: '1px solid #1a1a25' }}>
-                  <td style={{ padding: '.5rem .75rem', color: '#f0f0f5', fontWeight: 600 }}>{s.displayName}</td>
-                  <td style={{ padding: '.5rem .75rem', color: '#a0a0b5' }}>{userProjects.length}</td>
-                  <td style={{ padding: '.5rem .75rem', color: active.length > 0 ? '#4cd964' : '#4a4a60' }}>{active.length}</td>
-                  <td style={{ padding: '.5rem .75rem', color: out > 0 ? '#f97316' : '#4a4a60' }}>{out || '—'}</td>
-                  <td style={{ padding: '.5rem .75rem', color: returned > 0 ? '#4cd964' : '#4a4a60' }}>{returned || '—'}</td>
-                  <td style={{ padding: '.5rem .75rem', color: missing > 0 ? '#ff4757' : '#4a4a60', fontWeight: missing > 0 ? 700 : 400 }}>{missing || '—'}</td>
-                  <td style={{ padding: '.5rem .75rem', color: damaged > 0 ? '#ffa502' : '#4a4a60', fontWeight: damaged > 0 ? 700 : 400 }}>{damaged || '—'}</td>
-                </tr>
-              )
-            })}
-            {rows.length === 0 && (
-              <tr><td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#6a6a80' }}>No borrowers found</td></tr>
-            )}
-          </tbody>
-        </table>
       </div>
     </div>
   )

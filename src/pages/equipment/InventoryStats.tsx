@@ -176,21 +176,32 @@ function BorrowersTab({
   cohortNames: Record<string, string>
 }) {
   const rows = useMemo(() => {
-    return users.map(u => {
+    const known = users.map(u => ({ id: u.id, displayName: u.displayName, cohortId: u.cohortId ?? '' }))
+    const unknownNames = new Set<string>()
+    projects.forEach(p => (p.borrowers ?? []).forEach(name => {
+      if (name && !users.find(u => u.displayName === name)) unknownNames.add(name)
+    }))
+    const all = [...known, ...[...unknownNames].map(name => ({ id: '', displayName: name, cohortId: '' }))]
+
+    return all.map(u => {
       const uProjects = projects.filter(p =>
         (u.id && p.borrowerIds?.includes(u.id)) || p.borrowers?.includes(u.displayName),
       )
       if (uProjects.length === 0) return null
+      const active    = uProjects.filter(p => ['active', 'checked-out'].includes(p.status)).length
       const projIds   = new Set(uProjects.map(p => p.id))
       const uItems    = allItems.filter(i => projIds.has(i.projectId))
       return {
-        name:    u.displayName,
-        cohortId: u.cohortId ?? '',
+        name:     u.displayName,
+        cohortId: u.cohortId,
         projects: uProjects.length,
-        damaged: uItems.filter(i => i.status === 'damaged').length,
-        missing: uItems.filter(i => i.status === 'missing').length,
+        active,
+        out:      uItems.filter(i => i.status === 'checked-out').length,
+        returned: uItems.filter(i => i.status === 'returned').length,
+        damaged:  uItems.filter(i => i.status === 'damaged').length,
+        missing:  uItems.filter(i => i.status === 'missing').length,
       }
-    }).filter(Boolean).sort((a, b) => b!.projects - a!.projects) as NonNullable<ReturnType<typeof users.map>[0]>[]
+    }).filter(Boolean).sort((a, b) => b!.projects - a!.projects) as NonNullable<ReturnType<typeof all.map>[0]>[]
   }, [users, projects, allItems])
 
   if (rows.length === 0) return <Empty msg="No borrower data" />
@@ -200,8 +211,8 @@ function BorrowersTab({
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
         <thead>
           <tr style={{ borderBottom: '1px solid #2a2a3a' }}>
-            {['Name', 'Class', 'Projects', 'Damaged', 'Missing'].map(h => (
-              <th key={h} style={{ textAlign: 'left', padding: '.5rem .75rem', color: '#6a6a80', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
+            {['Borrower', 'Class', 'Projects', 'Active', 'Items Out', 'Returned', 'Missing', 'Damaged'].map(h => (
+              <th key={h} style={{ textAlign: 'left', padding: '.5rem .75rem', color: '#6a6a80', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -211,8 +222,11 @@ function BorrowersTab({
               <td style={{ padding: '.5rem .75rem', color: '#f0f0f5', fontWeight: 600 }}>{r.name}</td>
               <td style={{ padding: '.5rem .75rem' }}><CohortBadge cohortId={r.cohortId} cohorts={cohortNames} /></td>
               <td style={{ padding: '.5rem .75rem', color: r.projects > 0 ? '#f97316' : '#6a6a80', fontWeight: r.projects > 0 ? 700 : 400 }}>{r.projects}</td>
-              <td style={{ padding: '.5rem .75rem', color: r.damaged > 0 ? '#fbbf24' : '#6a6a80', fontWeight: r.damaged > 0 ? 700 : 400 }}>{r.damaged || '—'}</td>
+              <td style={{ padding: '.5rem .75rem', color: r.active > 0 ? '#4cd964' : '#6a6a80' }}>{r.active || '—'}</td>
+              <td style={{ padding: '.5rem .75rem', color: r.out > 0 ? '#60a5fa' : '#6a6a80' }}>{r.out || '—'}</td>
+              <td style={{ padding: '.5rem .75rem', color: r.returned > 0 ? '#4cd964' : '#6a6a80' }}>{r.returned || '—'}</td>
               <td style={{ padding: '.5rem .75rem', color: r.missing > 0 ? '#f87171' : '#6a6a80', fontWeight: r.missing > 0 ? 700 : 400 }}>{r.missing || '—'}</td>
+              <td style={{ padding: '.5rem .75rem', color: r.damaged > 0 ? '#fbbf24' : '#6a6a80', fontWeight: r.damaged > 0 ? 700 : 400 }}>{r.damaged || '—'}</td>
             </tr>
           ))}
         </tbody>

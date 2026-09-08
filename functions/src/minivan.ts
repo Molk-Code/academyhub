@@ -1,6 +1,6 @@
 import * as path from 'path'
 import { functions, db, escapeHtml, getResend, getEmailConfig, requireTeacherOrAdmin, PDFDocument } from './lib'
-import { getOrCreateBookingsChannel, postToBookingsChannel, pushToTeachersAndAdmins, pushToStudent } from './notifications-core'
+import { getOrCreateBookingsChannel, postToBookingsChannel, pushToAdmins, pushToStudent } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // sendMinivanEmail — notify staff about a new minivan booking request via Resend
@@ -52,7 +52,7 @@ export const onMinivanBookingCreated = functions.firestore
 
     const channelId = await getOrCreateBookingsChannel()
     await postToBookingsChannel(channelId, text)
-    await pushToTeachersAndAdmins(
+    await pushToAdmins(
       '🚐 New minivan request',
       `${d.studentName} — ${d.destination} on ${d.dateFrom}`,
       '/admin/minivan',

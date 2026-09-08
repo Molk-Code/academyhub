@@ -1,6 +1,6 @@
 import * as path from 'path'
 import { functions, db, getResend, getEmailConfig, requireTeacherOrAdmin, PDFDocument } from './lib'
-import { getOrCreateBookingsChannel, postToBookingsChannel, pushToTeachersAndAdmins, pushToStudent } from './notifications-core'
+import { getOrCreateBookingsChannel, postToBookingsChannel, pushToAdmins, pushToStudent } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // generateFoodBoxPdf — Swedish PDF for the admin export
@@ -313,7 +313,7 @@ export const onFoodBoxOrderCreated = functions.firestore
 
     const channelId = await getOrCreateBookingsChannel()
     await postToBookingsChannel(channelId, text)
-    await pushToTeachersAndAdmins(
+    await pushToAdmins(
       '🍱 New food box order',
       `${d.studentName} — date ${d.date}`,
       '/admin/food-box-orders',

@@ -23,22 +23,24 @@ function useBookingData() {
   const isStaff = roles.some(r => r === 'teacher' || r === 'admin')
     || (role ?? profile?.role) === 'teacher'
     || (role ?? profile?.role) === 'admin'
+  // Food box / minivan / equipment requests are admin-only — teachers no longer get these
+  const isAdmin = roles.includes('admin') || (role ?? profile?.role) === 'admin'
   const seenRev = useSeenRevision()
 
   const { data: pendingFood } = useCollection<FoodBoxOrderDoc>(
     'food_box_orders',
     [where('status', '==', 'pending')],
-    isStaff,
+    isAdmin,
   )
   const { data: pendingVan } = useCollection<MinivanBookingDoc>(
     'minivan_bookings',
     [where('status', '==', 'pending')],
-    isStaff,
+    isAdmin,
   )
   const { data: pendingEquipment } = useCollection<EquipmentBookingDoc>(
     'equipment_bookings',
     [where('status', '==', 'pending')],
-    isStaff,
+    isAdmin,
   )
   const { data: myFood } = useCollection<FoodBoxOrderDoc>(
     'food_box_orders',
@@ -51,15 +53,16 @@ function useBookingData() {
     !!uid && !isStaff,
   )
 
-  return { uid, isStaff, seenRev, pendingFood, pendingVan, pendingEquipment, myFood, myVan }
+  return { uid, isStaff, isAdmin, seenRev, pendingFood, pendingVan, pendingEquipment, myFood, myVan }
 }
 
 export function useBookingBadge(): number {
-  const { uid, isStaff, seenRev, pendingFood, pendingVan, pendingEquipment, myFood, myVan } = useBookingData()
+  const { uid, isStaff, isAdmin, seenRev, pendingFood, pendingVan, pendingEquipment, myFood, myVan } = useBookingData()
 
   return useMemo(() => {
     if (!uid) return 0
-    if (isStaff) return pendingFood.length + pendingVan.length + pendingEquipment.length
+    if (isAdmin) return pendingFood.length + pendingVan.length + pendingEquipment.length
+    if (isStaff) return 0
     const foodSeenAt = parseInt(localStorage.getItem(FOOD_SEEN_KEY(uid)) ?? '0', 10)
     const vanSeenAt  = parseInt(localStorage.getItem(VAN_SEEN_KEY(uid))  ?? '0', 10)
     const latestTs = (o: any) => Math.max(
@@ -69,17 +72,17 @@ export function useBookingBadge(): number {
     const activeFood = myFood.filter(o => o.status !== 'cancelled' && latestTs(o) > foodSeenAt).length
     const activeVan  = myVan.filter(b  => b.status !== 'rejected'  && latestTs(b) > vanSeenAt).length
     return activeFood + activeVan
-  }, [uid, isStaff, pendingFood, pendingVan, myFood, myVan, seenRev])
+  }, [uid, isStaff, isAdmin, pendingFood, pendingVan, myFood, myVan, seenRev])
 }
 
-/** For admin sidebar: separate pending counts per type */
+/** For admin sidebar: separate pending counts per type (admin only — teachers get none) */
 export function useBookingBadgeDetail(): { food: number; van: number; equipment: number } {
-  const { uid, isStaff, seenRev, pendingFood, pendingVan, pendingEquipment } = useBookingData()
+  const { uid, isAdmin, seenRev, pendingFood, pendingVan, pendingEquipment } = useBookingData()
 
   return useMemo(() => {
-    if (!uid || !isStaff) return { food: 0, van: 0, equipment: 0 }
+    if (!uid || !isAdmin) return { food: 0, van: 0, equipment: 0 }
     return { food: pendingFood.length, van: pendingVan.length, equipment: pendingEquipment.length }
-  }, [uid, isStaff, pendingFood, pendingVan, pendingEquipment, seenRev])
+  }, [uid, isAdmin, pendingFood, pendingVan, pendingEquipment, seenRev])
 }
 
 /** For student Booking tabs: per-tab unseen counts */

@@ -107,14 +107,21 @@ export async function getOrCreateBookingsChannel(): Promise<string> {
     .limit(1)
     .get()
 
-  if (!snap.empty) return snap.docs[0].id
+  if (!snap.empty) {
+    const doc = snap.docs[0]
+    // Self-heal: this channel is admin-only now — older docs may still list 'teacher'
+    if ((doc.data().allowedRoles ?? []).includes('teacher')) {
+      await doc.ref.update({ allowedRoles: ['admin'] })
+    }
+    return doc.id
+  }
 
   const ref = await db.collection('chat_channels').add({
     name:             'Bookings',
     description:      'Food box orders and minivan requests',
     order:            99,
     isPublic:         false,
-    allowedRoles:     ['teacher', 'admin'],
+    allowedRoles:     ['admin'],
     allowedCohortIds: [],
     allowedTeamIds:   [],
     memberIds:        [],
@@ -141,9 +148,9 @@ export async function postToBookingsChannel(channelId: string, text: string) {
   })
 }
 
-export async function pushToTeachersAndAdmins(title: string, body: string, url: string) {
+export async function pushToAdmins(title: string, body: string, url: string) {
   const snap = await db.collection('users')
-    .where('role', 'in', ['teacher', 'admin'])
+    .where('role', '==', 'admin')
     .get()
   const tokens: string[] = []
   const uids: string[] = []
@@ -157,28 +164,19 @@ export async function pushToTeachersAndAdmins(title: string, body: string, url: 
   ])
 }
 
-export async function pushToTeachersAndAdminsSplit(
-  title: string,
-  body: string,
-  teacherUrl: string,
-  adminUrl: string,
-) {
+export async function pushToTeachersAndAdmins(title: string, body: string, url: string) {
   const snap = await db.collection('users')
     .where('role', 'in', ['teacher', 'admin'])
     .get()
-  const teacherTokens: string[] = []; const teacherUids: string[] = []
-  const adminTokens:   string[] = []; const adminUids:   string[] = []
+  const tokens: string[] = []
+  const uids: string[] = []
   snap.docs.forEach(d => {
-    const role = d.data().role
-    const tokens: string[] = d.data().fcmTokens ?? []
-    if (role === 'admin') { adminTokens.push(...tokens); adminUids.push(d.id) }
-    else                  { teacherTokens.push(...tokens); teacherUids.push(d.id) }
+    tokens.push(...(d.data().fcmTokens ?? []))
+    uids.push(d.id)
   })
   await Promise.all([
-    sendPush(teacherTokens, { title, body, url: teacherUrl, tag: 'booking' }),
-    saveNotifications(teacherUids, { title, body, url: teacherUrl }),
-    sendPush(adminTokens,   { title, body, url: adminUrl,   tag: 'booking' }),
-    saveNotifications(adminUids,   { title, body, url: adminUrl }),
+    sendPush(tokens, { title, body, url, tag: 'booking' }),
+    saveNotifications(uids, { title, body, url }),
   ])
 }
 

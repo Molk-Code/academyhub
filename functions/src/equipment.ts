@@ -1,5 +1,5 @@
 import { functions, db } from './lib'
-import { sendPush, saveNotifications, pushToTeachersAndAdminsSplit } from './notifications-core'
+import { sendPush, saveNotifications, pushToAdmins } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // onEquipmentBookingCreated — notify teachers/admins of new equipment requests
@@ -66,10 +66,9 @@ export const onEquipmentBookingCreated = functions.firestore
       }
     }
 
-    await pushToTeachersAndAdminsSplit(
+    await pushToAdmins(
       '📦 Equipment booking request',
       `${booking.studentName} requested equipment for "${booking.projectName}"`,
-      '/teacher/equipment-requests',
       '/admin/equipment',
     )
     return null

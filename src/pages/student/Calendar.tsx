@@ -8,7 +8,7 @@ import type { EventInput } from '@fullcalendar/core'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
 import { toDate } from '@/lib/utils'
-import type { LessonDoc, AssignmentDoc, SubjectDoc, SemesterSettingsDoc, LessonCategoryDoc, CohortDoc, PersonalEventDoc, UserDoc, SyncedEventDoc } from '@/types'
+import type { LessonDoc, AssignmentDoc, SubjectDoc, SemesterSettingsDoc, LessonCategoryDoc, CohortDoc, PersonalEventDoc, UserDoc, SyncedEventDoc, GuestTeacherDoc } from '@/types'
 import { addDoc, collection, serverTimestamp, Timestamp, updateDoc, deleteDoc, doc } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
@@ -62,7 +62,8 @@ interface SelectedEvent {
   pointsValue?: number
   dueDate?: Date
   location?: string
-  overrideTeachers?: string[]
+  teacherNames?: string[]
+  guestTeacherNames?: string[]
   overrideNotes?: string
 }
 
@@ -353,6 +354,7 @@ export default function StudentCalendar() {
   )
 
   const { data: allUsers } = useCollection<UserDoc>('users')
+  const { data: guestTeachers } = useCollection<GuestTeacherDoc>('guest_teachers')
   // Group duplicate docs by displayName, collecting all their IDs — ensures profile.uid always matches
   const invitableGroups = useMemo(() => {
     type Group = { repId: string; allIds: string[]; displayName: string; roles: string[] }
@@ -694,13 +696,24 @@ export default function StudentCalendar() {
     return undefined
   }
 
+  function resolveTeacherNames(ids: string[] | undefined): string[] {
+    return (ids ?? [])
+      .map(tid => allUsers.find(u => u.uid === tid || u.id === tid)?.displayName)
+      .filter(Boolean) as string[]
+  }
+
+  function resolveGuestTeacherNames(ids: string[] | undefined): string[] {
+    return (ids ?? [])
+      .map(gid => guestTeachers.find(g => g.id === gid)?.name)
+      .filter(Boolean) as string[]
+  }
+
   function handleMobileEventClick(ev: EventInput) {
     const ep = ev.extendedProps ?? {}
     if (ep.isSynced) {
       const subj = ep.subjectId ? subjects.find(s => s.id === ep.subjectId) : undefined
-      const teachers = ((ep.teacherIds as string[]) ?? [])
-        .map(tid => allUsers.find(u => u.uid === tid || u.id === tid)?.displayName)
-        .filter(Boolean) as string[]
+      const teachers = resolveTeacherNames(ep.teacherIds as string[])
+      const guests   = resolveGuestTeacherNames(ep.guestTeacherIds as string[])
       setSelectedEvent({
         type: 'synced',
         title: String(ev.title).replace(/^📅 /, ''),
@@ -709,7 +722,8 @@ export default function StudentCalendar() {
         location:  ep.location,
         subjectTitle: subj?.title,
         subjectId: ep.subjectId ?? undefined,
-        overrideTeachers: teachers.length > 0 ? teachers : undefined,
+        teacherNames: teachers.length > 0 ? teachers : undefined,
+        guestTeacherNames: guests.length > 0 ? guests : undefined,
         overrideNotes: ep.notes ?? undefined,
       }); return
     }
@@ -731,6 +745,8 @@ export default function StudentCalendar() {
       const lessonId = rawId.startsWith('lesson-') ? rawId.slice(7) : rawId
       const lesson   = lessons.find(l => l.id === lessonId)
       const subject  = lesson ? subjects.find(s => s.id === lesson.subjectId) : undefined
+      const teachers = resolveTeacherNames(lesson?.teacherIds)
+      const guests   = resolveGuestTeacherNames(lesson?.guestTeacherIds)
       setSelectedEvent({
         type: 'lesson', lessonId,
         title:     String(ev.title),
@@ -739,6 +755,8 @@ export default function StudentCalendar() {
         endTime:   lesson ? toDate(lesson.endTime) ?? undefined : undefined,
         subjectId:    subject?.id ?? ep.subjectId ?? undefined,
         subjectTitle: subject?.title ?? ep.subjectTitle ?? undefined,
+        teacherNames: teachers.length > 0 ? teachers : undefined,
+        guestTeacherNames: guests.length > 0 ? guests : undefined,
       })
     } else if (ep.type === 'assignment') {
       setSelectedEvent({
@@ -874,8 +892,32 @@ export default function StudentCalendar() {
           <div
             ref={calendarCardRef}
             style={{ touchAction: 'pan-y' }}
-            className="hidden sm:block card p-0 overflow-hidden [&_.fc-toolbar]:flex-wrap [&_.fc-toolbar]:gap-y-2 [&_.fc-toolbar-title]:text-base [&_.fc-button]:text-xs [&_.fc-button]:px-2 [&_.fc-button]:py-1 sm:[&_.fc-button]:text-sm sm:[&_.fc-button]:px-3 sm:[&_.fc-button]:py-1.5 [&_.fc-timegrid-slot-label-cushion]:text-[10px] [&_.fc-timegrid-axis-cushion]:text-[10px] [&_.fc-timegrid-axis]:w-8 [&_.fc-col-header-cell-cushion]:text-xs [&_.fc-timegrid-axis-frame]:items-start [&_.fc-timegrid-axis-frame]:pt-1 [&_.fc-daygrid-week-number]:text-[9px] [&_.fc-daygrid-week-number]:leading-tight [&_.fc-daygrid-week-number]:p-0.5 [&_.fc-week-number]:w-5 [&_.fc-view-harness]:overflow-visible"
+            className="fc-student-cal hidden sm:block card p-0 overflow-hidden [&_.fc-toolbar]:flex-wrap [&_.fc-toolbar]:gap-y-2 [&_.fc-toolbar-title]:text-base [&_.fc-button]:text-xs [&_.fc-button]:px-2 [&_.fc-button]:py-1 sm:[&_.fc-button]:text-sm sm:[&_.fc-button]:px-3 sm:[&_.fc-button]:py-1.5 [&_.fc-timegrid-slot-label-cushion]:text-[10px] [&_.fc-timegrid-axis-cushion]:text-[10px] [&_.fc-timegrid-axis]:w-8 [&_.fc-col-header-cell-cushion]:text-xs [&_.fc-timegrid-axis-frame]:items-start [&_.fc-timegrid-axis-frame]:pt-1 [&_.fc-daygrid-week-number]:text-[9px] [&_.fc-daygrid-week-number]:leading-tight [&_.fc-daygrid-week-number]:p-0.5 [&_.fc-week-number]:w-5 [&_.fc-view-harness]:overflow-visible"
           >
+            <style>{`
+              .fc-student-cal .fc-daygrid-more-link { font-size: 10px !important; font-weight: 600 !important; }
+              .fc-student-cal .fc-popover {
+                z-index: 60 !important;
+                background: #18181b !important;
+                border: 1px solid rgba(255,255,255,.1) !important;
+                border-radius: 12px !important;
+                box-shadow: 0 20px 40px rgba(0,0,0,.5) !important;
+                overflow: hidden !important;
+                max-width: 260px !important;
+              }
+              .fc-student-cal .fc-popover-header {
+                background: #1f1f23 !important;
+                color: #e4e4e7 !important;
+                padding: 6px 10px !important;
+                font-size: 11px !important;
+                font-weight: 700 !important;
+              }
+              .fc-student-cal .fc-popover-close { color: #a1a1aa !important; opacity: .8 !important; }
+              .fc-student-cal .fc-popover-close:hover { opacity: 1 !important; }
+              .fc-student-cal .fc-popover-body { padding: 4px !important; max-height: 260px !important; overflow-y: auto !important; }
+              .fc-student-cal .fc-popover .fc-daygrid-event { border: none !important; border-radius: 6px !important; padding: 3px 6px !important; margin: 2px 0 !important; }
+              .fc-student-cal .fc-popover .fc-event-title { font-size: 12px !important; }
+            `}</style>
             <FullCalendar
               ref={calendarRef}
               plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -950,9 +992,8 @@ export default function StudentCalendar() {
                 if (info.event.extendedProps.isSynced) {
                   const ep = info.event.extendedProps
                   const subj = ep.subjectId ? subjects.find(s => s.id === ep.subjectId) : undefined
-                  const teachers = (ep.teacherIds as string[] ?? [])
-                    .map(tid => allUsers.find(u => u.uid === tid || u.id === tid)?.displayName)
-                    .filter(Boolean) as string[]
+                  const teachers = resolveTeacherNames(ep.teacherIds as string[])
+                  const guests   = resolveGuestTeacherNames(ep.guestTeacherIds as string[])
                   setSelectedEvent({
                     type: 'synced',
                     title: info.event.title.replace(/^📅 /, ''),
@@ -961,7 +1002,8 @@ export default function StudentCalendar() {
                     location:  ep.location,
                     subjectTitle: subj?.title,
                     subjectId: ep.subjectId ?? undefined,
-                    overrideTeachers: teachers.length > 0 ? teachers : undefined,
+                    teacherNames: teachers.length > 0 ? teachers : undefined,
+                    guestTeacherNames: guests.length > 0 ? guests : undefined,
                     overrideNotes: ep.notes ?? undefined,
                   })
                   return
@@ -992,6 +1034,8 @@ export default function StudentCalendar() {
                   // Live-lookup so we always have up-to-date subject data
                   const lesson  = lessons.find(l => l.id === lessonId)
                   const subject = lesson ? subjects.find(s => s.id === lesson.subjectId) : undefined
+                  const teachers = resolveTeacherNames(lesson?.teacherIds)
+                  const guests   = resolveGuestTeacherNames(lesson?.guestTeacherIds)
                   setSelectedEvent({
                     type: 'lesson',
                     lessonId,
@@ -1002,6 +1046,8 @@ export default function StudentCalendar() {
                     endTime:   info.event.end   ?? undefined,
                     subjectId:    subject?.id ?? p.subjectId ?? undefined,
                     subjectTitle: subject?.title ?? p.subjectTitle ?? undefined,
+                    teacherNames: teachers.length > 0 ? teachers : undefined,
+                    guestTeacherNames: guests.length > 0 ? guests : undefined,
                   })
                 } else if (p.type === 'assignment') {
                   setSelectedEvent({
@@ -1076,6 +1122,18 @@ export default function StudentCalendar() {
                       )}
                     </div>
                   )}
+                  {selectedEvent.teacherNames && selectedEvent.teacherNames.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-zinc-400">
+                      <span className="text-zinc-500">👤</span>
+                      <span>{selectedEvent.teacherNames.join(', ')}</span>
+                    </div>
+                  )}
+                  {selectedEvent.guestTeacherNames && selectedEvent.guestTeacherNames.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-zinc-400">
+                      <span className="text-zinc-500">🎤</span>
+                      <span>{selectedEvent.guestTeacherNames.join(', ')} <span className="text-zinc-600">(guest)</span></span>
+                    </div>
+                  )}
                   {selectedEvent.lessonId && (
                     <div className="pt-1 border-t border-white/8">
                       <LessonAttendancePanel
@@ -1113,10 +1171,16 @@ export default function StudentCalendar() {
                       )}
                     </div>
                   )}
-                  {selectedEvent.overrideTeachers && selectedEvent.overrideTeachers.length > 0 && (
+                  {selectedEvent.teacherNames && selectedEvent.teacherNames.length > 0 && (
                     <div className="flex items-center gap-2 text-sm text-zinc-400">
                       <span className="text-zinc-500">👤</span>
-                      <span>{selectedEvent.overrideTeachers.join(', ')}</span>
+                      <span>{selectedEvent.teacherNames.join(', ')}</span>
+                    </div>
+                  )}
+                  {selectedEvent.guestTeacherNames && selectedEvent.guestTeacherNames.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-zinc-400">
+                      <span className="text-zinc-500">🎤</span>
+                      <span>{selectedEvent.guestTeacherNames.join(', ')} <span className="text-zinc-600">(guest)</span></span>
                     </div>
                   )}
                   {selectedEvent.overrideNotes && (

@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
-import { collection, collectionGroup, getDocs, query, where } from 'firebase/firestore'
+import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
-  BarChart2, Package, TrendingUp, XCircle, AlertTriangle, Loader2, ArchiveRestore,
+  BarChart2, Package, TrendingUp, XCircle, AlertTriangle,
 } from 'lucide-react'
 import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, UserDoc } from '@/types'
 import './molkom.css'
@@ -38,231 +37,6 @@ function CohortBadge({ cohortId, cohorts }: { cohortId: string; cohorts: Record<
   )
 }
 
-export default function InventoryStats() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const navigate = useNavigate()
-  const activeTab = searchParams.get('tab') || 'most-borrowed'
-  const setTab = (t: string) => setSearchParams({ tab: t })
-
-  const [equipment, setEquipment] = useState<EquipmentDoc[]>([])
-  const [projects, setProjects]   = useState<InventoryProjectDoc[]>([])
-  const [allItems, setAllItems]   = useState<Item[]>([])
-  const [users, setUsers]         = useState<UserDoc[]>([])
-  const [loading, setLoading]     = useState(true)
-
-  useEffect(() => {
-    Promise.all([
-      getDocs(collection(db, 'equipment')),
-      getDocs(collection(db, 'inventory_projects')),
-      getDocs(collectionGroup(db, 'items')),
-      getDocs(query(collection(db, 'users'), where('role', 'in', ['student', 'teacher']))),
-    ]).then(([eSnap, pSnap, iSnap, uSnap]) => {
-      setEquipment(eSnap.docs.map(d => ({ id: d.id, ...d.data() } as EquipmentDoc)))
-      setProjects(pSnap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryProjectDoc)))
-      setAllItems(iSnap.docs.map(d => ({
-        id: d.id,
-        projectId: d.ref.parent.parent?.id ?? '',
-        ...d.data(),
-      } as Item)))
-      setUsers(uSnap.docs.map(d => ({ id: d.id, ...d.data() } as UserDoc)))
-      setLoading(false)
-    })
-  }, [])
-
-  const cohortNames = useMemo(() => {
-    const map: Record<string, string> = {}
-    users.forEach(u => { if (u.cohortId) map[u.cohortId] = u.cohortId })
-    return map
-  }, [users])
-
-  const projectMap = useMemo(() => {
-    const m: Record<string, InventoryProjectDoc> = {}
-    projects.forEach(p => { m[p.id] = p })
-    return m
-  }, [projects])
-
-  const itemsCheckedOut = allItems.filter(i => i.status === 'checked-out').length
-  const missingItems    = allItems.filter(i => i.status === 'missing').length
-  const damagedItems    = allItems.filter(i => i.status === 'damaged').length
-
-  const overdueItems = useMemo(() =>
-    allItems.filter(i => {
-      if (i.status !== 'checked-out') return false
-      const proj = projectMap[i.projectId]
-      return proj && proj.returnDate < today() && proj.returnDate
-    }),
-  [allItems, projectMap])
-
-  const overdueCount  = overdueItems.length
-  const manualItems   = allItems.filter(i => i.addonSessionId)
-
-  const tabsWithCounts = TABS.map(t => ({
-    ...t,
-    count:
-      t.id === 'overdue'  ? overdueCount :
-      t.id === 'damaged'  ? damagedItems :
-      t.id === 'missing'  ? missingItems :
-      t.id === 'manual'   ? manualItems.length :
-      t.id === 'projects' ? projects.length :
-      undefined,
-  }))
-
-  const statCards = [
-    { label: 'Total Equipment', value: equipment.length,    icon: <Package size={18} />,       color: '#60a5fa' },
-    { label: 'Currently Out',   value: itemsCheckedOut,      icon: <TrendingUp size={18} />,    color: '#f97316' },
-    { label: 'Total Projects',  value: projects.length,      icon: <BarChart2 size={18} />,     color: '#a78bfa' },
-    { label: 'Missing Items',   value: missingItems,         icon: <XCircle size={18} />,       color: '#f87171' },
-    { label: 'Damaged Items',   value: damagedItems,         icon: <AlertTriangle size={18} />, color: '#fbbf24' },
-  ]
-
-  return (
-    <div className="molkom-app" style={{ background: '#0a0a0f', minHeight: '100vh' }}>
-      <div className="inv-page">
-        {/* Page title */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <div className="inv-page-title">
-            <BarChart2 size={22} color="#f97316" />
-            Statistics
-          </div>
-        </div>
-
-        {/* Inventory nav tabs (mirrors InventoryPage) */}
-        <div className="inv-tabs">
-          {['Dashboard', 'All Projects', 'Equipment Status', 'Borrower Stats'].map(label => (
-            <button key={label} className="inv-tab" onClick={() => navigate('/admin/inventory')}>
-              {label}
-            </button>
-          ))}
-          <button className="inv-tab active">Statistics</button>
-        </div>
-
-        {loading && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4rem', gap: 12, color: '#6a6a80' }}>
-            <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
-            Loading statistics…
-          </div>
-        )}
-
-        {!loading && (
-          <>
-            {/* Stat cards */}
-            <div className="inv-stats-row" style={{ marginTop: '1.5rem' }}>
-              {statCards.map(c => (
-                <div key={c.label} className="inv-stat-card">
-                  <span style={{ color: c.color }}>{c.icon}</span>
-                  <div>
-                    <span className="inv-stat-value" style={{ color: '#f0f0f5' }}>{c.value}</span>
-                    <span className="inv-stat-label">{c.label}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Sub-tabs */}
-            <div style={{ display: 'flex', gap: 0, overflowX: 'auto', borderBottom: '1px solid rgba(255,255,255,.06)', marginTop: '1.5rem' }}>
-              {tabsWithCounts.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  style={{
-                    padding: '10px 16px', fontSize: '.8rem', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0,
-                    background: 'transparent', border: 'none', cursor: 'pointer', transition: 'all .15s',
-                    color: activeTab === t.id ? '#f97316' : '#6a6a80',
-                    borderBottom: activeTab === t.id ? '2px solid #f97316' : '2px solid transparent',
-                  }}
-                >
-                  {t.label}{t.count !== undefined ? ` (${t.count})` : ''}
-                </button>
-              ))}
-            </div>
-
-            {/* Tab content */}
-            <div style={{ marginTop: '1.5rem' }}>
-              {activeTab === 'most-borrowed' && <MostBorrowedTab allItems={allItems} />}
-              {activeTab === 'equipment-status' && <EquipmentStatusTab equipment={equipment} allItems={allItems} projectMap={projectMap} navigate={navigate} />}
-
-        {/* Overdue */}
-        {activeTab === 'overdue' && <SimpleItemsTab
-          items={overdueItems}
-          projectMap={projectMap}
-          columns={['Equipment', 'Project', 'Due Date', 'Days Overdue']}
-          renderRow={item => {
-            const proj = projectMap[item.projectId]
-            const days = proj ? Math.floor((Date.now() - new Date(proj.returnDate).getTime()) / 86400000) : 0
-            return [
-              item.equipmentName,
-              proj ? <button onClick={() => navigate('/admin/inventory')} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>{proj.name}</button> : '—',
-              <span style={{ color: '#f97316' }}>{proj ? formatDate(proj.returnDate) : '—'}</span>,
-              <span style={{ color: '#f87171', fontWeight: 700 }}>{days} day{days !== 1 ? 's' : ''}</span>,
-            ]
-          }}
-          emptyMsg="No overdue items"
-          borderColor="#f87171"
-        />}
-
-        {/* Damaged */}
-        {activeTab === 'damaged' && <SimpleItemsTab
-          items={allItems.filter(i => i.status === 'damaged')}
-          projectMap={projectMap}
-          columns={['Item Name', 'Project', 'Damage Notes']}
-          renderRow={item => {
-            const proj = projectMap[item.projectId]
-            return [
-              item.equipmentName,
-              proj ? <button onClick={() => navigate('/admin/inventory')} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>{proj.name}</button> : '—',
-              <span style={{ color: '#fbbf24', fontSize: '.8rem' }}>{item.damageNotes || '—'}</span>,
-            ]
-          }}
-          emptyMsg="No damaged items"
-          borderColor="#fbbf24"
-        />}
-
-        {/* Missing */}
-        {activeTab === 'missing' && <SimpleItemsTab
-          items={allItems.filter(i => i.status === 'missing')}
-          projectMap={projectMap}
-          columns={['Item Name', 'Project', 'Assigned To']}
-          renderRow={item => {
-            const proj = projectMap[item.projectId]
-            return [
-              item.equipmentName,
-              proj ? <button onClick={() => navigate('/admin/inventory')} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>{proj.name}</button> : '—',
-              item.assignedTo || '—',
-            ]
-          }}
-          emptyMsg="No missing items"
-          borderColor="#f87171"
-        />}
-
-        {/* Manual Checkouts */}
-        {activeTab === 'manual' && <SimpleItemsTab
-          items={manualItems}
-          projectMap={projectMap}
-          columns={['Item Name', 'Project', 'Added By', 'Date', 'Collected By']}
-          renderRow={item => {
-            const proj = projectMap[item.projectId]
-            return [
-              item.equipmentName,
-              proj ? <button onClick={() => navigate('/admin/inventory')} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>{proj.name}</button> : '—',
-              item.addonManager || '—',
-              item.addonDate ? formatDate(item.addonDate) : '—',
-              item.addonCollectedBy || '—',
-            ]
-          }}
-          emptyMsg="No manual checkouts"
-          borderColor="#a78bfa"
-        />}
-
-              {activeTab === 'borrowers' && <BorrowersTab users={users} projects={projects} allItems={allItems} cohortNames={cohortNames} />}
-              {activeTab === 'projects' && <ProjectsTab projects={projects} allItems={allItems} navigate={navigate} />}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
 function MostBorrowedTab({ allItems }: { allItems: Item[] }) {
   const sorted = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -290,12 +64,12 @@ function MostBorrowedTab({ allItems }: { allItems: Item[] }) {
 }
 
 function EquipmentStatusTab({
-  equipment, allItems, projectMap, navigate,
+  equipment, allItems, projectMap, onOpenProject,
 }: {
   equipment: EquipmentDoc[]
   allItems: Item[]
   projectMap: Record<string, InventoryProjectDoc>
-  navigate: (path: string) => void
+  onOpenProject: (id: string) => void
 }) {
   const [search, setSearch] = useState('')
   const filtered = equipment.filter(e => e.name?.toLowerCase().includes(search.toLowerCase()))
@@ -330,7 +104,7 @@ function EquipmentStatusTab({
                   <td style={{ padding: '.5rem .75rem' }}><span style={{ color }}>{dot} {label}</span></td>
                   <td style={{ padding: '.5rem .75rem', color: '#6a6a80' }}>
                     {proj
-                      ? <button onClick={() => navigate('/admin/inventory')} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>{proj.name}</button>
+                      ? <button onClick={() => onOpenProject(proj.id)} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>{proj.name}</button>
                       : '—'
                     }
                   </td>
@@ -447,11 +221,11 @@ function BorrowersTab({
 }
 
 function ProjectsTab({
-  projects, allItems, navigate,
+  projects, allItems, onOpenProject,
 }: {
   projects: InventoryProjectDoc[]
   allItems: Item[]
-  navigate: (path: string) => void
+  onOpenProject: (id: string) => void
 }) {
   const active   = projects.filter(p => ['active', 'checked-out'].includes(p.status))
   const archived = projects.filter(p => !['active', 'checked-out'].includes(p.status))
@@ -468,7 +242,7 @@ function ProjectsTab({
       p.status === 'returned'     ? '#60a5fa' : '#6b7280'
 
     return (
-      <tr style={{ borderBottom: '1px solid #1a1a25', cursor: 'pointer' }} onClick={() => navigate('/admin/inventory')}>
+      <tr style={{ borderBottom: '1px solid #1a1a25', cursor: 'pointer' }} onClick={() => onOpenProject(p.id)}>
         <td style={{ padding: '.5rem .75rem', color: '#f97316', fontWeight: 600 }}>{p.name}</td>
         <td style={{ padding: '.5rem .75rem', color: '#6a6a80', fontSize: '.78rem' }}>{(p.borrowers ?? []).slice(0, 3).join(', ')}{(p.borrowers?.length ?? 0) > 3 ? ` +${p.borrowers!.length - 3}` : ''}</td>
         <td style={{ padding: '.5rem .75rem', color: '#4a4a60', fontSize: '.75rem' }}>{p.checkoutDate ? `${p.checkoutDate} → ${p.returnDate}` : '—'}</td>
@@ -528,12 +302,13 @@ export function StatsContent({
   equipment,
   projects,
   allItems,
+  onOpenProject,
 }: {
   equipment: EquipmentDoc[]
   projects: InventoryProjectDoc[]
   allItems: Item[]
+  onOpenProject: (id: string) => void
 }) {
-  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('most-borrowed')
   const [users, setUsers] = useState<UserDoc[]>([])
 
@@ -567,7 +342,7 @@ export function StatsContent({
   [allItems, projectMap])
 
   const overdueCount = overdueItems.length
-  const manualItems  = allItems.filter(i => i.addonSessionId)
+  const manualItems  = allItems.filter(i => i.isManualEntry)
 
   const tabsWithCounts = TABS.map(t => ({
     ...t,
@@ -621,7 +396,7 @@ export function StatsContent({
 
       <div style={{ marginTop: '1.5rem' }}>
         {activeTab === 'most-borrowed' && <MostBorrowedTab allItems={allItems} />}
-        {activeTab === 'equipment-status' && <EquipmentStatusTab equipment={equipment} allItems={allItems} projectMap={projectMap} navigate={navigate} />}
+        {activeTab === 'equipment-status' && <EquipmentStatusTab equipment={equipment} allItems={allItems} projectMap={projectMap} onOpenProject={onOpenProject} />}
         {activeTab === 'overdue' && <SimpleItemsTab
           items={overdueItems}
           projectMap={projectMap}
@@ -631,7 +406,7 @@ export function StatsContent({
             const days = proj ? Math.floor((Date.now() - new Date(proj.returnDate).getTime()) / 86400000) : 0
             return [
               item.equipmentName,
-              proj ? <button onClick={() => navigate('/admin/inventory')} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>{proj.name}</button> : '—',
+              proj ? <button onClick={() => onOpenProject(proj.id)} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>{proj.name}</button> : '—',
               <span style={{ color: '#f97316' }}>{proj ? formatDate(proj.returnDate) : '—'}</span>,
               <span style={{ color: '#f87171', fontWeight: 700 }}>{days} day{days !== 1 ? 's' : ''}</span>,
             ]
@@ -647,7 +422,7 @@ export function StatsContent({
             const proj = projectMap[item.projectId]
             return [
               item.equipmentName,
-              proj ? <button onClick={() => navigate('/admin/inventory')} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>{proj.name}</button> : '—',
+              proj ? <button onClick={() => onOpenProject(proj.id)} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>{proj.name}</button> : '—',
               <span style={{ color: '#fbbf24', fontSize: '.8rem' }}>{item.damageNotes || '—'}</span>,
             ]
           }}
@@ -662,7 +437,7 @@ export function StatsContent({
             const proj = projectMap[item.projectId]
             return [
               item.equipmentName,
-              proj ? <button onClick={() => navigate('/admin/inventory')} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>{proj.name}</button> : '—',
+              proj ? <button onClick={() => onOpenProject(proj.id)} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>{proj.name}</button> : '—',
               item.assignedTo || '—',
             ]
           }}
@@ -672,22 +447,21 @@ export function StatsContent({
         {activeTab === 'manual' && <SimpleItemsTab
           items={manualItems}
           projectMap={projectMap}
-          columns={['Item Name', 'Project', 'Added By', 'Date', 'Collected By']}
+          columns={['Item Name', 'Project', 'Checked Out', 'Assigned To']}
           renderRow={item => {
             const proj = projectMap[item.projectId]
             return [
               item.equipmentName,
-              proj ? <button onClick={() => navigate('/admin/inventory')} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>{proj.name}</button> : '—',
-              item.addonManager || '—',
-              item.addonDate ? formatDate(item.addonDate) : '—',
-              item.addonCollectedBy || '—',
+              proj ? <button onClick={() => onOpenProject(proj.id)} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>{proj.name}</button> : '—',
+              item.checkoutTimestamp ? new Date(item.checkoutTimestamp).toLocaleString() : '—',
+              item.assignedTo || '—',
             ]
           }}
           emptyMsg="No manual checkouts"
           borderColor="#a78bfa"
         />}
         {activeTab === 'borrowers' && <BorrowersTab users={users} projects={projects} allItems={allItems} cohortNames={cohortNames} />}
-        {activeTab === 'projects'  && <ProjectsTab projects={projects} allItems={allItems} navigate={navigate} />}
+        {activeTab === 'projects'  && <ProjectsTab projects={projects} allItems={allItems} onOpenProject={onOpenProject} />}
       </div>
     </>
   )

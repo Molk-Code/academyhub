@@ -26,7 +26,7 @@ function EquipmentImg({ url, name, fallback }: { url: string | undefined | null;
   return <img src={optimizeImageUrl(url)} alt={name} onError={() => setFailed(true)} />
 }
 
-type InvTab = 'dashboard' | 'all-projects' | 'equipment-status' | 'borrower-stats' | 'statistics' | 'presets'
+type InvTab = 'dashboard' | 'all-projects' | 'borrower-stats' | 'statistics' | 'presets'
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -445,6 +445,8 @@ function ProjectDetail({
       status: 'checked-out',
       damageNotes: '',
       assignedTo: project.borrowers?.[0] ?? '',
+      // Typed by name, not chosen from the catalog picker — tracked separately in Statistics
+      ...(equipmentId ? {} : { isManualEntry: true }),
     })
     setManualInput('')
   }
@@ -1338,7 +1340,6 @@ export default function InventoryPage() {
           {([
             ['dashboard', 'Dashboard'],
             ['all-projects', 'All Projects'],
-            ['equipment-status', 'Equipment Status'],
             ['borrower-stats', 'Borrower Stats'],
             ['statistics', 'Statistics'],
             ['presets', 'Project Presets'],
@@ -1453,49 +1454,11 @@ export default function InventoryPage() {
           </div>
         )}
 
-        {/* Equipment Status tab */}
-        {tab === 'equipment-status' && (
-          <div className="inv-section">
-            <div className="inv-section-title"><Package size={18} /> Equipment Status</div>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #2a2a3a' }}>
-                    {['Name', 'Category', 'Out', 'Returned', 'Missing', 'Damaged', 'Catalog'].map(h => (
-                      <th key={h} style={{ textAlign: 'left', padding: '.5rem .75rem', color: '#6a6a80', fontWeight: 600 }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {equipment.filter(e => e.isActive).sort((a, b) => a.name.localeCompare(b.name)).map(e => {
-                    const eItems = allItems.filter(i => i.equipmentName === e.name || i.equipmentId === e.id)
-                    const out      = eItems.filter(i => i.status === 'checked-out').length
-                    const returned = eItems.filter(i => i.status === 'returned').length
-                    const missing  = eItems.filter(i => i.status === 'missing').length
-                    const damaged  = eItems.filter(i => i.status === 'damaged').length
-                    return (
-                      <tr key={e.id} style={{ borderBottom: '1px solid #1a1a25' }}>
-                        <td style={{ padding: '.5rem .75rem', color: '#f0f0f5' }}>{e.name}</td>
-                        <td style={{ padding: '.5rem .75rem', color: '#4cd964', fontSize: '.7rem', fontWeight: 700 }}>{e.category}</td>
-                        <td style={{ padding: '.5rem .75rem', color: out > 0 ? '#f97316' : '#4a4a60' }}>{out || '—'}</td>
-                        <td style={{ padding: '.5rem .75rem', color: returned > 0 ? '#4cd964' : '#4a4a60' }}>{returned || '—'}</td>
-                        <td style={{ padding: '.5rem .75rem', color: missing > 0 ? '#ff4757' : '#4a4a60', fontWeight: missing > 0 ? 700 : 400 }}>{missing || '—'}</td>
-                        <td style={{ padding: '.5rem .75rem', color: damaged > 0 ? '#ffa502' : '#4a4a60', fontWeight: damaged > 0 ? 700 : 400 }}>{damaged || '—'}</td>
-                        <td style={{ padding: '.5rem .75rem', color: e.available === 0 ? '#ff4757' : '#a0a0b5' }}>{e.available}/{e.totalQuantity}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
         {/* Borrower Stats tab */}
         {tab === 'borrower-stats' && <BorrowerStats projects={projects} allItems={allItems} />}
 
         {/* Statistics tab */}
-        {tab === 'statistics' && <StatsContent equipment={equipment} projects={projects} allItems={allItems} />}
+        {tab === 'statistics' && <StatsContent equipment={equipment} projects={projects} allItems={allItems} onOpenProject={setSelectedProjectId} />}
 
         {/* Presets tab */}
         {tab === 'presets' && <PresetsManager />}

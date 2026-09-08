@@ -434,6 +434,7 @@ export interface InventoryItemDoc {
   addonDate?: string
   addonCollectedBy?: string
   addonManager?: string
+  isManualEntry?: boolean
 }
 
 export interface InventoryPresetItem {

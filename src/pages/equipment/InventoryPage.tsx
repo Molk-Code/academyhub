@@ -833,8 +833,12 @@ function CreateProjectForm({
 
   useEffect(() => {
     async function load() {
-      const sq = await getDocs(query(collection(db, 'users'), where('role', '==', 'student')))
-      setStudents(sq.docs.map(d => ({ id: d.id, ...d.data() } as UserDoc)))
+      const sq = await getDocs(query(collection(db, 'users'), where('roles', 'array-contains', 'student')))
+      setStudents(
+        sq.docs
+          .map(d => ({ id: d.id, ...d.data() } as UserDoc))
+          .sort((a, b) => (a.displayName ?? '').localeCompare(b.displayName ?? '')),
+      )
       const tq = await getDocs(query(collection(db, 'users'), where('role', 'in', ['teacher', 'admin'])))
       setTeachers(tq.docs.map(d => ({ id: d.id, ...d.data() } as UserDoc)))
     }

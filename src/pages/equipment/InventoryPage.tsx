@@ -513,7 +513,10 @@ function ProjectDetail({
       })),
     }))
     win.document.close()
-    win.print()
+    let printed = false
+    const doPrint = () => { if (printed) return; printed = true; win.print() }
+    win.addEventListener('load', doPrint)
+    setTimeout(doPrint, 500)
   }
 
   const itemStatusClass = (s: string) =>

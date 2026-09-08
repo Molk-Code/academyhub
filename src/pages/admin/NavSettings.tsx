@@ -32,9 +32,9 @@ const FEATURES: Feature[] = [
   { id: 'production',       label: 'Production',          icon: Clapperboard,    student: true,  teacher: true  },
   { id: 'prizes',           label: 'Prizes',              icon: Trophy,          student: true,  teacher: true  },
   { id: 'resources',        label: 'Resources',           icon: FolderOpen,      student: true,  teacher: true  },
-  { id: 'booking',          label: 'Room Booking',        icon: DoorOpen,        student: true,  teacher: true  },
   { id: 'guide',            label: 'School Guide',        icon: BookMarked,      student: true,  teacher: true  },
   { id: 'productionPeriod', label: 'Production Period',   icon: CalendarRange,   student: true,  teacher: true  },
+  { id: 'roomBooking',      label: 'Booking – Room',      icon: DoorOpen,        student: true,  teacher: true  },
   // ── Teacher only ─────────────────────────────────────────────────────────────
   { id: 'students',         label: 'Students',            icon: Users,           student: false, teacher: true  },
   { id: 'notebook',         label: 'Notebook',            icon: BookMarked,      student: false, teacher: true  },
@@ -52,7 +52,6 @@ const FEATURES: Feature[] = [
   { id: 'equipment',        label: 'Equipment Booking',   icon: Package,         student: true,  teacher: false },
   { id: 'myPlan',           label: 'My Plan',             icon: ListChecks,      student: true,  teacher: false },
   { id: 'points',           label: 'Points',              icon: Trophy,          student: true,  teacher: false },
-  { id: 'roomBooking',      label: 'Booking – Room',      icon: DoorOpen,        student: true,  teacher: false },
   { id: 'foodBox',          label: 'Booking – Food Box',  icon: UtensilsCrossed, student: true,  teacher: false },
   { id: 'vehicle',          label: 'Booking – Vehicle',   icon: Car,             student: true,  teacher: false },
   { id: 'myBookings',       label: 'My Bookings',         icon: ClipboardCheck, student: true,  teacher: false },

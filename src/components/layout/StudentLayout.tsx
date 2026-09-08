@@ -302,10 +302,10 @@ export default function StudentLayout() {
         ) : null}
 
         {/* Booking group — only render if at least one item is visible */}
-        {(vis?.['myBookings'] !== false) || (canBooking && vis?.['booking'] !== false) || (canEquipment && vis?.['equipment'] !== false) || (canVehicles && vis?.['vehicle'] !== false) || (canFoodBox && vis?.['foodBox'] !== false) ? (
+        {(vis?.['myBookings'] !== false) || (canBooking && vis?.['roomBooking'] !== false) || (canEquipment && vis?.['equipment'] !== false) || (canVehicles && vis?.['vehicle'] !== false) || (canFoodBox && vis?.['foodBox'] !== false) ? (
           <SidebarGroup label="Booking" icon="📦" defaultOpen={false}>
             {vis?.['myBookings'] !== false && <NavItem to="/my-bookings"       icon={ClipboardCheck} label="My Bookings"  onNavigate={onNavigate} />}
-            {canBooking   && vis?.['booking']   !== false && <NavItem to="/booking"           icon={DoorOpen}       label="Room Booking" showBooking end onNavigate={onNavigate} />}
+            {canBooking   && vis?.['roomBooking'] !== false && <NavItem to="/booking"           icon={DoorOpen}       label="Room Booking" showBooking end onNavigate={onNavigate} />}
             {canEquipment && vis?.['equipment'] !== false && <NavItem to="/booking/equipment" icon={Package}         label="Equipment"    onNavigate={onNavigate} />}
             {canVehicles  && vis?.['vehicle']   !== false && <NavItem to="/vehicles"          icon={Car}             label="Vehicles"     onNavigate={onNavigate} />}
             {canFoodBox   && vis?.['foodBox']   !== false && <NavItem to="/food-boxes"        icon={UtensilsCrossed} label="Food Boxes"   onNavigate={onNavigate} />}

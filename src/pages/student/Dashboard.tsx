@@ -869,7 +869,7 @@ export default function StudentDashboard() {
       {(() => {
         const quickLinks = [
           navVis?.student?.['checkin'] !== false && { to: '/checkin', bg: 'bg-brand-600 hover:bg-brand-700', icon: '📷', label: 'Check In' },
-          navVis?.student?.['booking'] !== false && { to: '/booking', bg: 'bg-sky-500 hover:bg-sky-600', icon: '🚪', label: 'Book Room' },
+          navVis?.student?.['roomBooking'] !== false && { to: '/booking', bg: 'bg-sky-500 hover:bg-sky-600', icon: '🚪', label: 'Book Room' },
           navVis?.student?.['guide']   !== false && { to: '/guide',   bg: 'bg-amber-500 hover:bg-amber-600', icon: '📖', label: 'Guide' },
         ].filter(Boolean) as { to: string; bg: string; icon: string; label: string }[]
         if (!quickLinks.length) return null

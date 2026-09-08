@@ -188,7 +188,7 @@
 .molkom-app .project-card-meta-item{display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:#6a6a80}
 .molkom-app .project-card-footer{display:flex;align-items:center;justify-content:space-between;padding-top:.75rem;border-top:1px solid #2a2a3a;font-size:.8rem;color:#a0a0b5}
 .molkom-app .project-status-badge{padding:.2rem .6rem;border-radius:50px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
-.molkom-app .status-active{background:rgba(242,100,25,.15);color:#f26419}
+.molkom-app .status-active{background:rgba(76,217,100,.15);color:#4cd964}
 .molkom-app .status-checkout{background:rgba(0,122,255,.15);color:#4da6ff}
 .molkom-app .status-returned{background:rgba(100,100,120,.15);color:#a0a0b5}
 .molkom-app .status-archived{background:rgba(100,100,120,.1);color:#6a6a80}
@@ -248,8 +248,8 @@
 .molkom-app .item-status-damaged{background:rgba(255,165,2,.15);color:#ffa502}
 .molkom-app .item-status-missing{background:rgba(255,71,87,.15);color:#ff4757}
 .molkom-app .item-action-btns{display:flex;gap:.25rem;flex-shrink:0}
-.molkom-app .item-return-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:#f26419;cursor:pointer;background:none;border:none;transition:all .25s ease}
-.molkom-app .item-return-btn:hover{background:rgba(242,100,25,.15);transform:scale(1.1)}
+.molkom-app .item-return-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:#4cd964;cursor:pointer;background:none;border:none;transition:all .25s ease}
+.molkom-app .item-return-btn:hover{background:rgba(76,217,100,.15);transform:scale(1.1)}
 .molkom-app .item-damage-toggle-btn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:4px;color:#6a6a80;cursor:pointer;background:none;border:none;transition:all .25s ease}
 .molkom-app .item-damage-toggle-btn:hover{background:rgba(255,165,2,.15);color:#ffa502}
 .molkom-app .item-missing-btn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:4px;color:#6a6a80;cursor:pointer;background:none;border:none;transition:all .25s ease}

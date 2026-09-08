@@ -5,7 +5,7 @@ import { useDocument } from '@/hooks/useFirestore'
 import {
   BarChart2, Package, TrendingUp, XCircle, AlertTriangle,
 } from 'lucide-react'
-import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, UserDoc } from '@/types'
+import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, UserDoc, CohortDoc } from '@/types'
 import './molkom.css'
 
 type Item = InventoryItemDoc & { projectId: string }
@@ -354,11 +354,14 @@ export function StatsContent({
 }) {
   const [activeTab, setActiveTab] = useState('most-borrowed')
   const [users, setUsers] = useState<UserDoc[]>([])
+  const [cohorts, setCohorts] = useState<CohortDoc[]>([])
   const { data: resets } = useDocument<{ id: string } & Record<string, Timestamp | undefined>>('settings', 'inventory_stats_resets')
 
   useEffect(() => {
     getDocs(query(collection(db, 'users'), where('role', 'in', ['student', 'teacher'])))
       .then(snap => setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserDoc))))
+    getDocs(collection(db, 'cohorts'))
+      .then(snap => setCohorts(snap.docs.map(d => ({ id: d.id, ...d.data() } as CohortDoc))))
   }, [])
 
   const projectMap = useMemo(() => {
@@ -369,9 +372,9 @@ export function StatsContent({
 
   const cohortNames = useMemo(() => {
     const map: Record<string, string> = {}
-    users.forEach(u => { if (u.cohortId) map[u.cohortId] = u.cohortId })
+    cohorts.forEach(c => { map[c.id] = c.name })
     return map
-  }, [users])
+  }, [cohorts])
 
   const cutoffMs = (tabId: string) => resets?.[tabId]?.toMillis?.() ?? 0
   const afterCutoff = (tabId: string, iso: string) => {

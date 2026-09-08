@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
 import { Film, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react'
-import { doc, getDoc, getDocs, updateDoc, setDoc, deleteDoc, serverTimestamp, collection, query, where, arrayUnion } from 'firebase/firestore'
+import { doc, getDoc, getDocs, updateDoc, setDoc, deleteDoc, serverTimestamp, collection, query, where, arrayUnion, increment } from 'firebase/firestore'
 import { createUserWithEmailAndPassword as createUser, updateProfile as updateFbProfile } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -13,6 +13,7 @@ import { useSchool } from '@/contexts/SchoolContext'
 
 const schema = z.object({
   displayName: z.string().min(2, 'Enter your full name'),
+  email: z.string().email('Enter a valid email address'),
   password: z
     .string()
     .min(8, 'At least 8 characters')
@@ -35,14 +36,23 @@ interface Invitation {
   expiresAt?: { toDate: () => Date }
 }
 
+interface ClassInvite {
+  cohortId: string
+  cohortName: string
+  role: string
+  active: boolean
+}
+
 export default function AcceptInvite() {
   const [params]   = useSearchParams()
   const token      = params.get('token') ?? ''
+  const classToken = params.get('class') ?? ''
   const navigate   = useNavigate()
   const { refreshToken } = useAuth()
   const { shortName } = useSchool()
 
   const [invite,       setInvite]       = useState<Invitation | null>(null)
+  const [classInvite,  setClassInvite]  = useState<ClassInvite | null>(null)
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState('')
   const [showPw,       setShowPw]       = useState(false)
@@ -55,33 +65,51 @@ export default function AcceptInvite() {
   })
 
   useEffect(() => {
-    if (!token) { setLoading(false); return }
-    getDoc(doc(db, 'invitations', token)).then(snap => {
-      if (snap.exists()) {
-        const data = snap.data() as Invitation
-        if (data.used) {
-          setError('This invite link has already been used.')
-        } else if (data.expiresAt && data.expiresAt.toDate() < new Date()) {
-          setError('This invite link has expired.')
+    if (token) {
+      getDoc(doc(db, 'invitations', token)).then(snap => {
+        if (snap.exists()) {
+          const data = snap.data() as Invitation
+          if (data.used) {
+            setError('This invite link has already been used.')
+          } else if (data.expiresAt && data.expiresAt.toDate() < new Date()) {
+            setError('This invite link has expired.')
+          } else {
+            setInvite(data)
+            setValue('email', data.email)
+            if (data.displayName) setValue('displayName', data.displayName)
+          }
         } else {
-          setInvite(data)
-          if (data.displayName) setValue('displayName', data.displayName)
+          setError('Invalid or expired invite link.')
         }
-      } else {
-        setError('Invalid or expired invite link.')
-      }
+        setLoading(false)
+      }).catch(() => {
+        setError('Failed to load invite. Check your connection and try again.')
+        setLoading(false)
+      })
+    } else if (classToken) {
+      getDoc(doc(db, 'classInvites', classToken)).then(snap => {
+        if (snap.exists() && (snap.data() as ClassInvite).active) {
+          setClassInvite(snap.data() as ClassInvite)
+        } else {
+          setError('This class invite is no longer active. Ask your teacher for a new one.')
+        }
+        setLoading(false)
+      }).catch(() => {
+        setError('Failed to load invite. Check your connection and try again.')
+        setLoading(false)
+      })
+    } else {
       setLoading(false)
-    }).catch(() => {
-      setError('Failed to load invite. Check your connection and try again.')
-      setLoading(false)
-    })
-  }, [token])
+    }
+  }, [token, classToken])
 
   async function onSubmit(data: FormData) {
-    if (!invite) return
+    if (!invite && !classInvite) return
     setError('')
+    const role     = invite ? invite.role : 'student'
+    const cohortId = invite ? invite.cohortId : classInvite!.cohortId
     // Firebase Auth normalizes token.email to lowercase — invitation update rule compares against it
-    const normalizedEmail = invite.email.trim().toLowerCase()
+    const normalizedEmail = data.email.trim().toLowerCase()
     let cred: Awaited<ReturnType<typeof createUser>> | null = null
     let stage = 'init'
     try {
@@ -107,10 +135,10 @@ export default function AcceptInvite() {
         uid:                cred.user.uid,
         email:              normalizedEmail,
         displayName:        data.displayName,
-        role:               invite.role,
-        roles:              [invite.role],
+        role,
+        roles:              [role],
         avatarUrl:          null,
-        cohortId:           invite.cohortId,
+        cohortId,
         enrolledAt:         serverTimestamp(),
         totalPoints:        0,
         pointsRedeemed:     0,
@@ -131,7 +159,11 @@ export default function AcceptInvite() {
       stage = 'mark-invite-used'
       try {
         await cred.user.getIdToken(true)
-        await updateDoc(doc(db, 'invitations', token), { used: true })
+        if (invite) {
+          await updateDoc(doc(db, 'invitations', token), { used: true })
+        } else {
+          await updateDoc(doc(db, 'classInvites', classToken), { useCount: increment(1) })
+        }
       } catch (err) {
         console.warn('mark-invite-used failed (continuing anyway):', err)
       }
@@ -139,10 +171,10 @@ export default function AcceptInvite() {
       // For teacher invites with a cohort, add them to the cohort's teacherIds.
       // Best-effort — a fresh teacher account has no admin/teacher claim yet, so the
       // cohorts write rule may reject it. The onUserCreate Cloud Function reconciles later.
-      if (invite.role === 'teacher' && invite.cohortId) {
+      if (invite && role === 'teacher' && cohortId) {
         try {
           stage = 'add-teacher-to-cohort'
-          await updateDoc(doc(db, 'cohorts', invite.cohortId), {
+          await updateDoc(doc(db, 'cohorts', cohortId), {
             teacherIds: arrayUnion(cred.user.uid),
           })
         } catch (err) {
@@ -161,9 +193,9 @@ export default function AcceptInvite() {
       }
       setDone(true)
       setTimeout(() => {
-        if (invite.role === 'admin')        navigate('/admin/users')
-        else if (invite.role === 'teacher') navigate('/teacher')
-        else                                navigate('/dashboard')
+        if (role === 'admin')        navigate('/admin/users')
+        else if (role === 'teacher') navigate('/teacher')
+        else                         navigate('/dashboard')
       }, 1500)
     } catch (e: unknown) {
       const raw = e instanceof Error ? e.message : String(e)
@@ -202,6 +234,9 @@ export default function AcceptInvite() {
             {invite && (
               <p className="text-sm text-zinc-500 mt-1">Creating account for <strong>{invite.email}</strong></p>
             )}
+            {classInvite && (
+              <p className="text-sm text-zinc-500 mt-1">Joining class <strong>{classInvite.cohortName}</strong></p>
+            )}
           </div>
 
           {done ? (
@@ -210,7 +245,7 @@ export default function AcceptInvite() {
               <p className="font-semibold text-zinc-200">Account created!</p>
               <p className="text-sm text-zinc-500 mt-1">Redirecting you now…</p>
             </div>
-          ) : error && !invite ? (
+          ) : error && !invite && !classInvite ? (
             <div className="flex items-center gap-2 p-4 bg-rose-950/40 border border-rose-800/50 rounded-xl">
               <AlertCircle className="w-5 h-5 text-rose-500" />
               <p className="text-sm text-rose-600">{error}</p>
@@ -296,6 +331,14 @@ export default function AcceptInvite() {
                 <input {...register('displayName')} className="input" placeholder="Jane Doe" autoComplete="name" style={{ fontSize: 16 }} />
                 {errors.displayName && <p className="text-xs text-rose-500 mt-1">{errors.displayName.message}</p>}
               </div>
+
+              {classInvite && (
+                <div>
+                  <label className="label">Email</label>
+                  <input {...register('email')} type="email" className="input" placeholder="you@school.com" autoComplete="email" style={{ fontSize: 16 }} />
+                  {errors.email && <p className="text-xs text-rose-500 mt-1">{errors.email.message}</p>}
+                </div>
+              )}
 
               <div>
                 <label className="label">Password</label>

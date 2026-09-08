@@ -118,6 +118,17 @@ export interface CohortDoc {
   color?: string
 }
 
+export interface ClassInviteDoc {
+  id: string
+  cohortId: string
+  cohortName: string
+  role: 'student'
+  active: boolean
+  createdBy: string
+  createdAt: Timestamp
+  useCount?: number
+}
+
 export interface SubjectResource {
   id: string
   type: 'link' | 'file'

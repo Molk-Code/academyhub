@@ -8,8 +8,10 @@ import { auth } from '@/lib/firebase'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
 import { useCollection, where } from '@/hooks/useFirestore'
-import type { UserDoc, CohortDoc } from '@/types'
-import { Copy, Check, UserPlus, UserX, UserCheck, Mail, ShieldCheck, Trash2, KeyRound, X, Users, ClipboardCopy, ChevronDown, ChevronUp, RotateCcw, Link } from 'lucide-react'
+import type { UserDoc, CohortDoc, ClassInviteDoc } from '@/types'
+import { useAuth } from '@/contexts/AuthContext'
+import { Copy, Check, UserPlus, UserX, UserCheck, Mail, ShieldCheck, Trash2, KeyRound, X, Users, ClipboardCopy, ChevronDown, ChevronUp, RotateCcw, Link, QrCode, Download, Ban } from 'lucide-react'
+import { QRCodeCanvas } from 'qrcode.react'
 import Avatar from '@/components/common/Avatar'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 
@@ -48,10 +50,16 @@ export default function UserManager() {
   const [assignCohort,      setAssignCohort]      = useState('')
   const [assigning,         setAssigning]         = useState(false)
   const [assignedMsg,       setAssignedMsg]       = useState('')
+  const [qrOpen,            setQrOpen]            = useState(false)
+  const [qrCohortId,        setQrCohortId]        = useState<string | null>(null)
+  const [qrLoading,         setQrLoading]         = useState(false)
 
+  const { profile } = useAuth()
   const { data: users,       loading } = useCollection<UserDoc>('users')
   const { data: cohorts }              = useCollection<CohortDoc>('cohorts')
   const { data: invitations }          = useCollection<Invitation>('invitations')
+  const { data: classInvites }         = useCollection<ClassInviteDoc>('classInvites')
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null)
 
   // Self-heal: strip 'student' from any teacher/admin's roles array on first load
   const healedRef = useRef<Set<string>>(new Set())
@@ -191,6 +199,57 @@ export default function UserManager() {
 
   async function deleteInvite(invId: string) {
     await deleteDoc(doc(db, 'invitations', invId))
+  }
+
+  async function openClassQr(cohortId: string) {
+    setQrCohortId(cohortId)
+    setQrOpen(true)
+    const existing = classInvites.find(ci => ci.cohortId === cohortId && ci.active)
+    if (existing) return
+    setQrLoading(true)
+    try {
+      const cohort = cohorts.find(c => c.id === cohortId)
+      await addDoc(collection(db, 'classInvites'), {
+        cohortId,
+        cohortName: cohort?.name ?? '',
+        role: 'student',
+        active: true,
+        createdBy: profile?.uid ?? '',
+        createdAt: serverTimestamp(),
+        useCount: 0,
+      })
+    } finally {
+      setQrLoading(false)
+    }
+  }
+
+  async function regenerateClassQr(oldInviteId: string, cohortId: string) {
+    if (!confirm('Regenerate this QR code? The old one will stop working.')) return
+    setQrLoading(true)
+    try {
+      await updateDoc(doc(db, 'classInvites', oldInviteId), { active: false })
+      const cohort = cohorts.find(c => c.id === cohortId)
+      await addDoc(collection(db, 'classInvites'), {
+        cohortId,
+        cohortName: cohort?.name ?? '',
+        role: 'student',
+        active: true,
+        createdBy: profile?.uid ?? '',
+        createdAt: serverTimestamp(),
+        useCount: 0,
+      })
+    } finally {
+      setQrLoading(false)
+    }
+  }
+
+  function downloadClassQr(cohortName: string) {
+    const canvas = qrCanvasRef.current
+    if (!canvas) return
+    const link = document.createElement('a')
+    link.download = `${cohortName.replace(/\s+/g, '-').toLowerCase()}-invite-qr.png`
+    link.href = canvas.toDataURL('image/png')
+    link.click()
   }
 
   async function toggleSecondaryRole(user: UserDoc, secondaryRole: 'teacher' | 'admin') {
@@ -432,6 +491,85 @@ export default function UserManager() {
           </div>
         )}
       </div>
+
+      {/* Class invite QR codes — one reusable, multi-scan QR per class */}
+      {cohorts.length > 0 && (
+        <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 space-y-4 shadow-sm">
+          <h2 className="text-base font-semibold text-zinc-200 flex items-center gap-2">
+            <QrCode className="w-5 h-5 text-brand-500" /> Class Invite QR Codes
+            <span className="text-xs font-normal text-zinc-500">— scan to self-register into a class</span>
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {cohorts.slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => (
+              <button
+                key={c.id}
+                onClick={() => openClassQr(c.id)}
+                className="flex items-center gap-2 text-sm px-3 py-2 rounded-xl bg-zinc-800 text-zinc-200 hover:bg-zinc-700 transition-colors"
+              >
+                <QrCode className="w-4 h-4 text-brand-400" /> {c.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Class QR modal */}
+      {qrOpen && qrCohortId && (() => {
+        const cohort = cohorts.find(c => c.id === qrCohortId)
+        const invite = classInvites.find(ci => ci.cohortId === qrCohortId && ci.active)
+        const url = invite ? `${window.location.origin}/accept-invite?class=${invite.id}` : ''
+        return (
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setQrOpen(false)}>
+            <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm space-y-4" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold text-zinc-100">{cohort?.name ?? 'Class'} invite QR</h3>
+                <button onClick={() => setQrOpen(false)} className="p-1 text-zinc-400 hover:text-zinc-200 transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {qrLoading || !invite ? (
+                <div className="flex justify-center py-10"><LoadingSpinner /></div>
+              ) : (
+                <>
+                  <p className="text-xs text-zinc-500">
+                    Anyone who scans this is taken to the registration page and automatically placed in <strong className="text-zinc-300">{cohort?.name}</strong> as a student.
+                  </p>
+                  <div className="flex justify-center bg-white p-3 rounded-xl">
+                    <QRCodeCanvas ref={qrCanvasRef} value={url} size={220} level="H" />
+                  </div>
+                  <p className="text-xs text-zinc-500 text-center">Used {invite.useCount ?? 0} time{(invite.useCount ?? 0) === 1 ? '' : 's'}</p>
+                  <div className="bg-white/5 rounded-xl p-3 flex items-center gap-2">
+                    <code className="text-xs text-orange-400 flex-1 min-w-0 truncate">{url}</code>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(url); showToast('Link copied!') }}
+                      className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors flex-shrink-0"
+                      title="Copy link"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => downloadClassQr(cohort?.name ?? 'class')}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-xl bg-zinc-800 text-zinc-200 hover:bg-zinc-700 transition-colors"
+                    >
+                      <Download className="w-4 h-4" /> Download PNG
+                    </button>
+                    <button
+                      onClick={() => regenerateClassQr(invite.id, qrCohortId)}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-xl bg-zinc-800 text-rose-400 hover:bg-rose-950/40 transition-colors"
+                      title="Old QR stops working"
+                    >
+                      <Ban className="w-4 h-4" /> Regenerate
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Pending invites — grouped by cohort / role, sorted alphabetically */}
       {activeInvites.length > 0 && (() => {

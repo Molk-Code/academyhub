@@ -196,6 +196,16 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used']);
     }
 
+    // Reusable, class-scoped QR invite — many students may register through the same
+    // invite doc, so unlike /invitations there is no single-email binding or used flag.
+    match /classInvites/{inviteId} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create, delete: if isTeacherOrAdmin();
+      allow update: if isTeacherOrAdmin()
+        || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['useCount']));
+    }
+
     // ── Global settings (school day hours, etc.) ──────────────────────────────
     // settings/booking is publicly readable for the unauthenticated iPad kiosk display.
 

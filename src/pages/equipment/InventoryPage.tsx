@@ -81,7 +81,6 @@ function EquipmentPicker({
   const [cat, setCat] = useState('ALL')
 
   const cats = ['ALL', 'CAMERA', 'GRIP', 'LIGHTS', 'SOUND', 'LOCATION', 'BOOKS', 'OTHER']
-  const totalPicked = pickedCounts ? Object.values(pickedCounts).reduce((s, n) => s + n, 0) : 0
 
   const filtered = active.filter(e => {
     if (cat !== 'ALL' && e.category !== cat) return false
@@ -94,15 +93,7 @@ function EquipmentPicker({
       <div className="equip-picker-modal">
         <div className="equip-picker-header">
           <h3>Add Equipment</h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-            {pickedCounts && totalPicked > 0 && (
-              <span className="active-filter">{totalPicked} added</span>
-            )}
-            {pickedCounts && (
-              <button className="manual-add-btn" onClick={onClose}>Done</button>
-            )}
-            <button className="equip-picker-close" onClick={onClose}><X size={20} /></button>
-          </div>
+          <button className="equip-picker-close" onClick={onClose}><X size={20} /></button>
         </div>
         <div className="equip-picker-search">
           <Search size={16} />
@@ -1156,7 +1147,7 @@ function PresetsManager() {
           {showPicker && (
             <EquipmentPicker
               onClose={() => setShowPicker(false)}
-              onPick={item => addPickedItem(item)}
+              onPick={item => { setShowPicker(false); addPickedItem(item) }}
               pickedCounts={Object.fromEntries(items.map(i => [i.equipmentId, i.quantity]))}
             />
           )}

@@ -7,11 +7,11 @@ import {
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection } from '@/hooks/useFirestore'
-import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, UserDoc } from '@/types'
+import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, InventoryPresetDoc, InventoryPresetItem, UserDoc } from '@/types'
 import {
-  Package, Calendar, Users, Clock, AlertTriangle, Check, Trash2, Plus,
+  Package, Calendar, Users, Clock, AlertTriangle, Check, Trash2, Plus, Minus,
   ChevronDown, ChevronRight, ArrowLeft, Edit2, CheckCircle2, ArchiveRestore,
-  Layers, Search, X, ZapOff, Scan, Smartphone, QrCode,
+  Layers, Search, X, ZapOff, Scan, Smartphone, QrCode, ClipboardList, Pencil,
 } from 'lucide-react'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { NotFoundException } from '@zxing/library'
@@ -26,7 +26,7 @@ function EquipmentImg({ url, name, fallback }: { url: string | undefined | null;
   return <img src={optimizeImageUrl(url)} alt={name} onError={() => setFailed(true)} />
 }
 
-type InvTab = 'dashboard' | 'all-projects' | 'equipment-status' | 'borrower-stats' | 'statistics'
+type InvTab = 'dashboard' | 'all-projects' | 'equipment-status' | 'borrower-stats' | 'statistics' | 'presets'
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -71,7 +71,7 @@ function EquipmentPicker({
   onPick,
 }: {
   onClose: () => void
-  onPick: (name: string) => void
+  onPick: (item: { id: string; name: string }) => void
 }) {
   const { data: equipment } = useCollection<EquipmentDoc>('equipment')
   const active = equipment.filter(e => e.isActive).sort((a, b) => a.name.localeCompare(b.name))
@@ -115,7 +115,7 @@ function EquipmentPicker({
         </div>
         <div className="equip-picker-grid">
           {filtered.map(e => (
-            <button key={e.id} className="equip-picker-card" onClick={() => onPick(e.name)}>
+            <button key={e.id} className="equip-picker-card" onClick={() => onPick({ id: e.id, name: e.name })}>
               <div className="equip-picker-img">
                 <EquipmentImg
                   url={e.imageUrl}
@@ -423,10 +423,10 @@ function ProjectDetail({
     }
   }
 
-  async function addItemManual(name: string) {
+  async function addItemManual(name: string, equipmentId = '') {
     if (!name.trim()) return
     await addDoc(collection(db, `inventory_projects/${project.id}/items`), {
-      equipmentId: '',
+      equipmentId,
       equipmentName: name.trim(),
       checkoutTimestamp: new Date().toISOString(),
       checkinTimestamp: '',
@@ -516,7 +516,7 @@ function ProjectDetail({
       {showPicker && (
         <EquipmentPicker
           onClose={() => setShowPicker(false)}
-          onPick={name => { setShowPicker(false); addItemManual(name) }}
+          onPick={item => { setShowPicker(false); addItemManual(item.name, item.id) }}
         />
       )}
 
@@ -831,6 +831,11 @@ function CreateProjectForm({
   const [teachers, setTeachers] = useState<UserDoc[]>([])
   const [submitting, setSubmitting] = useState(false)
 
+  const { data: presets } = useCollection<InventoryPresetDoc>('inventory_presets')
+  const sortedPresets = useMemo(() => [...presets].sort((a, b) => a.name.localeCompare(b.name)), [presets])
+  const [selectedPresetId, setSelectedPresetId] = useState('')
+  const [presetItems, setPresetItems] = useState<InventoryPresetItem[]>([])
+
   useEffect(() => {
     async function load() {
       const sq = await getDocs(query(collection(db, 'users'), where('roles', 'array-contains', 'student')))
@@ -856,6 +861,24 @@ function CreateProjectForm({
     setBorrowers(prev => prev.filter(b => b !== n))
   }
 
+  function applyPreset(presetId: string) {
+    setSelectedPresetId(presetId)
+    const preset = presets.find(p => p.id === presetId)
+    if (!preset) { setPresetItems([]); return }
+    setPresetItems(preset.items.map(i => ({ ...i })))
+    if (!name.trim() || presets.some(p => p.name === name)) setName(preset.name)
+  }
+
+  function presetItemQty(equipmentId: string, delta: number) {
+    setPresetItems(prev => prev
+      .map(i => i.equipmentId === equipmentId ? { ...i, quantity: i.quantity + delta } : i)
+      .filter(i => i.quantity > 0))
+  }
+
+  function removePresetItem(equipmentId: string) {
+    setPresetItems(prev => prev.filter(i => i.equipmentId !== equipmentId))
+  }
+
   async function handleCreate() {
     if (!name || !returnDate) return
     setSubmitting(true)
@@ -873,6 +896,21 @@ function CreateProjectForm({
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
+      const checkoutTimestamp = new Date().toISOString()
+      const assignedTo = borrowers[0] ?? ''
+      for (const item of presetItems) {
+        for (let i = 0; i < item.quantity; i++) {
+          await addDoc(collection(db, `inventory_projects/${ref.id}/items`), {
+            equipmentId: item.equipmentId,
+            equipmentName: item.equipmentName,
+            checkoutTimestamp,
+            checkinTimestamp: '',
+            status: 'checked-out',
+            damageNotes: '',
+            assignedTo,
+          })
+        }
+      }
       onCreate(ref.id)
     } finally {
       setSubmitting(false)
@@ -885,10 +923,45 @@ function CreateProjectForm({
       <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f0f0f5', marginBottom: '1.5rem' }}>Create New Project</h2>
 
       <div className="inv-form">
+        {sortedPresets.length > 0 && (
+          <div className="form-group">
+            <label>Start from Preset (optional)</label>
+            <select
+              className="form-select"
+              value={selectedPresetId}
+              onChange={e => applyPreset(e.target.value)}
+            >
+              <option value="">No preset — custom project</option>
+              {sortedPresets.map(p => (
+                <option key={p.id} value={p.id}>{p.name} ({p.items.length} item{p.items.length === 1 ? '' : 's'})</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="form-group">
           <label>Project Name</label>
           <input type="text" className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Group A - Short Film" />
         </div>
+
+        {presetItems.length > 0 && (
+          <div className="form-group">
+            <label>Preset Equipment ({presetItems.reduce((sum, i) => sum + i.quantity, 0)} items)</label>
+            <div className="project-items-list">
+              {presetItems.map(i => (
+                <div key={i.equipmentId} className="project-item-row">
+                  <span className="project-item-name">{i.equipmentName}</span>
+                  <div className="qty-selector">
+                    <button type="button" className="day-btn" onClick={() => presetItemQty(i.equipmentId, -1)}><Minus size={12} /></button>
+                    <span className="day-count">{i.quantity}</span>
+                    <button type="button" className="day-btn" onClick={() => presetItemQty(i.equipmentId, 1)}><Plus size={12} /></button>
+                  </div>
+                  <button type="button" className="item-remove-btn" onClick={() => removePresetItem(i.equipmentId)}><X size={14} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="form-group">
           <label>Borrowers</label>
@@ -959,6 +1032,180 @@ function CreateProjectForm({
           {submitting ? 'Creating...' : 'Create Project'}
         </button>
       </div>
+    </div>
+  )
+}
+
+// ── Project Presets ─────────────────────────────────────────────────────────────
+
+function PresetsManager() {
+  const { data: presets } = useCollection<InventoryPresetDoc>('inventory_presets')
+  const sorted = useMemo(() => [...presets].sort((a, b) => a.name.localeCompare(b.name)), [presets])
+
+  const [editingId, setEditingId] = useState<string | null>(null) // 'new' or a preset id
+  const [name, setName] = useState('')
+  const [items, setItems] = useState<InventoryPresetItem[]>([])
+  const [showPicker, setShowPicker] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  function startNew() {
+    setEditingId('new')
+    setName('')
+    setItems([])
+  }
+
+  function startEdit(p: InventoryPresetDoc) {
+    setEditingId(p.id)
+    setName(p.name)
+    setItems(p.items.map(i => ({ ...i })))
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setName('')
+    setItems([])
+  }
+
+  function addPickedItem(item: { id: string; name: string }) {
+    setItems(prev => {
+      const existing = prev.find(i => i.equipmentId === item.id)
+      if (existing) {
+        return prev.map(i => i.equipmentId === item.id ? { ...i, quantity: i.quantity + 1 } : i)
+      }
+      return [...prev, { equipmentId: item.id, equipmentName: item.name, quantity: 1 }]
+    })
+  }
+
+  function updateQty(equipmentId: string, delta: number) {
+    setItems(prev => prev
+      .map(i => i.equipmentId === equipmentId ? { ...i, quantity: i.quantity + delta } : i)
+      .filter(i => i.quantity > 0))
+  }
+
+  function removeItem(equipmentId: string) {
+    setItems(prev => prev.filter(i => i.equipmentId !== equipmentId))
+  }
+
+  async function save() {
+    if (!name.trim() || items.length === 0) return
+    setSaving(true)
+    try {
+      if (editingId && editingId !== 'new') {
+        await updateDoc(doc(db, 'inventory_presets', editingId), {
+          name: name.trim(),
+          items,
+          updatedAt: serverTimestamp(),
+        })
+      } else {
+        await addDoc(collection(db, 'inventory_presets'), {
+          name: name.trim(),
+          items,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+      }
+      cancelEdit()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function removePreset(id: string) {
+    await deleteDoc(doc(db, 'inventory_presets', id))
+    if (editingId === id) cancelEdit()
+  }
+
+  const isEditing = editingId !== null
+
+  return (
+    <div className="inv-section">
+      <div className="inv-section-title" style={{ justifyContent: 'space-between' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+          <ClipboardList size={18} /> Project Presets
+        </span>
+        {!isEditing && (
+          <button className="primary-btn" onClick={startNew}>
+            <Plus size={16} /> New Preset
+          </button>
+        )}
+      </div>
+
+      {isEditing && (
+        <div className="inv-form" style={{ maxWidth: 600, marginBottom: '1.5rem' }}>
+          {showPicker && (
+            <EquipmentPicker onClose={() => setShowPicker(false)} onPick={item => addPickedItem(item)} />
+          )}
+          <div className="form-group">
+            <label>Preset Name</label>
+            <input
+              type="text"
+              className="form-input"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g. Sound Assignment"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Equipment ({items.reduce((sum, i) => sum + i.quantity, 0)} items)</label>
+            {items.length > 0 && (
+              <div className="project-items-list" style={{ marginBottom: '.5rem' }}>
+                {items.map(i => (
+                  <div key={i.equipmentId} className="project-item-row">
+                    <span className="project-item-name">{i.equipmentName}</span>
+                    <div className="qty-selector">
+                      <button type="button" className="day-btn" onClick={() => updateQty(i.equipmentId, -1)}><Minus size={12} /></button>
+                      <span className="day-count">{i.quantity}</span>
+                      <button type="button" className="day-btn" onClick={() => updateQty(i.equipmentId, 1)}><Plus size={12} /></button>
+                    </div>
+                    <button type="button" className="item-remove-btn" onClick={() => removeItem(i.equipmentId)}><X size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button type="button" className="equip-picker-open-btn" onClick={() => setShowPicker(true)}>
+              <Plus size={16} /> Add Equipment
+            </button>
+          </div>
+
+          <div className="checkout-buttons">
+            <button className="secondary-btn" onClick={cancelEdit}>Cancel</button>
+            <button
+              className="primary-btn"
+              disabled={saving || !name.trim() || items.length === 0}
+              onClick={save}
+            >
+              {saving ? 'Saving...' : 'Save Preset'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {sorted.length === 0 ? (
+        <div className="inv-empty">No presets yet. Create one to speed up project setup.</div>
+      ) : (
+        <div className="project-grid">
+          {sorted.map(p => (
+            <div key={p.id} className="project-card" style={{ cursor: 'default' }}>
+              <div className="project-card-header">
+                <ClipboardList size={16} />
+                <span style={{ fontWeight: 600 }}>{p.name}</span>
+                <div className="project-card-badges">
+                  <button className="item-damage-toggle-btn" onClick={() => startEdit(p)} title="Edit"><Pencil size={14} /></button>
+                  <button className="item-remove-btn" onClick={() => removePreset(p.id)} title="Delete"><Trash2 size={14} /></button>
+                </div>
+              </div>
+              <div className="project-card-meta">
+                {p.items.map(i => (
+                  <div key={i.equipmentId} className="project-card-meta-item">
+                    <Package size={14} /> {i.equipmentName}{i.quantity > 1 ? ` ×${i.quantity}` : ''}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -1075,6 +1322,7 @@ export default function InventoryPage() {
             ['equipment-status', 'Equipment Status'],
             ['borrower-stats', 'Borrower Stats'],
             ['statistics', 'Statistics'],
+            ['presets', 'Presets'],
           ] as [InvTab, string][]).map(([id, label]) => (
             <button
               key={id}
@@ -1229,6 +1477,9 @@ export default function InventoryPage() {
 
         {/* Statistics tab */}
         {tab === 'statistics' && <StatsContent equipment={equipment} projects={projects} allItems={allItems} />}
+
+        {/* Presets tab */}
+        {tab === 'presets' && <PresetsManager />}
       </div>
     </div>
   )

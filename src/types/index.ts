@@ -436,6 +436,20 @@ export interface InventoryItemDoc {
   addonManager?: string
 }
 
+export interface InventoryPresetItem {
+  equipmentId: string
+  equipmentName: string
+  quantity: number
+}
+
+export interface InventoryPresetDoc {
+  id: string
+  name: string
+  items: InventoryPresetItem[]
+  createdAt?: Timestamp
+  updatedAt?: Timestamp
+}
+
 // ── Attendance ────────────────────────────────────────────────────────────────
 
 export interface AttendanceSessionDoc {

@@ -475,6 +475,11 @@ service cloud.firestore {
       allow read: if isSignedIn();
     }
 
+    match /inventory_presets/{presetId} {
+      allow read: if isSignedIn() && (isAdmin() || tierHasFeature('inventory'));
+      allow write: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('inventory'));
+    }
+
     // ── Scan sessions (cross-device QR scanning) ──────────────────────────────
 
     match /scan_sessions/{sessionId} {

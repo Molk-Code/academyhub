@@ -32,7 +32,7 @@ const FEATURES: Feature[] = [
   { id: 'production',       label: 'Production',          icon: Clapperboard,    student: true,  teacher: true  },
   { id: 'prizes',           label: 'Prizes',              icon: Trophy,          student: true,  teacher: true  },
   { id: 'resources',        label: 'Resources',           icon: FolderOpen,      student: true,  teacher: true  },
-  { id: 'booking',          label: 'Booking',             icon: DoorOpen,        student: true,  teacher: true  },
+  { id: 'booking',          label: 'Room Booking',        icon: DoorOpen,        student: true,  teacher: true  },
   { id: 'guide',            label: 'School Guide',        icon: BookMarked,      student: true,  teacher: true  },
   { id: 'productionPeriod', label: 'Production Period',   icon: CalendarRange,   student: true,  teacher: true  },
   // ── Teacher only ─────────────────────────────────────────────────────────────

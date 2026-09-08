@@ -279,14 +279,16 @@ export default function EquipmentBookingPage() {
         studentEmail: profile?.email ?? '',
         cohortId: profile?.cohortId ?? '',
         projectName,
-        productionId: selectedProductionId ?? undefined,
-        productionTitle: selectedProduction?.title ?? undefined,
-        productionReadiness: selectedProductionId && productionReadiness[selectedProductionId]
-          ? (() => {
-              const r = productionReadiness[selectedProductionId]
-              return { score: r.score, hasBreakdown: r.hasBreakdown, hasCrew: r.hasCrew, hasCast: r.hasCast, hasLocations: r.hasLocations, hasSchedule: r.hasSchedule }
-            })()
-          : undefined,
+        ...(selectedProductionId ? { productionId: selectedProductionId } : {}),
+        ...(selectedProduction?.title ? { productionTitle: selectedProduction.title } : {}),
+        ...(selectedProductionId && productionReadiness[selectedProductionId]
+          ? {
+              productionReadiness: (() => {
+                const r = productionReadiness[selectedProductionId]
+                return { score: r.score, hasBreakdown: r.hasBreakdown, hasCrew: r.hasCrew, hasCast: r.hasCast, hasLocations: r.hasLocations, hasSchedule: r.hasSchedule }
+              })(),
+            }
+          : {}),
         items: cartList.map(({ item, quantity }) => ({
           equipmentId: item.id,
           equipmentName: item.name,

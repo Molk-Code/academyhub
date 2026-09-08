@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
-import { collection, getDocs, query, where } from 'firebase/firestore'
+import { collection, getDocs, query, where, doc, setDoc, serverTimestamp, type Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { useDocument } from '@/hooks/useFirestore'
 import {
   BarChart2, Package, TrendingUp, XCircle, AlertTriangle,
 } from 'lucide-react'
@@ -298,6 +299,34 @@ function Empty({ msg }: { msg: string }) {
   )
 }
 
+const CLEARABLE_TABS = new Set(['most-borrowed', 'overdue', 'damaged', 'missing', 'manual', 'borrowers'])
+
+async function clearStatTab(tabId: string) {
+  await setDoc(doc(db, 'settings', 'inventory_stats_resets'), { [tabId]: serverTimestamp() }, { merge: true })
+}
+
+function ClearStatButton({ tabId, label }: { tabId: string; label: string }) {
+  const [clearing, setClearing] = useState(false)
+  return (
+    <button
+      disabled={clearing}
+      onClick={async () => {
+        if (!window.confirm(`Clear ${label} history?\n\nThis only hides past entries from this stats view — it does not change any equipment status or project records.`)) return
+        setClearing(true)
+        try { await clearStatTab(tabId) } finally { setClearing(false) }
+      }}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', marginLeft: 'auto',
+        background: 'rgba(255,255,255,.04)', border: '1px solid #2a2a3a', borderRadius: 8,
+        color: '#a0a0b5', fontSize: '.78rem', fontWeight: 600, cursor: clearing ? 'default' : 'pointer',
+        opacity: clearing ? .6 : 1, flexShrink: 0,
+      }}
+    >
+      {clearing ? 'Clearing…' : 'Clear'}
+    </button>
+  )
+}
+
 export function StatsContent({
   equipment,
   projects,
@@ -311,6 +340,7 @@ export function StatsContent({
 }) {
   const [activeTab, setActiveTab] = useState('most-borrowed')
   const [users, setUsers] = useState<UserDoc[]>([])
+  const { data: resets } = useDocument<{ id: string } & Record<string, Timestamp | undefined>>('settings', 'inventory_stats_resets')
 
   useEffect(() => {
     getDocs(query(collection(db, 'users'), where('role', 'in', ['student', 'teacher'])))
@@ -329,9 +359,20 @@ export function StatsContent({
     return map
   }, [users])
 
+  const cutoffMs = (tabId: string) => resets?.[tabId]?.toMillis?.() ?? 0
+  const afterCutoff = (tabId: string, iso: string) => {
+    const cutoff = cutoffMs(tabId)
+    return !cutoff || (iso && new Date(iso).getTime() > cutoff)
+  }
+
   const itemsCheckedOut = allItems.filter(i => i.status === 'checked-out').length
   const missingItems    = allItems.filter(i => i.status === 'missing').length
   const damagedItems    = allItems.filter(i => i.status === 'damaged').length
+
+  const visibleMostBorrowedItems = useMemo(
+    () => allItems.filter(i => afterCutoff('most-borrowed', i.checkoutTimestamp)),
+    [allItems, resets],
+  )
 
   const overdueItems = useMemo(() =>
     allItems.filter(i => {
@@ -340,17 +381,39 @@ export function StatsContent({
       return proj && proj.returnDate < today() && proj.returnDate
     }),
   [allItems, projectMap])
+  const visibleOverdueItems = useMemo(
+    () => overdueItems.filter(i => afterCutoff('overdue', i.checkoutTimestamp)),
+    [overdueItems, resets],
+  )
 
-  const overdueCount = overdueItems.length
-  const manualItems  = allItems.filter(i => i.isManualEntry)
+  const visibleDamagedItems = useMemo(
+    () => allItems.filter(i => i.status === 'damaged' && afterCutoff('damaged', i.checkoutTimestamp)),
+    [allItems, resets],
+  )
+  const visibleMissingItems = useMemo(
+    () => allItems.filter(i => i.status === 'missing' && afterCutoff('missing', i.checkoutTimestamp)),
+    [allItems, resets],
+  )
+
+  const manualItems = allItems.filter(i => i.isManualEntry)
+  const visibleManualItems = useMemo(
+    () => manualItems.filter(i => afterCutoff('manual', i.checkoutTimestamp)),
+    [manualItems, resets],
+  )
+
+  const borrowersCutoff = cutoffMs('borrowers')
+  const visibleBorrowerProjects = useMemo(
+    () => !borrowersCutoff ? projects : projects.filter(p => ((p.createdAt as any)?.toMillis?.() ?? 0) > borrowersCutoff),
+    [projects, borrowersCutoff],
+  )
 
   const tabsWithCounts = TABS.map(t => ({
     ...t,
     count:
-      t.id === 'overdue'  ? overdueCount :
-      t.id === 'damaged'  ? damagedItems :
-      t.id === 'missing'  ? missingItems :
-      t.id === 'manual'   ? manualItems.length :
+      t.id === 'overdue'  ? visibleOverdueItems.length :
+      t.id === 'damaged'  ? visibleDamagedItems.length :
+      t.id === 'missing'  ? visibleMissingItems.length :
+      t.id === 'manual'   ? visibleManualItems.length :
       t.id === 'projects' ? projects.length :
       undefined,
   }))
@@ -395,10 +458,15 @@ export function StatsContent({
       </div>
 
       <div style={{ marginTop: '1.5rem' }}>
-        {activeTab === 'most-borrowed' && <MostBorrowedTab allItems={allItems} />}
+        {CLEARABLE_TABS.has(activeTab) && (
+          <div style={{ display: 'flex', marginBottom: 12 }}>
+            <ClearStatButton tabId={activeTab} label={TABS.find(t => t.id === activeTab)?.label ?? activeTab} />
+          </div>
+        )}
+        {activeTab === 'most-borrowed' && <MostBorrowedTab allItems={visibleMostBorrowedItems} />}
         {activeTab === 'equipment-status' && <EquipmentStatusTab equipment={equipment} allItems={allItems} projectMap={projectMap} onOpenProject={onOpenProject} />}
         {activeTab === 'overdue' && <SimpleItemsTab
-          items={overdueItems}
+          items={visibleOverdueItems}
           projectMap={projectMap}
           columns={['Equipment', 'Project', 'Due Date', 'Days Overdue']}
           renderRow={item => {
@@ -415,7 +483,7 @@ export function StatsContent({
           borderColor="#f87171"
         />}
         {activeTab === 'damaged' && <SimpleItemsTab
-          items={allItems.filter(i => i.status === 'damaged')}
+          items={visibleDamagedItems}
           projectMap={projectMap}
           columns={['Item Name', 'Project', 'Damage Notes']}
           renderRow={item => {
@@ -430,7 +498,7 @@ export function StatsContent({
           borderColor="#fbbf24"
         />}
         {activeTab === 'missing' && <SimpleItemsTab
-          items={allItems.filter(i => i.status === 'missing')}
+          items={visibleMissingItems}
           projectMap={projectMap}
           columns={['Item Name', 'Project', 'Assigned To']}
           renderRow={item => {
@@ -445,7 +513,7 @@ export function StatsContent({
           borderColor="#f87171"
         />}
         {activeTab === 'manual' && <SimpleItemsTab
-          items={manualItems}
+          items={visibleManualItems}
           projectMap={projectMap}
           columns={['Item Name', 'Project', 'Checked Out', 'Assigned To']}
           renderRow={item => {
@@ -460,7 +528,7 @@ export function StatsContent({
           emptyMsg="No manual checkouts"
           borderColor="#a78bfa"
         />}
-        {activeTab === 'borrowers' && <BorrowersTab users={users} projects={projects} allItems={allItems} cohortNames={cohortNames} />}
+        {activeTab === 'borrowers' && <BorrowersTab users={users} projects={visibleBorrowerProjects} allItems={allItems} cohortNames={cohortNames} />}
         {activeTab === 'projects'  && <ProjectsTab projects={projects} allItems={allItems} onOpenProject={onOpenProject} />}
       </div>
     </>

@@ -209,6 +209,11 @@ service cloud.firestore {
       allow write: if isTeacherOrAdmin();
     }
 
+    match /settings/inventory_stats_resets {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
+    }
+
     // ── Subject teachers (subcollection) ─────────────────────────────────────
 
     match /subjects/{subjectId}/teachers/{teacherId} {

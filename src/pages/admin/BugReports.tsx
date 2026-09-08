@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { updateDoc, doc } from 'firebase/firestore'
+import { updateDoc, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
-import { Bug, Copy, Check, ChevronDown, Circle, CheckCircle2, XCircle, Clock } from 'lucide-react'
+import { Bug, Copy, Check, ChevronDown, Circle, CheckCircle2, XCircle, Clock, Trash2 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { Timestamp } from 'firebase/firestore'
 
@@ -76,6 +76,7 @@ function StatusBadge({ status }: { status: BugReportDoc['status'] }) {
 function ReportCard({ report }: { report: BugReportDoc }) {
   const [expanded, setExpanded] = useState(false)
   const [updating, setUpdating] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   async function setStatus(status: BugReportDoc['status']) {
     setUpdating(true)
@@ -83,6 +84,16 @@ function ReportCard({ report }: { report: BugReportDoc }) {
       await updateDoc(doc(db, 'bug_reports', report.id), { status })
     } finally {
       setUpdating(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm('Delete this bug report? This cannot be undone.')) return
+    setDeleting(true)
+    try {
+      await deleteDoc(doc(db, 'bug_reports', report.id))
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -163,6 +174,13 @@ function ReportCard({ report }: { report: BugReportDoc }) {
                 {STATUS_CONFIG[s].label}
               </button>
             ))}
+            <button
+              disabled={deleting}
+              onClick={handleDelete}
+              className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-white/8 text-zinc-500 hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/5 transition-colors disabled:opacity-40 ml-auto"
+            >
+              <Trash2 className="w-3 h-3" /> {deleting ? 'Deleting…' : 'Delete'}
+            </button>
           </div>
         </div>
       )}

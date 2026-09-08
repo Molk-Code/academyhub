@@ -907,7 +907,14 @@ function CategoriesTab({ categories }: { categories: EquipmentCategoryDoc[] }) {
                   <ChevronDown size={13} />
                 </button>
               </div>
-              <span style={{ fontSize: '.75rem', fontWeight: 700, letterSpacing: '.08em', padding: '3px 10px', borderRadius: 20, minWidth: 80, textAlign: 'center', color: c.text, background: c.bg, border: `1px solid ${c.border}` }}>
+              <span
+                title={cat.name}
+                style={{
+                  fontSize: '.75rem', fontWeight: 700, letterSpacing: '.08em', padding: '3px 10px', borderRadius: 20,
+                  width: 170, flexShrink: 0, textAlign: 'center', color: c.text, background: c.bg, border: `1px solid ${c.border}`,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}
+              >
                 {cat.name}
               </span>
               <select

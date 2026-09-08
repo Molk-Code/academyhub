@@ -6,7 +6,7 @@ import { db, functions } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
 import { shortDate, timeStr, toDate } from '@/lib/utils'
-import type { LessonDoc, SubjectDoc, CohortDoc, LessonBlockDoc, SemesterSettingsDoc, LessonCategoryDoc, UserDoc, PersonalEventDoc, SyncedEventDoc, GuestTeacherDoc } from '@/types'
+import type { LessonDoc, SubjectDoc, CohortDoc, LessonBlockDoc, SemesterSettingsDoc, LessonCategoryDoc, UserDoc, PersonalEventDoc, SyncedEventDoc, GuestTeacherDoc, GuestTeacherBookingDoc } from '@/types'
 import { Plus, Pencil, Trash2, CalendarDays, List, X, QrCode, Circle, SlidersHorizontal, ChevronDown, Check, MapPin, Download } from 'lucide-react'
 import { markCalendarInvitesSeen } from '@/hooks/useCalendarInviteBadge'
 import AnnualPlanWheel from '@/components/calendar/AnnualPlanWheel'
@@ -318,6 +318,12 @@ export default function Lessons() {
     [where('roles', 'array-contains', 'teacher')],
   )
   const { data: guestTeachers } = useCollection<GuestTeacherDoc>('guest_teachers')
+  const { data: guestTeacherBookings } = useCollection<GuestTeacherBookingDoc>('guest_teacher_bookings', [where('type', '==', 'subject')])
+
+  const syncedEditSubjectGuestTeachers = useMemo(() => {
+    const ids = new Set(guestTeacherBookings.filter(b => b.subjectId === syncedEditSubjectId).map(b => b.guestTeacherId))
+    return guestTeachers.filter(g => ids.has(g.id)).sort((a, b) => a.name.localeCompare(b.name))
+  }, [guestTeacherBookings, guestTeachers, syncedEditSubjectId])
 
   // My personal events
   const { data: myPersonalEvents } = useCollection<PersonalEventDoc>(
@@ -1690,6 +1696,58 @@ export default function Lessons() {
                         ))}
                       </select>
                     </div>
+                    {/* Guest teachers */}
+                    {guestTeachers.length > 0 && (
+                      <div>
+                        <label className="block text-xs text-zinc-400 mb-1">Guest teachers</label>
+                        {syncedEditSubjectGuestTeachers.length > 0 && (
+                          <div className="mb-1.5">
+                            <p className="text-[10px] text-zinc-500 mb-1">For this subject:</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {syncedEditSubjectGuestTeachers.map(g => {
+                                const active = syncedEditGuestTeachers.includes(g.id)
+                                return (
+                                  <button
+                                    key={g.id}
+                                    type="button"
+                                    onClick={() => setSyncedEditGuestTeachers(prev =>
+                                      active ? prev.filter(id => id !== g.id) : [...prev, g.id])}
+                                    className={`text-xs px-2 py-1 rounded-full border transition-colors ${
+                                      active
+                                        ? 'bg-brand-600 border-brand-600 text-white'
+                                        : 'bg-zinc-800 border-white/10 text-zinc-300 hover:border-brand-400'
+                                    }`}
+                                  >
+                                    {g.name}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-1.5 mb-1.5">
+                          {syncedEditGuestTeachers.map(gid => {
+                            const g = guestTeachers.find(x => x.id === gid)
+                            return (
+                              <span key={gid} className="flex items-center gap-1 bg-zinc-700 text-xs text-zinc-200 px-2 py-0.5 rounded-full">
+                                {g?.name ?? gid}
+                                <button onClick={() => setSyncedEditGuestTeachers(prev => prev.filter(id => id !== gid))} className="text-zinc-400 hover:text-zinc-200"><X className="w-3 h-3" /></button>
+                              </span>
+                            )
+                          })}
+                        </div>
+                        <select
+                          className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-brand-500"
+                          value=""
+                          onChange={e => { if (e.target.value && !syncedEditGuestTeachers.includes(e.target.value)) setSyncedEditGuestTeachers(prev => [...prev, e.target.value]) }}
+                        >
+                          <option value="">+ Add guest teacher…</option>
+                          {guestTeachers.filter(g => !syncedEditGuestTeachers.includes(g.id)).sort((a, b) => a.name.localeCompare(b.name)).map(g => (
+                            <option key={g.id} value={g.id}>{g.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     {/* Notes */}
                     <div>
                       <label className="block text-xs text-zinc-400 mb-1">Notes</label>

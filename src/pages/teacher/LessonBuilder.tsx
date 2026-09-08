@@ -9,7 +9,7 @@ import {
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, orderBy, where } from '@/hooks/useFirestore'
-import type { SubjectDoc, CohortDoc, LessonBlockDoc, ClassroomDoc, UserDoc, LessonCategoryDoc, CurriculumItem, GuestTeacherDoc } from '@/types'
+import type { SubjectDoc, CohortDoc, LessonBlockDoc, ClassroomDoc, UserDoc, LessonCategoryDoc, CurriculumItem, GuestTeacherDoc, GuestTeacherBookingDoc } from '@/types'
 import { Link2, Trash2, Video, FileText } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import EmojiPicker    from '@/components/common/EmojiPicker'
@@ -153,6 +153,7 @@ export default function LessonBuilder() {
   const { data: classrooms } = useCollection<ClassroomDoc>('classrooms', [orderBy('order', 'asc')])
   const { data: teachers      } = useCollection<UserDoc>('users', [where('role', '==', 'teacher')])
   const { data: guestTeachers } = useCollection<GuestTeacherDoc>('guest_teachers')
+  const { data: guestTeacherBookings } = useCollection<GuestTeacherBookingDoc>('guest_teacher_bookings', [where('type', '==', 'subject')])
 
   const { register, handleSubmit, control, setValue, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -187,6 +188,10 @@ export default function LessonBuilder() {
     () => [...(selectedSubject?.curriculum ?? [])].sort((a, b) => a.title.localeCompare(b.title)),
     [selectedSubject],
   )
+  const subjectGuestTeachers = useMemo(() => {
+    const ids = new Set(guestTeacherBookings.filter(b => b.subjectId === selectedSubjectId).map(b => b.guestTeacherId))
+    return guestTeachers.filter(g => ids.has(g.id)).sort((a, b) => a.name.localeCompare(b.name))
+  }, [guestTeacherBookings, guestTeachers, selectedSubjectId])
 
   // Clear course when subject changes (but not on initial mount/edit load)
   const prevSubjectIdRef = useRef('')
@@ -503,6 +508,30 @@ export default function LessonBuilder() {
         {guestTeachers.length > 0 && (
           <div>
             <label className="label">Guest teachers <span className="text-zinc-400 font-normal">(optional)</span></label>
+            {subjectGuestTeachers.length > 0 && (
+              <div className="mb-2">
+                <p className="text-xs text-zinc-500 mb-1.5">For {selectedSubject?.title}:</p>
+                <div className="flex flex-wrap gap-2">
+                  {subjectGuestTeachers.map(g => {
+                    const active = (guestTeacherIds ?? []).includes(g.id)
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => toggleGuestTeacher(g.id)}
+                        className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+                          active
+                            ? 'bg-brand-600 border-brand-600 text-white'
+                            : 'bg-zinc-900 border-white/15 text-zinc-400 hover:border-brand-400 hover:text-brand-700'
+                        }`}
+                      >
+                        {g.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
             <select
               className="input"
               value=""

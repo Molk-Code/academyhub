@@ -323,7 +323,11 @@ export default function StudentCalendar() {
     cohortId ?? '',
   )
 
-  const { data: subjects }    = useCollection<SubjectDoc>('subjects', cohortId ? [where('cohortId', '==', cohortId)] : [], !!cohortId)
+  const { data: allSubjects } = useCollection<SubjectDoc>('subjects')
+  const subjects = useMemo(
+    () => allSubjects.filter(s => !s.cohortIds?.length || (!!cohortId && s.cohortIds.includes(cohortId))),
+    [allSubjects, cohortId],
+  )
   const { data: categories }  = useCollection<LessonCategoryDoc>('lessonCategories', [orderBy('order', 'asc')])
   const { data: semesterDoc } = useDocument<SemesterSettingsDoc>('settings', 'semester')
   const { data: cohorts }     = useCollection<CohortDoc>('cohorts')
@@ -528,6 +532,7 @@ export default function StudentCalendar() {
           location: e.customLocation || e.location,
           subjectId: e.subjectId ?? null,
           teacherIds: e.teacherIds ?? [],
+          guestTeacherIds: e.guestTeacherIds ?? [],
           notes: e.notes ?? null,
         },
       }
@@ -989,6 +994,9 @@ export default function StudentCalendar() {
                 setAddEventModal({ date, start, end, allDay: info.allDay })
               }}
               eventClick={(info) => {
+                // Close the "+more" popover (if this click came from inside it) so it
+                // doesn't linger behind/beside the event detail panel we're about to open
+                (document.querySelector('.fc-popover .fc-popover-close') as HTMLElement | null)?.click()
                 if (info.event.extendedProps.isSynced) {
                   const ep = info.event.extendedProps
                   const subj = ep.subjectId ? subjects.find(s => s.id === ep.subjectId) : undefined

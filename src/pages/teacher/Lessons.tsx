@@ -1759,15 +1759,17 @@ export default function Lessons() {
                           </div>
                         )}
                         <div className="flex flex-wrap gap-1.5 mb-1.5">
-                          {syncedEditGuestTeachers.map(gid => {
-                            const g = guestTeachers.find(x => x.id === gid)
-                            return (
-                              <span key={gid} className="flex items-center gap-1 bg-zinc-700 text-xs text-zinc-200 px-2 py-0.5 rounded-full">
-                                {g?.name ?? gid}
-                                <button onClick={() => setSyncedEditGuestTeachers(prev => prev.filter(id => id !== gid))} className="text-zinc-400 hover:text-zinc-200"><X className="w-3 h-3" /></button>
-                              </span>
-                            )
-                          })}
+                          {syncedEditGuestTeachers
+                            .filter(gid => !syncedEditSubjectGuestTeachers.some(g => g.id === gid))
+                            .map(gid => {
+                              const g = guestTeachers.find(x => x.id === gid)
+                              return (
+                                <span key={gid} className="flex items-center gap-1 bg-zinc-700 text-xs text-zinc-200 px-2 py-0.5 rounded-full">
+                                  {g?.name ?? gid}
+                                  <button onClick={() => setSyncedEditGuestTeachers(prev => prev.filter(id => id !== gid))} className="text-zinc-400 hover:text-zinc-200"><X className="w-3 h-3" /></button>
+                                </span>
+                              )
+                            })}
                         </div>
                         <select
                           className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-brand-500"

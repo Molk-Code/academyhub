@@ -549,7 +549,9 @@ export default function LessonBuilder() {
             </select>
             {(guestTeacherIds ?? []).length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
-                {(guestTeacherIds ?? []).map(gid => {
+                {(guestTeacherIds ?? [])
+                  .filter(gid => !subjectGuestTeachers.some(g => g.id === gid))
+                  .map(gid => {
                   const g = guestTeachers.find(x => x.id === gid)
                   if (!g) return null
                   return (

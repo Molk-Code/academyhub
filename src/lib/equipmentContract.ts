@@ -1,7 +1,7 @@
 // Shared HTML template for the printable/downloadable equipment loan contract.
 // Layout mirrors the school's official "Equipment Contract" paper form.
 
-import cineforgeLogo from '@/assets/fire.png'
+import { cineforgeLogoDataUri as cineforgeLogo } from '@/assets/cineforgeLogoDataUri'
 
 export interface EquipmentContractItem {
   product: string

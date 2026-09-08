@@ -3,8 +3,8 @@ import { addDays, format, startOfWeek, isToday, getDay } from 'date-fns'
 import { deleteDoc, doc } from 'firebase/firestore'
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
 import { db } from '@/lib/firebase'
-import { useCollection, where } from '@/hooks/useFirestore'
-import type { RoomDoc, RoomBookingDoc, RoomAvailabilityWindow } from '@/types'
+import { useCollection, useDocument, where } from '@/hooks/useFirestore'
+import type { RoomDoc, RoomBookingDoc, RoomAvailabilityWindow, SemesterSettingsDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 
@@ -14,16 +14,34 @@ function slotKey(slot: TimeSlot, date: string, roomId: string) {
   return `${slot.startTime}_${slot.endTime}_${date}_${roomId}`
 }
 
-function isRoomAvailableForSlot(room: RoomDoc, dateStr: string, dayNum: number, slot: TimeSlot): boolean {
+// Most availability windows are configured with useSemesterDates:true, in which case
+// their own startDate/endDate are meaningless — the active semester's dates apply instead.
+function isRoomAvailableForSlot(
+  room: RoomDoc,
+  dateStr: string,
+  dayNum: number,
+  slot: TimeSlot,
+  semDates?: { start: string; end: string },
+): boolean {
   const windows: RoomAvailabilityWindow[] = room.availability ?? []
-  if (windows.length === 0) return true
-  return windows.some(w =>
-    dateStr >= w.startDate &&
-    dateStr <= w.endDate &&
-    w.days.includes(dayNum) &&
-    w.startTime === slot.startTime &&
-    w.endTime === slot.endTime,
-  )
+  if (windows.length === 0) {
+    // No windows configured — fall back to semester dates if known
+    if (semDates) return dateStr >= semDates.start && dateStr <= semDates.end
+    return true
+  }
+  return windows.some(w => {
+    const useSem = w.useSemesterDates !== false
+    if (useSem && !semDates) return w.days.includes(dayNum) && w.startTime === slot.startTime && w.endTime === slot.endTime
+    const start = useSem ? semDates!.start : w.startDate
+    const end   = useSem ? semDates!.end   : w.endDate
+    return (
+      dateStr >= start &&
+      dateStr <= end &&
+      w.days.includes(dayNum) &&
+      w.startTime === slot.startTime &&
+      w.endTime === slot.endTime
+    )
+  })
 }
 
 export default function BookingOverview() {
@@ -59,6 +77,11 @@ export default function BookingOverview() {
     true,
     `${weekStartStr}_${weekEndStr}`,
   )
+  const { data: semester } = useDocument<SemesterSettingsDoc>('settings', 'semester')
+
+  const semStartStr = semester?.startDate ?? null
+  const semEndStr   = semester?.sem2End ?? semester?.endDate ?? null
+  const semDates    = semStartStr && semEndStr ? { start: semStartStr, end: semEndStr } : undefined
 
   const sortedRooms = useMemo(
     () => [...rooms]
@@ -76,10 +99,20 @@ export default function BookingOverview() {
     const seen = new Map<string, TimeSlot>()
     for (const room of allSortedRooms) {
       for (const w of (room.availability ?? []) as RoomAvailabilityWindow[]) {
+        const useSem = w.useSemesterDates !== false
+        if (useSem && !semDates) {
+          if (w.days.includes(selectedDayNum)) {
+            const k = `${w.startTime}_${w.endTime}`
+            if (!seen.has(k)) seen.set(k, { startTime: w.startTime, endTime: w.endTime })
+          }
+          continue
+        }
+        const start = useSem ? semDates!.start : w.startDate
+        const end   = useSem ? semDates!.end   : w.endDate
         if (
           w.days.includes(selectedDayNum) &&
-          selectedDateStr >= w.startDate &&
-          selectedDateStr <= w.endDate
+          selectedDateStr >= start &&
+          selectedDateStr <= end
         ) {
           const k = `${w.startTime}_${w.endTime}`
           if (!seen.has(k)) seen.set(k, { startTime: w.startTime, endTime: w.endTime })
@@ -87,7 +120,7 @@ export default function BookingOverview() {
       }
     }
     return [...seen.values()].sort((a, b) => a.startTime.localeCompare(b.startTime))
-  }, [allSortedRooms, selectedDayNum, selectedDateStr])
+  }, [allSortedRooms, selectedDayNum, selectedDateStr, semDates])
 
   const bookingMap = useMemo(() => {
     const m = new Map<string, RoomBookingDoc>()
@@ -208,7 +241,7 @@ export default function BookingOverview() {
                   </td>
                   {sortedRooms.map(room => {
                     const booking      = bookingMap.get(slotKey(slot, selectedDateStr, room.id))
-                    const isUnavailable = !isRoomAvailableForSlot(room, selectedDateStr, selectedDayNum, slot)
+                    const isUnavailable = !isRoomAvailableForSlot(room, selectedDateStr, selectedDayNum, slot, semDates)
 
                     return (
                       <td key={room.id} className="px-2 py-2 text-center">

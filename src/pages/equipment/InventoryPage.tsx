@@ -459,6 +459,15 @@ function ProjectDetail({
     })
   }
 
+  // Undo an accidental return — checkoutTimestamp is left untouched, so the
+  // item goes back to being checked out from its original checkout time.
+  async function undoReturn(item: InventoryItemDoc) {
+    await updateDoc(doc(db, `inventory_projects/${project.id}/items`, item.id), {
+      status: 'checked-out',
+      checkinTimestamp: '',
+    })
+  }
+
   async function markMissing(item: InventoryItemDoc) {
     await updateDoc(doc(db, `inventory_projects/${project.id}/items`, item.id), { status: 'missing' })
   }
@@ -794,7 +803,18 @@ function ProjectDetail({
                 <span className="project-item-time">
                   {item.checkoutTimestamp ? new Date(item.checkoutTimestamp).toLocaleString() : ''}
                 </span>
-                <span className={`project-item-status ${itemStatusClass(item.status)}`}>{item.status}</span>
+                {item.status === 'returned' ? (
+                  <button
+                    className={`project-item-status ${itemStatusClass(item.status)}`}
+                    style={{ cursor: 'pointer', border: 'none' }}
+                    title="Undo — check this item back out"
+                    onClick={() => undoReturn(item)}
+                  >
+                    {item.status}
+                  </button>
+                ) : (
+                  <span className={`project-item-status ${itemStatusClass(item.status)}`}>{item.status}</span>
+                )}
                 <div className="item-action-btns">
                   {item.status === 'checked-out' && (
                     <>

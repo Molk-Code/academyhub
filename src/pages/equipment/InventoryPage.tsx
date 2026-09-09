@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { StatsContent } from './InventoryStats'
 import {
   collection, collectionGroup, addDoc, updateDoc, deleteDoc, doc, getDocs,
-  serverTimestamp, query, where, onSnapshot,
+  serverTimestamp, query, where, onSnapshot, increment,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -413,18 +413,29 @@ function ProjectDetail({
     return () => { if (remoteSessionId) updateDoc(doc(db, 'scan_sessions', remoteSessionId), { active: false }).catch(() => {}) }
   }, [remoteSessionId])
 
+  // Equipment catalog "available" count reflects real-time checkout status
+  // across every project — decrement when a unit leaves availability
+  // (checked out or missing), increment when it comes back (returned).
+  // Items not matched to a catalog entry (equipmentId blank) have nothing to adjust.
+  async function adjustEquipmentAvailable(equipmentId: string, delta: number) {
+    if (!equipmentId) return
+    await updateDoc(doc(db, 'equipment', equipmentId), { available: increment(delta) })
+  }
+
   async function handleScan(text: string) {
     setScanEntries(prev => [{ name: text, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 19)])
     if (scanMode === 'checkout') {
+      const matchedEquip = equipmentAll.find(e => e.qrCode === text || e.name === text)
       await addDoc(collection(db, `inventory_projects/${project.id}/items`), {
-        equipmentId: '',
-        equipmentName: text,
+        equipmentId: matchedEquip?.id ?? '',
+        equipmentName: matchedEquip?.name ?? text,
         checkoutTimestamp: new Date().toISOString(),
         checkinTimestamp: '',
         status: 'checked-out',
         damageNotes: '',
         assignedTo: project.borrowers?.[0] ?? '',
       })
+      if (matchedEquip) await adjustEquipmentAvailable(matchedEquip.id, -1)
     } else {
       const match = items.find(i => i.status === 'checked-out' && i.equipmentName === text)
       if (match) {
@@ -432,6 +443,7 @@ function ProjectDetail({
           status: 'returned',
           checkinTimestamp: new Date().toISOString(),
         })
+        if (match.equipmentId) await adjustEquipmentAvailable(match.equipmentId, 1)
       }
     }
   }
@@ -449,6 +461,7 @@ function ProjectDetail({
       // Typed by name, not chosen from the catalog picker — tracked separately in Statistics
       ...(equipmentId ? {} : { isManualEntry: true }),
     })
+    if (equipmentId) await adjustEquipmentAvailable(equipmentId, -1)
     setManualInput('')
   }
 
@@ -465,6 +478,9 @@ function ProjectDetail({
       status: 'returned',
       checkinTimestamp: new Date().toISOString(),
     })
+    // Covers both checked-out → returned and missing → returned ("Found") — both
+    // are non-available states beforehand, so this is always a +1.
+    if (item.equipmentId) await adjustEquipmentAvailable(item.equipmentId, 1)
   }
 
   // Undo an accidental return — checkoutTimestamp is left untouched, so the
@@ -475,14 +491,17 @@ function ProjectDetail({
       status: 'checked-out',
       checkinTimestamp: '',
     })
+    if (item.equipmentId) await adjustEquipmentAvailable(item.equipmentId, -1)
   }
 
   async function markMissing(item: InventoryItemDoc) {
     clearInlineDamage(item.id)
+    // checked-out → missing: both already non-available, no count change.
     await updateDoc(doc(db, `inventory_projects/${project.id}/items`, item.id), { status: 'missing' })
   }
 
   async function saveDamage(item: InventoryItemDoc, note: string) {
+    // checked-out → damaged: both already non-available, no count change.
     await updateDoc(doc(db, `inventory_projects/${project.id}/items`, item.id), {
       status: 'damaged',
       damageNotes: note,
@@ -497,10 +516,14 @@ function ProjectDetail({
       damageNotes: '',
       checkinTimestamp: new Date().toISOString(),
     })
+    if (item.equipmentId) await adjustEquipmentAvailable(item.equipmentId, 1)
   }
 
   async function removeItem(item: InventoryItemDoc) {
     await deleteDoc(doc(db, `inventory_projects/${project.id}/items`, item.id))
+    // Deleting a not-yet-returned item would otherwise permanently understate
+    // availability — give the unit back unless it was already returned.
+    if (item.equipmentId && item.status !== 'returned') await adjustEquipmentAvailable(item.equipmentId, 1)
   }
 
   async function markAllReturned() {
@@ -990,6 +1013,9 @@ function CreateProjectForm({
             damageNotes: '',
             assignedTo,
           })
+        }
+        if (item.equipmentId && item.quantity > 0) {
+          await updateDoc(doc(db, 'equipment', item.equipmentId), { available: increment(-item.quantity) })
         }
       }
       onCreate(ref.id)

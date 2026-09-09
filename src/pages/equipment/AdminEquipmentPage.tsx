@@ -144,18 +144,93 @@ function QRModal({ item, onClose }: { item: EquipmentDoc; onClose: () => void })
   )
 }
 
+function InfoModal({ item, cohorts, onClose }: { item: EquipmentDoc; cohorts: CohortDoc[]; onClose: () => void }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={onClose}>
+      <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 16, width: '100%', maxWidth: 440, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+        <div style={{ position: 'relative' }}>
+          <EquipmentImg
+            url={item.imageUrl}
+            name={item.name}
+            fallback={<div style={{ width: '100%', height: 220, background: '#1a1a25', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3a3a4a' }}><Package size={40} /></div>}
+          />
+          <button className="close-btn" onClick={onClose} style={{ position: 'absolute', top: 10, right: 10, width: 32, height: 32, background: 'rgba(14,14,22,.85)' }}><X size={16} /></button>
+        </div>
+        <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <p style={{ fontWeight: 700, fontSize: '1.05rem', color: '#f0f0f5' }}>{item.name}</p>
+            <p style={{ fontSize: '.72rem', fontWeight: 700, color: '#4cd964', textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 2 }}>{item.category}</p>
+          </div>
+
+          <div style={{ fontSize: '.8rem', fontWeight: 600, color: item.available === 0 ? '#ff4757' : '#4cd964' }}>
+            {item.available}/{item.totalQuantity} available
+            {item.priceInclVat > 0 ? <span style={{ color: '#6a6a80', fontWeight: 500 }}> · {item.priceInclVat} kr/day</span> : <span style={{ color: '#6a6a80', fontWeight: 500 }}> · Free</span>}
+          </div>
+
+          {item.allowedCohortIds && item.allowedCohortIds.length > 0 && (
+            <div>
+              <p style={{ fontSize: '.7rem', fontWeight: 700, color: '#6a6a80', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Available to classes</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {item.allowedCohortIds.map(id => {
+                  const c = cohorts.find(x => x.id === id)
+                  return c ? (
+                    <span key={id} style={{ fontSize: '.7rem', fontWeight: 700, background: 'rgba(251,191,36,.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,.25)', borderRadius: 10, padding: '2px 8px' }}>
+                      {c.name}
+                    </span>
+                  ) : null
+                })}
+              </div>
+            </div>
+          )}
+
+          {item.description && (
+            <div>
+              <p style={{ fontSize: '.7rem', fontWeight: 700, color: '#6a6a80', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Description</p>
+              <p style={{ fontSize: '.85rem', color: '#c0c0d5', lineHeight: 1.5 }}>{item.description}</p>
+            </div>
+          )}
+
+          {item.notes && (
+            <div>
+              <p style={{ fontSize: '.7rem', fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Special Instructions / Notes</p>
+              <p style={{ fontSize: '.85rem', color: '#c0c0d5', lineHeight: 1.5 }}>{item.notes}</p>
+            </div>
+          )}
+
+          {item.included?.length > 0 && (
+            <div>
+              <p style={{ fontSize: '.7rem', fontWeight: 700, color: '#6a6a80', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Included Accessories</p>
+              <ul style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {item.included.map((inc, i) => (
+                  <li key={i} style={{ fontSize: '.82rem', color: '#a0a0b5', paddingLeft: 12, position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: 0, color: '#4cd964' }}>•</span>{inc}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {item.location && (
+            <p style={{ fontSize: '.78rem', color: '#6a6a80' }}>📍 {item.location}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Item Form ─────────────────────────────────────────────────────────────────
 
 interface FormState {
   name: string; category: EquipmentCategory; description: string; notes: string
-  location: string; totalQuantity: string; available: string
+  location: string; totalQuantity: string
   priceExclVat: string; priceInclVat: string; imageUrl: string
   included: string[]; allowedCohortIds: string[]; requiresProduction: boolean; isActive: boolean
 }
 
 const EMPTY_FORM: FormState = {
   name: '', category: 'CAMERA', description: '', notes: '',
-  location: '', totalQuantity: '1', available: '1',
+  location: '', totalQuantity: '1',
   priceExclVat: '', priceInclVat: '', imageUrl: '',
   included: [], allowedCohortIds: [], requiresProduction: true, isActive: true,
 }
@@ -175,7 +250,6 @@ function ItemForm({ existing, onClose, categories }: { existing: EquipmentDoc | 
     name: existing.name, category: existing.category,
     description: existing.description ?? '', notes: existing.notes ?? '',
     location: existing.location ?? '', totalQuantity: String(existing.totalQuantity),
-    available: String(existing.available),
     priceExclVat: existing.priceExclVat ? String(existing.priceExclVat) : '',
     priceInclVat: existing.priceInclVat ? String(existing.priceInclVat) : '',
     imageUrl: existing.imageUrl ?? '', included: existing.included ?? [],
@@ -213,11 +287,19 @@ function ItemForm({ existing, onClose, categories }: { existing: EquipmentDoc | 
   async function handleSave() {
     if (!form.name.trim()) { setError('Name is required'); return }
     setSaving(true); setError('')
+    const totalQuantity = parseInt(form.totalQuantity) || 1
+    // "Available" isn't hand-entered — it's the total minus whatever's currently
+    // checked out or missing. On create, nothing is out yet, so all units are
+    // available. On edit, preserve however many are currently out and just apply
+    // the total-quantity change on top of that.
+    const available = existing
+      ? Math.max(0, Math.min(totalQuantity, totalQuantity - (existing.totalQuantity - existing.available)))
+      : totalQuantity
     const payload = {
       name: form.name.trim(), category: form.category,
       description: form.description.trim(), notes: form.notes.trim(),
-      location: form.location.trim(), totalQuantity: parseInt(form.totalQuantity) || 1,
-      available: parseInt(form.available) || 0,
+      location: form.location.trim(), totalQuantity,
+      available,
       priceExclVat: parseFloat(form.priceExclVat) || 0,
       priceInclVat: parseFloat(form.priceInclVat) || 0,
       imageUrl: form.imageUrl, qrCode: form.name.trim(),
@@ -240,7 +322,6 @@ function ItemForm({ existing, onClose, categories }: { existing: EquipmentDoc | 
   }
 
   const row2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }
-  const row3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={onClose}>
@@ -283,15 +364,11 @@ function ItemForm({ existing, onClose, categories }: { existing: EquipmentDoc | 
             </div>
           </div>
 
-          {/* Quantities + Location */}
-          <div style={row3}>
+          {/* Quantity + Location */}
+          <div style={row2}>
             <div>
               <label style={lbl}>Total Quantity</label>
               <input style={inp} type="number" min={1} value={form.totalQuantity} onChange={e => set('totalQuantity', e.target.value)} />
-            </div>
-            <div>
-              <label style={lbl}>Available Now</label>
-              <input style={inp} type="number" min={0} value={form.available} onChange={e => set('available', e.target.value)} />
             </div>
             <div>
               <label style={lbl}>Storage Location</label>
@@ -468,6 +545,7 @@ function CatalogTab({ categories }: { categories: EquipmentCategoryDoc[] }) {
   const [editItem, setEditItem] = useState<EquipmentDoc | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [qrItem, setQrItem] = useState<EquipmentDoc | null>(null)
+  const [infoItem, setInfoItem] = useState<EquipmentDoc | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const sortedCats = useMemo(
@@ -537,7 +615,7 @@ function CatalogTab({ categories }: { categories: EquipmentCategoryDoc[] }) {
               style={{ opacity: item.isActive ? 1 : 0.55, position: 'relative' }}
             >
               {/* Admin hover overlay */}
-              <div className="product-image" style={{ position: 'relative' }}>
+              <div className="product-image" style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setInfoItem(item)}>
                 <EquipmentImg
                   url={item.imageUrl}
                   name={item.name}
@@ -548,11 +626,13 @@ function CatalogTab({ categories }: { categories: EquipmentCategoryDoc[] }) {
                   <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 9, fontWeight: 700, background: '#3a1a1a', color: '#f87171', border: '1px solid rgba(248,113,113,.3)', borderRadius: 20, padding: '2px 6px' }}>Inactive</span>
                 )}
                 {/* Hover actions */}
-                <div style={{
-                  position: 'absolute', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', gap: 8, opacity: 0, transition: 'opacity .2s',
-                  borderRadius: 'inherit',
-                }}
+                <div
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    position: 'absolute', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', gap: 8, opacity: 0, transition: 'opacity .2s',
+                    borderRadius: 'inherit',
+                  }}
                   className="admin-card-overlay"
                 >
                   <button onClick={() => setQrItem(item)} title="QR Code"
@@ -587,6 +667,9 @@ function CatalogTab({ categories }: { categories: EquipmentCategoryDoc[] }) {
                   </div>
                 )}
                 {item.description && <div className="product-description">{item.description}</div>}
+                {item.notes && (
+                  <div className="product-notes"><AlertTriangle size={11} style={{ display: 'inline', verticalAlign: '-1px', marginRight: 3 }} />{item.notes}</div>
+                )}
                 <div className="product-pricing">
                   {item.priceInclVat > 0
                     ? <span className="price-day">{item.priceInclVat} kr/day</span>
@@ -598,6 +681,8 @@ function CatalogTab({ categories }: { categories: EquipmentCategoryDoc[] }) {
           ))}
         </div>
       )}
+
+      {infoItem && <InfoModal item={infoItem} cohorts={cohorts} onClose={() => setInfoItem(null)} />}
 
       {showForm && <ItemForm existing={editItem} onClose={() => { setShowForm(false); setEditItem(null) }} categories={categories} />}
       {qrItem && <QRModal item={qrItem} onClose={() => setQrItem(null)} />}

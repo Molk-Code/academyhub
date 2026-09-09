@@ -498,7 +498,7 @@ function ProjectDetail({
   }
 
   async function unarchiveProject() {
-    await onUpdate({ status: 'returned' })
+    await onUpdate({ status: 'active' })
   }
 
   async function withActionFlash(state: 'complete' | 'archive' | 'unarchive', action: () => Promise<void>) {

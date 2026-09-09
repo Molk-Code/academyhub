@@ -477,6 +477,7 @@ service cloud.firestore {
             && resource.data.status in ['pending', 'confirmed']
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
             && request.resource.data.status == 'cancelled');
+      allow delete: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'));
     }
 
     match /inventory_projects/{projectId} {

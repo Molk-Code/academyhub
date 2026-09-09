@@ -962,7 +962,7 @@ export default function EquipmentBookingPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {myBookings.map(b => {
                   const statusColors: Record<string, string> = {
-                    pending: '#f59e0b', confirmed: '#3b82f6',
+                    pending: '#f59e0b', confirmed: '#4cd964',
                     'checked-out': '#f97316', returned: '#4cd964', denied: '#f87171', cancelled: '#6b7280',
                   }
                   const statusIcons: Record<string, React.ReactNode> = {

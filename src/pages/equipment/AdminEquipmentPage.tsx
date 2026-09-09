@@ -62,7 +62,7 @@ const BOOKING_STATUSES = ['all', 'pending', 'confirmed', 'checked-out', 'returne
 
 const STATUS_COLOR: Record<string, string> = {
   pending:       '#f59e0b',
-  confirmed:     '#3b82f6',
+  confirmed:     '#4cd964',
   'checked-out': '#f97316',
   returned:      '#4cd964',
   denied:        '#f87171',
@@ -795,6 +795,19 @@ function BookingsTab() {
     }
   }
 
+  async function deleteBooking(b: EquipmentBookingDoc) {
+    const warning = b.linkedProjectId
+      ? `Delete this booking request? Its linked inventory project will NOT be deleted — only the booking record itself.`
+      : `Delete this booking request? This cannot be undone.`
+    if (!confirm(warning)) return
+    setSavingId(b.id)
+    try {
+      await deleteDoc(doc(db, 'equipment_bookings', b.id))
+    } finally {
+      setSavingId(null)
+    }
+  }
+
   const pendingCount = sorted.filter(b => b.status === 'pending').length
 
   return (
@@ -950,6 +963,14 @@ function BookingsTab() {
                           Reopen
                         </button>
                       )}
+                      <button
+                        disabled={savingId === b.id}
+                        onClick={() => deleteBooking(b)}
+                        title="Delete this booking"
+                        style={{ marginLeft: 'auto', padding: '6px 10px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8, color: '#f87171', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                   </div>
                 )}

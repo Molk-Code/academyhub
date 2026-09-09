@@ -1,16 +1,16 @@
 import { useState, useMemo } from 'react'
-import { updateDoc, doc } from 'firebase/firestore'
+import { updateDoc, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
 import type { EquipmentBookingDoc } from '@/types'
-import { Package, CheckCircle, XCircle, ChevronRight } from 'lucide-react'
+import { Package, CheckCircle, XCircle, ChevronRight, Trash2 } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { useNavigate } from 'react-router-dom'
 
 const STATUS_STYLE: Record<string, string> = {
   pending:       'text-amber-300 bg-amber-900/30 border-amber-700/40',
-  confirmed:     'text-blue-300 bg-blue-900/30 border-blue-700/40',
+  confirmed:     'text-green-300 bg-green-900/30 border-green-700/40',
   'checked-out': 'text-orange-300 bg-orange-900/30 border-orange-700/40',
   returned:      'text-green-300 bg-green-900/30 border-green-700/40',
   denied:        'text-rose-300 bg-rose-900/30 border-rose-700/40',
@@ -76,6 +76,19 @@ export default function EquipmentRequests() {
     }
   }
 
+  async function handleDelete(booking: EquipmentBookingDoc) {
+    const warning = booking.linkedProjectId
+      ? 'Delete this booking request? Its linked inventory project will NOT be deleted — only the booking record itself.'
+      : 'Delete this booking request? This cannot be undone.'
+    if (!window.confirm(warning)) return
+    setConfirmingId(booking.id)
+    try {
+      await deleteDoc(doc(db, 'equipment_bookings', booking.id))
+    } finally {
+      setConfirmingId(null)
+    }
+  }
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       <div className="flex items-center gap-3">
@@ -134,6 +147,7 @@ export default function EquipmentRequests() {
                 </div>
 
                 {/* Actions */}
+                <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
                 {booking.status === 'pending' && (
                   <div className="flex gap-2 flex-shrink-0">
                     <button
@@ -184,6 +198,15 @@ export default function EquipmentRequests() {
                     Denied
                   </button>
                 )}
+                  <button
+                    onClick={() => handleDelete(booking)}
+                    disabled={confirmingId === booking.id}
+                    title="Delete this booking"
+                    className="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               {/* Items */}

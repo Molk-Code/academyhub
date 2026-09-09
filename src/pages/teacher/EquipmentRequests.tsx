@@ -67,6 +67,15 @@ export default function EquipmentRequests() {
     navigate(`/teacher/inventory?fromBooking=${booking.id}`)
   }
 
+  async function handleReopen(id: string) {
+    setConfirmingId(id)
+    try {
+      await updateDoc(doc(db, 'equipment_bookings', id), { status: 'pending' })
+    } finally {
+      setConfirmingId(null)
+    }
+  }
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       <div className="flex items-center gap-3">
@@ -133,7 +142,7 @@ export default function EquipmentRequests() {
                       className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white rounded-lg transition-colors"
                     >
                       <CheckCircle className="w-3.5 h-3.5" />
-                      Confirm
+                      Accept
                     </button>
                     <button
                       onClick={() => { setDenyTarget(booking); setDenyReason('') }}
@@ -144,13 +153,35 @@ export default function EquipmentRequests() {
                     </button>
                   </div>
                 )}
-                {booking.status === 'confirmed' && (
+                {booking.status === 'confirmed' && !booking.linkedProjectId && (
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => handleReopen(booking.id)}
+                      disabled={confirmingId === booking.id}
+                      title="Click to undo and move back to pending"
+                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white rounded-lg transition-colors"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      Accepted
+                    </button>
+                    <button
+                      onClick={() => handleCreateProject(booking)}
+                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-brand-700 hover:bg-brand-600 text-white rounded-lg transition-colors"
+                    >
+                      Create Inventory Project
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+                {booking.status === 'denied' && (
                   <button
-                    onClick={() => handleCreateProject(booking)}
-                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-brand-700 hover:bg-brand-600 text-white rounded-lg transition-colors flex-shrink-0"
+                    onClick={() => handleReopen(booking.id)}
+                    disabled={confirmingId === booking.id}
+                    title="Click to undo and move back to pending"
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded-lg transition-colors flex-shrink-0"
                   >
-                    Create Inventory Project
-                    <ChevronRight className="w-3.5 h-3.5" />
+                    <XCircle className="w-3.5 h-3.5" />
+                    Denied
                   </button>
                 )}
               </div>

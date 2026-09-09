@@ -883,7 +883,7 @@ function BookingsTab() {
                             onClick={() => setStatus(b.id, 'confirmed')}
                             style={{ padding: '6px 14px', background: 'rgba(76,217,100,.15)', border: '1px solid rgba(76,217,100,.3)', borderRadius: 8, color: '#4cd964', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                           >
-                            {savingId === b.id ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={12} />} Confirm
+                            {savingId === b.id ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={12} />} Accept
                           </button>
                           <button
                             disabled={savingId === b.id}
@@ -895,12 +895,32 @@ function BookingsTab() {
                         </>
                       )}
                       {b.status === 'confirmed' && !b.linkedProjectId && (
+                        <>
+                          <button
+                            disabled={savingId === b.id}
+                            title="Click to undo and move back to pending"
+                            onClick={() => setStatus(b.id, 'pending')}
+                            style={{ padding: '6px 14px', background: 'rgba(76,217,100,.15)', border: '1px solid rgba(76,217,100,.3)', borderRadius: 8, color: '#4cd964', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                          >
+                            <Check size={12} /> Accepted
+                          </button>
+                          <button
+                            disabled={savingId === b.id}
+                            onClick={() => navigate(`/admin/inventory?fromBooking=${b.id}`)}
+                            style={{ padding: '6px 14px', background: 'rgba(249,115,22,.15)', border: '1px solid rgba(249,115,22,.3)', borderRadius: 8, color: '#f97316', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                          >
+                            Set Up in Inventory <ArrowRight size={12} />
+                          </button>
+                        </>
+                      )}
+                      {b.status === 'denied' && (
                         <button
                           disabled={savingId === b.id}
-                          onClick={() => navigate(`/admin/inventory?fromBooking=${b.id}`)}
-                          style={{ padding: '6px 14px', background: 'rgba(249,115,22,.15)', border: '1px solid rgba(249,115,22,.3)', borderRadius: 8, color: '#f97316', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                          title="Click to undo and move back to pending"
+                          onClick={() => setStatus(b.id, 'pending')}
+                          style={{ padding: '6px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8, color: '#f87171', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                         >
-                          Set Up in Inventory <ArrowRight size={12} />
+                          <X size={12} /> Denied
                         </button>
                       )}
                       {b.status === 'checked-out' && b.linkedProjectId && (
@@ -921,7 +941,7 @@ function BookingsTab() {
                           <CheckCircle2 size={12} /> Mark Returned
                         </button>
                       )}
-                      {(b.status === 'returned' || b.status === 'denied' || b.status === 'cancelled') && !b.linkedProjectId && (
+                      {(b.status === 'returned' || b.status === 'cancelled') && !b.linkedProjectId && (
                         <button
                           disabled={savingId === b.id}
                           onClick={() => setStatus(b.id, 'pending')}

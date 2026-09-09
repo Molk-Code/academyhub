@@ -49,6 +49,15 @@ function overdueDays(returnDate: string): number {
   return diff > 0 ? diff : 0
 }
 
+// Individual-unit QR codes are encoded as "<qrCode or name>::<unit number>"
+// (see qrUnitValue in AdminEquipmentPage) so a scan can be traced back to a
+// specific physical unit rather than just the equipment type.
+function parseScanText(raw: string): { base: string; unit: number | null } {
+  const m = raw.match(/^(.*)::(\d+)$/)
+  if (m) return { base: m[1], unit: parseInt(m[2], 10) }
+  return { base: raw, unit: null }
+}
+
 function beep(freq: number) {
   try {
     const ctx = new AudioContext()
@@ -318,6 +327,7 @@ function ProjectDetail({
             await updateDoc(doc(db, `inventory_projects/${project.id}/items`, match.id), {
               status: 'returned', checkinTimestamp: new Date().toISOString(),
             })
+            if (match.equipmentId) await adjustEquipmentAvailable(match.equipmentId, 1)
           }
           beep(660)
           setScanEntries(prev => [{ name: equipmentName, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 19)])
@@ -424,11 +434,15 @@ function ProjectDetail({
 
   async function handleScan(text: string) {
     setScanEntries(prev => [{ name: text, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 19)])
+    const { base, unit } = parseScanText(text)
+    const matchedEquip = equipmentAll.find(e => e.id === base || e.qrCode === base || e.name === base)
+    const displayName = matchedEquip
+      ? (unit ? `${matchedEquip.name} #${unit}` : matchedEquip.name)
+      : text
     if (scanMode === 'checkout') {
-      const matchedEquip = equipmentAll.find(e => e.qrCode === text || e.name === text)
       await addDoc(collection(db, `inventory_projects/${project.id}/items`), {
         equipmentId: matchedEquip?.id ?? '',
-        equipmentName: matchedEquip?.name ?? text,
+        equipmentName: displayName,
         checkoutTimestamp: new Date().toISOString(),
         checkinTimestamp: '',
         status: 'checked-out',
@@ -437,7 +451,7 @@ function ProjectDetail({
       })
       if (matchedEquip) await adjustEquipmentAvailable(matchedEquip.id, -1)
     } else {
-      const match = items.find(i => i.status === 'checked-out' && i.equipmentName === text)
+      const match = items.find(i => i.status === 'checked-out' && i.equipmentName === displayName)
       if (match) {
         await updateDoc(doc(db, `inventory_projects/${project.id}/items`, match.id), {
           status: 'returned',

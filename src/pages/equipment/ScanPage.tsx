@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { doc, addDoc, updateDoc, collection, serverTimestamp, onSnapshot, getDocs } from 'firebase/firestore'
+import { doc, addDoc, updateDoc, collection, serverTimestamp, onSnapshot, getDocs, increment } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { BrowserMultiFormatReader } from '@zxing/browser'
@@ -109,13 +109,20 @@ export default function ScanPage() {
     const sess = sessionRef.current
     if (!sess || !sess.active || !sessionId) return
 
-    const equipmentName = equipmentCacheRef.current[text] ?? text
+    // Individual-unit QRs are encoded as "<equipmentId>::<unit number>" so a
+    // scan can be traced back to a specific physical unit (see qrUnitValue).
+    const m = text.match(/^(.*)::(\d+)$/)
+    const base = m ? m[1] : text
+    const unit = m ? m[2] : null
+    const baseName = equipmentCacheRef.current[base] ?? base
+    const equipmentName = unit ? `${baseName} #${unit}` : baseName
+    const equipmentId = equipmentCacheRef.current[base] ? base : ''
     let ok = false
 
     try {
       if (sess.mode === 'checkout') {
         await addDoc(collection(db, `inventory_projects/${sess.projectId}/items`), {
-          equipmentId: equipmentCacheRef.current[text] ? text : '',
+          equipmentId,
           equipmentName,
           checkoutTimestamp: new Date().toISOString(),
           checkinTimestamp: '',
@@ -124,10 +131,11 @@ export default function ScanPage() {
           assignedTo: '',
           scannedViaSession: sessionId,
         })
+        if (equipmentId) await updateDoc(doc(db, 'equipment', equipmentId), { available: increment(-1) })
       } else {
         await addDoc(collection(db, `scan_sessions/${sessionId}/checkins`), {
           equipmentName,
-          equipmentId: equipmentCacheRef.current[text] ? text : '',
+          equipmentId,
           scannedAt: serverTimestamp(),
         })
       }

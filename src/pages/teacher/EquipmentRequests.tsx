@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react'
-import { updateDoc, doc, addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { updateDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
 import type { EquipmentBookingDoc } from '@/types'
@@ -14,13 +13,13 @@ const STATUS_STYLE: Record<string, string> = {
   confirmed:     'text-blue-300 bg-blue-900/30 border-blue-700/40',
   'checked-out': 'text-orange-300 bg-orange-900/30 border-orange-700/40',
   returned:      'text-green-300 bg-green-900/30 border-green-700/40',
+  denied:        'text-rose-300 bg-rose-900/30 border-rose-700/40',
   cancelled:     'text-zinc-400 bg-zinc-800/40 border-zinc-600/40',
 }
 
 type StatusFilter = 'pending' | 'confirmed' | 'all'
 
 export default function EquipmentRequests() {
-  const { profile } = useAuth()
   const navigate = useNavigate()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending')
   const [denyTarget, setDenyTarget] = useState<EquipmentBookingDoc | null>(null)
@@ -54,7 +53,7 @@ export default function EquipmentRequests() {
     setDenySubmitting(true)
     try {
       await updateDoc(doc(db, 'equipment_bookings', denyTarget.id), {
-        status: 'cancelled',
+        status: 'denied',
         teacherNotes: denyReason.trim(),
       })
       setDenyTarget(null)
@@ -64,22 +63,8 @@ export default function EquipmentRequests() {
     }
   }
 
-  async function handleCreateProject(booking: EquipmentBookingDoc) {
-    if (!profile) return
-    const ref = await addDoc(collection(db, 'inventory_projects'), {
-      name: booking.projectName,
-      borrowers: [booking.studentName],
-      borrowerIds: [booking.studentId],
-      equipmentManagerId: profile.uid,
-      equipmentManagerName: profile.displayName ?? '',
-      cohortId: booking.cohortId ?? '',
-      checkoutDate: booking.checkoutDate,
-      returnDate: booking.returnDate,
-      status: 'active',
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
-    navigate(`/teacher/inventory/project/${ref.id}`)
+  function handleCreateProject(booking: EquipmentBookingDoc) {
+    navigate(`/teacher/inventory?fromBooking=${booking.id}`)
   }
 
   return (

@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDoc, setDoc, increment, writeBatch,
 } from 'firebase/firestore'
@@ -11,6 +12,7 @@ import {
   ShoppingCart, X, Search, Package, Calendar, Check,
   AlertTriangle, CheckCircle2, Pencil, Trash2, QrCode,
   Printer, Upload, Loader2, Plus, ToggleRight, ToggleLeft, ChevronUp, ChevronDown,
+  ArrowRight, ExternalLink,
 } from 'lucide-react'
 import './molkom.css'
 
@@ -56,13 +58,14 @@ function catStyle(name: string, cats: EquipmentCategoryDoc[]): React.CSSProperti
   return { color: c.text, background: c.bg, border: `1px solid ${c.border}` }
 }
 
-const BOOKING_STATUSES = ['all', 'pending', 'confirmed', 'checked-out', 'returned', 'cancelled'] as const
+const BOOKING_STATUSES = ['all', 'pending', 'confirmed', 'checked-out', 'returned', 'denied', 'cancelled'] as const
 
 const STATUS_COLOR: Record<string, string> = {
   pending:       '#f59e0b',
   confirmed:     '#3b82f6',
   'checked-out': '#f97316',
   returned:      '#4cd964',
+  denied:        '#f87171',
   cancelled:     '#6b7280',
 }
 
@@ -744,6 +747,7 @@ function CatalogTab({ categories }: { categories: EquipmentCategoryDoc[] }) {
 // ── Bookings Tab ──────────────────────────────────────────────────────────────
 
 function BookingsTab() {
+  const navigate = useNavigate()
   const { data: bookings } = useCollection<EquipmentBookingDoc>('equipment_bookings')
   const sorted = useMemo(
     () => [...bookings].sort((a, b) => {
@@ -883,23 +887,32 @@ function BookingsTab() {
                           </button>
                           <button
                             disabled={savingId === b.id}
-                            onClick={() => setStatus(b.id, 'cancelled')}
+                            onClick={() => setStatus(b.id, 'denied')}
                             style={{ padding: '6px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8, color: '#f87171', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }}
                           >
-                            Cancel
+                            Deny
                           </button>
                         </>
                       )}
-                      {b.status === 'confirmed' && (
+                      {b.status === 'confirmed' && !b.linkedProjectId && (
                         <button
                           disabled={savingId === b.id}
-                          onClick={() => setStatus(b.id, 'checked-out')}
-                          style={{ padding: '6px 14px', background: 'rgba(249,115,22,.15)', border: '1px solid rgba(249,115,22,.3)', borderRadius: 8, color: '#f97316', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }}
+                          onClick={() => navigate(`/admin/inventory?fromBooking=${b.id}`)}
+                          style={{ padding: '6px 14px', background: 'rgba(249,115,22,.15)', border: '1px solid rgba(249,115,22,.3)', borderRadius: 8, color: '#f97316', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                         >
-                          Mark Checked Out
+                          Set Up in Inventory <ArrowRight size={12} />
                         </button>
                       )}
-                      {b.status === 'checked-out' && (
+                      {b.status === 'checked-out' && b.linkedProjectId && (
+                        <button
+                          disabled={savingId === b.id}
+                          onClick={() => navigate(`/admin/inventory?openProject=${b.linkedProjectId}`)}
+                          style={{ padding: '6px 14px', background: 'rgba(76,217,100,.1)', border: '1px solid rgba(76,217,100,.25)', borderRadius: 8, color: '#4cd964', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          View in Inventory <ExternalLink size={12} />
+                        </button>
+                      )}
+                      {b.status === 'checked-out' && !b.linkedProjectId && (
                         <button
                           disabled={savingId === b.id}
                           onClick={() => setStatus(b.id, 'returned')}
@@ -908,7 +921,7 @@ function BookingsTab() {
                           <CheckCircle2 size={12} /> Mark Returned
                         </button>
                       )}
-                      {(b.status === 'returned' || b.status === 'cancelled') && (
+                      {(b.status === 'returned' || b.status === 'denied' || b.status === 'cancelled') && !b.linkedProjectId && (
                         <button
                           disabled={savingId === b.id}
                           onClick={() => setStatus(b.id, 'pending')}

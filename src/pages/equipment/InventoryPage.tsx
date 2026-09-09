@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { StatsContent } from './InventoryStats'
 import {
-  collection, collectionGroup, addDoc, updateDoc, deleteDoc, doc, getDocs,
-  serverTimestamp, query, where, onSnapshot, increment,
+  collection, collectionGroup, addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs,
+  serverTimestamp, query, where, onSnapshot, increment, writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection } from '@/hooks/useFirestore'
-import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, InventoryPresetDoc, InventoryPresetItem, UserDoc } from '@/types'
+import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, InventoryPresetDoc, InventoryPresetItem, UserDoc, EquipmentBookingDoc } from '@/types'
 import {
   Package, Calendar, Users, Clock, AlertTriangle, Check, Trash2, Plus, Minus,
   ChevronDown, ChevronRight, ArrowLeft, Edit2, CheckCircle2, ArchiveRestore,
@@ -933,15 +934,17 @@ function ProjectDetail({
 function CreateProjectForm({
   onBack,
   onCreate,
+  fromBooking,
 }: {
   onBack: () => void
   onCreate: (id: string) => void
+  fromBooking?: EquipmentBookingDoc | null
 }) {
   const { profile } = useAuth()
-  const [name, setName] = useState('')
-  const [checkoutDate, setCheckoutDate] = useState(today())
-  const [returnDate, setReturnDate] = useState('')
-  const [borrowers, setBorrowers] = useState<string[]>([])
+  const [name, setName] = useState(fromBooking?.projectName ?? '')
+  const [checkoutDate, setCheckoutDate] = useState(fromBooking?.checkoutDate || today())
+  const [returnDate, setReturnDate] = useState(fromBooking?.returnDate ?? '')
+  const [borrowers, setBorrowers] = useState<string[]>(fromBooking?.studentName ? [fromBooking.studentName] : [])
   const [borrowerInput, setBorrowerInput] = useState('')
   const [manager, setManager] = useState(profile?.displayName ?? '')
   const [managerId, setManagerId] = useState(profile?.uid ?? '')
@@ -952,7 +955,9 @@ function CreateProjectForm({
   const { data: presets } = useCollection<InventoryPresetDoc>('inventory_presets')
   const sortedPresets = useMemo(() => [...presets].sort((a, b) => a.name.localeCompare(b.name)), [presets])
   const [selectedPresetId, setSelectedPresetId] = useState('')
-  const [presetItems, setPresetItems] = useState<InventoryPresetItem[]>([])
+  const [presetItems, setPresetItems] = useState<InventoryPresetItem[]>(
+    fromBooking?.items?.map(i => ({ ...i })) ?? [],
+  )
 
   useEffect(() => {
     async function load() {
@@ -1032,6 +1037,12 @@ function CreateProjectForm({
           await updateDoc(doc(db, 'equipment', item.equipmentId), { available: increment(-item.quantity) })
         }
       }
+      if (fromBooking) {
+        await updateDoc(doc(db, 'equipment_bookings', fromBooking.id), {
+          status: 'checked-out',
+          linkedProjectId: ref.id,
+        })
+      }
       onCreate(ref.id)
     } finally {
       setSubmitting(false)
@@ -1042,6 +1053,12 @@ function CreateProjectForm({
     <div className="inv-form-page">
       <button className="back-btn" onClick={onBack}>← Back</button>
       <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f0f0f5', marginBottom: '1.5rem' }}>Create New Project</h2>
+
+      {fromBooking && (
+        <div style={{ background: 'rgba(76,217,100,.08)', border: '1px solid rgba(76,217,100,.25)', borderRadius: 10, padding: '10px 14px', marginBottom: '1.25rem', fontSize: '.85rem', color: '#c0c0d5' }}>
+          Setting up from <strong style={{ color: '#4cd964' }}>{fromBooking.studentName}</strong>'s accepted booking request. Project name, dates and equipment have been preloaded below — fill in the rest to finish checkout.
+        </div>
+      )}
 
       <div className="inv-form">
         {sortedPresets.length > 0 && (
@@ -1363,6 +1380,28 @@ export default function InventoryPage() {
   const [createProject, setCreateProject] = useState(false)
   const [archivedOpen, setArchivedOpen] = useState(false)
 
+  // Handoff from an accepted equipment booking (see AdminEquipmentPage's Bookings tab)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [fromBooking, setFromBooking] = useState<EquipmentBookingDoc | null>(null)
+  useEffect(() => {
+    const bookingId = searchParams.get('fromBooking')
+    const openProjectId = searchParams.get('openProject')
+    if (bookingId) {
+      getDoc(doc(db, 'equipment_bookings', bookingId)).then(snap => {
+        if (snap.exists()) {
+          setFromBooking({ id: snap.id, ...snap.data() } as EquipmentBookingDoc)
+          setCreateProject(true)
+        }
+      })
+    } else if (openProjectId) {
+      setSelectedProjectId(openProjectId)
+    }
+    if (bookingId || openProjectId) {
+      setSearchParams(prev => { prev.delete('fromBooking'); prev.delete('openProject'); return prev }, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const activeProjects = useMemo(
     () => projects.filter(p => ['active', 'checked-out'].includes(p.status))
       .sort((a, b) => (b.createdAt as any)?.seconds - (a.createdAt as any)?.seconds || 0),
@@ -1405,8 +1444,9 @@ export default function InventoryPage() {
     return (
       <div className="molkom-app" style={{ background: '#0a0a0f', minHeight: '100vh', padding: '1.5rem' }}>
         <CreateProjectForm
-          onBack={() => setCreateProject(false)}
-          onCreate={id => { setCreateProject(false); setSelectedProjectId(id) }}
+          fromBooking={fromBooking}
+          onBack={() => { setCreateProject(false); setFromBooking(null) }}
+          onCreate={id => { setCreateProject(false); setFromBooking(null); setSelectedProjectId(id) }}
         />
       </div>
     )

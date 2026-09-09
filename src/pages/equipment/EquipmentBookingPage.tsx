@@ -963,12 +963,12 @@ export default function EquipmentBookingPage() {
                 {myBookings.map(b => {
                   const statusColors: Record<string, string> = {
                     pending: '#f59e0b', confirmed: '#3b82f6',
-                    'checked-out': '#f97316', returned: '#4cd964', cancelled: '#6b7280',
+                    'checked-out': '#f97316', returned: '#4cd964', denied: '#f87171', cancelled: '#6b7280',
                   }
                   const statusIcons: Record<string, React.ReactNode> = {
                     pending: <Clock size={13} />, confirmed: <Check size={13} />,
                     'checked-out': <Truck size={13} />, returned: <RotateCcw size={13} />,
-                    cancelled: <XCircle size={13} />,
+                    denied: <XCircle size={13} />, cancelled: <XCircle size={13} />,
                   }
                   const color = statusColors[b.status] ?? '#8a8aab'
                   return (

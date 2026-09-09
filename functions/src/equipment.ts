@@ -107,10 +107,19 @@ export const onEquipmentBookingUpdated = functions.firestore
         url:   '/booking/equipment',
         tag:   'equipment-booking',
       })
+    } else if (after.status === 'denied') {
+      await sendPush(tokens, {
+        title: '❌ Equipment booking denied',
+        body:  after.teacherNotes
+          ? `Your equipment request for "${after.projectName}" was denied: ${after.teacherNotes}`
+          : `Your equipment request for "${after.projectName}" was denied`,
+        url:   '/booking/equipment',
+        tag:   'equipment-booking',
+      })
     } else if (after.status === 'cancelled') {
       await sendPush(tokens, {
-        title: '❌ Equipment booking cancelled',
-        body:  `Your equipment request for "${after.projectName}" was not approved`,
+        title: '🗑️ Equipment booking cancelled',
+        body:  `Your equipment request for "${after.projectName}" was cancelled`,
         url:   '/booking/equipment',
         tag:   'equipment-booking',
       })

@@ -363,7 +363,7 @@ export interface EquipmentCategoryDoc {
   color: string      // tailwind-like color key, e.g. "blue"
   order: number
 }
-export type EquipmentBookingStatus = 'pending' | 'confirmed' | 'checked-out' | 'returned' | 'cancelled'
+export type EquipmentBookingStatus = 'pending' | 'confirmed' | 'denied' | 'checked-out' | 'returned' | 'cancelled'
 export type InventoryProjectStatus = 'active' | 'checked-out' | 'returned' | 'archived'
 export type InventoryItemStatus = 'checked-out' | 'returned' | 'damaged' | 'missing'
 
@@ -407,6 +407,7 @@ export interface EquipmentBookingDoc {
   returnDate: string
   status: EquipmentBookingStatus
   teacherNotes: string
+  linkedProjectId?: string   // set once "Set Up in Inventory" has created the inventory_projects doc
   productionId?: string
   productionTitle?: string
   productionReadiness?: { score: number; hasBreakdown: boolean; hasCrew: boolean; hasCast: boolean; hasLocations: boolean; hasSchedule: boolean }

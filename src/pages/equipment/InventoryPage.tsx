@@ -452,7 +452,15 @@ function ProjectDetail({
     setManualInput('')
   }
 
+  // Dismiss the inline "describe damage" input for an item — used whenever a
+  // different action is taken on it, so a stale open input doesn't linger.
+  function clearInlineDamage(itemId: string) {
+    setInlineDamage(prev => { const n = { ...prev }; delete n[itemId]; return n })
+    setDamageEdit(prev => { const n = { ...prev }; delete n[itemId]; return n })
+  }
+
   async function returnItem(item: InventoryItemDoc) {
+    clearInlineDamage(item.id)
     await updateDoc(doc(db, `inventory_projects/${project.id}/items`, item.id), {
       status: 'returned',
       checkinTimestamp: new Date().toISOString(),
@@ -462,6 +470,7 @@ function ProjectDetail({
   // Undo an accidental return — checkoutTimestamp is left untouched, so the
   // item goes back to being checked out from its original checkout time.
   async function undoReturn(item: InventoryItemDoc) {
+    clearInlineDamage(item.id)
     await updateDoc(doc(db, `inventory_projects/${project.id}/items`, item.id), {
       status: 'checked-out',
       checkinTimestamp: '',
@@ -469,6 +478,7 @@ function ProjectDetail({
   }
 
   async function markMissing(item: InventoryItemDoc) {
+    clearInlineDamage(item.id)
     await updateDoc(doc(db, `inventory_projects/${project.id}/items`, item.id), { status: 'missing' })
   }
 
@@ -477,14 +487,15 @@ function ProjectDetail({
       status: 'damaged',
       damageNotes: note,
     })
-    setInlineDamage(prev => { const n = { ...prev }; delete n[item.id]; return n })
-    setDamageEdit(prev => { const n = { ...prev }; delete n[item.id]; return n })
+    clearInlineDamage(item.id)
   }
 
   async function resolveDamage(item: InventoryItemDoc) {
+    clearInlineDamage(item.id)
     await updateDoc(doc(db, `inventory_projects/${project.id}/items`, item.id), {
       status: 'returned',
       damageNotes: '',
+      checkinTimestamp: new Date().toISOString(),
     })
   }
 
@@ -801,7 +812,9 @@ function ProjectDetail({
               <div className={`project-item-row ${statusRowClass(item.status)}`}>
                 <span className="project-item-name">{item.equipmentName}</span>
                 <span className="project-item-time">
-                  {item.checkoutTimestamp ? new Date(item.checkoutTimestamp).toLocaleString() : ''}
+                  {item.status === 'returned' && item.checkinTimestamp
+                    ? new Date(item.checkinTimestamp).toLocaleString()
+                    : item.checkoutTimestamp ? new Date(item.checkoutTimestamp).toLocaleString() : ''}
                 </span>
                 {item.status === 'returned' ? (
                   <button

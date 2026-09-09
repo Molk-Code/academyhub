@@ -89,7 +89,7 @@ function printQRLabel(name: string, id: string, category: string, container: HTM
   const svg = container.querySelector('svg')
   if (!svg) return
   const svgData = new XMLSerializer().serializeToString(svg)
-  const win = window.open('', '_blank', 'width=400,height=400')
+  const win = window.open('', '_blank', 'width=700,height=800')
   if (!win) return
   win.document.write(`<html><head><title>QR — ${name}</title>
     <style>

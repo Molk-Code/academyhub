@@ -279,6 +279,7 @@ function ProjectDetail({
   const [scanEntries, setScanEntries] = useState<{ name: string; time: string }[]>([])
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [actionState, setActionState] = useState<'idle' | 'complete' | 'archive' | 'unarchive'>('idle')
   const [manualInput, setManualInput] = useState('')
   const [showPicker, setShowPicker] = useState(false)
   const [inlineDamage, setInlineDamage] = useState<Record<string, string>>({})
@@ -496,6 +497,16 @@ function ProjectDetail({
     await onUpdate({ status: 'archived' })
   }
 
+  async function unarchiveProject() {
+    await onUpdate({ status: 'returned' })
+  }
+
+  async function withActionFlash(state: 'complete' | 'archive' | 'unarchive', action: () => Promise<void>) {
+    setActionState(state)
+    await Promise.all([action(), new Promise(r => setTimeout(r, 600))])
+    setActionState('idle')
+  }
+
   async function saveEdit() {
     await onUpdate({ name: editName, returnDate: editReturn })
     setEditing(false)
@@ -593,14 +604,34 @@ function ProjectDetail({
         <button className="primary-btn" onClick={generateContract}>
           Download Contract PDF
         </button>
-        {['active', 'checked-out'].includes(project.status) && (
-          <button className="secondary-btn" onClick={async () => { await markAllReturned(); await archiveProject() }}>
-            <CheckCircle2 size={16} /> Complete & Archive
+        {((['active', 'checked-out'].includes(project.status) && actionState === 'idle') || actionState === 'complete') && (
+          <button
+            className="secondary-btn"
+            disabled={actionState === 'complete'}
+            style={actionState === 'complete' ? { background: '#4cd964', borderColor: '#4cd964', color: '#000' } : undefined}
+            onClick={() => withActionFlash('complete', async () => { await markAllReturned(); await archiveProject() })}
+          >
+            {actionState === 'complete' ? <><Check size={16} /> Done!</> : <><CheckCircle2 size={16} /> Complete & Archive</>}
           </button>
         )}
-        {['returned', 'archived'].includes(project.status) && (
-          <button className="secondary-btn" onClick={archiveProject}>
-            <ArchiveRestore size={16} /> Archive
+        {((project.status === 'returned' && actionState === 'idle') || actionState === 'archive') && (
+          <button
+            className="secondary-btn"
+            disabled={actionState === 'archive'}
+            style={actionState === 'archive' ? { background: '#4cd964', borderColor: '#4cd964', color: '#000' } : undefined}
+            onClick={() => withActionFlash('archive', archiveProject)}
+          >
+            {actionState === 'archive' ? <><Check size={16} /> Archived!</> : <><ArchiveRestore size={16} /> Archive</>}
+          </button>
+        )}
+        {((project.status === 'archived' && actionState === 'idle') || actionState === 'unarchive') && (
+          <button
+            className="secondary-btn"
+            disabled={actionState === 'unarchive'}
+            style={actionState === 'unarchive' ? { background: '#4cd964', borderColor: '#4cd964', color: '#000' } : undefined}
+            onClick={() => withActionFlash('unarchive', unarchiveProject)}
+          >
+            {actionState === 'unarchive' ? <><Check size={16} /> Unarchived!</> : <><ArchiveRestore size={16} /> Unarchive</>}
           </button>
         )}
         {confirmDelete ? (

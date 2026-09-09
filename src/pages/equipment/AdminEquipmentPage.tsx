@@ -679,24 +679,23 @@ function CatalogTab({ categories }: { categories: EquipmentCategoryDoc[] }) {
                 )}
                 {/* Hover actions */}
                 <div
-                  onClick={e => e.stopPropagation()}
                   style={{
                     position: 'absolute', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex',
                     alignItems: 'center', justifyContent: 'center', gap: 8, opacity: 0, transition: 'opacity .2s',
-                    borderRadius: 'inherit',
+                    borderRadius: 'inherit', pointerEvents: 'none',
                   }}
                   className="admin-card-overlay"
                 >
-                  <button onClick={() => setQrItem(item)} title="QR Code"
-                    style={{ padding: 8, background: 'rgba(30,30,40,.9)', border: '1px solid #2a2a3a', borderRadius: 8, color: '#c0c0d5', cursor: 'pointer' }}>
+                  <button onClick={e => { e.stopPropagation(); setQrItem(item) }} title="QR Code"
+                    style={{ padding: 8, background: 'rgba(30,30,40,.9)', border: '1px solid #2a2a3a', borderRadius: 8, color: '#c0c0d5', cursor: 'pointer', pointerEvents: 'auto' }}>
                     <QrCode size={16} />
                   </button>
-                  <button onClick={() => { setEditItem(item); setShowForm(true) }} title="Edit"
-                    style={{ padding: 8, background: 'rgba(30,30,40,.9)', border: '1px solid #2a2a3a', borderRadius: 8, color: '#c0c0d5', cursor: 'pointer' }}>
+                  <button onClick={e => { e.stopPropagation(); setEditItem(item); setShowForm(true) }} title="Edit"
+                    style={{ padding: 8, background: 'rgba(30,30,40,.9)', border: '1px solid #2a2a3a', borderRadius: 8, color: '#c0c0d5', cursor: 'pointer', pointerEvents: 'auto' }}>
                     <Pencil size={16} />
                   </button>
-                  <button onClick={() => handleDelete(item)} disabled={deletingId === item.id} title="Delete"
-                    style={{ padding: 8, background: 'rgba(60,10,10,.9)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, color: '#f87171', cursor: 'pointer' }}>
+                  <button onClick={e => { e.stopPropagation(); handleDelete(item) }} disabled={deletingId === item.id} title="Delete"
+                    style={{ padding: 8, background: 'rgba(60,10,10,.9)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 8, color: '#f87171', cursor: 'pointer', pointerEvents: 'auto' }}>
                     {deletingId === item.id ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={16} />}
                   </button>
                 </div>

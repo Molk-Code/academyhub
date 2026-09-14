@@ -8,15 +8,25 @@ export async function sendPush(
   tokens: string[],
   opts: { title: string; body: string; url?: string; tag?: string },
 ) {
-  if (tokens.length === 0) return
+  if (tokens.length === 0) {
+    console.log('sendPush skipped — recipient has no registered fcmTokens', { title: opts.title })
+    return
+  }
   const uniqueTokens = [...new Set(tokens)]
   try {
     for (let i = 0; i < uniqueTokens.length; i += 500) {
       const chunk = uniqueTokens.slice(i, i + 500)
       const res = await admin.messaging().sendEachForMulticast({
         tokens: chunk,
-        // Data-only — no notification field so FCM does not auto-display.
-        // The service worker's onBackgroundMessage handler is the sole display path.
+        // Both a notification payload (so the OS/browser can auto-display the
+        // push even if the service worker never wakes to run onBackgroundMessage
+        // — notably unreliable for data-only pushes on iOS PWA) and a data
+        // payload (used by onBackgroundMessage/onMessage when they do run, and
+        // for the notificationclick handler's target URL).
+        notification: {
+          title: opts.title,
+          body:  opts.body,
+        },
         data: {
           title: opts.title,
           body:  opts.body,
@@ -25,6 +35,14 @@ export async function sendPush(
         },
         webpush: {
           headers: { Urgency: 'high' },
+          notification: {
+            icon:  '/icons/icon-192.png',
+            badge: '/icons/icon-192.png',
+            tag:   opts.tag ?? 'cineforge',
+          },
+          fcmOptions: {
+            link: opts.url ?? '/',
+          },
         },
       })
       const successCount = res.responses.filter(r => r.success).length

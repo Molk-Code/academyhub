@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useFeature } from '@/hooks/useFeature'
 import { useCollection, useDocument, where } from '@/hooks/useFirestore'
 import { markFoodBoxSeen, markMinivanSeen } from '@/hooks/useBookingBadge'
-import type { InventoryProjectDoc, InventoryItemDoc, FoodBoxOrderDoc, MinivanBookingDoc } from '@/types'
+import type { InventoryProjectDoc, InventoryItemDoc, FoodBoxOrderDoc, MinivanBookingDoc, EquipmentBookingDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import {
   ClipboardList, Package, UtensilsCrossed, Car,
@@ -42,6 +42,7 @@ const STATUS_STYLE: Record<string, string> = {
   confirmed:    'bg-emerald-950/40 text-emerald-300 border-emerald-800/50',
   approved:     'bg-emerald-950/40 text-emerald-300 border-emerald-800/50',
   cancelled:    'bg-zinc-800 text-zinc-500 border-white/10',
+  denied:       'bg-rose-950/40 text-rose-300 border-rose-800/50',
   rejected:     'bg-rose-950/40 text-rose-300 border-rose-800/50',
 }
 
@@ -56,6 +57,7 @@ const STATUS_ICON: Record<string, React.ReactNode> = {
   confirmed:     <CheckCircle2 className="w-3 h-3" />,
   approved:      <CheckCircle2 className="w-3 h-3" />,
   cancelled:     <XCircle className="w-3 h-3" />,
+  denied:        <XCircle className="w-3 h-3" />,
   rejected:      <XCircle className="w-3 h-3" />,
 }
 
@@ -97,6 +99,22 @@ function useEquipmentProjects(uid: string, enabled: boolean) {
   )
   const items = useProjectItems(sorted.map(p => p.id))
   return { projects: sorted, items }
+}
+
+function useEquipmentBookingRequests(uid: string, enabled: boolean) {
+  const { data: bookings } = useCollection<EquipmentBookingDoc>(
+    'equipment_bookings',
+    enabled ? [where('studentId', '==', uid)] : [],
+    enabled,
+  )
+  // Once accepted and set up in Inventory, the linked project card takes over —
+  // drop the raw booking request from this list so it isn't shown twice.
+  return useMemo(
+    () => bookings
+      .filter(b => !b.linkedProjectId)
+      .sort((a, b) => ((b.createdAt as any)?.toMillis?.() ?? 0) - ((a.createdAt as any)?.toMillis?.() ?? 0)),
+    [bookings],
+  )
 }
 
 function useFoodBoxOrders(uid: string, enabled: boolean) {
@@ -187,6 +205,47 @@ function EquipmentProjectsSection({ projects, items }: {
   )
 }
 
+// ── Equipment booking requests section ───────────────────────────────────────
+// Requests still in the pending/confirmed/denied stage — before "Set Up in
+// Inventory" turns one into a real checked-out project (shown above instead).
+
+function BookingRequestsSection({ bookings }: { bookings: EquipmentBookingDoc[] }) {
+  if (bookings.length === 0) return null
+
+  return (
+    <div className="space-y-3">
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
+        <Package className="w-4 h-4" /> Equipment Requests
+      </h2>
+      <div className="space-y-2">
+        {bookings.map(b => (
+          <div key={b.id} className="bg-zinc-900 rounded-xl border border-white/10 px-4 py-3 space-y-2">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-zinc-200">{b.projectName}</p>
+                <p className="text-xs text-zinc-400 mt-0.5">{fmtDate(b.checkoutDate)} → {fmtDate(b.returnDate)}</p>
+              </div>
+              <StatusPill status={b.status} />
+            </div>
+            {b.items?.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {b.items.map((it, i) => (
+                  <span key={i} className="text-xs px-2.5 py-1 rounded-full border bg-zinc-800/60 text-zinc-300 border-white/10">
+                    {it.quantity}× {it.equipmentName}
+                  </span>
+                ))}
+              </div>
+            )}
+            {b.status === 'denied' && b.teacherNotes && (
+              <p className="text-xs text-rose-300/80 italic border-l-2 border-rose-800/50 pl-2">{b.teacherNotes}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Food box section ─────────────────────────────────────────────────────────
 
 function FoodBoxSection({ orders }: { orders: FoodBoxOrderDoc[] }) {
@@ -269,6 +328,7 @@ export default function MyBookings() {
   const showVehicles  = canVehicles  && navVis?.student?.['vehicle']   !== false
 
   const { projects, items } = useEquipmentProjects(uid, !!uid && showEquipment)
+  const bookingRequests     = useEquipmentBookingRequests(uid, !!uid && showEquipment)
   const foodOrders          = useFoodBoxOrders(uid, !!uid && showFoodBox)
   const vanBookings         = useMinivanBookings(uid, !!uid && showVehicles)
 
@@ -281,7 +341,7 @@ export default function MyBookings() {
 
   if (!profile) return null
 
-  const nothingToShow = projects.length === 0 && foodOrders.length === 0 && vanBookings.length === 0
+  const nothingToShow = projects.length === 0 && bookingRequests.length === 0 && foodOrders.length === 0 && vanBookings.length === 0
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -299,6 +359,7 @@ export default function MyBookings() {
         </div>
       ) : (
         <>
+          {showEquipment && <BookingRequestsSection bookings={bookingRequests} />}
           {showEquipment && <EquipmentProjectsSection projects={projects} items={items} />}
           {showFoodBox   && <FoodBoxSection orders={foodOrders} />}
           {showVehicles  && <MinivanSection bookings={vanBookings} />}

@@ -84,46 +84,50 @@ export const onEquipmentBookingUpdated = functions.firestore
     const before = change.before.data()
     const after  = change.after.data()
     if (before.status === after.status) return null
-    const studentSnap = await db.collection('users').doc(after.studentId as string).get()
+    const studentId = after.studentId as string
+    const studentSnap = await db.collection('users').doc(studentId).get()
     const tokens: string[] = studentSnap.data()?.fcmTokens ?? []
+
+    let opts: { title: string; body: string; url: string } | null = null
     if (after.status === 'confirmed') {
-      await sendPush(tokens, {
+      opts = {
         title: '✅ Equipment booking confirmed',
         body:  `Your equipment for "${after.projectName}" has been confirmed`,
-        url:   '/booking/equipment',
-        tag:   'equipment-booking',
-      })
+        url:   '/my-bookings',
+      }
     } else if (after.status === 'checked-out') {
-      await sendPush(tokens, {
+      opts = {
         title: '📦 Equipment checked out',
         body:  `Equipment for "${after.projectName}" has been handed over — remember to return it on time`,
-        url:   '/booking/equipment',
-        tag:   'equipment-booking',
-      })
+        url:   '/my-bookings',
+      }
     } else if (after.status === 'returned') {
-      await sendPush(tokens, {
+      opts = {
         title: '✅ Equipment returned',
         body:  `Your equipment for "${after.projectName}" has been marked as returned`,
-        url:   '/booking/equipment',
-        tag:   'equipment-booking',
-      })
+        url:   '/my-bookings',
+      }
     } else if (after.status === 'denied') {
-      await sendPush(tokens, {
+      opts = {
         title: '❌ Equipment booking denied',
         body:  after.teacherNotes
           ? `Your equipment request for "${after.projectName}" was denied: ${after.teacherNotes}`
           : `Your equipment request for "${after.projectName}" was denied`,
-        url:   '/booking/equipment',
-        tag:   'equipment-booking',
-      })
+        url:   '/my-bookings',
+      }
     } else if (after.status === 'cancelled') {
-      await sendPush(tokens, {
+      opts = {
         title: '🗑️ Equipment booking cancelled',
         body:  `Your equipment request for "${after.projectName}" was cancelled`,
-        url:   '/booking/equipment',
-        tag:   'equipment-booking',
-      })
+        url:   '/my-bookings',
+      }
     }
+    if (!opts) return null
+
+    await Promise.all([
+      sendPush(tokens, { ...opts, tag: 'equipment-booking' }),
+      saveNotifications([studentId], opts),
+    ])
     return null
   })
 

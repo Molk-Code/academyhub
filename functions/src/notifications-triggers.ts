@@ -77,6 +77,46 @@ export const onSubmissionCreated = functions.firestore
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// onAbsenceReportCreated — push to the cohort's assigned teacher(s)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const onAbsenceReportCreated = functions.firestore
+  .document('absence_reports/{reportId}')
+  .onCreate(async (snap) => {
+    const report = snap.data()
+    // Teachers can also log an absence directly for a student (status starts
+    // 'reviewed' in that flow) — only notify for student self-reports, so a
+    // teacher doesn't get pushed about their own action.
+    if (report.status !== 'pending') return null
+    const cohortId = report.cohortId as string | undefined
+    if (!cohortId) return null
+
+    const cohortSnap = await db.collection('cohorts').doc(cohortId).get()
+    const teacherIds: string[] = cohortSnap.data()?.teacherIds ?? []
+    if (teacherIds.length === 0) return null
+
+    const teacherSnaps = await Promise.all(teacherIds.map(uid => db.collection('users').doc(uid).get()))
+    const tokens: string[] = []
+    teacherSnaps.forEach(d => tokens.push(...(d.data()?.fcmTokens ?? [])))
+
+    const studentName: string = report.studentName ?? 'A student'
+    const when = report.type === 'lesson' && report.lessonTitle
+      ? `"${report.lessonTitle}" on ${report.date}`
+      : `${report.date}`
+
+    const opts = {
+      title: '🤒 Absence reported',
+      body:  `${studentName} reported an absence for ${when}`,
+      url:   '/teacher/students',
+    }
+    await Promise.all([
+      tokens.length > 0 ? sendPush(tokens, { ...opts, tag: 'absence-report' }) : Promise.resolve(),
+      saveNotifications(teacherIds, opts),
+    ])
+    return null
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
 // onChatMessage — push notification to all channel members except the sender
 // ─────────────────────────────────────────────────────────────────────────────
 

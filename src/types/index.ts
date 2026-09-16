@@ -1024,7 +1024,8 @@ export interface ProductionDoc {
   screenplayUrl?: string
   screenplayName?: string
   periodId?: string
-  productionType?: 'period' | 'side'
+  productionType?: 'period' | 'side' | 'custom'
+  description?: string   // custom projects only — their sole content besides the title
   productionPeriodId?: string | null
   budgetLimit?: number
 }

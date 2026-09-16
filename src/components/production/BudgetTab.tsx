@@ -11,7 +11,7 @@ interface BudgetTabProps {
   shootingDays: ProductionShootingDayDoc[]
   budgetLimit?: number
   budgetCurrency?: string
-  productionType?: 'period' | 'side'
+  productionType?: 'period' | 'side' | 'custom'
   canEdit?: boolean
 }
 

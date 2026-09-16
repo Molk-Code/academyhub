@@ -346,6 +346,11 @@ export default function EquipmentBookingPage() {
     if (userProductions.length === 0) return
     let cancelled = false
     async function loadOne(prod: ProductionDoc) {
+      // Custom projects have no planning subcollections and are always ready —
+      // description + title is all they need before booking equipment.
+      if (prod.productionType === 'custom') {
+        return { id: prod.id, scenes: [], crew: [], cast: [], locations: [], days: [], isCustom: true }
+      }
       const [scenesSnap, crewSnap, castSnap, locSnap, daysSnap] = await Promise.all([
         getDocs(collection(db, `productions/${prod.id}/scenes`)),
         getDocs(collection(db, `productions/${prod.id}/crew`)),
@@ -360,6 +365,7 @@ export default function EquipmentBookingPage() {
         cast:     castSnap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionCastDoc)),
         locations: locSnap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionLocationDoc)),
         days:     daysSnap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionShootingDayDoc)),
+        isCustom: false,
       }
     }
     async function loadAll() {
@@ -369,7 +375,11 @@ export default function EquipmentBookingPage() {
         if (cancelled) return
         setProductionReadiness(prev => {
           const next = { ...prev }
-          results.forEach(r => { next[r.id] = getProductionReadiness(r.scenes, r.crew, r.cast, r.locations, r.days) })
+          results.forEach(r => {
+            next[r.id] = r.isCustom
+              ? { isReady: true, score: 100, missing: [], hasBreakdown: true, hasCrew: true, hasCast: true, hasLocations: true, hasSchedule: true }
+              : getProductionReadiness(r.scenes, r.crew, r.cast, r.locations, r.days)
+          })
           return next
         })
         setProductionShootingDays(prev => {
@@ -401,6 +411,7 @@ export default function EquipmentBookingPage() {
   // is fresh even if it changed while this page was open.
   useEffect(() => {
     if (!selectedProductionId) return
+    if (selectedProduction?.productionType === 'custom') return
     let cancelled = false
     ;(async () => {
       try {
@@ -603,8 +614,9 @@ export default function EquipmentBookingPage() {
                   <div style={{ flex: 1 }}>
                     <h2 style={{ fontWeight: 700, fontSize: '1rem', color: '#f0f0f5', marginBottom: 4 }}>Select a production to book equipment</h2>
                     <p style={{ fontSize: '.82rem', color: '#6a6a80', marginBottom: '1rem' }}>
-                      Equipment can only be booked for a registered production with a completed plan.
-                      Your production needs a script breakdown, crew, cast, locations and shooting schedule.
+                      Equipment can only be booked for a registered production with a completed plan
+                      (script breakdown, crew, cast, locations and shooting schedule) — or a Custom Project,
+                      which only needs a name and description.
                     </p>
                     {readinessLoading ? (
                       <p style={{ fontSize: '.82rem', color: '#4a4a60' }}>Loading productions…</p>

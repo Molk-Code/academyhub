@@ -1,14 +1,115 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, where } from '@/hooks/useFirestore'
 import type { ProductionTeamDoc, UserDoc, ProductionDoc, ProductionPeriodDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { cn } from '@/lib/utils'
-import { Plus, Film, Clock, Globe, Lock, X, Users, CalendarRange } from 'lucide-react'
+import { Plus, Film, Clock, Globe, Lock, X, Users, CalendarRange, Trash2 } from 'lucide-react'
 import StudentProductionPeriod from '@/pages/student/ProductionPeriod'
+
+function EditCustomProjectModal({ production, canEdit, canDelete, onClose }: {
+  production: ProductionDoc
+  canEdit: boolean
+  canDelete: boolean
+  onClose: () => void
+}) {
+  const [title,       setTitle]       = useState(production.title)
+  const [description, setDescription] = useState(production.description ?? '')
+  const [saving,      setSaving]      = useState(false)
+  const [deleting,    setDeleting]    = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  async function save() {
+    if (!title.trim()) return
+    setSaving(true)
+    try {
+      await updateDoc(doc(db, 'productions', production.id), {
+        title: title.trim(),
+        description: description.trim(),
+        updatedAt: serverTimestamp(),
+      })
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function remove() {
+    setDeleting(true)
+    try {
+      await deleteDoc(doc(db, 'productions', production.id))
+      onClose()
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">🗂️ Custom Project</h2>
+          <button onClick={onClose} className="p-1.5 text-zinc-400 hover:text-zinc-200 rounded-lg">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div>
+          <label className="label">Name</label>
+          <input
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            disabled={!canEdit}
+            className="input w-full disabled:opacity-60"
+          />
+        </div>
+        <div>
+          <label className="label">Description</label>
+          <textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            disabled={!canEdit}
+            className="input w-full resize-none disabled:opacity-60"
+            rows={4}
+          />
+        </div>
+        {canEdit && (
+          <div className="flex gap-3">
+            <button
+              onClick={save}
+              disabled={saving || !title.trim()}
+              className="btn-primary py-2.5 px-6 flex-1 disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            {canDelete && (confirmDelete ? (
+              <button
+                onClick={remove}
+                disabled={deleting}
+                className="flex items-center gap-1.5 py-2.5 px-4 rounded-xl text-sm font-medium bg-rose-950/60 text-rose-300 border border-rose-800/50 hover:bg-rose-900/60 transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'Deleting…' : 'Confirm delete'}
+              </button>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="p-2.5 text-zinc-500 hover:text-rose-400 rounded-xl hover:bg-rose-950/30 transition-colors"
+                title="Delete project"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function relTime(ts: any): string {
   if (!ts?.toDate) return ''
@@ -25,10 +126,12 @@ export default function StudentProduction() {
   const navigate = useNavigate()
   const [showNew,         setShowNew]         = useState(false)
   const [newTitle,        setNewTitle]        = useState('')
+  const [newDescription,  setNewDescription]  = useState('')
   const [creating,        setCreating]        = useState(false)
   const [prodTab,         setProdTab]         = useState<'crew' | 'period' | 'productions'>('crew')
-  const [productionType,  setProductionType]  = useState<'period' | 'side'>('period')
+  const [productionType,  setProductionType]  = useState<'period' | 'side' | 'custom'>('period')
   const [selectedPeriodId,setSelectedPeriodId] = useState('')
+  const [editCustom,      setEditCustom]      = useState<ProductionDoc | null>(null)
 
   const { data: teams, loading: teamsLoading } = useCollection<ProductionTeamDoc>(
     'production_teams',
@@ -136,6 +239,7 @@ export default function StudentProduction() {
 
   async function createProduction() {
     if (!newTitle.trim() || !profile || !cohortId) return
+    if (productionType === 'custom' && !newDescription.trim()) return
     setCreating(true)
     const linkedPeriod = productionType === 'period' && selectedPeriodId
       ? periods.find(p => p.id === selectedPeriodId) ?? null
@@ -153,13 +257,16 @@ export default function StudentProduction() {
         updatedAt: serverTimestamp(),
         lastEditedBy: profile.uid,
         productionType,
+        ...(productionType === 'custom' ? { description: newDescription.trim() } : {}),
         productionPeriodId: linkedPeriod?.id ?? null,
         periodId: linkedPeriod?.id ?? null,
         ...(linkedPeriod?.budgetPerProduction != null ? { budgetLimit: linkedPeriod.budgetPerProduction } : {}),
       })
       setShowNew(false)
       setNewTitle('')
-      navigate(`/production/planning/${ref.id}`)
+      setNewDescription('')
+      // Custom projects have nothing to plan — skip the full production editor.
+      if (productionType !== 'custom') navigate(`/production/planning/${ref.id}`)
     } finally {
       setCreating(false)
     }
@@ -170,23 +277,29 @@ export default function StudentProduction() {
   const sortedCommandments = myTeam ? [...myTeam.commandments].sort((a, b) => a.order - b.order) : []
 
   function ProductionCard({ prod }: { prod: ProductionDoc }) {
+    const isCustom = prod.productionType === 'custom'
     return (
       <button
-        onClick={() => navigate(`/production/planning/${prod.id}`)}
+        onClick={() => isCustom ? setEditCustom(prod) : navigate(`/production/planning/${prod.id}`)}
         className="w-full text-left bg-zinc-900 border border-white/10 rounded-2xl p-4 hover:border-brand-500/40 hover:bg-zinc-800/80 transition-all group"
       >
         <div className="flex items-start gap-3 mb-2">
-          <div className="w-9 h-9 rounded-xl bg-brand-600/20 flex items-center justify-center text-lg flex-shrink-0">🎬</div>
+          <div className="w-9 h-9 rounded-xl bg-brand-600/20 flex items-center justify-center text-lg flex-shrink-0">{isCustom ? '🗂️' : '🎬'}</div>
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-zinc-100 truncate group-hover:text-brand-400 transition-colors text-sm">{prod.title}</p>
             <div className="flex items-center gap-1.5 mt-0.5">
-              {prod.isPublic
-                ? <span className="text-[10px] text-emerald-500 flex items-center gap-0.5"><Globe className="w-2.5 h-2.5" />Shared</span>
-                : <span className="text-[10px] text-zinc-600 flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" />Private</span>
+              {isCustom
+                ? <span className="text-[10px] text-zinc-500">Custom project</span>
+                : prod.isPublic
+                  ? <span className="text-[10px] text-emerald-500 flex items-center gap-0.5"><Globe className="w-2.5 h-2.5" />Shared</span>
+                  : <span className="text-[10px] text-zinc-600 flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" />Private</span>
               }
             </div>
           </div>
         </div>
+        {isCustom && prod.description && (
+          <p className="text-xs text-zinc-500 line-clamp-2 mb-2">{prod.description}</p>
+        )}
         <div className="flex items-center gap-1 text-[10px] text-zinc-500">
           <Clock className="w-3 h-3" />
           {relTime(prod.updatedAt ?? prod.createdAt)}
@@ -405,7 +518,7 @@ export default function StudentProduction() {
             <div>
               <label className="label">Type</label>
               <div className="flex gap-2">
-                {(['period', 'side'] as const).map(t => (
+                {(['period', 'side', 'custom'] as const).map(t => (
                   <button
                     key={t}
                     type="button"
@@ -417,10 +530,15 @@ export default function StudentProduction() {
                         : 'bg-zinc-800 border-white/10 text-zinc-400 hover:text-zinc-200',
                     )}
                   >
-                    {t === 'period' ? '📅 Period production' : '✨ Side project'}
+                    {t === 'period' ? '📅 Period production' : t === 'side' ? '✨ Side project' : '🗂️ Custom project'}
                   </button>
                 ))}
               </div>
+              {productionType === 'custom' && (
+                <p className="text-xs text-zinc-500 mt-2">
+                  A lightweight project with just a name and description — no planning tools, ready to book equipment for immediately.
+                </p>
+              )}
             </div>
             {productionType === 'period' && periods.length > 0 && (
               <div>
@@ -437,18 +555,40 @@ export default function StudentProduction() {
                 </select>
               </div>
             )}
+            {productionType === 'custom' && (
+              <div>
+                <label className="label">Description</label>
+                <textarea
+                  value={newDescription}
+                  onChange={e => setNewDescription(e.target.value)}
+                  className="input w-full resize-none"
+                  rows={3}
+                  placeholder="What's this project for?"
+                />
+              </div>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={createProduction}
-                disabled={creating || !newTitle.trim()}
+                disabled={creating || !newTitle.trim() || (productionType === 'custom' && !newDescription.trim())}
                 className="btn-primary py-2.5 px-6 flex-1 disabled:opacity-50"
               >
-                {creating ? 'Creating…' : 'Create & Open'}
+                {creating ? 'Creating…' : productionType === 'custom' ? 'Create' : 'Create & Open'}
               </button>
               <button onClick={() => setShowNew(false)} className="btn-secondary py-2.5 px-4">Cancel</button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Edit custom project modal ────────────────────────────────── */}
+      {editCustom && (
+        <EditCustomProjectModal
+          production={editCustom}
+          canEdit={editCustom.createdBy === profile?.uid || (editCustom.collaborators?.includes(profile?.uid ?? '') ?? false)}
+          canDelete={editCustom.createdBy === profile?.uid}
+          onClose={() => setEditCustom(null)}
+        />
       )}
     </div>
   )

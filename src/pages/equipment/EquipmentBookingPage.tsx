@@ -91,7 +91,7 @@ export default function EquipmentBookingPage() {
   const { data: equipmentRaw } = useCollection<EquipmentDoc>('equipment')
   const { data: cohort } = useDocument<CohortDoc>('cohorts', cohortId || null)
   const { data: navVis } = useDocument<{ id: string; student: Record<string, boolean> }>('settings', 'nav_visibility')
-  const canCreateProduction = navVis?.student?.['production'] !== false
+  const productionNavEnabled = navVis?.student?.['production'] !== false
   const { data: myBookings } = useCollection<EquipmentBookingDoc>(
     'equipment_bookings',
     profile?.uid ? [where('studentId', '==', profile.uid), orderBy('createdAt', 'desc')] : [],
@@ -165,6 +165,9 @@ export default function EquipmentBookingPage() {
       if (snap.exists()) setRequireProductionSetting(snap.data().requireProductionForBooking !== false)
     })
   }, [])
+  // If Production is turned off in Nav Settings entirely, equipment can never
+  // require one — there'd be no way to select or create one.
+  const productionRequired = requireProductionSetting && productionNavEnabled
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<EquipmentCategory>('ALL')
   const [modalItem, setModalItem] = useState<EquipmentDoc | null>(null)
@@ -601,7 +604,7 @@ export default function EquipmentBookingPage() {
 
       <div className="main">
         {/* Production selector — only shown when production is required */}
-        {requireProductionSetting && (view === 'browse' || view === 'checkout') && (
+        {productionRequired && (view === 'browse' || view === 'checkout') && (
           <div style={{ marginBottom: '1.5rem' }}>
             {!selectedProductionId ? (
               <div style={{ background: 'rgba(249,115,22,.08)', border: '1px solid rgba(249,115,22,.3)', borderRadius: 16, padding: '1.5rem' }}>
@@ -619,7 +622,7 @@ export default function EquipmentBookingPage() {
                     ) : userProductions.length === 0 ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <p style={{ fontSize: '.82rem', color: '#4a4a60' }}>You have no productions yet.</p>
-                        {canCreateProduction && (
+                        {productionNavEnabled && (
                           <Link to="/production" style={{ background: '#f97316', color: '#fff', fontWeight: 700, fontSize: '.8rem', padding: '7px 14px', borderRadius: 10, textDecoration: 'none' }}>
                             Go to Productions →
                           </Link>
@@ -764,7 +767,7 @@ export default function EquipmentBookingPage() {
                   const outOfStock = item.available <= 0
                   const locked = isItemLocked(item)
                   const budgetBlocked = !inCart && isOverEquipmentBudget(item)
-                  const needsProduction = requireProductionSetting && item.requiresProduction !== false
+                  const needsProduction = productionRequired && item.requiresProduction !== false
                   const disabled = outOfStock || locked || budgetBlocked
                   return (
                     <div className={`product-card${inCart ? ' card-added' : ''}`} key={item.id}

@@ -85,14 +85,13 @@ function weeklyRate(pricePerDay: number): number {
 }
 
 export default function EquipmentBookingPage() {
-  const { profile, role, loading: authLoading, cohortId: ctxCohortId, previewCohortId } = useAuth()
+  const { profile, loading: authLoading, cohortId: ctxCohortId, previewCohortId } = useAuth()
   const cohortId = ctxCohortId ?? previewCohortId ?? profile?.cohortId ?? ''
-  // Use profile.role as fallback — token claims can lag behind or be missing
-  const effectiveRole = role ?? profile?.role ?? null
-  const isStaff = effectiveRole === 'teacher' || effectiveRole === 'admin'
 
   const { data: equipmentRaw } = useCollection<EquipmentDoc>('equipment')
   const { data: cohort } = useDocument<CohortDoc>('cohorts', cohortId || null)
+  const { data: navVis } = useDocument<{ id: string; student: Record<string, boolean> }>('settings', 'nav_visibility')
+  const canCreateProduction = navVis?.student?.['production'] !== false
   const { data: myBookings } = useCollection<EquipmentBookingDoc>(
     'equipment_bookings',
     profile?.uid ? [where('studentId', '==', profile.uid), orderBy('createdAt', 'desc')] : [],
@@ -100,35 +99,32 @@ export default function EquipmentBookingPage() {
     profile?.uid ?? '',
   )
 
-  // Teachers/admins see all productions; students see productions they created or collaborate on.
-  // Firestore rules reject the cohortId-only query for students because it can't guarantee readability.
-  const { data: staffProductions } = useCollection<ProductionDoc>(
-    'productions',
-    [],
-    !!profile && !authLoading && isStaff,
-    'staff-all',
-  )
+  // Always scope to productions this user personally created or collaborates
+  // on — never someone else's, staff included. Also scoped to the currently
+  // active cohort context, so a teacher/admin in student preview only sees
+  // productions created within that same preview session, not ones created
+  // outside of preview under their real account.
   const { data: myOwnProds } = useCollection<ProductionDoc>(
     'productions',
     profile?.uid ? [where('createdBy', '==', profile.uid)] : [],
-    !!profile?.uid && !authLoading && !isStaff,
+    !!profile?.uid && !authLoading,
     `own:${profile?.uid ?? ''}`,
   )
   const { data: collabProds } = useCollection<ProductionDoc>(
     'productions',
     profile?.uid ? [where('collaborators', 'array-contains', profile.uid)] : [],
-    !!profile?.uid && !authLoading && !isStaff,
+    !!profile?.uid && !authLoading,
     `collab:${profile?.uid ?? ''}`,
   )
   const userProductions = useMemo(() => {
-    if (isStaff) return staffProductions
     const seen = new Set<string>()
     return [...myOwnProds, ...collabProds].filter(p => {
       if (seen.has(p.id)) return false
       seen.add(p.id)
+      if (cohortId && p.cohortId !== cohortId) return false
       return true
     })
-  }, [isStaff, staffProductions, myOwnProds, collabProds])
+  }, [myOwnProds, collabProds, cohortId])
 
   const [selectedProductionId, setSelectedProductionId] = useState<string | null>(null)
   const [productionReadiness, setProductionReadiness] = useState<Record<string, ProductionReadiness>>({})
@@ -623,9 +619,11 @@ export default function EquipmentBookingPage() {
                     ) : userProductions.length === 0 ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <p style={{ fontSize: '.82rem', color: '#4a4a60' }}>You have no productions yet.</p>
-                        <Link to="/production" style={{ background: '#f97316', color: '#fff', fontWeight: 700, fontSize: '.8rem', padding: '7px 14px', borderRadius: 10, textDecoration: 'none' }}>
-                          Go to Productions →
-                        </Link>
+                        {canCreateProduction && (
+                          <Link to="/production" style={{ background: '#f97316', color: '#fff', fontWeight: 700, fontSize: '.8rem', padding: '7px 14px', borderRadius: 10, textDecoration: 'none' }}>
+                            Go to Productions →
+                          </Link>
+                        )}
                       </div>
                     ) : (
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 10 }}>

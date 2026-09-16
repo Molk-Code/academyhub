@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
-import { useCollection, where } from '@/hooks/useFirestore'
+import { useCollection, useDocument, where } from '@/hooks/useFirestore'
 import type { ProductionTeamDoc, UserDoc, ProductionDoc, ProductionPeriodDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { cn } from '@/lib/utils'
@@ -132,6 +132,9 @@ export default function StudentProduction() {
   const [productionType,  setProductionType]  = useState<'period' | 'side' | 'custom'>('period')
   const [selectedPeriodId,setSelectedPeriodId] = useState('')
   const [editCustom,      setEditCustom]      = useState<ProductionDoc | null>(null)
+
+  const { data: navVis } = useDocument<{ id: string; student: Record<string, boolean> }>('settings', 'nav_visibility')
+  const canCreateProduction = navVis?.student?.['production'] !== false
 
   const { data: teams, loading: teamsLoading } = useCollection<ProductionTeamDoc>(
     'production_teams',
@@ -339,15 +342,19 @@ export default function StudentProduction() {
           <p className="text-5xl mb-4">🎬</p>
           <h2 className="text-xl font-bold text-white mb-2">No productions yet</h2>
           <p className="text-gray-400 text-sm mb-6 max-w-xs mx-auto">
-            Create your first production to start planning your film, or wait for your teacher to add you to a crew.
+            {canCreateProduction
+              ? 'Create your first production to start planning your film, or wait for your teacher to add you to a crew.'
+              : 'Wait for your teacher to add you to a crew.'}
           </p>
           <div className="flex gap-3 justify-center flex-wrap">
-            <button
-              onClick={() => setShowNew(true)}
-              className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors text-sm"
-            >
-              + Create Production
-            </button>
+            {canCreateProduction && (
+              <button
+                onClick={() => setShowNew(true)}
+                className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors text-sm"
+              >
+                + Create Production
+              </button>
+            )}
             <a href="/guide" className="bg-white/10 hover:bg-white/15 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors text-sm">
               Read the guide
             </a>
@@ -440,12 +447,14 @@ export default function StudentProduction() {
           <h2 className="section-title flex items-center gap-2">
             <Film className="w-4 h-4 text-brand-500" /> Productions
           </h2>
-          <button
-            onClick={() => setShowNew(true)}
-            className="btn-primary flex items-center gap-1.5 py-2 px-4 text-sm"
-          >
-            <Plus className="w-4 h-4" /> New
-          </button>
+          {canCreateProduction && (
+            <button
+              onClick={() => setShowNew(true)}
+              className="btn-primary flex items-center gap-1.5 py-2 px-4 text-sm"
+            >
+              <Plus className="w-4 h-4" /> New
+            </button>
+          )}
         </div>
 
         {/* My productions */}
@@ -484,15 +493,17 @@ export default function StudentProduction() {
           <div className="bg-zinc-900 border border-white/10 rounded-2xl p-10 text-center">
             <span className="text-4xl block mb-3">🎬</span>
             <p className="text-zinc-400 text-sm">No productions yet — start planning your film!</p>
-            <button onClick={() => setShowNew(true)} className="mt-4 btn-primary py-2 px-5 text-sm">
-              Create First Production
-            </button>
+            {canCreateProduction && (
+              <button onClick={() => setShowNew(true)} className="mt-4 btn-primary py-2 px-5 text-sm">
+                Create First Production
+              </button>
+            )}
           </div>
         )}
       </div>}
 
       {/* ── New production modal ─────────────────────────────────────── */}
-      {showNew && (
+      {showNew && canCreateProduction && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onClick={e => { if (e.target === e.currentTarget) setShowNew(false) }}

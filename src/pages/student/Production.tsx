@@ -128,6 +128,7 @@ export default function StudentProduction() {
   const [newTitle,        setNewTitle]        = useState('')
   const [newDescription,  setNewDescription]  = useState('')
   const [creating,        setCreating]        = useState(false)
+  const [createError,     setCreateError]     = useState<string | null>(null)
   const [prodTab,         setProdTab]         = useState<'crew' | 'period' | 'productions'>('crew')
   const [productionType,  setProductionType]  = useState<'period' | 'side' | 'custom'>('period')
   const [selectedPeriodId,setSelectedPeriodId] = useState('')
@@ -241,7 +242,9 @@ export default function StudentProduction() {
   )
 
   async function createProduction() {
-    if (!newTitle.trim() || !profile || !cohortId) return
+    setCreateError(null)
+    if (!newTitle.trim() || !profile) return
+    if (!cohortId) { setCreateError('No class selected — switch to Student Preview for a class first.'); return }
     if (productionType === 'custom' && !newDescription.trim()) return
     setCreating(true)
     const linkedPeriod = productionType === 'period' && selectedPeriodId
@@ -270,6 +273,8 @@ export default function StudentProduction() {
       setNewDescription('')
       // Custom projects have nothing to plan — skip the full production editor.
       if (productionType !== 'custom') navigate(`/production/planning/${ref.id}`)
+    } catch (e: any) {
+      setCreateError(e?.message ?? 'Failed to create production.')
     } finally {
       setCreating(false)
     }
@@ -349,7 +354,7 @@ export default function StudentProduction() {
           <div className="flex gap-3 justify-center flex-wrap">
             {canCreateProduction && (
               <button
-                onClick={() => setShowNew(true)}
+                onClick={() => { setShowNew(true); setCreateError(null) }}
                 className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors text-sm"
               >
                 + Create Production
@@ -449,7 +454,7 @@ export default function StudentProduction() {
           </h2>
           {canCreateProduction && (
             <button
-              onClick={() => setShowNew(true)}
+              onClick={() => { setShowNew(true); setCreateError(null) }}
               className="btn-primary flex items-center gap-1.5 py-2 px-4 text-sm"
             >
               <Plus className="w-4 h-4" /> New
@@ -494,7 +499,7 @@ export default function StudentProduction() {
             <span className="text-4xl block mb-3">🎬</span>
             <p className="text-zinc-400 text-sm">No productions yet — start planning your film!</p>
             {canCreateProduction && (
-              <button onClick={() => setShowNew(true)} className="mt-4 btn-primary py-2 px-5 text-sm">
+              <button onClick={() => { setShowNew(true); setCreateError(null) }} className="mt-4 btn-primary py-2 px-5 text-sm">
                 Create First Production
               </button>
             )}
@@ -541,7 +546,7 @@ export default function StudentProduction() {
                         : 'bg-zinc-800 border-white/10 text-zinc-400 hover:text-zinc-200',
                     )}
                   >
-                    {t === 'period' ? '📅 Period production' : t === 'side' ? '✨ Side project' : '🗂️ Custom project'}
+                    {t === 'period' ? '🏫 School Film' : t === 'side' ? '✨ Side project' : '🗂️ Custom project'}
                   </button>
                 ))}
               </div>
@@ -551,19 +556,23 @@ export default function StudentProduction() {
                 </p>
               )}
             </div>
-            {productionType === 'period' && periods.length > 0 && (
+            {productionType === 'period' && (
               <div>
-                <label className="label">Link to period <span className="text-zinc-500 font-normal">(optional)</span></label>
-                <select
-                  value={selectedPeriodId}
-                  onChange={e => setSelectedPeriodId(e.target.value)}
-                  className="input w-full"
-                >
-                  <option value="">— No period —</option>
-                  {periods.map(p => (
-                    <option key={p.id} value={p.id}>{p.title}</option>
-                  ))}
-                </select>
+                <label className="label">Production period <span className="text-zinc-500 font-normal">(optional)</span></label>
+                {periods.length > 0 ? (
+                  <select
+                    value={selectedPeriodId}
+                    onChange={e => setSelectedPeriodId(e.target.value)}
+                    className="input w-full"
+                  >
+                    <option value="">— No period —</option>
+                    {periods.map(p => (
+                      <option key={p.id} value={p.id}>{p.title}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-xs text-zinc-500">No production periods created for your class yet.</p>
+                )}
               </div>
             )}
             {productionType === 'custom' && (
@@ -578,10 +587,18 @@ export default function StudentProduction() {
                 />
               </div>
             )}
+            {!cohortId && (
+              <p className="text-xs text-amber-400 bg-amber-950/30 rounded-lg px-3 py-2">
+                No class selected — switch to Student Preview for a class to create a production.
+              </p>
+            )}
+            {createError && (
+              <p className="text-xs text-rose-400 bg-rose-950/40 rounded-lg px-3 py-2">{createError}</p>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={createProduction}
-                disabled={creating || !newTitle.trim() || (productionType === 'custom' && !newDescription.trim())}
+                disabled={creating || !newTitle.trim() || !cohortId || (productionType === 'custom' && !newDescription.trim())}
                 className="btn-primary py-2.5 px-6 flex-1 disabled:opacity-50"
               >
                 {creating ? 'Creating…' : productionType === 'custom' ? 'Create' : 'Create & Open'}

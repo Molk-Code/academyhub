@@ -82,7 +82,8 @@ export default function TeacherProduction() {
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
   const selectedTeam = teams.find(t => t.id === selectedTeamId) ?? null
 
-  const [teamPanel, setTeamPanel] = useState<'new' | null>(null)
+  const [teamPanel, setTeamPanel] = useState<'new' | 'edit' | null>(null)
+  const [editingTeamId, setEditingTeamId] = useState<string | null>(null)
   const [teamForm, setTeamForm] = useState({ name: '', emoji: '🎬', color: TEAM_COLORS[0] })
   const [savingTeam, setSavingTeam] = useState(false)
   const [teamError, setTeamError] = useState<string | null>(null)
@@ -154,6 +155,41 @@ export default function TeacherProduction() {
     if (!confirm('Delete this crew? All member assignments will be lost.')) return
     if (selectedTeamId === id) setSelectedTeamId(null)
     await deleteDoc(doc(db, 'production_teams', id))
+  }
+
+  function startEditTeam(team: ProductionTeamDoc) {
+    setTeamForm({ name: team.name, emoji: team.emoji, color: team.color })
+    setEditingTeamId(team.id)
+    setTeamPanel('edit')
+    setTeamError(null)
+  }
+
+  async function saveTeamEdit() {
+    if (!editingTeamId || !teamForm.name.trim()) return
+    setSavingTeam(true)
+    setTeamError(null)
+    try {
+      await updateDoc(doc(db, 'production_teams', editingTeamId), {
+        name: teamForm.name.trim(),
+        emoji: teamForm.emoji,
+        color: teamForm.color,
+      })
+      // Keep the crew's linked chat channel name in sync
+      const channel = allChannels.find(ch => (ch.allowedTeamIds ?? []).includes(editingTeamId))
+      if (channel) {
+        await updateDoc(doc(db, 'chat_channels', channel.id), {
+          name: `${teamForm.emoji} ${teamForm.name.trim()}`,
+          description: `Channel for the ${teamForm.name.trim()} crew`,
+        })
+      }
+      setTeamPanel(null)
+      setEditingTeamId(null)
+      setTeamForm({ name: '', emoji: '🎬', color: TEAM_COLORS[0] })
+    } catch (e: any) {
+      setTeamError(e.message ?? 'Failed to save crew. Check your permissions.')
+    } finally {
+      setSavingTeam(false)
+    }
   }
 
   async function toggleMember(studentId: string) {
@@ -312,6 +348,12 @@ export default function TeacherProduction() {
                         <p className="text-xs text-zinc-400">{team.memberIds.length} members · {team.commandments.length} commandments</p>
                       </div>
                       <button
+                        onMouseDown={e => { e.stopPropagation(); startEditTeam(team) }}
+                        className="p-1.5 text-zinc-300 hover:text-brand-400 transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
                         onMouseDown={e => { e.stopPropagation(); deleteTeam(team.id) }}
                         className="p-1.5 text-zinc-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
                       >
@@ -321,8 +363,11 @@ export default function TeacherProduction() {
                   </button>
                 ))}
 
-                {teamPanel === 'new' ? (
+                {teamPanel === 'new' || teamPanel === 'edit' ? (
                   <div className="bg-zinc-900 rounded-2xl border border-brand-200 p-4 space-y-3">
+                    {teamPanel === 'edit' && (
+                      <p className="text-xs font-semibold text-brand-400 uppercase tracking-wider">Editing crew</p>
+                    )}
                     {teamError && (
                       <p className="text-xs text-rose-400 bg-rose-950/40 rounded-lg px-3 py-2">{teamError}</p>
                     )}
@@ -332,7 +377,7 @@ export default function TeacherProduction() {
                       placeholder="Crew name…"
                       value={teamForm.name}
                       onChange={e => setTeamForm(f => ({ ...f, name: e.target.value }))}
-                      onKeyDown={e => e.key === 'Enter' && createTeam()}
+                      onKeyDown={e => e.key === 'Enter' && (teamPanel === 'edit' ? saveTeamEdit() : createTeam())}
                     />
                     <div>
                       <p className="text-xs text-zinc-400 mb-1.5">Icon</p>
@@ -356,10 +401,10 @@ export default function TeacherProduction() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={createTeam} disabled={savingTeam || !teamForm.name.trim()} className="btn-primary py-1.5 text-xs">
-                        <Check className="w-3.5 h-3.5" /> Create
+                      <button onClick={teamPanel === 'edit' ? saveTeamEdit : createTeam} disabled={savingTeam || !teamForm.name.trim()} className="btn-primary py-1.5 text-xs">
+                        <Check className="w-3.5 h-3.5" /> {teamPanel === 'edit' ? 'Save' : 'Create'}
                       </button>
-                      <button onClick={() => setTeamPanel(null)} className="btn-secondary py-1.5 text-xs"><X className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => { setTeamPanel(null); setEditingTeamId(null) }} className="btn-secondary py-1.5 text-xs"><X className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
                 ) : (

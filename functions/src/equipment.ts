@@ -1,5 +1,5 @@
 import { functions, db } from './lib'
-import { sendPush, saveNotifications, pushToAdmins, getOrCreateBookingsChannel, postToBookingsChannel } from './notifications-core'
+import { sendPush, saveNotifications, pushToAdmins } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // onEquipmentBookingCreated — notify teachers/admins of new equipment requests
@@ -66,12 +66,6 @@ export const onEquipmentBookingCreated = functions.firestore
       }
     }
 
-    const itemsList = (booking.items ?? []).map((i: any) => `${i.quantity}× ${i.equipmentName}`).join(', ')
-    const channelId = await getOrCreateBookingsChannel()
-    await postToBookingsChannel(
-      channelId,
-      `📦 **New equipment booking** from ${booking.studentName}\n"${booking.projectName}" — ${itemsList || 'no items'}`,
-    )
     await pushToAdmins(
       '📦 Equipment booking request',
       `${booking.studentName} requested equipment for "${booking.projectName}"`,

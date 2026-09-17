@@ -49,7 +49,7 @@ const NAV: NavItem[] = [
   { to: '/teacher/gradebook',     icon: BookMarked,      label: 'Grade Book',     featureId: 'gradebook',                             tierFeature: 'lessons'   },
   { to: '/teacher/subjects',      icon: BookOpen,        label: 'Subjects',       featureId: 'subjects'                                      },
   { to: '/teacher/prizes',        icon: Gift,            label: 'Prizes',         featureId: 'prizes',                                tierFeature: 'prizes'    },
-  { to: '/teacher/room-bookings', icon: DoorOpen,        label: 'Bookings',       featureId: 'roomBooking',  showBooking: true,       tierFeature: 'booking'   },
+  { to: '/teacher/room-bookings', icon: DoorOpen,        label: 'Room Bookings',  featureId: 'roomBooking',  showBooking: true,       tierFeature: 'booking'   },
   { to: '/teacher/chat',          icon: MessageSquare,   label: 'Chat',           featureId: 'chat',         showUnread: true,        tierFeature: 'chat'      },
   { to: '/teacher/production',    icon: Clapperboard,    label: 'Production',     featureId: 'production',                            tierFeature: 'production' },
   { to: '/teacher/resources',     icon: BookMarked,      label: 'Resources',      featureId: 'resources',                             tierFeature: 'resources' },
@@ -145,6 +145,9 @@ export default function TeacherLayout() {
   const chatUnread      = useChatUnreadCount()
   const bookingBadge    = useBookingBadge()
   const bookingDetail   = useBookingBadgeDetail()
+  // Equipment pending requests get their own dedicated badge (showEquipmentBadge)
+  // — the "Room Bookings" nav item should only reflect food/van, never equipment.
+  const roomBookingBadge = bookingDetail.food + bookingDetail.van
   const calendarBadge   = useCalendarInviteBadge()
   const totalBadge      = chatUnread + bookingBadge + calendarBadge
   useAppBadge(totalBadge)
@@ -187,9 +190,9 @@ export default function TeacherLayout() {
                     {chatUnread}
                   </span>
                 )}
-                {showBooking && bookingBadge > 0 && (
+                {showBooking && roomBookingBadge > 0 && (
                   <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[10px] font-bold px-1 leading-none">
-                    {bookingBadge}
+                    {roomBookingBadge}
                   </span>
                 )}
                 {showCalendarBadge && calendarBadge > 0 && (

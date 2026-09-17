@@ -1009,6 +1009,11 @@ export default function EquipmentBookingPage() {
                           </span>
                         ))}
                       </div>
+                      {b.teacherNotes && (
+                        <p style={{ fontSize: '.78rem', fontStyle: 'italic', color: b.status === 'denied' ? '#f87171' : '#8a8aab', borderLeft: `2px solid ${b.status === 'denied' ? 'rgba(248,113,113,.4)' : 'rgba(255,255,255,.15)'}`, paddingLeft: 8, margin: '8px 0 0' }}>
+                          "{b.teacherNotes}"
+                        </p>
+                      )}
                       {(b.status === 'pending' || b.status === 'confirmed') && (
                         <button
                           onClick={() => cancelBooking(b.id)}

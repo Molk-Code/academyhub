@@ -236,8 +236,13 @@ function BookingRequestsSection({ bookings }: { bookings: EquipmentBookingDoc[] 
                 ))}
               </div>
             )}
-            {b.status === 'denied' && b.teacherNotes && (
-              <p className="text-xs text-rose-300/80 italic border-l-2 border-rose-800/50 pl-2">{b.teacherNotes}</p>
+            {b.teacherNotes && (
+              <p className={cn(
+                'text-xs italic border-l-2 pl-2',
+                b.status === 'denied' ? 'text-rose-300/80 border-rose-800/50' : 'text-zinc-400 border-white/15',
+              )}>
+                "{b.teacherNotes}"
+              </p>
             )}
           </div>
         ))}

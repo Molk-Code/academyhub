@@ -1023,7 +1023,10 @@ export default function Lessons() {
   return (
     <div className="space-y-6">
       {/* ── Mobile header (agenda mode) ───────────────────────────────────── */}
-      <div className="sm:hidden flex items-center justify-end gap-2">
+      {/* Gated on isMobileDim (min of width/height) rather than a pure width
+          breakpoint — a landscape phone can be wide enough to pass a sm: width
+          check while still being far too short for the desktop header. */}
+      <div className={isMobileDim ? 'flex items-center justify-end gap-2' : 'hidden'}>
         <div className="flex items-center gap-1.5">
           <div className="flex rounded-xl border border-white/10 overflow-hidden">
             <button
@@ -1060,7 +1063,7 @@ export default function Lessons() {
       </div>
 
       {/* ── Desktop header ────────────────────────────────────────────────── */}
-      <div className="hidden sm:flex flex-wrap items-start gap-3">
+      <div className={isMobileDim ? 'hidden' : 'flex flex-wrap items-start gap-3'}>
         <div className="flex-1 min-w-0">
           <h1 className="page-title">Calendar</h1>
           <p className="text-zinc-500 text-sm mt-1">Schedule and manage your lessons.</p>

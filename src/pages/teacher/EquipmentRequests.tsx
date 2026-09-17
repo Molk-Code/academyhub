@@ -22,9 +22,9 @@ type StatusFilter = 'pending' | 'confirmed' | 'all'
 export default function EquipmentRequests() {
   const navigate = useNavigate()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending')
-  const [denyTarget, setDenyTarget] = useState<EquipmentBookingDoc | null>(null)
-  const [denyReason, setDenyReason] = useState('')
-  const [denySubmitting, setDenySubmitting] = useState(false)
+  const [actionTarget, setActionTarget] = useState<{ booking: EquipmentBookingDoc; action: 'confirmed' | 'denied' } | null>(null)
+  const [actionMessage, setActionMessage] = useState('')
+  const [actionSubmitting, setActionSubmitting] = useState(false)
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   const { data: bookings, loading } = useCollection<EquipmentBookingDoc>(
@@ -39,27 +39,18 @@ export default function EquipmentRequests() {
 
   const pendingCount = useMemo(() => bookings.filter(b => b.status === 'pending').length, [bookings])
 
-  async function handleConfirm(booking: EquipmentBookingDoc) {
-    setConfirmingId(booking.id)
+  async function handleAction() {
+    if (!actionTarget) return
+    setActionSubmitting(true)
     try {
-      await updateDoc(doc(db, 'equipment_bookings', booking.id), { status: 'confirmed' })
-    } finally {
-      setConfirmingId(null)
-    }
-  }
-
-  async function handleDeny() {
-    if (!denyTarget) return
-    setDenySubmitting(true)
-    try {
-      await updateDoc(doc(db, 'equipment_bookings', denyTarget.id), {
-        status: 'denied',
-        teacherNotes: denyReason.trim(),
+      await updateDoc(doc(db, 'equipment_bookings', actionTarget.booking.id), {
+        status: actionTarget.action,
+        teacherNotes: actionMessage.trim(),
       })
-      setDenyTarget(null)
-      setDenyReason('')
+      setActionTarget(null)
+      setActionMessage('')
     } finally {
-      setDenySubmitting(false)
+      setActionSubmitting(false)
     }
   }
 
@@ -151,15 +142,14 @@ export default function EquipmentRequests() {
                 {booking.status === 'pending' && (
                   <div className="flex gap-2 flex-shrink-0">
                     <button
-                      onClick={() => handleConfirm(booking)}
-                      disabled={confirmingId === booking.id}
+                      onClick={() => { setActionTarget({ booking, action: 'confirmed' }); setActionMessage('') }}
                       className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white rounded-lg transition-colors"
                     >
                       <CheckCircle className="w-3.5 h-3.5" />
                       Accept
                     </button>
                     <button
-                      onClick={() => { setDenyTarget(booking); setDenyReason('') }}
+                      onClick={() => { setActionTarget({ booking, action: 'denied' }); setActionMessage('') }}
                       className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded-lg transition-colors"
                     >
                       <XCircle className="w-3.5 h-3.5" />
@@ -265,37 +255,45 @@ export default function EquipmentRequests() {
         </div>
       )}
 
-      {/* Deny modal */}
-      {denyTarget && (
+      {/* Accept/Deny modal */}
+      {actionTarget && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-4">
-            <h3 className="text-base font-semibold text-zinc-100">Deny request</h3>
+            <h3 className="text-base font-semibold text-zinc-100">
+              {actionTarget.action === 'confirmed' ? 'Accept request' : 'Deny request'}
+            </h3>
             <p className="text-sm text-zinc-400">
-              Denying <span className="text-zinc-200 font-medium">"{denyTarget.projectName}"</span> by {denyTarget.studentName}.
+              {actionTarget.action === 'confirmed' ? 'Accepting' : 'Denying'}{' '}
+              <span className="text-zinc-200 font-medium">"{actionTarget.booking.projectName}"</span> by {actionTarget.booking.studentName}.
             </p>
             <div>
-              <label className="label">Reason (optional — sent to student)</label>
+              <label className="label">Message (optional — sent to student as a push notification)</label>
               <textarea
-                value={denyReason}
-                onChange={e => setDenyReason(e.target.value)}
+                value={actionMessage}
+                onChange={e => setActionMessage(e.target.value)}
                 rows={3}
                 className="input resize-none"
-                placeholder="Equipment unavailable, dates conflict…"
+                placeholder={actionTarget.action === 'confirmed' ? 'Pick up from the equipment room after 2pm…' : 'Equipment unavailable, dates conflict…'}
               />
             </div>
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => setDenyTarget(null)}
+                onClick={() => setActionTarget(null)}
                 className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={handleDeny}
-                disabled={denySubmitting}
-                className="px-4 py-2 text-sm bg-rose-700 hover:bg-rose-600 disabled:opacity-50 text-white rounded-lg transition-colors"
+                onClick={handleAction}
+                disabled={actionSubmitting}
+                className={cn(
+                  'px-4 py-2 text-sm disabled:opacity-50 text-white rounded-lg transition-colors',
+                  actionTarget.action === 'confirmed' ? 'bg-green-700 hover:bg-green-600' : 'bg-rose-700 hover:bg-rose-600',
+                )}
               >
-                {denySubmitting ? 'Denying…' : 'Deny Request'}
+                {actionSubmitting
+                  ? (actionTarget.action === 'confirmed' ? 'Accepting…' : 'Denying…')
+                  : (actionTarget.action === 'confirmed' ? 'Accept Request' : 'Deny Request')}
               </button>
             </div>
           </div>

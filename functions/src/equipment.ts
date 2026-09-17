@@ -1,5 +1,5 @@
 import { functions, db } from './lib'
-import { sendPush, saveNotifications, pushToAdmins } from './notifications-core'
+import { sendPush, saveNotifications, pushToAdmins, getOrCreateBookingsChannel, postToBookingsChannel } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // onEquipmentBookingCreated — notify teachers/admins of new equipment requests
@@ -66,6 +66,12 @@ export const onEquipmentBookingCreated = functions.firestore
       }
     }
 
+    const itemsList = (booking.items ?? []).map((i: any) => `${i.quantity}× ${i.equipmentName}`).join(', ')
+    const channelId = await getOrCreateBookingsChannel()
+    await postToBookingsChannel(
+      channelId,
+      `📦 **New equipment booking** from ${booking.studentName}\n"${booking.projectName}" — ${itemsList || 'no items'}`,
+    )
     await pushToAdmins(
       '📦 Equipment booking request',
       `${booking.studentName} requested equipment for "${booking.projectName}"`,
@@ -92,7 +98,9 @@ export const onEquipmentBookingUpdated = functions.firestore
     if (after.status === 'confirmed') {
       opts = {
         title: '✅ Equipment booking confirmed',
-        body:  `Your equipment for "${after.projectName}" has been confirmed`,
+        body:  after.teacherNotes
+          ? `Your equipment for "${after.projectName}" has been confirmed: ${after.teacherNotes}`
+          : `Your equipment for "${after.projectName}" has been confirmed`,
         url:   '/my-bookings',
       }
     } else if (after.status === 'checked-out') {

@@ -760,18 +760,23 @@ function BookingsTab() {
   const [statusFilter, setStatusFilter] = useState<'all' | typeof BOOKING_STATUSES[number]>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [actionModal, setActionModal] = useState<{ booking: EquipmentBookingDoc; action: 'confirmed' | 'denied' } | null>(null)
+  const [actionMessage, setActionMessage] = useState('')
 
   const filtered = useMemo(
     () => statusFilter === 'all' ? sorted : sorted.filter(b => b.status === statusFilter),
     [sorted, statusFilter],
   )
 
-  async function setStatus(id: string, newStatus: string) {
+  async function setStatus(id: string, newStatus: string, teacherNotes?: string) {
     setSavingId(id)
     try {
       const booking = bookings.find(b => b.id === id)
       const batch = writeBatch(db)
-      batch.update(doc(db, 'equipment_bookings', id), { status: newStatus })
+      batch.update(doc(db, 'equipment_bookings', id), {
+        status: newStatus,
+        ...(teacherNotes !== undefined ? { teacherNotes } : {}),
+      })
 
       // Adjust available count when equipment physically moves
       if (booking?.items?.length) {
@@ -793,6 +798,13 @@ function BookingsTab() {
     } finally {
       setSavingId(null)
     }
+  }
+
+  async function confirmAction() {
+    if (!actionModal) return
+    await setStatus(actionModal.booking.id, actionModal.action, actionMessage.trim())
+    setActionModal(null)
+    setActionMessage('')
   }
 
   async function deleteBooking(b: EquipmentBookingDoc) {
@@ -893,14 +905,14 @@ function BookingsTab() {
                         <>
                           <button
                             disabled={savingId === b.id}
-                            onClick={() => setStatus(b.id, 'confirmed')}
+                            onClick={() => { setActionModal({ booking: b, action: 'confirmed' }); setActionMessage('') }}
                             style={{ padding: '6px 14px', background: 'rgba(76,217,100,.15)', border: '1px solid rgba(76,217,100,.3)', borderRadius: 8, color: '#4cd964', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                           >
                             {savingId === b.id ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={12} />} Accept
                           </button>
                           <button
                             disabled={savingId === b.id}
-                            onClick={() => setStatus(b.id, 'denied')}
+                            onClick={() => { setActionModal({ booking: b, action: 'denied' }); setActionMessage('') }}
                             style={{ padding: '6px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8, color: '#f87171', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }}
                           >
                             Deny
@@ -977,6 +989,47 @@ function BookingsTab() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {actionModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setActionModal(null)}>
+          <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 16, width: '100%', maxWidth: 400, padding: '1.5rem' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#f0f0f5', marginBottom: 6 }}>
+              {actionModal.action === 'confirmed' ? 'Accept booking' : 'Deny booking'}
+            </h3>
+            <p style={{ fontSize: '.82rem', color: '#8a8aab', marginBottom: 14 }}>
+              "{actionModal.booking.projectName}" — {actionModal.booking.studentName}
+            </p>
+            <label style={{ fontSize: '.75rem', fontWeight: 600, color: '#6a6a80', display: 'block', marginBottom: 6 }}>
+              Message to student <span style={{ fontWeight: 400 }}>(optional — sent as a push notification)</span>
+            </label>
+            <textarea
+              autoFocus
+              value={actionMessage}
+              onChange={e => setActionMessage(e.target.value)}
+              rows={3}
+              placeholder={actionModal.action === 'confirmed' ? 'e.g. Pick up from the equipment room after 2pm' : 'e.g. Dates conflict with another booking'}
+              style={{ width: '100%', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 10, padding: '10px 12px', color: '#f0f0f5', fontSize: '.85rem', resize: 'none', marginBottom: 14, fontFamily: 'inherit' }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                disabled={savingId === actionModal.booking.id}
+                onClick={confirmAction}
+                style={{
+                  flex: 1, padding: '9px 16px', borderRadius: 10, fontSize: '.85rem', fontWeight: 700, cursor: 'pointer',
+                  background: actionModal.action === 'confirmed' ? 'rgba(76,217,100,.15)' : 'rgba(239,68,68,.12)',
+                  border: `1px solid ${actionModal.action === 'confirmed' ? 'rgba(76,217,100,.35)' : 'rgba(239,68,68,.3)'}`,
+                  color: actionModal.action === 'confirmed' ? '#4cd964' : '#f87171',
+                }}
+              >
+                {savingId === actionModal.booking.id ? 'Saving…' : actionModal.action === 'confirmed' ? 'Accept' : 'Deny'}
+              </button>
+              <button onClick={() => setActionModal(null)} style={{ padding: '9px 16px', borderRadius: 10, fontSize: '.85rem', fontWeight: 600, cursor: 'pointer', background: '#1a1a25', border: '1px solid #2a2a3a', color: '#8a8aab' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>

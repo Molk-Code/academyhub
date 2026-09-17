@@ -178,6 +178,12 @@ export default function EquipmentBookingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
+  // Project name transfers automatically from the selected production —
+  // still editable afterward in case this specific booking needs a variant.
+  useEffect(() => {
+    if (selectedProduction) setProjectName(selectedProduction.title)
+  }, [selectedProduction?.id])
+
   const rentalDays = calcDays(fromDate, toDate)
 
   // Category counts

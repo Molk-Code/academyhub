@@ -166,16 +166,29 @@ export async function postToBookingsChannel(channelId: string, text: string) {
   })
 }
 
-export async function pushToAdmins(title: string, body: string, url: string) {
-  const snap = await db.collection('users')
-    .where('role', '==', 'admin')
-    .get()
+// Users store a single "active" role in `role` plus every role they can switch
+// between in `roles` — someone who is both teacher and admin may be actively
+// switched to 'teacher', so admin-only queries must also check `roles` or they
+// silently miss multi-role admins.
+async function usersWithAnyRole(targetRoles: string[]): Promise<{ tokens: string[]; uids: string[] }> {
+  const [byRole, byRoles] = await Promise.all([
+    db.collection('users').where('role', 'in', targetRoles).get(),
+    db.collection('users').where('roles', 'array-contains-any', targetRoles).get(),
+  ])
+  const seen = new Set<string>()
   const tokens: string[] = []
   const uids: string[] = []
-  snap.docs.forEach(d => {
+  for (const d of [...byRole.docs, ...byRoles.docs]) {
+    if (seen.has(d.id)) continue
+    seen.add(d.id)
     tokens.push(...(d.data().fcmTokens ?? []))
     uids.push(d.id)
-  })
+  }
+  return { tokens, uids }
+}
+
+export async function pushToAdmins(title: string, body: string, url: string) {
+  const { tokens, uids } = await usersWithAnyRole(['admin'])
   await Promise.all([
     sendPush(tokens, { title, body, url, tag: 'booking' }),
     saveNotifications(uids, { title, body, url }),
@@ -183,15 +196,7 @@ export async function pushToAdmins(title: string, body: string, url: string) {
 }
 
 export async function pushToTeachersAndAdmins(title: string, body: string, url: string) {
-  const snap = await db.collection('users')
-    .where('role', 'in', ['teacher', 'admin'])
-    .get()
-  const tokens: string[] = []
-  const uids: string[] = []
-  snap.docs.forEach(d => {
-    tokens.push(...(d.data().fcmTokens ?? []))
-    uids.push(d.id)
-  })
+  const { tokens, uids } = await usersWithAnyRole(['teacher', 'admin'])
   await Promise.all([
     sendPush(tokens, { title, body, url, tag: 'booking' }),
     saveNotifications(uids, { title, body, url }),

@@ -1016,6 +1016,7 @@ function CreateProjectForm({
         checkoutDate,
         returnDate,
         status: 'active',
+        ...(fromBooking ? { bookingId: fromBooking.id } : {}),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })

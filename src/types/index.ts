@@ -438,6 +438,7 @@ export interface InventoryProjectDoc {
   checkoutDate: string
   returnDate: string
   status: InventoryProjectStatus
+  bookingId?: string   // set when created via "Set Up in Inventory" from an equipment booking
   createdAt?: Timestamp
   updatedAt?: Timestamp
 }

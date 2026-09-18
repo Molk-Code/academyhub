@@ -196,6 +196,7 @@ function EquipmentProjectsSection({ projects, items }: {
                 ) : (
                   <p className="text-xs text-zinc-500">No equipment scanned out yet</p>
                 )}
+                {p.bookingId && <BookingMessageThread bookingId={p.bookingId} />}
               </div>
             </div>
           )

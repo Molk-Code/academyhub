@@ -478,6 +478,20 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
             && request.resource.data.status == 'cancelled');
       allow delete: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'));
+
+      match /messages/{messageId} {
+        function bookingStudentId() {
+          return get(/databases/$(database)/documents/equipment_bookings/$(bookingId)).data.studentId;
+        }
+        allow read: if (isAdmin() || tierHasFeature('equipment'))
+          && (isTeacherOrAdmin() || (isSignedIn() && bookingStudentId() == request.auth.uid));
+        allow create: if (isAdmin() || tierHasFeature('equipment'))
+          && request.resource.data.senderId == request.auth.uid
+          && (
+            (isTeacherOrAdmin() && request.resource.data.senderRole == 'staff')
+            || (isSignedIn() && bookingStudentId() == request.auth.uid && request.resource.data.senderRole == 'student')
+          );
+      }
     }
 
     match /inventory_projects/{projectId} {

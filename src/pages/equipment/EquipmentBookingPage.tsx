@@ -3,11 +3,11 @@ import { collection, addDoc, updateDoc, serverTimestamp, query, where, orderBy, 
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument } from '@/hooks/useFirestore'
-import type { EquipmentDoc, EquipmentBookingDoc, CohortDoc, ProductionDoc, ProductionSceneDoc, ProductionCrewAssignmentDoc, ProductionCastDoc, ProductionLocationDoc, ProductionShootingDayDoc } from '@/types'
+import type { EquipmentDoc, EquipmentBookingDoc, EquipmentBookingMessageDoc, CohortDoc, ProductionDoc, ProductionSceneDoc, ProductionCrewAssignmentDoc, ProductionCastDoc, ProductionLocationDoc, ProductionShootingDayDoc } from '@/types'
 import { Link } from 'react-router-dom'
 import {
   ShoppingCart, X, Search, Package, Calendar, Check,
-  AlertTriangle, ChevronDown, ChevronRight, CheckCircle2, Clock, Truck, RotateCcw, XCircle, Lock, Trash2,
+  AlertTriangle, ChevronDown, ChevronRight, CheckCircle2, Clock, Truck, RotateCcw, XCircle, Lock, Trash2, Send,
 } from 'lucide-react'
 import { optimizeImageUrl } from '@/lib/cloudinary'
 import './molkom.css'
@@ -82,6 +82,72 @@ function billableDays(days: number): number {
 
 function weeklyRate(pricePerDay: number): number {
   return pricePerDay * 5
+}
+
+function BookingMessageThread({ bookingId }: { bookingId: string }) {
+  const { profile } = useAuth()
+  const { data: messages } = useCollection<EquipmentBookingMessageDoc>(
+    `equipment_bookings/${bookingId}/messages`,
+    [orderBy('createdAt', 'asc')],
+  )
+  const [text, setText] = useState('')
+  const [sending, setSending] = useState(false)
+
+  async function send() {
+    if (!text.trim() || !profile) return
+    setSending(true)
+    try {
+      await addDoc(collection(db, `equipment_bookings/${bookingId}/messages`), {
+        senderId: profile.uid,
+        senderName: profile.displayName ?? 'Student',
+        senderRole: 'student',
+        text: text.trim(),
+        createdAt: serverTimestamp(),
+      })
+      setText('')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      {messages.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+          {messages.map(m => (
+            <p
+              key={m.id}
+              style={{
+                fontSize: '.76rem', padding: '6px 10px', borderRadius: 8, maxWidth: '85%', margin: 0,
+                alignSelf: m.senderRole === 'student' ? 'flex-end' : 'flex-start',
+                background: m.senderRole === 'student' ? 'rgba(59,130,246,.15)' : '#0e0e16',
+                color: m.senderRole === 'student' ? '#bfdbfe' : '#8a8aab',
+                fontStyle: m.senderRole === 'student' ? 'normal' : 'italic',
+              }}
+            >
+              {m.text}
+            </p>
+          ))}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && send()}
+          placeholder="Reply…"
+          style={{ flex: 1, fontSize: '.76rem', background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 8, padding: '6px 10px', color: '#f0f0f5' }}
+        />
+        <button
+          disabled={sending || !text.trim()}
+          onClick={send}
+          style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(59,130,246,.15)', border: '1px solid rgba(59,130,246,.3)', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: sending || !text.trim() ? 0.5 : 1 }}
+        >
+          <Send size={12} />
+        </button>
+      </div>
+    </div>
+  )
 }
 
 export default function EquipmentBookingPage() {
@@ -1009,11 +1075,7 @@ export default function EquipmentBookingPage() {
                           </span>
                         ))}
                       </div>
-                      {b.teacherNotes && (
-                        <p style={{ fontSize: '.78rem', fontStyle: 'italic', color: b.status === 'denied' ? '#f87171' : '#8a8aab', borderLeft: `2px solid ${b.status === 'denied' ? 'rgba(248,113,113,.4)' : 'rgba(255,255,255,.15)'}`, paddingLeft: 8, margin: '8px 0 0' }}>
-                          "{b.teacherNotes}"
-                        </p>
-                      )}
+                      <BookingMessageThread bookingId={b.id} />
                       {(b.status === 'pending' || b.status === 'confirmed') && (
                         <button
                           onClick={() => cancelBooking(b.id)}

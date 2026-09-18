@@ -4,15 +4,16 @@ import {
   collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDoc, setDoc, increment, writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { useCollection } from '@/hooks/useFirestore'
+import { useAuth } from '@/contexts/AuthContext'
+import { useCollection, orderBy } from '@/hooks/useFirestore'
 import { uploadFile, optimizeImageUrl } from '@/lib/cloudinary'
-import type { EquipmentDoc, EquipmentCategory, EquipmentCategoryDoc, EquipmentBookingDoc, CohortDoc } from '@/types'
+import type { EquipmentDoc, EquipmentCategory, EquipmentCategoryDoc, EquipmentBookingDoc, EquipmentBookingMessageDoc, CohortDoc } from '@/types'
 import { QRCodeSVG } from 'qrcode.react'
 import {
   ShoppingCart, X, Search, Package, Calendar, Check,
   AlertTriangle, CheckCircle2, Pencil, Trash2, QrCode,
   Printer, Upload, Loader2, Plus, ToggleRight, ToggleLeft, ChevronUp, ChevronDown,
-  ArrowRight, ExternalLink,
+  ArrowRight, ExternalLink, Send,
 } from 'lucide-react'
 import './molkom.css'
 
@@ -744,10 +745,79 @@ function CatalogTab({ categories }: { categories: EquipmentCategoryDoc[] }) {
   )
 }
 
+// ── Booking message thread ───────────────────────────────────────────────────
+
+function BookingMessageThread({ bookingId }: { bookingId: string }) {
+  const { profile } = useAuth()
+  const { data: messages } = useCollection<EquipmentBookingMessageDoc>(
+    `equipment_bookings/${bookingId}/messages`,
+    [orderBy('createdAt', 'asc')],
+  )
+  const [text, setText] = useState('')
+  const [sending, setSending] = useState(false)
+
+  async function send() {
+    if (!text.trim() || !profile) return
+    setSending(true)
+    try {
+      await addDoc(collection(db, `equipment_bookings/${bookingId}/messages`), {
+        senderId: profile.uid,
+        senderName: profile.displayName ?? 'Staff',
+        senderRole: 'staff',
+        text: text.trim(),
+        createdAt: serverTimestamp(),
+      })
+      setText('')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      {messages.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+          {messages.map(m => (
+            <p
+              key={m.id}
+              style={{
+                fontSize: '.78rem', padding: '6px 10px', borderRadius: 8, maxWidth: '85%', margin: 0,
+                alignSelf: m.senderRole === 'staff' ? 'flex-end' : 'flex-start',
+                background: m.senderRole === 'staff' ? 'rgba(76,217,100,.12)' : '#1a1a25',
+                color: m.senderRole === 'staff' ? '#c8f0d0' : '#c0c0d5',
+                fontStyle: m.senderRole === 'staff' ? 'normal' : 'italic',
+              }}
+            >
+              {m.text}
+            </p>
+          ))}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && send()}
+          placeholder="Reply to student…"
+          style={{ flex: 1, fontSize: '.78rem', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 8, padding: '7px 10px', color: '#f0f0f5' }}
+        />
+        <button
+          disabled={sending || !text.trim()}
+          onClick={send}
+          style={{ padding: '7px 12px', borderRadius: 8, background: 'rgba(76,217,100,.15)', border: '1px solid rgba(76,217,100,.3)', color: '#4cd964', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: sending || !text.trim() ? 0.5 : 1 }}
+        >
+          <Send size={13} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Bookings Tab ──────────────────────────────────────────────────────────────
 
 function BookingsTab() {
   const navigate = useNavigate()
+  const { profile } = useAuth()
   const { data: bookings } = useCollection<EquipmentBookingDoc>('equipment_bookings')
   const sorted = useMemo(
     () => [...bookings].sort((a, b) => {
@@ -802,7 +872,17 @@ function BookingsTab() {
 
   async function confirmAction() {
     if (!actionModal) return
-    await setStatus(actionModal.booking.id, actionModal.action, actionMessage.trim())
+    const note = actionMessage.trim()
+    await setStatus(actionModal.booking.id, actionModal.action, note)
+    if (note && profile) {
+      await addDoc(collection(db, `equipment_bookings/${actionModal.booking.id}/messages`), {
+        senderId: profile.uid,
+        senderName: profile.displayName ?? 'Staff',
+        senderRole: 'staff',
+        text: note,
+        createdAt: serverTimestamp(),
+      })
+    }
     setActionModal(null)
     setActionMessage('')
   }
@@ -895,9 +975,7 @@ function BookingsTab() {
                       </div>
                     </div>
 
-                    {b.teacherNotes && (
-                      <p style={{ fontSize: '.8rem', color: '#8a8aab', marginBottom: 12 }}>📝 {b.teacherNotes}</p>
-                    )}
+                    <BookingMessageThread bookingId={b.id} />
 
                     {/* Actions */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>

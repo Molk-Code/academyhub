@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collectionGroup, onSnapshot } from 'firebase/firestore'
+import { addDoc, collection, collectionGroup, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useFeature } from '@/hooks/useFeature'
-import { useCollection, useDocument, where } from '@/hooks/useFirestore'
+import { useCollection, useDocument, orderBy, where } from '@/hooks/useFirestore'
 import { markFoodBoxSeen, markMinivanSeen } from '@/hooks/useBookingBadge'
-import type { InventoryProjectDoc, InventoryItemDoc, FoodBoxOrderDoc, MinivanBookingDoc, EquipmentBookingDoc } from '@/types'
+import type { InventoryProjectDoc, InventoryItemDoc, FoodBoxOrderDoc, MinivanBookingDoc, EquipmentBookingDoc, EquipmentBookingMessageDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import {
   ClipboardList, Package, UtensilsCrossed, Car,
-  AlertTriangle, CheckCircle2, XCircle, Clock, RotateCcw,
+  AlertTriangle, CheckCircle2, XCircle, Clock, RotateCcw, Send,
 } from 'lucide-react'
 
 function today() {
@@ -209,6 +209,69 @@ function EquipmentProjectsSection({ projects, items }: {
 // Requests still in the pending/confirmed/denied stage — before "Set Up in
 // Inventory" turns one into a real checked-out project (shown above instead).
 
+function BookingMessageThread({ bookingId }: { bookingId: string }) {
+  const { profile } = useAuth()
+  const { data: messages } = useCollection<EquipmentBookingMessageDoc>(
+    `equipment_bookings/${bookingId}/messages`,
+    [orderBy('createdAt', 'asc')],
+  )
+  const [text, setText] = useState('')
+  const [sending, setSending] = useState(false)
+
+  async function send() {
+    if (!text.trim() || !profile) return
+    setSending(true)
+    try {
+      await addDoc(collection(db, `equipment_bookings/${bookingId}/messages`), {
+        senderId: profile.uid,
+        senderName: profile.displayName ?? 'Student',
+        senderRole: 'student',
+        text: text.trim(),
+        createdAt: serverTimestamp(),
+      })
+      setText('')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      {messages.length > 0 && (
+        <div className="space-y-1.5">
+          {messages.map(m => (
+            <p
+              key={m.id}
+              className={cn(
+                'text-xs px-2.5 py-1.5 rounded-lg max-w-[85%] italic',
+                m.senderRole === 'student' ? 'ml-auto bg-brand-600/20 text-brand-100 not-italic' : 'bg-zinc-800 text-zinc-300',
+              )}
+            >
+              {m.text}
+            </p>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-1.5">
+        <input
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && send()}
+          placeholder="Reply to your teacher…"
+          className="flex-1 text-xs bg-zinc-800 border border-white/10 rounded-lg px-2.5 py-1.5 text-zinc-200 placeholder:text-zinc-600"
+        />
+        <button
+          onClick={send}
+          disabled={sending || !text.trim()}
+          className="flex items-center gap-1 text-xs px-3 py-1.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-40 text-white rounded-lg transition-colors"
+        >
+          <Send className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function BookingRequestsSection({ bookings }: { bookings: EquipmentBookingDoc[] }) {
   if (bookings.length === 0) return null
 
@@ -236,14 +299,7 @@ function BookingRequestsSection({ bookings }: { bookings: EquipmentBookingDoc[] 
                 ))}
               </div>
             )}
-            {b.teacherNotes && (
-              <p className={cn(
-                'text-xs italic border-l-2 pl-2',
-                b.status === 'denied' ? 'text-rose-300/80 border-rose-800/50' : 'text-zinc-400 border-white/15',
-              )}>
-                "{b.teacherNotes}"
-              </p>
-            )}
+            <BookingMessageThread bookingId={b.id} />
           </div>
         ))}
       </div>

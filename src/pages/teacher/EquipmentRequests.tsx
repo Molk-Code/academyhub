@@ -1,12 +1,76 @@
 import { useState, useMemo } from 'react'
-import { updateDoc, deleteDoc, doc } from 'firebase/firestore'
+import { addDoc, collection, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
-import type { EquipmentBookingDoc } from '@/types'
-import { Package, CheckCircle, XCircle, ChevronRight, Trash2 } from 'lucide-react'
+import type { EquipmentBookingDoc, EquipmentBookingMessageDoc } from '@/types'
+import { Package, CheckCircle, XCircle, ChevronRight, Trash2, Send } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { useNavigate } from 'react-router-dom'
+
+function BookingMessageThread({ bookingId }: { bookingId: string }) {
+  const { profile } = useAuth()
+  const { data: messages } = useCollection<EquipmentBookingMessageDoc>(
+    `equipment_bookings/${bookingId}/messages`,
+    [orderBy('createdAt', 'asc')],
+  )
+  const [text, setText] = useState('')
+  const [sending, setSending] = useState(false)
+
+  async function send() {
+    if (!text.trim() || !profile) return
+    setSending(true)
+    try {
+      await addDoc(collection(db, `equipment_bookings/${bookingId}/messages`), {
+        senderId: profile.uid,
+        senderName: profile.displayName ?? 'Staff',
+        senderRole: 'staff',
+        text: text.trim(),
+        createdAt: serverTimestamp(),
+      })
+      setText('')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      {messages.length > 0 && (
+        <div className="space-y-1.5">
+          {messages.map(m => (
+            <p
+              key={m.id}
+              className={cn(
+                'text-xs px-2.5 py-1.5 rounded-lg max-w-[85%]',
+                m.senderRole === 'staff' ? 'ml-auto bg-green-900/30 text-green-100' : 'bg-zinc-800 text-zinc-300 italic',
+              )}
+            >
+              {m.text}
+            </p>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-1.5">
+        <input
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && send()}
+          placeholder="Reply to student…"
+          className="flex-1 text-xs bg-zinc-800 border border-white/10 rounded-lg px-2.5 py-1.5 text-zinc-200 placeholder:text-zinc-600"
+        />
+        <button
+          onClick={send}
+          disabled={sending || !text.trim()}
+          className="flex items-center gap-1 text-xs px-3 py-1.5 bg-green-700 hover:bg-green-600 disabled:opacity-40 text-white rounded-lg transition-colors"
+        >
+          <Send className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  )
+}
 
 const STATUS_STYLE: Record<string, string> = {
   pending:       'text-amber-300 bg-amber-900/30 border-amber-700/40',
@@ -21,6 +85,7 @@ type StatusFilter = 'pending' | 'confirmed' | 'all'
 
 export default function EquipmentRequests() {
   const navigate = useNavigate()
+  const { profile } = useAuth()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending')
   const [actionTarget, setActionTarget] = useState<{ booking: EquipmentBookingDoc; action: 'confirmed' | 'denied' } | null>(null)
   const [actionMessage, setActionMessage] = useState('')
@@ -43,10 +108,20 @@ export default function EquipmentRequests() {
     if (!actionTarget) return
     setActionSubmitting(true)
     try {
+      const note = actionMessage.trim()
       await updateDoc(doc(db, 'equipment_bookings', actionTarget.booking.id), {
         status: actionTarget.action,
-        teacherNotes: actionMessage.trim(),
+        teacherNotes: note,
       })
+      if (note && profile) {
+        await addDoc(collection(db, `equipment_bookings/${actionTarget.booking.id}/messages`), {
+          senderId: profile.uid,
+          senderName: profile.displayName ?? 'Staff',
+          senderRole: 'staff',
+          text: note,
+          createdAt: serverTimestamp(),
+        })
+      }
       setActionTarget(null)
       setActionMessage('')
     } finally {
@@ -210,9 +285,7 @@ export default function EquipmentRequests() {
                 </div>
               )}
 
-              {booking.teacherNotes && (
-                <p className="text-xs text-zinc-500 italic border-l-2 border-brand-500/30 pl-2">{booking.teacherNotes}</p>
-              )}
+              <BookingMessageThread bookingId={booking.id} />
 
               {booking.productionTitle && (
                 <div className="mt-2 p-3 bg-white/5 rounded-xl">

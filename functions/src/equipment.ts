@@ -75,6 +75,40 @@ export const onEquipmentBookingCreated = functions.firestore
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// onEquipmentBookingMessageCreated — notify the other side of a reply
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const onEquipmentBookingMessageCreated = functions.firestore
+  .document('equipment_bookings/{bookingId}/messages/{messageId}')
+  .onCreate(async (snap, context) => {
+    const message = snap.data()
+    const bookingSnap = await db.collection('equipment_bookings').doc(context.params.bookingId).get()
+    if (!bookingSnap.exists) return null
+    const booking = bookingSnap.data()!
+
+    if (message.senderRole === 'student') {
+      await pushToAdmins(
+        '💬 New message on a booking',
+        `${message.senderName} — "${booking.projectName}": ${message.text}`,
+        '/admin/equipment',
+      )
+    } else {
+      const studentSnap = await db.collection('users').doc(booking.studentId as string).get()
+      const tokens: string[] = studentSnap.data()?.fcmTokens ?? []
+      const opts = {
+        title: '💬 New message on your booking',
+        body:  `"${booking.projectName}": ${message.text}`,
+        url:   '/my-bookings',
+      }
+      await Promise.all([
+        sendPush(tokens, { ...opts, tag: 'equipment-booking' }),
+        saveNotifications([booking.studentId as string], opts),
+      ])
+    }
+    return null
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
 // onEquipmentBookingUpdated — notify student when booking status changes
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -418,6 +418,15 @@ export interface EquipmentBookingDoc {
   isGuest?: boolean
 }
 
+export interface EquipmentBookingMessageDoc {
+  id: string
+  senderId: string
+  senderName: string
+  senderRole: 'student' | 'staff'
+  text: string
+  createdAt?: Timestamp
+}
+
 export interface InventoryProjectDoc {
   id: string
   name: string

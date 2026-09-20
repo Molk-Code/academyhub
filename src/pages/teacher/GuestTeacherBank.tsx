@@ -239,21 +239,28 @@ export default function GuestTeacherBank() {
         const guestId = (panel as { id: string }).id
         await updateDoc(doc(db, 'guest_teachers', guestId), update)
 
-        // Sync to any subject teacher entries that reference this guest teacher
-        const snap = await getDocs(query(collectionGroup(db, 'teachers'), where('guestTeacherId', '==', guestId)))
-        if (!snap.empty) {
-          const batch = writeBatch(db)
-          snap.docs.forEach(d => {
-            const subjectUpdate: Record<string, unknown> = {
-              name:         form.name.trim(),
-              description:  form.bio.trim(),
-              portfolioUrl: form.portfolioUrl.trim() || null,
-              expertise:    expertises.join(', '),
-            }
-            if (img) subjectUpdate.imageUrl = profilePictureUrl
-            batch.update(d.ref, subjectUpdate)
-          })
-          await batch.commit()
+        // Sync to any subject teacher entries that reference this guest teacher.
+        // Best-effort: the guest teacher record itself is already saved above,
+        // so a failure here (e.g. a stale auth token) shouldn't surface as a
+        // save error — just leave those subject cards to catch up next edit.
+        try {
+          const snap = await getDocs(query(collectionGroup(db, 'teachers'), where('guestTeacherId', '==', guestId)))
+          if (!snap.empty) {
+            const batch = writeBatch(db)
+            snap.docs.forEach(d => {
+              const subjectUpdate: Record<string, unknown> = {
+                name:         form.name.trim(),
+                description:  form.bio.trim(),
+                portfolioUrl: form.portfolioUrl.trim() || null,
+                expertise:    expertises.join(', '),
+              }
+              if (img) subjectUpdate.imageUrl = profilePictureUrl
+              batch.update(d.ref, subjectUpdate)
+            })
+            await batch.commit()
+          }
+        } catch (syncErr) {
+          console.warn('[GuestTeacherBank] subject teacher sync failed:', syncErr)
         }
       }
       cancel()

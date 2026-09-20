@@ -7,7 +7,7 @@ import interactionPlugin from '@fullcalendar/interaction'
 import type { EventInput } from '@fullcalendar/core'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
-import { toDate } from '@/lib/utils'
+import { toDate, cn, initials, avatarColor } from '@/lib/utils'
 import type { LessonDoc, AssignmentDoc, SubjectDoc, SemesterSettingsDoc, LessonCategoryDoc, CohortDoc, PersonalEventDoc, UserDoc, SyncedEventDoc, GuestTeacherDoc } from '@/types'
 import { addDoc, collection, serverTimestamp, Timestamp, updateDoc, deleteDoc, doc } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
@@ -33,7 +33,7 @@ function semesterMarkers(dates: {
 import AnnualPlanWheel from '@/components/calendar/AnnualPlanWheel'
 import LessonAttendancePanel from '@/components/calendar/LessonAttendancePanel'
 import MobileAgendaView from '@/components/calendar/MobileAgendaView'
-import { Circle, X, CalendarDays, BookOpen, Clock, ChevronDown, Check, MapPin, Trash2 } from 'lucide-react'
+import { Circle, X, CalendarDays, BookOpen, Clock, ChevronDown, Check, MapPin, Trash2, Mail, ExternalLink } from 'lucide-react'
 import { markCalendarInvitesSeen } from '@/hooks/useCalendarInviteBadge'
 import { format } from 'date-fns'
 
@@ -64,12 +64,14 @@ interface SelectedEvent {
   location?: string
   teacherNames?: string[]
   guestTeacherNames?: string[]
+  guestTeacherIds?: string[]
   overrideNotes?: string
 }
 
 export default function StudentCalendar() {
   const [showWheel, setShowWheel] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<SelectedEvent | null>(null)
+  const [viewingGuestTeacher, setViewingGuestTeacher] = useState<GuestTeacherDoc | null>(null)
   const [mobileView, setMobileView] = useState<ViewId>('timeGridWeek')
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false)
   const [addEventModal, setAddEventModal] = useState<{ date: string; start: string; end: string; allDay: boolean } | null>(null)
@@ -729,6 +731,7 @@ export default function StudentCalendar() {
         subjectId: ep.subjectId ?? undefined,
         teacherNames: teachers.length > 0 ? teachers : undefined,
         guestTeacherNames: guests.length > 0 ? guests : undefined,
+        guestTeacherIds: (ep.guestTeacherIds as string[]) ?? undefined,
         overrideNotes: ep.notes ?? undefined,
       }); return
     }
@@ -762,6 +765,7 @@ export default function StudentCalendar() {
         subjectTitle: subject?.title ?? ep.subjectTitle ?? undefined,
         teacherNames: teachers.length > 0 ? teachers : undefined,
         guestTeacherNames: guests.length > 0 ? guests : undefined,
+        guestTeacherIds: lesson?.guestTeacherIds ?? undefined,
       })
     } else if (ep.type === 'assignment') {
       setSelectedEvent({
@@ -843,12 +847,6 @@ export default function StudentCalendar() {
         <>
           {/* Legend — desktop only */}
           <div className="hidden sm:flex items-center gap-4 flex-wrap">
-            {subjects.map(s => (
-              <div key={s.id} className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: subjectHexMap[s.color] ?? '#6366f1' }} />
-                <span className="text-xs text-zinc-400">{s.iconEmoji} {s.title}</span>
-              </div>
-            ))}
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded-full bg-rose-500 flex-shrink-0" />
               <span className="text-xs text-zinc-400">Deadline</span>
@@ -1012,6 +1010,7 @@ export default function StudentCalendar() {
                     subjectId: ep.subjectId ?? undefined,
                     teacherNames: teachers.length > 0 ? teachers : undefined,
                     guestTeacherNames: guests.length > 0 ? guests : undefined,
+                    guestTeacherIds: (ep.guestTeacherIds as string[]) ?? undefined,
                     overrideNotes: ep.notes ?? undefined,
                   })
                   return
@@ -1056,6 +1055,7 @@ export default function StudentCalendar() {
                     subjectTitle: subject?.title ?? p.subjectTitle ?? undefined,
                     teacherNames: teachers.length > 0 ? teachers : undefined,
                     guestTeacherNames: guests.length > 0 ? guests : undefined,
+                    guestTeacherIds: lesson?.guestTeacherIds ?? undefined,
                   })
                 } else if (p.type === 'assignment') {
                   setSelectedEvent({
@@ -1136,10 +1136,20 @@ export default function StudentCalendar() {
                       <span>{selectedEvent.teacherNames.join(', ')}</span>
                     </div>
                   )}
-                  {selectedEvent.guestTeacherNames && selectedEvent.guestTeacherNames.length > 0 && (
-                    <div className="flex items-center gap-2 text-sm text-zinc-400">
+                  {selectedEvent.guestTeacherIds && selectedEvent.guestTeacherIds.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-zinc-400 flex-wrap">
                       <span className="text-zinc-500">🎤</span>
-                      <span>{selectedEvent.guestTeacherNames.join(', ')} <span className="text-zinc-600">(guest)</span></span>
+                      {selectedEvent.guestTeacherIds.map((gid, i) => {
+                        const g = guestTeachers.find(gt => gt.id === gid)
+                        if (!g) return null
+                        return (
+                          <span key={gid}>
+                            <button onClick={() => setViewingGuestTeacher(g)} className="text-brand-400 hover:underline">{g.name}</button>
+                            {i < selectedEvent.guestTeacherIds!.length - 1 ? ',' : ''}
+                          </span>
+                        )
+                      })}
+                      <span className="text-zinc-600">(guest)</span>
                     </div>
                   )}
                   {selectedEvent.lessonId && (
@@ -1185,10 +1195,20 @@ export default function StudentCalendar() {
                       <span>{selectedEvent.teacherNames.join(', ')}</span>
                     </div>
                   )}
-                  {selectedEvent.guestTeacherNames && selectedEvent.guestTeacherNames.length > 0 && (
-                    <div className="flex items-center gap-2 text-sm text-zinc-400">
+                  {selectedEvent.guestTeacherIds && selectedEvent.guestTeacherIds.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-zinc-400 flex-wrap">
                       <span className="text-zinc-500">🎤</span>
-                      <span>{selectedEvent.guestTeacherNames.join(', ')} <span className="text-zinc-600">(guest)</span></span>
+                      {selectedEvent.guestTeacherIds.map((gid, i) => {
+                        const g = guestTeachers.find(gt => gt.id === gid)
+                        if (!g) return null
+                        return (
+                          <span key={gid}>
+                            <button onClick={() => setViewingGuestTeacher(g)} className="text-brand-400 hover:underline">{g.name}</button>
+                            {i < selectedEvent.guestTeacherIds!.length - 1 ? ',' : ''}
+                          </span>
+                        )
+                      })}
+                      <span className="text-zinc-600">(guest)</span>
                     </div>
                   )}
                   {selectedEvent.overrideNotes && (
@@ -1476,6 +1496,74 @@ export default function StudentCalendar() {
           </div>
         </div>
       )}
+
+      {viewingGuestTeacher && (
+        <GuestTeacherProfileModal guest={viewingGuestTeacher} onClose={() => setViewingGuestTeacher(null)} />
+      )}
+    </div>
+  )
+}
+
+// ── Guest teacher profile card ───────────────────────────────────────────────
+// A read-only version of the card shown in the Guest Teacher Bank — no booking
+// status or price, just enough to introduce who's teaching.
+
+function GuestTeacherProfileModal({ guest, onClose }: { guest: GuestTeacherDoc; onClose: () => void }) {
+  const expertise = Array.isArray(guest.expertise) ? guest.expertise.filter(Boolean) : []
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-zinc-900 border border-white/10 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex justify-end p-3">
+          <button onClick={onClose} className="p-2 bg-zinc-800 rounded-xl text-zinc-400 hover:text-zinc-200 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Hero */}
+        <div className="flex flex-col items-center text-center pb-6 px-6 -mt-8 border-b border-white/8">
+          {guest.profilePictureUrl ? (
+            <img src={guest.profilePictureUrl} alt={guest.name} className="w-28 h-28 rounded-full object-cover ring-4 ring-white/10 shadow-lg" />
+          ) : (
+            <div className={cn('w-28 h-28 rounded-full flex items-center justify-center text-white text-3xl font-bold ring-4 ring-white/10', avatarColor(guest.name))}>
+              {initials(guest.name)}
+            </div>
+          )}
+          <h2 className="mt-4 text-xl font-bold text-zinc-100">{guest.name}</h2>
+          {expertise.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-1.5 mt-1.5">
+              {expertise.map(e => (
+                <span key={e} className="text-xs bg-brand-600/20 text-brand-300 px-2.5 py-0.5 rounded-full font-medium">{e}</span>
+              ))}
+            </div>
+          )}
+          {guest.location && (
+            <span className="flex items-center gap-1 mt-2 text-xs text-zinc-400"><MapPin className="w-3 h-3" />{guest.location}</span>
+          )}
+        </div>
+
+        <div className="p-6 space-y-5">
+          {(guest.email || guest.portfolioUrl) && (
+            <div className="flex flex-wrap gap-3">
+              {guest.email && (
+                <a href={`mailto:${guest.email}`} className="inline-flex items-center gap-1.5 text-sm text-zinc-300 hover:text-brand-400 transition-colors">
+                  <Mail className="w-4 h-4 text-zinc-500" />{guest.email}
+                </a>
+              )}
+              {guest.portfolioUrl && (
+                <a href={guest.portfolioUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-brand-400 hover:underline">
+                  <ExternalLink className="w-4 h-4" />Portfolio
+                </a>
+              )}
+            </div>
+          )}
+          {guest.bio && (
+            <div>
+              <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1.5">Bio</p>
+              <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line">{guest.bio}</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

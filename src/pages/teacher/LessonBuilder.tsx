@@ -179,6 +179,18 @@ export default function LessonBuilder() {
   const teacherIds      = watch('teacherIds')
   const guestTeacherIds = watch('guestTeacherIds')
   const selectedSubjectId = watch('subjectId')
+  const selectedCohortId  = watch('cohortId')
+
+  // Only offer subjects that actually belong to this class's program year —
+  // matches the filter the Subjects menu itself uses.
+  const selectedCohort = useMemo(
+    () => cohorts.find(c => c.id === selectedCohortId) ?? null,
+    [cohorts, selectedCohortId],
+  )
+  const availableSubjects = useMemo(
+    () => subjects.filter(s => !selectedCohort || s.programYear === selectedCohort.programYear),
+    [subjects, selectedCohort],
+  )
 
   const selectedSubject = useMemo(
     () => subjects.find(s => s.id === selectedSubjectId) ?? null,
@@ -304,11 +316,14 @@ export default function LessonBuilder() {
             <label className="label">Subject</label>
             <select {...register('subjectId')} className="input">
               <option value="">Select subject…</option>
-              {[...subjects].sort((a, b) => a.title.localeCompare(b.title)).map(s =>
+              {[...availableSubjects].sort((a, b) => a.title.localeCompare(b.title)).map(s =>
                 <option key={s.id} value={s.id}>{s.iconEmoji} {s.title}</option>
               )}
             </select>
             {errors.subjectId && <p className="text-xs text-rose-500 mt-1">{errors.subjectId.message}</p>}
+            {selectedCohort && availableSubjects.length === 0 && (
+              <p className="text-xs text-amber-500 mt-1">No subjects set up for Year {selectedCohort.programYear} in the Subjects menu yet.</p>
+            )}
           </div>
           {lcategories.length > 0 && (
             <div>

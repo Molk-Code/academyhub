@@ -200,7 +200,7 @@ function QRModal({ item, onClose }: { item: EquipmentDoc; onClose: () => void })
   )
 }
 
-function InfoModal({ item, cohorts, onClose }: { item: EquipmentDoc; cohorts: CohortDoc[]; onClose: () => void }) {
+function InfoModal({ item, cohorts, pricingEnabled, onClose }: { item: EquipmentDoc; cohorts: CohortDoc[]; pricingEnabled: boolean; onClose: () => void }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={onClose}>
       <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 16, width: '100%', maxWidth: 440, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
@@ -220,7 +220,7 @@ function InfoModal({ item, cohorts, onClose }: { item: EquipmentDoc; cohorts: Co
 
           <div style={{ fontSize: '.8rem', fontWeight: 600, color: item.available === 0 ? '#ff4757' : '#4cd964' }}>
             {item.available}/{item.totalQuantity} available
-            {item.priceInclVat > 0 ? <span style={{ color: '#6a6a80', fontWeight: 500 }}> · {item.priceInclVat} kr/day</span> : <span style={{ color: '#6a6a80', fontWeight: 500 }}> · Free</span>}
+            {pricingEnabled && (item.priceInclVat > 0 ? <span style={{ color: '#6a6a80', fontWeight: 500 }}> · {item.priceInclVat} kr/day</span> : <span style={{ color: '#6a6a80', fontWeight: 500 }}> · Free</span>)}
           </div>
 
           {item.allowedCohortIds && item.allowedCohortIds.length > 0 && (
@@ -589,7 +589,7 @@ function ItemForm({ existing, onClose, categories }: { existing: EquipmentDoc | 
 
 // ── Catalog Tab ───────────────────────────────────────────────────────────────
 
-function CatalogTab({ categories }: { categories: EquipmentCategoryDoc[] }) {
+function CatalogTab({ categories, pricingEnabled }: { categories: EquipmentCategoryDoc[]; pricingEnabled: boolean }) {
   const { data: equipmentRaw } = useCollection<EquipmentDoc>('equipment')
   const { data: cohorts } = useCollection<CohortDoc>('cohorts')
   const equipment = useMemo(
@@ -725,19 +725,21 @@ function CatalogTab({ categories }: { categories: EquipmentCategoryDoc[] }) {
                 {item.notes && (
                   <div className="product-notes"><AlertTriangle size={11} style={{ display: 'inline', verticalAlign: '-1px', marginRight: 3 }} />{item.notes}</div>
                 )}
-                <div className="product-pricing">
-                  {item.priceInclVat > 0
-                    ? <span className="price-day">{item.priceInclVat} kr/day</span>
-                    : <span className="price-free">Free</span>
-                  }
-                </div>
+                {pricingEnabled && (
+                  <div className="product-pricing">
+                    {item.priceInclVat > 0
+                      ? <span className="price-day">{item.priceInclVat} kr/day</span>
+                      : <span className="price-free">Free</span>
+                    }
+                  </div>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {infoItem && <InfoModal item={infoItem} cohorts={cohorts} onClose={() => setInfoItem(null)} />}
+      {infoItem && <InfoModal item={infoItem} cohorts={cohorts} pricingEnabled={pricingEnabled} onClose={() => setInfoItem(null)} />}
 
       {showForm && <ItemForm existing={editItem} onClose={() => { setShowForm(false); setEditItem(null) }} categories={categories} />}
       {qrItem && <QRModal item={qrItem} onClose={() => setQrItem(null)} />}
@@ -1306,6 +1308,18 @@ export default function AdminEquipmentPage() {
     await setDoc(doc(db, 'settings', 'production'), { requireProductionForBooking: next }, { merge: true })
   }
 
+  const [pricingEnabled, setPricingEnabled] = useState(true)
+  useEffect(() => {
+    getDoc(doc(db, 'settings', 'equipment')).then(snap => {
+      if (snap.exists()) setPricingEnabled(snap.data().pricingEnabled !== false)
+    })
+  }, [])
+  async function togglePricing() {
+    const next = !pricingEnabled
+    setPricingEnabled(next)
+    await setDoc(doc(db, 'settings', 'equipment'), { pricingEnabled: next }, { merge: true })
+  }
+
   const tabs: { id: AdminTab; label: string; badge?: number }[] = [
     { id: 'catalog',    label: 'Catalog' },
     { id: 'bookings',   label: 'Bookings', badge: pendingCount },
@@ -1360,12 +1374,21 @@ export default function AdminEquipmentPage() {
               <span className="hidden sm:inline">Require production</span>
               <span className="sm:hidden">Prod.</span>
             </button>
+            <button
+              onClick={togglePricing}
+              title={pricingEnabled ? 'Prices shown — click to hide prices everywhere' : 'Prices hidden — click to show prices'}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 10, background: 'transparent', border: '1px solid #2a2a3a', cursor: 'pointer', fontSize: '.75rem', fontWeight: 600, color: pricingEnabled ? '#4cd964' : '#4a4a60', transition: 'all .2s', whiteSpace: 'nowrap' }}
+            >
+              {pricingEnabled ? <ToggleRight size={15} color="#4cd964" /> : <ToggleLeft size={15} color="#4a4a60" />}
+              <span className="hidden sm:inline">Prices</span>
+              <span className="sm:hidden">Kr</span>
+            </button>
           </div>
         </div>
       </header>
 
       <div className="main">
-        {tab === 'catalog'     && <CatalogTab categories={categories} />}
+        {tab === 'catalog'     && <CatalogTab categories={categories} pricingEnabled={pricingEnabled} />}
         {tab === 'bookings'    && <BookingsTab />}
         {tab === 'categories'  && <CategoriesTab categories={categoriesRaw} />}
       </div>

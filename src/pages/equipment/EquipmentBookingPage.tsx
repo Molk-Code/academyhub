@@ -231,6 +231,12 @@ export default function EquipmentBookingPage() {
       if (snap.exists()) setRequireProductionSetting(snap.data().requireProductionForBooking !== false)
     })
   }, [])
+  const [pricingEnabled, setPricingEnabled] = useState(true)
+  useEffect(() => {
+    getDoc(doc(db, 'settings', 'equipment')).then(snap => {
+      if (snap.exists()) setPricingEnabled(snap.data().pricingEnabled !== false)
+    })
+  }, [])
   // If Production is turned off in Nav Settings entirely, equipment can never
   // require one — there'd be no way to select or create one.
   const productionRequired = requireProductionSetting && productionNavEnabled
@@ -342,7 +348,7 @@ export default function EquipmentBookingPage() {
   }, [selectedProductionId, selectedProduction, productionCrew, productionShootingDays, crewRoles])
 
   function isOverEquipmentBudget(item: EquipmentDoc): boolean {
-    if (!budgetInfo) return false
+    if (!pricingEnabled || !budgetInfo) return false
     const addCost = item.priceInclVat * chargeableDays
     return totalPrice + addCost > budgetInfo.equipmentBudget
   }
@@ -584,9 +590,11 @@ export default function EquipmentBookingPage() {
                     </div>
                   </div>
                   <div className="cart-item-right">
-                    <span className="cart-item-price">
-                      {item.priceInclVat > 0 ? `${(item.priceInclVat * quantity * chargeableDays).toFixed(0)} kr` : 'Free'}
-                    </span>
+                    {pricingEnabled && (
+                      <span className="cart-item-price">
+                        {item.priceInclVat > 0 ? `${(item.priceInclVat * quantity * chargeableDays).toFixed(0)} kr` : 'Free'}
+                      </span>
+                    )}
                     <button className="remove-btn" onClick={() => removeFromCart(item.id)}><X size={14} /></button>
                   </div>
                 </div>
@@ -626,7 +634,7 @@ export default function EquipmentBookingPage() {
               {(!fromDate || !toDate) && (
                 <div className="cart-dates-hint">Select rental dates to proceed</div>
               )}
-              {budgetInfo && (
+              {pricingEnabled && budgetInfo && (
                 <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: totalPrice > budgetInfo.equipmentBudget ? 'rgba(248,113,113,.1)' : 'rgba(52,211,153,.07)', border: `1px solid ${totalPrice > budgetInfo.equipmentBudget ? 'rgba(248,113,113,.3)' : 'rgba(52,211,153,.2)'}` }}>
                   <div style={{ fontSize: '.7rem', color: '#6a6a80', marginBottom: 2 }}>Equipment budget</div>
                   <div style={{ fontSize: '.85rem', fontWeight: 700, color: totalPrice > budgetInfo.equipmentBudget ? '#f87171' : '#34d399' }}>
@@ -637,13 +645,15 @@ export default function EquipmentBookingPage() {
                   )}
                 </div>
               )}
-              <div className="cart-total">
-                <span>Total</span>
-                <strong>{totalPrice > 0 ? `${totalPrice.toFixed(0)} kr` : 'Free'}</strong>
-              </div>
+              {pricingEnabled && (
+                <div className="cart-total">
+                  <span>Total</span>
+                  <strong>{totalPrice > 0 ? `${totalPrice.toFixed(0)} kr` : 'Free'}</strong>
+                </div>
+              )}
               <button
                 className="checkout-btn"
-                disabled={!fromDate || !toDate || (budgetInfo != null && totalPrice > budgetInfo.equipmentBudget)}
+                disabled={!fromDate || !toDate || (pricingEnabled && budgetInfo != null && totalPrice > budgetInfo.equipmentBudget)}
                 onClick={() => { setCartOpen(false); setView('checkout') }}
               >
                 Proceed to Checkout
@@ -765,21 +775,25 @@ export default function EquipmentBookingPage() {
                         <p style={{ fontSize: '.6rem', color: '#6a6a80', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Salaries</p>
                         <p style={{ fontSize: '.95rem', fontWeight: 700, color: '#60a5fa', margin: 0 }}>{budgetInfo.salaryCost.toLocaleString('sv-SE')} <span style={{ fontWeight: 400, color: '#6a6a80', fontSize: '.75rem' }}>/ {budgetInfo.limit.toLocaleString('sv-SE')} SEK</span></p>
                       </div>
-                      <div>
-                        <p style={{ fontSize: '.6rem', color: '#6a6a80', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Equipment budget</p>
-                        <p style={{ fontSize: '.95rem', fontWeight: 700, color: totalPrice > budgetInfo.equipmentBudget ? '#f87171' : '#34d399', margin: 0 }}>
-                          {(budgetInfo.equipmentBudget - totalPrice).toLocaleString('sv-SE')} <span style={{ fontWeight: 400, color: '#6a6a80', fontSize: '.75rem' }}>/ {budgetInfo.equipmentBudget.toLocaleString('sv-SE')} SEK remaining</span>
-                        </p>
-                      </div>
+                      {pricingEnabled && (
+                        <div>
+                          <p style={{ fontSize: '.6rem', color: '#6a6a80', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Equipment budget</p>
+                          <p style={{ fontSize: '.95rem', fontWeight: 700, color: totalPrice > budgetInfo.equipmentBudget ? '#f87171' : '#34d399', margin: 0 }}>
+                            {(budgetInfo.equipmentBudget - totalPrice).toLocaleString('sv-SE')} <span style={{ fontWeight: 400, color: '#6a6a80', fontSize: '.75rem' }}>/ {budgetInfo.equipmentBudget.toLocaleString('sv-SE')} SEK remaining</span>
+                          </p>
+                        </div>
+                      )}
                     </div>
                     {/* progress bar */}
                     <div style={{ height: 5, background: '#1e1e2e', borderRadius: 99, overflow: 'hidden', display: 'flex' }}>
                       <div style={{ height: '100%', background: '#3b82f6', transition: 'width .4s', width: `${Math.min((budgetInfo.salaryCost / budgetInfo.limit) * 100, 100)}%` }} />
-                      <div style={{ height: '100%', background: '#10b981', transition: 'width .4s', width: `${Math.min((totalPrice / budgetInfo.limit) * 100, 100)}%` }} />
+                      {pricingEnabled && (
+                        <div style={{ height: '100%', background: '#10b981', transition: 'width .4s', width: `${Math.min((totalPrice / budgetInfo.limit) * 100, 100)}%` }} />
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: '1rem', marginTop: 5 }}>
                       <span style={{ fontSize: '.65rem', color: '#3b82f6' }}>■ Salaries</span>
-                      <span style={{ fontSize: '.65rem', color: '#10b981' }}>■ Equipment in cart</span>
+                      {pricingEnabled && <span style={{ fontSize: '.65rem', color: '#10b981' }}>■ Equipment in cart</span>}
                       <span style={{ fontSize: '.65rem', color: '#3a3a4a' }}>■ Available</span>
                     </div>
                   </div>
@@ -867,15 +881,17 @@ export default function EquipmentBookingPage() {
                         }
                         {item.notes && <div className="product-notes">{item.notes}</div>}
                         {item.description && <div className="product-description">{item.description}</div>}
-                        <div className="product-pricing">
-                          {item.priceInclVat > 0
-                            ? <>
-                                <span className="price-day">{item.priceInclVat} kr/day</span>
-                                <span className="price-week">{weeklyRate(item.priceInclVat).toFixed(0)} kr/week</span>
-                              </>
-                            : <span className="price-free">Free</span>
-                          }
-                        </div>
+                        {pricingEnabled && (
+                          <div className="product-pricing">
+                            {item.priceInclVat > 0
+                              ? <>
+                                  <span className="price-day">{item.priceInclVat} kr/day</span>
+                                  <span className="price-week">{weeklyRate(item.priceInclVat).toFixed(0)} kr/week</span>
+                                </>
+                              : <span className="price-free">Free</span>
+                            }
+                          </div>
+                        )}
                         <div className="product-actions">
                           {!disabled && !inCart && (
                             <div className="qty-selector">
@@ -980,12 +996,14 @@ export default function EquipmentBookingPage() {
                         <span className="summary-name">{item.name}</span>
                         <span className="summary-days">×{quantity} · {chargeableDays} days{weekDiscountActive ? ` (of ${rentalDays})` : ''}</span>
                       </div>
-                      <span className="summary-price">
-                        {item.priceInclVat > 0 ? `${(item.priceInclVat * quantity * chargeableDays).toFixed(0)} kr` : 'Free'}
-                      </span>
+                      {pricingEnabled && (
+                        <span className="summary-price">
+                          {item.priceInclVat > 0 ? `${(item.priceInclVat * quantity * chargeableDays).toFixed(0)} kr` : 'Free'}
+                        </span>
+                      )}
                     </div>
                   ))}
-                  {weekDiscountActive && (
+                  {pricingEnabled && weekDiscountActive && (
                     <div className="summary-item" style={{ borderTop: '1px solid rgba(76,217,100,.2)', paddingTop: '.5rem', marginTop: '.25rem' }}>
                       <span style={{ fontSize: '.8rem', color: '#4cd964', fontWeight: 600 }}>🎉 Week discount applied</span>
                       <span style={{ fontSize: '.8rem', color: '#4cd964', fontWeight: 600 }}>
@@ -994,24 +1012,28 @@ export default function EquipmentBookingPage() {
                     </div>
                   )}
                 </div>
-                <div className="summary-total">
-                  <span>Total</span>
-                  <strong>{totalPrice > 0 ? `${totalPrice.toFixed(0)} kr` : 'Free'}</strong>
-                </div>
+                {pricingEnabled && (
+                  <div className="summary-total">
+                    <span>Total</span>
+                    <strong>{totalPrice > 0 ? `${totalPrice.toFixed(0)} kr` : 'Free'}</strong>
+                  </div>
+                )}
                 {budgetInfo && (
                   <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: '#0e0e16', border: '1px solid #2a2a3a', fontSize: '.78rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                       <span style={{ color: '#6a6a80' }}>Salaries</span>
                       <span style={{ color: '#60a5fa', fontWeight: 600 }}>{budgetInfo.salaryCost.toLocaleString('sv-SE')} SEK</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ color: '#6a6a80' }}>Equipment (this booking)</span>
-                      <span style={{ color: '#f0f0f5', fontWeight: 600 }}>{totalPrice.toFixed(0)} SEK</span>
-                    </div>
+                    {pricingEnabled && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ color: '#6a6a80' }}>Equipment (this booking)</span>
+                        <span style={{ color: '#f0f0f5', fontWeight: 600 }}>{totalPrice.toFixed(0)} SEK</span>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #2a2a3a', paddingTop: 6 }}>
                       <span style={{ color: '#6a6a80' }}>Total budget used</span>
-                      <span style={{ color: (budgetInfo.salaryCost + totalPrice) > budgetInfo.limit ? '#f87171' : '#34d399', fontWeight: 700 }}>
-                        {(budgetInfo.salaryCost + totalPrice).toLocaleString('sv-SE')} / {budgetInfo.limit.toLocaleString('sv-SE')} SEK
+                      <span style={{ color: (budgetInfo.salaryCost + (pricingEnabled ? totalPrice : 0)) > budgetInfo.limit ? '#f87171' : '#34d399', fontWeight: 700 }}>
+                        {(budgetInfo.salaryCost + (pricingEnabled ? totalPrice : 0)).toLocaleString('sv-SE')} / {budgetInfo.limit.toLocaleString('sv-SE')} SEK
                       </span>
                     </div>
                   </div>

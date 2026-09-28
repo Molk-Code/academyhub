@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where } from '@/hooks/useFirestore'
-import type { SubjectDoc, AssignmentDoc, LessonDoc, CohortDoc } from '@/types'
+import type { SubjectDoc, AssignmentDoc, LessonDoc, SyncedEventDoc, CohortDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 
 export default function SubjectList() {
@@ -29,6 +29,15 @@ export default function SubjectList() {
     effectiveCohortId ?? '',
   )
 
+  // A curriculum topic can also be covered by a synced Outlook event (e.g. a
+  // guest teacher's session), not just a native lesson.
+  const { data: syncedEvents } = useCollection<SyncedEventDoc>(
+    'synced_events',
+    effectiveCohortId ? [where('cohortId', 'in', [effectiveCohortId, 'all'])] : [],
+    !!effectiveCohortId,
+    `synced-${effectiveCohortId ?? ''}`,
+  )
+
   const assignmentsBySubject = useMemo(() => assignments.reduce<Record<string, number>>((acc, a) => {
     acc[a.subjectId] = (acc[a.subjectId] ?? 0) + 1
     return acc
@@ -47,10 +56,16 @@ export default function SubjectList() {
         if (!lessonDate || lessonDate > now) continue
         for (const cid of (l.coveredCurriculumIds ?? [])) coveredIds.add(cid)
       }
+      for (const e of syncedEvents) {
+        if (e.subjectId !== subject.id) continue
+        const eventDate = e.startTime?.toDate?.()
+        if (!eventDate || eventDate > now) continue
+        for (const cid of (e.coveredCurriculumIds ?? [])) coveredIds.add(cid)
+      }
       result[subject.id] = { covered: coveredIds.size, total }
     }
     return result
-  }, [subjects, lessons])
+  }, [subjects, lessons, syncedEvents])
 
   const overallProgress = useMemo(() => {
     const entries = Object.values(curriculumProgressBySubject)

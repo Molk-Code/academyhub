@@ -4,7 +4,7 @@ import { doc, updateDoc, addDoc, deleteDoc, collection, serverTimestamp } from '
 import { db } from '@/lib/firebase'
 import { uploadWithQuota, deleteWithTracking } from '@/lib/uploadWithQuota'
 import { useDocument, useCollection, orderBy, where } from '@/hooks/useFirestore'
-import type { SubjectDoc, CurriculumItem, SubjectResource, SubjectTeacherDoc, UserDoc, LessonDoc, VideoLabDoc, AbsenceReportDoc, GuestTeacherDoc, GuestTeacherBookingDoc, AssignmentDoc } from '@/types'
+import type { SubjectDoc, CurriculumItem, SubjectResource, SubjectTeacherDoc, UserDoc, LessonDoc, SyncedEventDoc, VideoLabDoc, AbsenceReportDoc, GuestTeacherDoc, GuestTeacherBookingDoc, AssignmentDoc } from '@/types'
 import { thumbnailUrl } from '@/lib/cloudinary'
 import {
   ArrowLeft, Plus, Pencil, Trash2, Check, X,
@@ -41,6 +41,15 @@ export default function SubjectDetail() {
     [where('subjectId', '==', id ?? '')],
     !!id,
     id ?? '',
+  )
+  // Curriculum topics can also be covered by a synced Outlook event (e.g. a
+  // guest teacher's session), not just a native lesson — both must count
+  // toward "completed".
+  const { data: syncedEvents } = useCollection<SyncedEventDoc>(
+    'synced_events',
+    [where('subjectId', '==', id ?? '')],
+    !!id,
+    `synced-${id ?? ''}`,
   )
   const { data: subjectVideos } = useCollection<VideoLabDoc>(
     'video_lab',
@@ -118,19 +127,22 @@ export default function SubjectDetail() {
     return set.length ? set : [1]
   }, [curriculum])
 
-  // For each curriculum item: completed only when ALL covering lessons are in the past
+  // For each curriculum item: completed only when ALL covering lessons/synced
+  // events are in the past
   const itemLessonMap = useMemo(() => {
     const now = new Date()
     const grouped: Record<string, { date: Date; isPast: boolean }[]> = {}
-    for (const l of lessons) {
-      const d = l.startTime?.toDate?.()
-      if (!d) continue
+    const addCovering = (coveredCurriculumIds: string[] | undefined, startTime: { toDate?: () => Date } | undefined) => {
+      const d = startTime?.toDate?.()
+      if (!d) return
       const isPast = d <= now
-      for (const cid of (l.coveredCurriculumIds ?? [])) {
+      for (const cid of (coveredCurriculumIds ?? [])) {
         if (!grouped[cid]) grouped[cid] = []
         grouped[cid].push({ date: d, isPast })
       }
     }
+    for (const l of lessons) addCovering(l.coveredCurriculumIds, l.startTime)
+    for (const e of syncedEvents) addCovering(e.coveredCurriculumIds, e.startTime)
     const map: Record<string, { completed: boolean; plannedDate: Date | null }> = {}
     for (const [cid, ls] of Object.entries(grouped)) {
       const allPast = ls.every(l => l.isPast)
@@ -138,7 +150,7 @@ export default function SubjectDetail() {
       map[cid] = { completed: allPast, plannedDate: futureDates[0] ?? null }
     }
     return map
-  }, [lessons])
+  }, [lessons, syncedEvents])
 
   const coveredIds   = useMemo(() => new Set(Object.keys(itemLessonMap).filter(k => itemLessonMap[k].completed)), [itemLessonMap])
   const currProgress = curriculum.length > 0 ? Math.round((coveredIds.size / curriculum.length) * 100) : 0

@@ -13,7 +13,7 @@ import { useFeature } from '@/hooks/useFeature'
 import { useDocument, useCollection, where, orderBy } from '@/hooks/useFirestore'
 import { doc, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { NotificationDoc } from '@/types'
+import type { NotificationDoc, CohortDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import Avatar from '@/components/common/Avatar'
 import { useChatUnreadCount } from '@/hooks/useChatUnread'
@@ -128,7 +128,7 @@ function StudentContentSkeleton() {
 }
 
 export default function StudentLayout() {
-  const { profile, role, roles, signOut } = useAuth()
+  const { profile, role, roles, signOut, previewCohortId, setPreviewCohortId } = useAuth()
   const { shortName } = useSchool()
   const canProduction   = useFeature('production')
   const canEquipment    = useFeature('equipment')
@@ -166,6 +166,18 @@ export default function StudentLayout() {
   const isFullPage     = pathname === '/booking/equipment'
   const isGuidePage    = pathname.endsWith('/guide')
   const isAdminPreview = role === 'admin' || roles.includes('admin')
+
+  // Preview class switcher — lets an admin browsing student routes pick which
+  // class they're previewing as, right from the banner. Without a class
+  // selected, cohort-scoped data (like synced Outlook events) falls back to
+  // showing everything across every class, which isn't what a real student
+  // would ever see — so default to the first class the moment we land here.
+  const { data: previewCohorts } = useCollection<CohortDoc>('cohorts', [], isAdminPreview)
+  useEffect(() => {
+    if (isAdminPreview && !previewCohortId && previewCohorts.length > 0) {
+      setPreviewCohortId(previewCohorts[0].id)
+    }
+  }, [isAdminPreview, previewCohortId, previewCohorts, setPreviewCohortId])
   const { data: navVis, loading: navVisLoading } = useDocument<{ id: string; student: Record<string, boolean>; customLinks?: { id: string; label: string; url: string; roles: string[] }[] }>('settings', 'nav_visibility')
 
   const chatUnread     = useChatUnreadCount()
@@ -549,8 +561,20 @@ export default function StudentLayout() {
           </div>
         )}
         {isAdminPreview && (
-          <div className="bg-rose-600 text-white text-xs font-semibold px-4 py-2 flex items-center gap-2">
-            <span className="flex-1">ADMIN PREVIEW — viewing as student</span>
+          <div className="bg-rose-600 text-white text-xs font-semibold px-4 py-2 flex items-center gap-2 flex-wrap">
+            <span>ADMIN PREVIEW — viewing as student</span>
+            {previewCohorts.length > 1 && (
+              <select
+                value={previewCohortId ?? ''}
+                onChange={e => setPreviewCohortId(e.target.value)}
+                className="bg-white/20 hover:bg-white/30 text-white text-xs font-semibold rounded-md px-2 py-1 border-none focus:outline-none focus:ring-1 focus:ring-white/60"
+              >
+                {previewCohorts.map(c => (
+                  <option key={c.id} value={c.id} className="text-zinc-900">{c.name}</option>
+                ))}
+              </select>
+            )}
+            <span className="flex-1" />
             <button
               onClick={() => navigate('/admin')}
               className="flex items-center gap-1 bg-white/20 hover:bg-white/30 px-2 py-1 rounded-md transition-colors"

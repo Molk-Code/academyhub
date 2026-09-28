@@ -122,6 +122,14 @@
         { "fieldPath": "studentId", "order": "ASCENDING" },
         { "fieldPath": "reportedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "synced_events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "subjectId", "order": "ASCENDING" },
+        { "fieldPath": "cohortId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

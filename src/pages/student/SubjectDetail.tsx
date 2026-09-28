@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useDocument, useCollection, orderBy, where } from '@/hooks/useFirestore'
 import { useAuth } from '@/contexts/AuthContext'
-import type { SubjectDoc, SubjectTeacherDoc, LessonDoc, VideoLabDoc, AbsenceReportDoc, AssignmentDoc } from '@/types'
+import type { SubjectDoc, SubjectTeacherDoc, LessonDoc, SyncedEventDoc, VideoLabDoc, AbsenceReportDoc, AssignmentDoc } from '@/types'
 import { thumbnailUrl } from '@/lib/cloudinary'
 import { Link2, FileText, ExternalLink, UserRound, CheckCircle2, XCircle, Globe, Play, Clock } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
@@ -25,6 +25,16 @@ export default function StudentSubjectDetail() {
     effectiveCohortId && id ? [where('cohortId', '==', effectiveCohortId), where('subjectId', '==', id)] : [],
     !!(effectiveCohortId && id),
     `${effectiveCohortId}-${id}`,
+  )
+  // A curriculum topic can also be covered by a synced Outlook event (e.g. a
+  // guest teacher's session), not just a native lesson — scoped to this
+  // student's own class (or "all") so a shared subject's other-cohort
+  // sessions never mark a topic complete here.
+  const { data: syncedEvents } = useCollection<SyncedEventDoc>(
+    'synced_events',
+    id && effectiveCohortId ? [where('subjectId', '==', id), where('cohortId', 'in', [effectiveCohortId, 'all'])] : [],
+    !!(id && effectiveCohortId),
+    `synced-${id}-${effectiveCohortId}`,
   )
   const { data: subjectVideos } = useCollection<VideoLabDoc>(
     'video_lab',
@@ -81,6 +91,17 @@ export default function StudentSubjectDetail() {
         grouped[cid].push({ id: l.id, isPast })
       }
     }
+    // Synced Outlook events (e.g. a guest teacher's session) also count, but
+    // have no attendance tracking, so they only ever affect "covered".
+    for (const e of syncedEvents) {
+      const eventDate = e.startTime?.toDate?.()
+      if (!eventDate) continue
+      const isPast = eventDate <= now
+      for (const cid of (e.coveredCurriculumIds ?? [])) {
+        if (!grouped[cid]) grouped[cid] = []
+        grouped[cid].push({ id: e.id, isPast })
+      }
+    }
     const covered = new Set<string>()
     const absentCovered = new Set<string>()
     for (const [cid, ls] of Object.entries(grouped)) {
@@ -90,7 +111,7 @@ export default function StudentSubjectDetail() {
       }
     }
     return { coveredIds: covered, absentCoveredIds: absentCovered }
-  }, [lessons, absentLessonIds])
+  }, [lessons, syncedEvents, absentLessonIds])
 
   const curriculumProgress = curriculum.length > 0
     ? Math.round((coveredIds.size / curriculum.length) * 100)

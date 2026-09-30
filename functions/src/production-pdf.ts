@@ -23,7 +23,8 @@ export const exportProductionPdf = functions.https.onCall(async (data, context) 
     prod.createdBy === uid ||
     (prod.collaborators ?? []).includes(uid) ||
     (prod.viewerIds    ?? []).includes(uid) ||
-    prod.isPublic === true
+    (prod.isPublic === true && prod.cohortId === claims.cohortId) ||
+    (prod.sharedCohortIds ?? []).includes(claims.cohortId)
   if (!canAccess) throw new functions.https.HttpsError('permission-denied', 'Access denied.')
 
   const [scenesSnap, castSnap, daysSnap, crewSnap, locSnap, costumeSnap, makeupSnap, propsSnap] = await Promise.all([

@@ -166,14 +166,20 @@ export default function StudentProduction() {
     !!cohortId && !authLoading,
     `pub:${cohortId ?? ''}`,
   )
+  const { data: classSharedProds } = useCollection<ProductionDoc>(
+    'productions',
+    cohortId ? [where('sharedCohortIds', 'array-contains', cohortId)] : [],
+    !!cohortId && !authLoading,
+    `sharedcohort:${cohortId ?? ''}`,
+  )
   const productions = useMemo(() => {
     const seen = new Set<string>()
-    return [...myProds, ...collabProds, ...publicProds].filter(p => {
+    return [...myProds, ...collabProds, ...publicProds, ...classSharedProds].filter(p => {
       if (seen.has(p.id)) return false
       seen.add(p.id)
       return true
     })
-  }, [myProds, collabProds, publicProds])
+  }, [myProds, collabProds, publicProds, classSharedProds])
   const prodsLoading = myProdsLoading
 
   const { data: periods } = useCollection<ProductionPeriodDoc>(

@@ -10,8 +10,8 @@ import { uploadResumableWithQuota } from '@/lib/uploadWithQuota'
 import { useAuth } from '@/contexts/AuthContext'
 import { useDocument, useCollection, where, orderBy } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
-import type { ProductionDoc, UserDoc, ProductionFeedbackDoc, ProductionTeamDoc, ProductionSceneDoc, ProductionCastDoc, ProductionShotDoc, ProductionShootingDayDoc, ProductionCrewAssignmentDoc, ProductionLocationDoc, ProductionPeriodDoc, ProductionCostumeDoc, ProductionMakeupDoc, ProductionPropsDoc } from '@/types'
-import { ArrowLeft, Users, Globe, Lock, Trash2, MessageSquare, X, Send, ChevronDown, Download, FileSpreadsheet, UserPlus, Eye, Loader2, FileText, Upload, Sparkles, CheckCircle2 } from 'lucide-react'
+import type { ProductionDoc, UserDoc, ProductionFeedbackDoc, ProductionTeamDoc, ProductionSceneDoc, ProductionCastDoc, ProductionShotDoc, ProductionShootingDayDoc, ProductionCrewAssignmentDoc, ProductionLocationDoc, ProductionPeriodDoc, ProductionCostumeDoc, ProductionMakeupDoc, ProductionPropsDoc, CohortDoc } from '@/types'
+import { ArrowLeft, Users, Globe, Trash2, MessageSquare, X, Send, ChevronDown, Download, FileSpreadsheet, UserPlus, Eye, Loader2, FileText, Upload, Sparkles, CheckCircle2 } from 'lucide-react'
 import { parseScreenplayPDF, type ParsedScene } from '@/lib/parseScreenplay'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import Avatar from '@/components/common/Avatar'
@@ -504,6 +504,8 @@ export default function ProductionEditor() {
     production?.cohortId ?? '',
   )
 
+  const { data: allCohorts } = useCollection<CohortDoc>('cohorts', [orderBy('name', 'asc')])
+
   // Data for exports
   const { data: scenes } = useCollection<ProductionSceneDoc>(
     `productions/${id}/scenes`,
@@ -659,9 +661,16 @@ export default function ProductionEditor() {
     setImportSuccess(false)
   }
 
-  async function togglePublic() {
+  async function shareCohort(cohortId: string) {
     if (!id || !production) return
-    await updateDoc(doc(db, 'productions', id), { isPublic: !production.isPublic })
+    const next = [...(production.sharedCohortIds ?? []), cohortId]
+    await updateDoc(doc(db, 'productions', id), { sharedCohortIds: next, isPublic: true })
+  }
+
+  async function unshareCohort(cohortId: string) {
+    if (!id || !production) return
+    const next = (production.sharedCohortIds ?? []).filter(cid => cid !== cohortId)
+    await updateDoc(doc(db, 'productions', id), { sharedCohortIds: next, isPublic: next.length > 0 })
   }
 
   const addCollabSuggestions = useMemo(() => {
@@ -890,31 +899,56 @@ export default function ProductionEditor() {
                     </div>
                   )}
 
-                  {/* Full class */}
+                  {/* Classes */}
                   {canEdit && isOwner && (
-                    <div className="border-t border-white/10 pt-3">
-                      <button
-                        onClick={togglePublic}
-                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-zinc-800/60 transition-colors"
-                      >
-                        {production.isPublic
-                          ? <Globe className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                          : <Lock className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />}
-                        <span className="text-xs font-semibold text-zinc-300 flex-1 text-left">Full Class</span>
-                        <span className="text-[10px] text-zinc-500">view only</span>
-                        <div className={cn(
-                          'relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors',
-                          production.isPublic ? 'bg-emerald-600' : 'bg-zinc-700',
-                        )}>
-                          <span className={cn(
-                            'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform',
-                            production.isPublic ? 'translate-x-[18px]' : 'translate-x-1',
-                          )} />
+                    <div className="space-y-2 border-t border-white/10 pt-3">
+                      <div className="flex items-center gap-1.5">
+                        <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                        <p className="text-xs font-semibold text-zinc-300">Classes</p>
+                        <span className="text-[10px] text-zinc-500 ml-auto">view only</span>
+                      </div>
+
+                      {/* Currently shared classes */}
+                      {(production.sharedCohortIds ?? []).length > 0 && (
+                        <div className="space-y-1">
+                          {(production.sharedCohortIds ?? []).map(cid => {
+                            const cohort = allCohorts.find(c => c.id === cid)
+                            return (
+                              <div key={cid} className="flex items-center gap-2 bg-emerald-950/20 border border-emerald-900/30 rounded-lg px-2.5 py-1.5">
+                                <span className="text-xs text-emerald-300 flex-1">{cohort?.name ?? 'Unknown class'}</span>
+                                <button
+                                  onClick={() => unshareCohort(cid)}
+                                  className="text-zinc-500 hover:text-rose-400 transition-colors"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )
+                          })}
                         </div>
-                      </button>
-                      <p className="text-[10px] text-zinc-500 px-2.5 mt-1">
-                        {production.isPublic ? 'Everyone in your class can view this production.' : 'Only editors and crew viewers above can see this production.'}
-                      </p>
+                      )}
+
+                      {/* Add class */}
+                      {(() => {
+                        const sharedIds = new Set(production.sharedCohortIds ?? [])
+                        const unsharedCohorts = allCohorts.filter(c => !sharedIds.has(c.id))
+                        return unsharedCohorts.length > 0 ? (
+                          <div className="space-y-1">
+                            <p className="text-[10px] text-zinc-500">Share with a class:</p>
+                            {unsharedCohorts.map(cohort => (
+                              <button
+                                key={cohort.id}
+                                onClick={() => shareCohort(cohort.id)}
+                                className="w-full flex items-center gap-2 px-2.5 py-1.5 bg-zinc-800/60 hover:bg-zinc-800 rounded-lg text-xs text-zinc-300 transition-colors"
+                              >
+                                <span className="flex-1 text-left">{cohort.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (production.sharedCohortIds ?? []).length === 0 ? (
+                          <p className="text-xs text-zinc-500">No classes yet.</p>
+                        ) : null
+                      })()}
                     </div>
                   )}
 

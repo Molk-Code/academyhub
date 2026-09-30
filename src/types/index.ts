@@ -1027,7 +1027,8 @@ export interface ProductionDoc {
   collaborators: string[]   // can edit
   viewerIds: string[]       // view-only (populated from team shares)
   sharedTeams: { teamId: string; teamName: string }[]
-  isPublic: boolean
+  sharedCohortIds?: string[] // view-only — other classes shared with, by cohort id
+  isPublic: boolean         // kept in sync as (sharedCohortIds.length > 0), for legacy badges/checks
   createdAt: Timestamp
   updatedAt: Timestamp
   lastEditedBy?: string

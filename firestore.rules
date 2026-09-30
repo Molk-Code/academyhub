@@ -647,6 +647,7 @@ service cloud.firestore {
       function canReadProd() {
         return canEditProd()
           || (prodData().isPublic && prodData().cohortId == request.auth.token.cohortId)
+          || (prodData().sharedCohortIds != null && request.auth.token.cohortId in prodData().sharedCohortIds)
           || (prodData().viewerIds != null && request.auth.uid in prodData().viewerIds);
       }
 

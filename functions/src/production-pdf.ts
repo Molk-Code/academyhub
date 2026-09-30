@@ -287,6 +287,55 @@ export const exportProductionPdf = functions.https.onCall(async (data, context) 
       y += 20
     }
 
+    // ── Costume / Make-up / Props ────────────────────────────────────────────
+    function itemSection(title: string, items: any[], nameLabel: string, sceneField: string): void {
+      if (items.length === 0) return
+      addPageIfNeeded(60)
+      sectionHead(title)
+
+      const IC = [nameLabel.toUpperCase(), 'DESCRIPTION', 'SCENES', 'RESPONSIBLE', 'NOTES']
+      const nameW = 110, scenesW = 70, respW = 110
+      const descW = Math.floor((CW - nameW - scenesW - respW) * 0.55)
+      const notesW = CW - nameW - descW - scenesW - respW
+      const ICW = [nameW, descW, scenesW, respW, notesW]
+      const rh = 18
+      let cx = M
+      doc.rect(M, y, CW, rh).fill('#1e293b')
+      IC.forEach((h, i) => {
+        doc.fillColor('#94a3b8').fontSize(7).font('Helvetica-Bold')
+           .text(h, cx + 3, y + 5, { width: ICW[i] - 6, lineBreak: false })
+        cx += ICW[i]
+      })
+      y += rh
+
+      items.forEach((item: any, idx: number) => {
+        addPageIfNeeded(rh)
+        const itemScenes = scenes
+          .filter((s: any) => ((s[sceneField] ?? []) as string[]).includes(item.id))
+          .map((s: any) => String(s.sceneNumber))
+          .join(', ')
+        const cells = [
+          item.characterName || '–',
+          item.description || '–',
+          itemScenes || '–',
+          item.responsible || '–',
+          item.notes || '–',
+        ]
+        cx = M
+        if (idx % 2 === 0) doc.rect(M, y, CW, rh).fill('#f8fafc')
+        cells.forEach((cell: string, i: number) => {
+          doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(cx, y, ICW[i], rh).stroke()
+          fitCell(cell, cx, y, ICW[i], rh, 'Helvetica', 8, '#1e293b')
+          cx += ICW[i]
+        })
+        y += rh
+      })
+      y += 20
+    }
+    itemSection('Costume', costumes, 'Character', 'costumeIds')
+    itemSection('Make-up', makeupItems, 'Character', 'makeupIds')
+    itemSection('Props',   propsItems,  'Item',      'propsIds')
+
     // ── Schedule — 2-row per scene (call-sheet format) ───────────────────────
     if (days.length > 0) {
       addPageIfNeeded(60)

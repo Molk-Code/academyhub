@@ -1188,9 +1188,9 @@ export default function ProductionEditor() {
         {activeTab === 'shots'     && <ShotListTab  productionId={id!} canEdit={canEdit} />}
         {activeTab === 'locations' && <LocationsTab productionId={id!} canEdit={canEdit} />}
         {activeTab === 'schedule'  && <ScheduleTab  productionId={id!} canEdit={canEdit} productionTitle={production.title} />}
-        {activeTab === 'costume'   && <CostumeTab   productionId={id!} productionTitle={production.title} canEdit={canEdit} />}
-        {activeTab === 'makeup'    && <MakeupTab    productionId={id!} productionTitle={production.title} canEdit={canEdit} />}
-        {activeTab === 'props'     && <PropsTab     productionId={id!} productionTitle={production.title} canEdit={canEdit} />}
+        {activeTab === 'costume'   && <CostumeTab   productionId={id!} canEdit={canEdit} />}
+        {activeTab === 'makeup'    && <MakeupTab    productionId={id!} canEdit={canEdit} />}
+        {activeTab === 'props'     && <PropsTab     productionId={id!} canEdit={canEdit} />}
         {activeTab === 'shotlog'   && (
           <ShotLogTab
             productionId={id!}

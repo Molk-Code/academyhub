@@ -4,7 +4,7 @@ import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
 import type { ProductionCostumeDoc, ProductionCastDoc, ProductionSceneDoc } from '@/types'
-import { Plus, Trash2, Download } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 function InlineInput({
@@ -34,12 +34,10 @@ function InlineInput({
 
 interface ItemTabProps {
   productionId: string
-  productionTitle: string
   canEdit: boolean
   collectionName: string          // 'costumes' | 'makeup' | 'props'
   sceneField: keyof Pick<ProductionSceneDoc, 'costumeIds' | 'makeupIds' | 'propsIds'>
   icon: LucideIcon
-  deptLabel: string                 // "Costume" / "Make-up" / "Props" — used on the exported PDF
   nameLabel: string                // column header — "Character" or "Item"
   namePlaceholder: string
   addLabel: string                 // "Add Costume" / "Add Make-up" / "Add Prop"
@@ -48,8 +46,8 @@ interface ItemTabProps {
 }
 
 export function ItemTab({
-  productionId, productionTitle, canEdit, collectionName, sceneField, icon: Icon,
-  deptLabel, nameLabel, namePlaceholder, addLabel, emptyTitle, useCharacterDatalist,
+  productionId, canEdit, collectionName, sceneField, icon: Icon,
+  nameLabel, namePlaceholder, addLabel, emptyTitle, useCharacterDatalist,
 }: ItemTabProps) {
   const { data: items } = useCollection<ProductionCostumeDoc>(
     `productions/${productionId}/${collectionName}`,
@@ -105,75 +103,16 @@ export function ItemTab({
       .sort((a, b) => a - b)
   }
 
-  async function exportPDF() {
-    const { default: jsPDF }   = await import('jspdf')
-    const { default: autoTable } = await import('jspdf-autotable')
-
-    const docPdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-    const PW = 297, M = 14, CW = PW - M * 2
-
-    docPdf.setFillColor(15, 23, 42)
-    docPdf.rect(0, 0, PW, 22, 'F')
-    docPdf.setTextColor(255, 255, 255)
-    docPdf.setFontSize(13).setFont('helvetica', 'bold')
-    docPdf.text('CineForge', M, 14)
-    docPdf.setFontSize(8).setFont('helvetica', 'normal')
-    docPdf.setTextColor(148, 163, 184)
-    docPdf.text(`${deptLabel} Breakdown`, M + 30, 14)
-
-    docPdf.setFillColor(249, 115, 22)
-    docPdf.rect(0, 22, PW, 1.2, 'F')
-
-    let y = 32
-    docPdf.setTextColor(15, 23, 42)
-    docPdf.setFontSize(16).setFont('helvetica', 'bold')
-    docPdf.text(productionTitle, M, y)
-    y += 7
-    docPdf.setFontSize(9).setFont('helvetica', 'normal')
-    docPdf.setTextColor(100, 116, 139)
-    docPdf.text(`${deptLabel}  ·  ${items.length} item${items.length !== 1 ? 's' : ''}`, M, y)
-    y += 8
-
-    const rows = items.map(it => [
-      it.characterName || '—',
-      it.description || '',
-      scenesFor(it.id).join(', ') || '—',
-      it.responsible || '',
-      it.notes || '',
-    ])
-
-    autoTable(docPdf, {
-      startY: y,
-      head: [[nameLabel, 'Description', 'Scenes', 'Responsible', 'Notes']],
-      body: rows,
-      styles: { fontSize: 9, cellPadding: 3, font: 'helvetica' },
-      headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold', fontSize: 9 },
-      columnStyles: {
-        0: { cellWidth: 44 },
-        1: { cellWidth: 70 },
-        2: { cellWidth: 30 },
-        3: { cellWidth: 44 },
-        4: { cellWidth: CW - 188 },
-      },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-    })
-
-    docPdf.save(`${productionTitle.replace(/[^a-z0-9]/gi, '_')}_${deptLabel.replace(/[^a-z0-9]/gi, '_')}.pdf`)
-  }
-
   if (items.length === 0) {
     return (
       <div className="space-y-4">
-        <div className="flex justify-end gap-2">
-          <button onClick={exportPDF} className="flex items-center gap-2 py-2 px-4 text-sm rounded-xl border border-white/10 text-zinc-300 hover:bg-white/5 transition-colors">
-            <Download className="w-4 h-4" /> Export PDF
-          </button>
-          {canEdit && (
+        {canEdit && (
+          <div className="flex justify-end">
             <button onClick={addItem} className="btn-primary flex items-center gap-2 py-2 px-4 text-sm">
               <Plus className="w-4 h-4" /> {addLabel}
             </button>
-          )}
-        </div>
+          </div>
+        )}
         <div className="text-center py-16 bg-zinc-900 border border-white/10 rounded-2xl">
           <Icon className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
           <p className="text-zinc-400 text-sm font-medium">{emptyTitle}</p>
@@ -197,16 +136,13 @@ export function ItemTab({
         </datalist>
       )}
 
-      <div className="flex justify-end gap-2">
-        <button onClick={exportPDF} className="flex items-center gap-2 py-2 px-4 text-sm rounded-xl border border-white/10 text-zinc-300 hover:bg-white/5 transition-colors">
-          <Download className="w-4 h-4" /> Export PDF
-        </button>
-        {canEdit && (
+      {canEdit && (
+        <div className="flex justify-end">
           <button onClick={addItem} className="btn-primary flex items-center gap-2 py-2 px-4 text-sm">
             <Plus className="w-4 h-4" /> {addLabel}
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden">
         <table className="w-full text-sm">

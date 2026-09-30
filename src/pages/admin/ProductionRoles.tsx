@@ -15,7 +15,6 @@ export default function ProductionRoles() {
   // ── Production settings ───────────────────────────────────────────────────
   const [maxHours,       setMaxHours]       = useState(8)
   const [maxShots,       setMaxShots]       = useState(25)
-  const [showLeaderboard, setShowLeaderboard] = useState(true)
   const [saved,          setSaved]          = useState(false)
 
   useEffect(() => {
@@ -23,7 +22,6 @@ export default function ProductionRoles() {
       if (snap.exists()) {
         setMaxHours(snap.data().maxHoursPerDay ?? 8)
         setMaxShots(snap.data().maxShotsPerDay ?? 25)
-        setShowLeaderboard(snap.data().showLeaderboard !== false)
       }
     })
   }, [])
@@ -32,7 +30,6 @@ export default function ProductionRoles() {
     await setDoc(doc(db, 'settings', 'production'), {
       maxHoursPerDay: maxHours,
       maxShotsPerDay: maxShots,
-      showLeaderboard,
     }, { merge: true })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -181,24 +178,6 @@ export default function ProductionRoles() {
             </div>
             <p className="text-xs text-zinc-500 mt-2">A warning is shown when the total shots for a shooting day exceeds this limit.</p>
           </div>
-        </div>
-        <div className="flex items-center justify-between py-3 border-t border-white/8 mt-6">
-          <div>
-            <p className="text-sm font-medium text-zinc-300">🏆 Show points leaderboard</p>
-            <p className="text-xs text-zinc-500 mt-0.5">Display a top-5 leaderboard on the student dashboard.</p>
-          </div>
-          <button
-            onClick={() => { const next = !showLeaderboard; setShowLeaderboard(next); saveSettings() }}
-            className={cn(
-              'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none',
-              showLeaderboard ? 'bg-brand-500' : 'bg-zinc-700',
-            )}
-          >
-            <span className={cn(
-              'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
-              showLeaderboard ? 'translate-x-6' : 'translate-x-1',
-            )} />
-          </button>
         </div>
         {saved && <p className="text-xs text-emerald-400 mt-4">✓ Settings saved</p>}
       </div>

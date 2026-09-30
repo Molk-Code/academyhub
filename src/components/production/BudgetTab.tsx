@@ -96,7 +96,7 @@ export function BudgetTab({
         </div>
       ) : (
         <div className="bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-400">
-          No budget limit set for this production. Set one via the production period settings.
+          No budget limit set for this production.
         </div>
       )}
 

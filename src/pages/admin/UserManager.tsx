@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore'
+import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp, getDoc, setDoc } from 'firebase/firestore'
 import { sendPasswordResetEmail, sendSignInLinkToEmail } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { httpsCallable } from 'firebase/functions'
@@ -10,10 +10,11 @@ import { db, functions } from '@/lib/firebase'
 import { useCollection, where } from '@/hooks/useFirestore'
 import type { UserDoc, CohortDoc, ClassInviteDoc } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
-import { Copy, Check, UserPlus, UserX, UserCheck, Mail, ShieldCheck, Trash2, KeyRound, X, Users, ClipboardCopy, ChevronDown, ChevronUp, RotateCcw, Link, QrCode, Download, Ban } from 'lucide-react'
+import { Copy, Check, UserPlus, UserX, UserCheck, Mail, ShieldCheck, Trash2, KeyRound, X, Users, ClipboardCopy, ChevronDown, ChevronUp, RotateCcw, Link, QrCode, Download, Ban, Trophy } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
 import Avatar from '@/components/common/Avatar'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import { cn } from '@/lib/utils'
 
 const schema = z.object({
   email:    z.string().email('Valid email required'),
@@ -53,6 +54,19 @@ export default function UserManager() {
   const [qrOpen,            setQrOpen]            = useState(false)
   const [qrCohortId,        setQrCohortId]        = useState<string | null>(null)
   const [qrLoading,         setQrLoading]         = useState(false)
+  const [showLeaderboard,   setShowLeaderboard]   = useState(true)
+
+  useEffect(() => {
+    getDoc(doc(db, 'settings', 'experience_levels')).then(snap => {
+      if (snap.exists()) setShowLeaderboard(snap.data().showLeaderboard !== false)
+    })
+  }, [])
+
+  async function toggleLeaderboard() {
+    const next = !showLeaderboard
+    setShowLeaderboard(next)
+    await setDoc(doc(db, 'settings', 'experience_levels'), { showLeaderboard: next }, { merge: true })
+  }
 
   const { profile } = useAuth()
   const { data: users,       loading } = useCollection<UserDoc>('users')
@@ -347,6 +361,31 @@ export default function UserManager() {
       <div>
         <h1 className="page-title">User Manager</h1>
         <p className="text-zinc-500 text-sm mt-1">Invite new students and teachers, manage accounts.</p>
+      </div>
+
+      {/* Leaderboard toggle */}
+      <div className="bg-zinc-900 border border-white/10 rounded-2xl px-5 py-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0">
+            <Trophy className="w-4 h-4 text-amber-400" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-zinc-100">🏆 Show points leaderboard</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Display a top-5 leaderboard on the student dashboard.</p>
+          </div>
+        </div>
+        <button
+          onClick={toggleLeaderboard}
+          className={cn(
+            'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none',
+            showLeaderboard ? 'bg-brand-500' : 'bg-zinc-700',
+          )}
+        >
+          <span className={cn(
+            'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
+            showLeaderboard ? 'translate-x-6' : 'translate-x-1',
+          )} />
+        </button>
       </div>
 
       {/* Invite form */}

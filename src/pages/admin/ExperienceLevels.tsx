@@ -3,32 +3,11 @@ import { doc, setDoc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useDocument } from '@/hooks/useFirestore'
 import type { ExperienceLevel } from '@/types'
-import { Trophy, Plus, Trash2, Pencil, Check, X, Star, BarChart2 } from 'lucide-react'
+import { Trophy, Plus, Trash2, Pencil, Check, X, Star } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
-import { cn } from '@/lib/utils'
 import { nanoid } from 'nanoid'
 
-interface LevelDoc { id: string; levels: ExperienceLevel[]; showLeaderboard?: boolean }
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onChange}
-      className={cn(
-        'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none',
-        checked ? 'bg-brand-600' : 'bg-zinc-700',
-      )}
-    >
-      <span
-        className={cn(
-          'inline-block h-4 w-4 transform rounded-full bg-zinc-900 shadow transition-transform duration-200',
-          checked ? 'translate-x-6' : 'translate-x-1',
-        )}
-      />
-    </button>
-  )
-}
+interface LevelDoc { id: string; levels: ExperienceLevel[] }
 
 function LevelForm({
   initial,
@@ -113,10 +92,6 @@ export default function ExperienceLevels() {
 
   async function saveLevels(next: ExperienceLevel[]) {
     await saveField('levels', next)
-  }
-
-  async function toggleLeaderboard() {
-    await saveField('showLeaderboard', !(levelData?.showLeaderboard ?? true))
   }
 
   async function handleAdd(level: ExperienceLevel) {
@@ -217,23 +192,6 @@ export default function ExperienceLevels() {
             <p className="text-zinc-500 text-sm">No levels yet. Add your first one above.</p>
           </div>
         )}
-      </div>
-
-      {/* Leaderboard toggle */}
-      <div className="bg-zinc-900 border border-white/10 rounded-2xl px-5 py-4 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0">
-            <BarChart2 className="w-4 h-4 text-zinc-500" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-zinc-100">Class Leaderboard</p>
-            <p className="text-xs text-zinc-500 mt-0.5">Show points leaderboard on the student dashboard.</p>
-          </div>
-        </div>
-        <Toggle
-          checked={levelData?.showLeaderboard ?? true}
-          onChange={toggleLeaderboard}
-        />
       </div>
 
       <div className="bg-zinc-900/50 border border-white/8 rounded-xl px-4 py-3 text-xs text-zinc-500 space-y-1">

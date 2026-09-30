@@ -3,7 +3,10 @@ import { getDocs, collection } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { cn } from '@/lib/utils'
 import { useSchool } from '@/contexts/SchoolContext'
-import type { ProductionCrewAssignmentDoc, ProductionShootingDayDoc, CrewRoleDoc } from '@/types'
+import { useAuth } from '@/contexts/AuthContext'
+import { useCollection, where } from '@/hooks/useFirestore'
+import { equipmentCostForProduction } from '@/lib/productionBudget'
+import type { ProductionCrewAssignmentDoc, ProductionShootingDayDoc, CrewRoleDoc, EquipmentDoc, EquipmentBookingDoc } from '@/types'
 
 interface BudgetTabProps {
   productionId: string
@@ -25,7 +28,7 @@ function ProgressBar({ value, max, color }: { value: number; max: number; color:
 }
 
 export function BudgetTab({
-  productionId: _productionId,
+  productionId,
   crewAssignments,
   shootingDays,
   budgetLimit,
@@ -33,6 +36,7 @@ export function BudgetTab({
 }: BudgetTabProps) {
   const { currency: schoolCurrency } = useSchool()
   const activeCurrency = budgetCurrency || schoolCurrency
+  const { profile } = useAuth()
   const [crewRoles, setCrewRoles] = useState<CrewRoleDoc[]>([])
 
   useEffect(() => {
@@ -40,6 +44,26 @@ export function BudgetTab({
       setCrewRoles(snap.docs.map(d => ({ id: d.id, ...d.data() } as CrewRoleDoc)))
     )
   }, [])
+
+  // Equipment already booked against this production. Security rules only
+  // let a student read their own booking docs, so this reflects "my"
+  // bookings — still an accurate/strict view when one student manages a
+  // production's equipment, which is the common case.
+  const { data: myBookings } = useCollection<EquipmentBookingDoc>(
+    'equipment_bookings',
+    profile?.uid ? [where('studentId', '==', profile.uid)] : [],
+    !!profile?.uid,
+    profile?.uid ?? '',
+  )
+  const { data: equipmentRaw } = useCollection<EquipmentDoc>('equipment')
+  const equipmentById = useMemo(
+    () => Object.fromEntries(equipmentRaw.map(e => [e.id, e])),
+    [equipmentRaw],
+  )
+  const existingEquipmentCost = useMemo(
+    () => equipmentCostForProduction(productionId, myBookings, equipmentById),
+    [productionId, myBookings, equipmentById],
+  )
 
   const shootingDayCount = shootingDays.length
 
@@ -57,7 +81,7 @@ export function BudgetTab({
   /* Rate overrides intentionally not available here — edit rates in Admin → Production Settings */
 
   const salaryCost    = useMemo(() => rows.reduce((sum, r) => sum + r.total, 0), [rows])
-  const equipmentLeft = budgetLimit != null ? budgetLimit - salaryCost : null
+  const equipmentLeft = budgetLimit != null ? budgetLimit - salaryCost - existingEquipmentCost : null
   const overSalary    = budgetLimit != null && salaryCost > budgetLimit
 
   const fmt = (n: number) => n.toLocaleString('sv-SE')
@@ -90,7 +114,9 @@ export function BudgetTab({
             <p className={cn('text-xl font-bold', (equipmentLeft ?? 0) < 0 ? 'text-rose-400' : 'text-emerald-400')}>
               {fmt(Math.max(0, equipmentLeft ?? 0))} <span className="text-sm font-normal text-zinc-500">{activeCurrency}</span>
             </p>
-            <p className="text-xs text-zinc-600 mt-0.5">Remaining after salaries</p>
+            <p className={cn('text-xs mt-0.5', (equipmentLeft ?? 0) < 0 ? 'text-rose-500' : 'text-zinc-600')}>
+              {fmt(Math.max(0, equipmentLeft ?? 0))} / {fmt(budgetLimit)} remaining after salaries{existingEquipmentCost > 0 ? ' and bookings' : ''}
+            </p>
             <ProgressBar value={Math.max(0, equipmentLeft ?? 0)} max={budgetLimit} color={(equipmentLeft ?? 0) < 0 ? '#f87171' : '#34d399'} />
           </div>
         </div>

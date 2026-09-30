@@ -8,8 +8,9 @@ import { useCollection, orderBy, where } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
 import type {
   ProductionPeriodDoc, PeriodAllocationDoc, ProductionDoc, UserDoc, CohortDoc,
-  ProductionShootingDayDoc, ProductionCrewAssignmentDoc,
+  ProductionShootingDayDoc, ProductionCrewAssignmentDoc, CrewRoleDoc, EquipmentDoc, EquipmentBookingDoc,
 } from '@/types'
+import { salaryCost as calcSalaryCost, equipmentCostForProduction } from '@/lib/productionBudget'
 import {
   CalendarRange, Plus, X, Check, Pencil, Trash2,
   AlertTriangle, Clock, MapPin, Users, Settings,
@@ -564,16 +565,24 @@ function CrewView({ allocations, students, productions }: {
 
 // ── Budget overview ───────────────────────────────────────────────────────────
 
-function BudgetOverview({ period, productions }: { period: ProductionPeriodDoc; productions: ProductionDoc[] }) {
+function BudgetOverview({ period, productions, prodDayData, crewRoles, equipmentBookings, equipmentById }: {
+  period: ProductionPeriodDoc
+  productions: ProductionDoc[]
+  prodDayData: Record<string, { days: ProductionShootingDayDoc[]; crewAssignments: ProductionCrewAssignmentDoc[] }>
+  crewRoles: CrewRoleDoc[]
+  equipmentBookings: EquipmentBookingDoc[]
+  equipmentById: Record<string, EquipmentDoc>
+}) {
   const currency = period.budgetCurrency || 'SEK'
   const limit    = period.budgetPerProduction ?? null
+  const fmt = (n: number) => n.toLocaleString('sv-SE')
 
   return (
     <div className="space-y-4">
       {limit != null && (
         <div className="flex items-center gap-3 bg-brand-900/20 border border-brand-500/20 rounded-xl px-4 py-3 text-sm">
           <span className="text-brand-400 font-semibold">Budget per production:</span>
-          <span className="text-zinc-200 font-bold">{limit.toLocaleString('sv-SE')} {currency}</span>
+          <span className="text-zinc-200 font-bold">{fmt(limit)} {currency}</span>
           {period.budgetNotes && <span className="text-zinc-500 ml-2">— {period.budgetNotes}</span>}
         </div>
       )}
@@ -587,30 +596,44 @@ function BudgetOverview({ period, productions }: { period: ProductionPeriodDoc; 
               <tr className="border-b border-white/10">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">Production</th>
                 {limit != null && (
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase tracking-wider">Budget limit</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase tracking-wider">Budget used</th>
                 )}
                 <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase tracking-wider">Type</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {productions.map(prod => (
-                <tr key={prod.id} className="hover:bg-white/3 transition-colors">
-                  <td className="px-4 py-3 text-zinc-200 font-medium">{prod.title}</td>
-                  {limit != null && (
-                    <td className="px-4 py-3 text-right text-zinc-300">
-                      {(prod.budgetLimit ?? limit).toLocaleString('sv-SE')} {currency}
+              {productions.map(prod => {
+                const prodLimit = prod.budgetLimit ?? limit
+                const data      = prodDayData[prod.id]
+                const salary    = data ? calcSalaryCost(data.crewAssignments, crewRoles, data.days.length) : 0
+                const equipCost = equipmentCostForProduction(prod.id, equipmentBookings, equipmentById)
+                const used      = salary + equipCost
+                const over      = prodLimit != null && used > prodLimit
+                return (
+                  <tr key={prod.id} className="hover:bg-white/3 transition-colors">
+                    <td className="px-4 py-3 text-zinc-200 font-medium">{prod.title}</td>
+                    {limit != null && (
+                      <td className="px-4 py-3 text-right">
+                        {prodLimit != null ? (
+                          <span className={cn('font-semibold', over ? 'text-rose-400' : 'text-emerald-400')}>
+                            {fmt(used)} / {fmt(prodLimit)} {currency}
+                          </span>
+                        ) : (
+                          <span className="text-zinc-500">—</span>
+                        )}
+                      </td>
+                    )}
+                    <td className="px-4 py-3 text-right">
+                      <span className={cn(
+                        'text-xs px-2 py-0.5 rounded-full font-medium',
+                        prod.productionType === 'side' ? 'bg-amber-900/30 text-amber-400' : 'bg-brand-900/30 text-brand-400',
+                      )}>
+                        {prod.productionType === 'side' ? 'Side project' : 'Period'}
+                      </span>
                     </td>
-                  )}
-                  <td className="px-4 py-3 text-right">
-                    <span className={cn(
-                      'text-xs px-2 py-0.5 rounded-full font-medium',
-                      prod.productionType === 'side' ? 'bg-amber-900/30 text-amber-400' : 'bg-brand-900/30 text-brand-400',
-                    )}>
-                      {prod.productionType === 'side' ? 'Side project' : 'Period'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -664,6 +687,7 @@ export default function TeacherProductionPeriod({
   const [prodDayData, setProdDayData] = useState<Record<string, {
     days: ProductionShootingDayDoc[]
     crewIds: string[]
+    crewAssignments: ProductionCrewAssignmentDoc[]
   }>>({})
 
   useEffect(() => {
@@ -673,14 +697,14 @@ export default function TeacherProductionPeriod({
     allProductions.forEach(prod => {
       getDocs(collection(db, `productions/${prod.id}/crew`)).then(crewSnap => {
         if (!mounted) return
-        const crewIds = crewSnap.docs
-          .map(d => d.data() as ProductionCrewAssignmentDoc)
+        const crewAssignments = crewSnap.docs.map(d => ({ id: d.id, ...d.data() } as ProductionCrewAssignmentDoc))
+        const crewIds = crewAssignments
           .filter(c => c.assignedUid)
           .map(c => c.assignedUid as string)
         const unsub = onSnapshot(collection(db, `productions/${prod.id}/shootingDays`), snap => {
           if (!mounted) return
           const days = snap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductionShootingDayDoc[]
-          setProdDayData(prev => ({ ...prev, [prod.id]: { days, crewIds } }))
+          setProdDayData(prev => ({ ...prev, [prod.id]: { days, crewIds, crewAssignments } }))
         })
         unsubs.push(unsub)
       })
@@ -689,6 +713,15 @@ export default function TeacherProductionPeriod({
   }, [allProductions.map(p => p.id).join(',')])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const colorMap = useMemo(() => buildColorMap(allProductions), [allProductions])
+
+  // ── Budget data (teacher-only page, so unfiltered reads are permitted) ───
+  const { data: crewRoles } = useCollection<CrewRoleDoc>('crew_roles')
+  const { data: equipmentCatalog } = useCollection<EquipmentDoc>('equipment')
+  const equipmentById = useMemo(
+    () => Object.fromEntries(equipmentCatalog.map(e => [e.id, e])),
+    [equipmentCatalog],
+  )
+  const { data: equipmentBookings } = useCollection<EquipmentBookingDoc>('equipment_bookings')
   const { data: students } = useCollection<UserDoc>(
     'users',
     periodCohortId ? [where('cohortId', '==', periodCohortId), where('role', '==', 'student')] : [],
@@ -854,7 +887,14 @@ export default function TeacherProductionPeriod({
           )}
 
           {tab === 'budget' && period && (
-            <BudgetOverview period={period} productions={allProductions} />
+            <BudgetOverview
+              period={period}
+              productions={allProductions}
+              prodDayData={prodDayData}
+              crewRoles={crewRoles}
+              equipmentBookings={equipmentBookings}
+              equipmentById={equipmentById}
+            />
           )}
         </>
       )}

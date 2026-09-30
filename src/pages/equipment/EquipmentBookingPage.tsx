@@ -3,7 +3,8 @@ import { collection, addDoc, updateDoc, serverTimestamp, query, where, orderBy, 
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument } from '@/hooks/useFirestore'
-import type { EquipmentDoc, EquipmentBookingDoc, EquipmentBookingMessageDoc, CohortDoc, ProductionDoc, ProductionSceneDoc, ProductionCrewAssignmentDoc, ProductionCastDoc, ProductionLocationDoc, ProductionShootingDayDoc } from '@/types'
+import type { EquipmentDoc, EquipmentBookingDoc, EquipmentBookingMessageDoc, CohortDoc, ProductionDoc, ProductionSceneDoc, ProductionCrewAssignmentDoc, ProductionCastDoc, ProductionLocationDoc, ProductionShootingDayDoc, CrewRoleDoc } from '@/types'
+import { calcRentalDays, billableDays, salaryCost as calcSalaryCost, equipmentCostForProduction } from '@/lib/productionBudget'
 import { Link } from 'react-router-dom'
 import {
   ShoppingCart, X, Search, Package, Calendar, Check,
@@ -64,20 +65,6 @@ function formatDate(d: string) {
   if (!d) return ''
   const dt = new Date(d + 'T12:00:00')
   return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function calcDays(from: string, to: string): number {
-  if (!from || !to) return 1
-  const a = new Date(from + 'T00:00:00')
-  const b = new Date(to + 'T00:00:00')
-  const diff = Math.round((b.getTime() - a.getTime()) / 86400000)
-  return diff > 0 ? diff : 1
-}
-
-// Week discount: 5+ days → only charge 5 days per 7-day block (weekends free)
-function billableDays(days: number): number {
-  if (days < 5) return days
-  return Math.ceil(days / 7) * 5
 }
 
 function weeklyRate(pricePerDay: number): number {
@@ -196,7 +183,7 @@ export default function EquipmentBookingPage() {
   const [productionReadiness, setProductionReadiness] = useState<Record<string, ProductionReadiness>>({})
   const [productionShootingDays, setProductionShootingDays] = useState<Record<string, ProductionShootingDayDoc[]>>({})
   const [productionCrew, setProductionCrew] = useState<Record<string, ProductionCrewAssignmentDoc[]>>({})
-  const [crewRoles, setCrewRoles] = useState<Array<{ id: string; dayRate?: number }>>([])
+  const [crewRoles, setCrewRoles] = useState<CrewRoleDoc[]>([])
   const [readinessLoading, setReadinessLoading] = useState(false)
 
   const selectedProduction = useMemo(
@@ -256,7 +243,7 @@ export default function EquipmentBookingPage() {
     if (selectedProduction) setProjectName(selectedProduction.title)
   }, [selectedProduction?.id])
 
-  const rentalDays = calcDays(fromDate, toDate)
+  const rentalDays = calcRentalDays(fromDate, toDate)
 
   // Category counts
   const categoryCounts = useMemo(() => {
@@ -330,22 +317,25 @@ export default function EquipmentBookingPage() {
   }
 
   // ── Budget computations ──────────────────────────────────────────────────────
+  const equipmentById = useMemo(
+    () => Object.fromEntries(equipmentRaw.map(e => [e.id, e])),
+    [equipmentRaw],
+  )
+
   const budgetInfo = useMemo(() => {
     if (!selectedProductionId || !selectedProduction?.budgetLimit) return null
-    const limit       = selectedProduction.budgetLimit
-    const crew        = productionCrew[selectedProductionId] ?? []
-    const days        = productionShootingDays[selectedProductionId] ?? []
-    const dayCount    = days.length
-    const salaryCost  = crew
-      .filter(a => a.assignedName?.trim())
-      .reduce((sum, a) => {
-        const role    = crewRoles.find(r => r.id === a.roleId)
-        const rate    = (a as any).dayRateOverride ?? role?.dayRate ?? 0
-        return sum + rate * dayCount
-      }, 0)
-    const equipmentBudget = Math.max(0, limit - salaryCost)
-    return { limit, salaryCost, equipmentBudget, currency: 'SEK' }
-  }, [selectedProductionId, selectedProduction, productionCrew, productionShootingDays, crewRoles])
+    const limit      = selectedProduction.budgetLimit
+    const crew       = productionCrew[selectedProductionId] ?? []
+    const days       = productionShootingDays[selectedProductionId] ?? []
+    const salary     = calcSalaryCost(crew, crewRoles, days.length)
+    // Equipment this student already has booked for this production (other
+    // collaborators' bookings aren't readable client-side, so this covers
+    // what we can see — still a strict improvement over ignoring bookings
+    // entirely, which is what this used to do).
+    const existingEquipmentCost = equipmentCostForProduction(selectedProductionId, myBookings, equipmentById)
+    const equipmentBudget = Math.max(0, limit - salary - existingEquipmentCost)
+    return { limit, salaryCost: salary, existingEquipmentCost, equipmentBudget, currency: 'SEK' }
+  }, [selectedProductionId, selectedProduction, productionCrew, productionShootingDays, crewRoles, myBookings, equipmentById])
 
   function isOverEquipmentBudget(item: EquipmentDoc): boolean {
     if (!pricingEnabled || !budgetInfo) return false
@@ -353,11 +343,18 @@ export default function EquipmentBookingPage() {
     return totalPrice + addCost > budgetInfo.equipmentBudget
   }
 
+  // Whole-booking over-budget check — this is the actual submit gate. Per-item
+  // isOverEquipmentBudget only disables adding new items at the current
+  // rental-day count; changing dates afterward can still push the cart over,
+  // so the final total must be re-checked here regardless of how it got there.
+  const isOverBudget = pricingEnabled && budgetInfo != null && totalPrice > budgetInfo.equipmentBudget
+
   async function handleSubmit() {
     if (!fromDate || !toDate) return
     const today = new Date().toISOString().slice(0, 10)
     if (fromDate < today) { setSubmitError('Checkout date cannot be in the past'); return }
     if (toDate < fromDate) { setSubmitError('Return date must be on or after the checkout date'); return }
+    if (isOverBudget) { setSubmitError('This booking exceeds the production budget. Remove items or shorten the rental period before sending.'); return }
     setSubmitting(true)
     setSubmitError('')
     try {
@@ -653,7 +650,7 @@ export default function EquipmentBookingPage() {
               )}
               <button
                 className="checkout-btn"
-                disabled={!fromDate || !toDate || (pricingEnabled && budgetInfo != null && totalPrice > budgetInfo.equipmentBudget)}
+                disabled={!fromDate || !toDate || isOverBudget}
                 onClick={() => { setCartOpen(false); setView('checkout') }}
               >
                 Proceed to Checkout
@@ -976,9 +973,12 @@ export default function EquipmentBookingPage() {
                   {(!fromDate || !toDate) && (
                     <p style={{ fontSize: '.8rem', color: '#f59e0b', marginBottom: 8 }}>⚠ Set rental dates before sending</p>
                   )}
+                  {isOverBudget && (
+                    <p style={{ fontSize: '.8rem', color: '#f87171', marginBottom: 8 }}>⚠ This booking exceeds the production budget — remove items or shorten the rental period</p>
+                  )}
                   <button
                     className="primary-btn"
-                    disabled={submitting || !contactName || !projectName || !fromDate || !toDate}
+                    disabled={submitting || !contactName || !projectName || !fromDate || !toDate || isOverBudget}
                     onClick={handleSubmit}
                   >
                     {submitting ? 'Sending...' : 'Send Booking'}
@@ -1024,6 +1024,12 @@ export default function EquipmentBookingPage() {
                       <span style={{ color: '#6a6a80' }}>Salaries</span>
                       <span style={{ color: '#60a5fa', fontWeight: 600 }}>{budgetInfo.salaryCost.toLocaleString('sv-SE')} SEK</span>
                     </div>
+                    {budgetInfo.existingEquipmentCost > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ color: '#6a6a80' }}>Equipment (already booked)</span>
+                        <span style={{ color: '#f0f0f5', fontWeight: 600 }}>{budgetInfo.existingEquipmentCost.toLocaleString('sv-SE')} SEK</span>
+                      </div>
+                    )}
                     {pricingEnabled && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                         <span style={{ color: '#6a6a80' }}>Equipment (this booking)</span>
@@ -1032,8 +1038,8 @@ export default function EquipmentBookingPage() {
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #2a2a3a', paddingTop: 6 }}>
                       <span style={{ color: '#6a6a80' }}>Total budget used</span>
-                      <span style={{ color: (budgetInfo.salaryCost + (pricingEnabled ? totalPrice : 0)) > budgetInfo.limit ? '#f87171' : '#34d399', fontWeight: 700 }}>
-                        {(budgetInfo.salaryCost + (pricingEnabled ? totalPrice : 0)).toLocaleString('sv-SE')} / {budgetInfo.limit.toLocaleString('sv-SE')} SEK
+                      <span style={{ color: (budgetInfo.salaryCost + budgetInfo.existingEquipmentCost + (pricingEnabled ? totalPrice : 0)) > budgetInfo.limit ? '#f87171' : '#34d399', fontWeight: 700 }}>
+                        {(budgetInfo.salaryCost + budgetInfo.existingEquipmentCost + (pricingEnabled ? totalPrice : 0)).toLocaleString('sv-SE')} / {budgetInfo.limit.toLocaleString('sv-SE')} SEK
                       </span>
                     </div>
                   </div>

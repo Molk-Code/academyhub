@@ -1037,6 +1037,23 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
     return result
   }, [days, edits])
 
+  const timeWarnings = useMemo(() => {
+    const result: Record<string, { rtsOutOfRange: boolean; lunchOutOfRange: boolean; lunchLate: boolean }> = {}
+    for (const day of days) {
+      const { startTime, endTime } = getStartEnd(day)
+      const s   = parseTime(get(day.id, 'startTime', startTime))
+      const e   = parseTime(get(day.id, 'endTime', endTime))
+      const rts = parseTime(get(day.id, 'rtsTime', day.rtsTime ?? ''))
+      const lunchStart = parseTime(get(day.id, 'lunchStart', day.lunchStart ?? ''))
+      result[day.id] = {
+        rtsOutOfRange:   rts !== null && s !== null && e !== null && (rts < s || rts > e),
+        lunchOutOfRange: lunchStart !== null && s !== null && e !== null && (lunchStart < s || lunchStart > e),
+        lunchLate:       lunchStart !== null && s !== null && (lunchStart - s) > 240,
+      }
+    }
+    return result
+  }, [days, edits])
+
   const scheduledIds = new Set(days.flatMap(d => d.sceneIds ?? []))
   const unscheduled  = scenes.filter(s => !scheduledIds.has(s.id))
 
@@ -1107,6 +1124,7 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
           const daySceneIds2 = new Set(day.sceneIds ?? [])
           const totalShots   = shots.filter(s => daySceneIds2.has(s.sceneId)).length
           const tooManyShots = totalShots > productionSettings.maxShotsPerDay
+          const timeW        = timeWarnings[day.id]
           const movesMap     = Object.fromEntries((day.locationMoves ?? []).map(m => [m.afterSceneId, m]))
           const ss           = sunriseSunset[day.id]
 
@@ -1216,6 +1234,24 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
                   <div className="mt-2 flex items-start gap-2 text-xs text-rose-400 bg-rose-950/40 border border-rose-800/50 rounded-lg px-3 py-2">
                     <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                     <span>Shooting day is {duration!.toFixed(1)} hours — exceeds the {maxHours}h limit. Consider splitting scenes across multiple days.</span>
+                  </div>
+                )}
+                {timeW?.rtsOutOfRange && (
+                  <div className="mt-2 flex items-start gap-2 text-xs text-amber-400 bg-amber-950/40 border border-amber-800/50 rounded-lg px-3 py-2">
+                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span>RTS is outside the day's start/end time.</span>
+                  </div>
+                )}
+                {timeW?.lunchOutOfRange && (
+                  <div className="mt-2 flex items-start gap-2 text-xs text-amber-400 bg-amber-950/40 border border-amber-800/50 rounded-lg px-3 py-2">
+                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span>Lunch is outside the day's start/end time.</span>
+                  </div>
+                )}
+                {timeW?.lunchLate && (
+                  <div className="mt-2 flex items-start gap-2 text-xs text-rose-400 bg-rose-950/40 border border-rose-800/50 rounded-lg px-3 py-2">
+                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span>Lunch is more than 4 hours after start time — you're required to plan a break after 4 hours of working.</span>
                   </div>
                 )}
                 {tooManyShots && (

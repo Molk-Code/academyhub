@@ -345,10 +345,10 @@ export default function StudentProduction() {
       {prodTab === 'crew' && !myTeam && (
         <div className="card text-center py-16">
           <p className="text-5xl mb-4">🎬</p>
-          <h2 className="text-xl font-bold text-white mb-2">No productions yet</h2>
+          <h2 className="text-xl font-bold text-white mb-2">Not assigned to a crew yet</h2>
           <p className="text-gray-400 text-sm mb-6 max-w-xs mx-auto">
             {canCreateProduction
-              ? 'Create your first production to start planning your film, or wait for your teacher to add you to a crew.'
+              ? 'Create a production to form your own crew, or wait for your teacher to add you to one.'
               : 'Wait for your teacher to add you to a crew.'}
           </p>
           <div className="flex gap-3 justify-center flex-wrap">

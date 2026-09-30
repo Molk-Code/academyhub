@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   doc, updateDoc, deleteDoc, addDoc, collection, serverTimestamp, arrayUnion, arrayRemove,
-  getDocs,
+  getDocs, deleteField,
 } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
@@ -724,12 +724,19 @@ export default function ProductionEditor() {
 
   async function linkPeriod(periodId: string) {
     if (!id) return
-    await updateDoc(doc(db, 'productions', id), { periodId })
+    const linkedPeriod = productionPeriods.find(p => p.id === periodId)
+    await updateDoc(doc(db, 'productions', id), {
+      periodId,
+      // Each production governed by a period starts off with that period's
+      // budget (crew + equipment combined) — not a pool shared across
+      // productions. Re-linking refreshes it to the period's current figure.
+      ...(linkedPeriod?.budgetPerProduction != null ? { budgetLimit: linkedPeriod.budgetPerProduction } : {}),
+    })
   }
 
   async function unlinkPeriod() {
     if (!id) return
-    await updateDoc(doc(db, 'productions', id), { periodId: '' })
+    await updateDoc(doc(db, 'productions', id), { periodId: '', budgetLimit: deleteField() })
   }
 
   async function deleteProduction() {

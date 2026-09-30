@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   doc, updateDoc, deleteDoc, addDoc, collection, serverTimestamp, arrayUnion, arrayRemove,
-  getDocs, query, where as fsWhere,
+  getDocs,
 } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
@@ -475,7 +475,7 @@ export default function ProductionEditor() {
   const [exportingPdf, setExportingPdf] = useState(false)
   const [exportingXls, setExportingXls] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
-  const [addCollabEmail, setAddCollabEmail] = useState('')
+  const [addCollabQuery, setAddCollabQuery] = useState('')
   const [addCollabError, setAddCollabError] = useState('')
   const [addingCollab, setAddingCollab] = useState(false)
   const [titleEditing, setTitleEditing] = useState(false)
@@ -664,24 +664,32 @@ export default function ProductionEditor() {
     await updateDoc(doc(db, 'productions', id), { isPublic: !production.isPublic })
   }
 
-  async function addCollaborator() {
-    if (!id || !addCollabEmail.trim() || !production) return
+  const addCollabSuggestions = useMemo(() => {
+    const term = addCollabQuery.trim().toLowerCase()
+    if (!term) return []
+    return allCohortUsers
+      .filter(u => u.id !== profile?.uid && !allCollabIds.includes(u.id))
+      .filter(u => (u.displayName ?? '').toLowerCase().includes(term))
+      .slice(0, 6)
+  }, [addCollabQuery, allCohortUsers, allCollabIds, profile])
+
+  async function addCollaboratorUser(user: UserDoc & { id: string }) {
+    if (!id) return
     setAddCollabError('')
     setAddingCollab(true)
     try {
-      const term = addCollabEmail.trim().toLowerCase()
-      const snap = await getDocs(query(collection(db, 'users'), fsWhere('email', '==', term)))
-      const snap2 = snap.empty
-        ? await getDocs(query(collection(db, 'users'), fsWhere('displayName', '==', addCollabEmail.trim())))
-        : snap
-      const user = snap2.empty ? null : { id: snap2.docs[0].id, ...snap2.docs[0].data() } as UserDoc & { id: string }
-      if (!user) { setAddCollabError('User not found on the platform'); setAddingCollab(false); return }
-      if (allCollabIds.includes(user.id)) { setAddCollabError('Already a collaborator'); setAddingCollab(false); return }
       await updateDoc(doc(db, 'productions', id), { collaborators: arrayUnion(user.id) })
-      setAddCollabEmail('')
+      setAddCollabQuery('')
     } finally {
       setAddingCollab(false)
     }
+  }
+
+  async function addCollaborator() {
+    if (!addCollabQuery.trim()) return
+    setAddCollabError('')
+    if (addCollabSuggestions.length === 0) { setAddCollabError('No matching student or teacher in this class'); return }
+    await addCollaboratorUser(addCollabSuggestions[0])
   }
 
   async function shareTeam(team: ProductionTeamDoc) {
@@ -819,30 +827,42 @@ export default function ProductionEditor() {
                     {canEdit && isOwner && (
                       <div className="space-y-1.5 pt-1 border-t border-white/10">
                         <input
-                          value={addCollabEmail}
-                          onChange={e => { setAddCollabEmail(e.target.value); setAddCollabError('') }}
+                          value={addCollabQuery}
+                          onChange={e => { setAddCollabQuery(e.target.value); setAddCollabError('') }}
                           onKeyDown={e => e.key === 'Enter' && addCollaborator()}
                           className="input w-full text-sm"
-                          placeholder="Name or email to add editor…"
+                          placeholder="Search a name in your class…"
                         />
+                        {addCollabQuery.trim() && (
+                          addCollabSuggestions.length > 0 ? (
+                            <div className="border border-white/10 rounded-lg overflow-hidden divide-y divide-white/5">
+                              {addCollabSuggestions.map(u => (
+                                <button
+                                  key={u.id}
+                                  onClick={() => addCollaboratorUser(u)}
+                                  disabled={addingCollab}
+                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-zinc-800 transition-colors disabled:opacity-40"
+                                >
+                                  <span className="text-xs text-zinc-200 flex-1 truncate">{u.displayName}</span>
+                                  <span className="text-[10px] text-zinc-500 capitalize">{u.role}</span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-zinc-500 px-1">No matching student or teacher in this class</p>
+                          )
+                        )}
                         {addCollabError && <p className="text-xs text-rose-400">{addCollabError}</p>}
-                        <button
-                          onClick={addCollaborator}
-                          disabled={addingCollab || !addCollabEmail.trim()}
-                          className="btn-primary w-full py-1.5 text-xs disabled:opacity-40"
-                        >
-                          {addingCollab ? 'Adding…' : 'Add Editor'}
-                        </button>
                       </div>
                     )}
                   </div>
 
-                  {/* Team viewers section */}
+                  {/* Crew viewers section */}
                   {canEdit && isOwner && (
                     <div className="space-y-2 border-t border-white/10 pt-3">
                       <div className="flex items-center gap-1.5">
                         <Eye className="w-3.5 h-3.5 text-amber-400" />
-                        <p className="text-xs font-semibold text-zinc-300">Team Viewers</p>
+                        <p className="text-xs font-semibold text-zinc-300">Crew Viewers</p>
                         <span className="text-[10px] text-zinc-500 ml-auto">view only</span>
                       </div>
 
@@ -866,7 +886,7 @@ export default function ProductionEditor() {
                       {/* Add team */}
                       {unsharedTeams.length > 0 && (
                         <div className="space-y-1">
-                          <p className="text-[10px] text-zinc-500">Share with a team:</p>
+                          <p className="text-[10px] text-zinc-500">Share with a crew:</p>
                           {unsharedTeams.map(team => (
                             <button
                               key={team.id}
@@ -882,7 +902,7 @@ export default function ProductionEditor() {
                       )}
 
                       {unsharedTeams.length === 0 && (production.sharedTeams ?? []).length === 0 && (
-                        <p className="text-xs text-zinc-500">No teams in your cohort yet.</p>
+                        <p className="text-xs text-zinc-500">No crews in your class yet.</p>
                       )}
                     </div>
                   )}

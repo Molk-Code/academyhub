@@ -20,7 +20,7 @@ function fmtMinutes(m: number): string {
 
 const SIZE_OPTS     = ['Wide', 'Medium', 'Close-up', 'Extreme Close-up', 'Insert', 'Over-the-shoulder']
 const ANGLE_OPTS    = ['Eye level', 'High angle', 'Low angle', 'Ground level', "Bird's eye", 'Dutch']
-const MOVEMENT_OPTS = ['Static', 'Pan', 'Tilt', 'Track', 'Zoom', 'Handheld', 'Crane', 'Drone']
+const MOVEMENT_OPTS = ['Static', 'Pan', 'Tilt', 'Track', 'Dolly', 'Zoom', 'Handheld', 'Crane', 'Drone']
 
 interface Props { productionId: string; canEdit: boolean }
 

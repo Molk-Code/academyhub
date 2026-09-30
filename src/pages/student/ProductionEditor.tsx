@@ -10,7 +10,7 @@ import { uploadResumableWithQuota } from '@/lib/uploadWithQuota'
 import { useAuth } from '@/contexts/AuthContext'
 import { useDocument, useCollection, where, orderBy } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
-import type { ProductionDoc, UserDoc, ProductionFeedbackDoc, ProductionTeamDoc, ProductionSceneDoc, ProductionCastDoc, ProductionShotDoc, ProductionShootingDayDoc, ProductionCrewAssignmentDoc, ProductionLocationDoc, ProductionPeriodDoc } from '@/types'
+import type { ProductionDoc, UserDoc, ProductionFeedbackDoc, ProductionTeamDoc, ProductionSceneDoc, ProductionCastDoc, ProductionShotDoc, ProductionShootingDayDoc, ProductionCrewAssignmentDoc, ProductionLocationDoc, ProductionPeriodDoc, ProductionCostumeDoc, ProductionMakeupDoc, ProductionPropsDoc } from '@/types'
 import { ArrowLeft, Users, Globe, Lock, Trash2, MessageSquare, X, Send, ChevronDown, Download, FileSpreadsheet, UserPlus, Eye, Loader2, FileText, Upload, Sparkles, CheckCircle2 } from 'lucide-react'
 import { parseScreenplayPDF, type ParsedScene } from '@/lib/parseScreenplay'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
@@ -22,10 +22,12 @@ import { ShotListTab }   from './production/ShotListTab'
 import { ScheduleTab }   from './production/ScheduleTab'
 import { LocationsTab }  from './production/LocationsTab'
 import { CostumeTab }    from './production/CostumeTab'
+import { MakeupTab }     from './production/MakeupTab'
+import { PropsTab }      from './production/PropsTab'
 import ShotLogTab        from '@/components/production/ShotLogTab'
 import { BudgetTab }     from '@/components/production/BudgetTab'
 
-type Tab = 'script' | 'breakdown' | 'crew' | 'cast' | 'shots' | 'locations' | 'schedule' | 'costume' | 'shotlog' | 'budget'
+type Tab = 'script' | 'breakdown' | 'crew' | 'cast' | 'shots' | 'locations' | 'costume' | 'makeup' | 'props' | 'schedule' | 'shotlog' | 'budget'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'script',    label: 'Script' },
@@ -34,8 +36,10 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'cast',      label: 'Cast' },
   { id: 'shots',     label: 'Shot List' },
   { id: 'locations', label: 'Locations' },
-  { id: 'schedule',  label: 'Schedule' },
   { id: 'costume',   label: 'Costume' },
+  { id: 'makeup',    label: 'Make-up' },
+  { id: 'props',     label: 'Props' },
+  { id: 'schedule',  label: 'Schedule' },
   { id: 'budget',    label: 'Budget' },
   { id: 'shotlog',   label: 'Shot Log' },
 ]
@@ -76,6 +80,9 @@ async function exportXLS(
   shootingDays: ProductionShootingDayDoc[],
   crew: ProductionCrewAssignmentDoc[],
   locations: ProductionLocationDoc[],
+  costumes: ProductionCostumeDoc[],
+  makeupItems: ProductionMakeupDoc[],
+  propsItems: ProductionPropsDoc[],
 ) {
   const XLSX = await import('xlsx-js-style')
 
@@ -83,6 +90,12 @@ async function exportXLS(
   const castById  = Object.fromEntries(cast.map(c => [String(c.castId), c]))
   const castNames = (ids: number[]) =>
     (ids ?? []).map(id => castById[String(id)]?.characterName ?? `ID${id}`).join(', ')
+
+  const costumeById = Object.fromEntries(costumes.map(c => [c.id, c]))
+  const makeupById  = Object.fromEntries(makeupItems.map(c => [c.id, c]))
+  const propsById   = Object.fromEntries(propsItems.map(c => [c.id, c]))
+  const itemNames = (ids: string[] | undefined, byId: Record<string, ProductionCostumeDoc>) =>
+    (ids ?? []).map(id => byId[id]?.characterName).filter(Boolean).join(', ')
 
   const sortedScenes = [...scenes].sort((a, b) => a.sceneNumber - b.sceneNumber)
   const sortedCast   = [...cast].sort((a, b) => a.castId - b.castId)
@@ -148,9 +161,9 @@ async function exportXLS(
 
   // ── Breakdown ────────────────────────────────────────────────────────────────
   addSheet('Breakdown', `Script Breakdown — ${production.title}`,
-    ['Scene', 'D/N', 'INT/EXT', 'Location', 'Description', 'Character/s', 'Props', 'Make-up', 'Costumes', 'Notes'],
+    ['Scene', 'D/N', 'INT/EXT', 'Location', 'Description', 'Character/s', 'Costumes', 'Make-up', 'Props', 'Notes'],
     sortedScenes.map(s => [s.sceneNumber, s.dayNight, s.intExt, s.location, s.description,
-      castNames(s.castIds), s.props, s.makeup, s.costume, s.notes]),
+      castNames(s.castIds), itemNames(s.costumeIds, costumeById), itemNames(s.makeupIds, makeupById), itemNames(s.propsIds, propsById), s.notes]),
     [7, 8, 9, 22, 34, 26, 22, 22, 22, 22])
 
   // ── Crew ─────────────────────────────────────────────────────────────────────
@@ -208,19 +221,19 @@ async function exportXLS(
   // ── Props ─────────────────────────────────────────────────────────────────────
   addSheet('Props', `Props — ${production.title}`,
     ['Scene', 'Props'],
-    sortedScenes.filter(s => s.props?.trim()).map(s => [s.sceneNumber, s.props]),
+    sortedScenes.filter(s => (s.propsIds ?? []).length > 0).map(s => [s.sceneNumber, itemNames(s.propsIds, propsById)]),
     [8, 56])
 
   // ── Make-Up ───────────────────────────────────────────────────────────────────
   addSheet('Make-Up', `Make-Up — ${production.title}`,
-    ['Scene', 'Character', 'Make-Up Notes'],
-    sortedScenes.filter(s => s.makeup?.trim()).map(s => [s.sceneNumber, castNames(s.castIds), s.makeup]),
+    ['Scene', 'Character', 'Make-Up'],
+    sortedScenes.filter(s => (s.makeupIds ?? []).length > 0).map(s => [s.sceneNumber, castNames(s.castIds), itemNames(s.makeupIds, makeupById)]),
     [8, 28, 46])
 
   // ── Costume ───────────────────────────────────────────────────────────────────
   addSheet('Costume', `Costume — ${production.title}`,
     ['Scene', 'Character', 'Costume'],
-    sortedScenes.filter(s => s.costume?.trim()).map(s => [s.sceneNumber, castNames(s.castIds), s.costume]),
+    sortedScenes.filter(s => (s.costumeIds ?? []).length > 0).map(s => [s.sceneNumber, castNames(s.castIds), itemNames(s.costumeIds, costumeById)]),
     [8, 28, 46])
 
   // ── Schedule — 2-row per scene matching the call-sheet format ─────────────────
@@ -521,6 +534,21 @@ export default function ProductionEditor() {
     [],
     !!id,
   )
+  const { data: costumes } = useCollection<ProductionCostumeDoc>(
+    `productions/${id}/costumes`,
+    [],
+    !!id,
+  )
+  const { data: makeupItems } = useCollection<ProductionMakeupDoc>(
+    `productions/${id}/makeup`,
+    [],
+    !!id,
+  )
+  const { data: propsItems } = useCollection<ProductionPropsDoc>(
+    `productions/${id}/props`,
+    [],
+    !!id,
+  )
 
   const { data: productionPeriods } = useCollection<ProductionPeriodDoc>(
     'production_periods',
@@ -609,11 +637,10 @@ export default function ProductionEditor() {
         location: s.location,
         dayNight: s.dayNight,
         description: '',
-        cast: [],
-        props: [],
-        costumes: [],
-        makeup: [],
-        sfx: [],
+        castIds: [],
+        costumeIds: [],
+        makeupIds: [],
+        propsIds: [],
         notes: '',
       })
     }
@@ -930,7 +957,7 @@ export default function ProductionEditor() {
               disabled={exportingXls}
               onClick={async () => {
                 setExportingXls(true)
-                try { await exportXLS(production, scenes, cast, shots, shootingDays, crewAssignments, locations) }
+                try { await exportXLS(production, scenes, cast, shots, shootingDays, crewAssignments, locations, costumes, makeupItems, propsItems) }
                 catch (e) { console.error('XLS export failed:', e); alert('Export failed — see console for details.') }
                 finally { setExportingXls(false) }
               }}
@@ -1161,6 +1188,8 @@ export default function ProductionEditor() {
         {activeTab === 'locations' && <LocationsTab productionId={id!} canEdit={canEdit} />}
         {activeTab === 'schedule'  && <ScheduleTab  productionId={id!} canEdit={canEdit} productionTitle={production.title} />}
         {activeTab === 'costume'   && <CostumeTab   productionId={id!} canEdit={canEdit} />}
+        {activeTab === 'makeup'    && <MakeupTab    productionId={id!} canEdit={canEdit} />}
+        {activeTab === 'props'     && <PropsTab     productionId={id!} canEdit={canEdit} />}
         {activeTab === 'shotlog'   && (
           <ShotLogTab
             productionId={id!}

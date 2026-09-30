@@ -4,8 +4,15 @@ import { doc, updateDoc, addDoc, deleteDoc, collection, serverTimestamp } from '
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
-import type { ProductionSceneDoc, ProductionCastDoc, ProductionLocationDoc } from '@/types'
+import type { ProductionSceneDoc, ProductionCastDoc, ProductionLocationDoc, ProductionCostumeDoc, ProductionMakeupDoc, ProductionPropsDoc } from '@/types'
 import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, MapPin } from 'lucide-react'
+
+type ItemField = 'costumeIds' | 'makeupIds' | 'propsIds'
+const ITEM_KINDS: { field: ItemField; collectionName: string; label: string }[] = [
+  { field: 'costumeIds', collectionName: 'costumes', label: 'Costume' },
+  { field: 'makeupIds',  collectionName: 'makeup',   label: 'Make-up' },
+  { field: 'propsIds',   collectionName: 'props',    label: 'Props' },
+]
 
 // Eighths → display string: 1→"1/8", 8→"1", 9→"1 1/8"
 function fmtPages(eighths: number): string {
@@ -161,15 +168,31 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
   const { data: locations } = useCollection<ProductionLocationDoc>(
     `productions/${productionId}/locations`, [orderBy('name', 'asc')],
   )
+  const { data: costumes } = useCollection<ProductionCostumeDoc>(
+    `productions/${productionId}/costumes`, [orderBy('order', 'asc')],
+  )
+  const { data: makeupItems } = useCollection<ProductionMakeupDoc>(
+    `productions/${productionId}/makeup`, [orderBy('order', 'asc')],
+  )
+  const { data: propsItems } = useCollection<ProductionPropsDoc>(
+    `productions/${productionId}/props`, [orderBy('order', 'asc')],
+  )
+  const itemCollections: Record<ItemField, ProductionCostumeDoc[]> = {
+    costumeIds: costumes, makeupIds: makeupItems, propsIds: propsItems,
+  }
 
   const [edits,       setEdits]       = useState<Record<string, Record<string, any>>>({})
   const [castOpen,    setCastOpen]    = useState<string | null>(null)
   const [castPos,     setCastPos]     = useState<{ top: number; left: number } | null>(null)
   const [locOpen,     setLocOpen]     = useState<string | null>(null)
   const [locPos,      setLocPos]      = useState<{ top: number; left: number } | null>(null)
+  const [itemPicker,    setItemPicker]    = useState<{ field: ItemField; sceneId: string } | null>(null)
+  const [itemPickerPos, setItemPickerPos] = useState<{ top: number; left: number } | null>(null)
+  const [revealedCast, setRevealedCast]   = useState<Set<string>>(new Set())
   const [expanded,    setExpanded]    = useState<Set<string>>(new Set())
   const castBtnRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const locBtnRefs  = useRef<Record<string, HTMLButtonElement | null>>({})
+  const itemBtnRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
   function get(id: string, field: string, fallback: any) { return edits[id]?.[field] ?? fallback }
   function setLocal(id: string, field: string, value: any) {
@@ -209,11 +232,26 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
       : [...current, castId].sort((a, b) => a - b)
     await save(sceneId, 'castIds', next)
   }
+  async function toggleItemId(sceneId: string, field: ItemField, itemId: string) {
+    if (!canEdit) return
+    const scene = scenes.find(s => s.id === sceneId)
+    if (!scene) return
+    const current = (scene[field] as string[] | undefined) ?? []
+    const next = current.includes(itemId) ? current.filter(x => x !== itemId) : [...current, itemId]
+    await save(sceneId, field, next)
+  }
+  function toggleRevealCast(key: string) {
+    setRevealedCast(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
   async function addScene() {
     const maxNum = scenes.reduce((m, s) => Math.max(m, s.sceneNumber), 0)
     await addDoc(collection(db, `productions/${productionId}/scenes`), {
       sceneNumber: maxNum + 1, dayNight: 'Day', intExt: 'INT',
-      location: '', description: '', castIds: [], props: '', makeup: '', costume: '', notes: '',
+      location: '', description: '', castIds: [], costumeIds: [], makeupIds: [], propsIds: [], notes: '',
     })
   }
   async function deleteScene(id: string) {
@@ -251,6 +289,16 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
     setLocOpen(sceneId)
   }
 
+  function openItemPicker(field: ItemField, sceneId: string) {
+    if (itemPicker?.field === field && itemPicker.sceneId === sceneId) { setItemPicker(null); return }
+    const btn = itemBtnRefs.current[`${field}-${sceneId}`]
+    if (btn) {
+      const rect = btn.getBoundingClientRect()
+      setItemPickerPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX })
+    }
+    setItemPicker({ field, sceneId })
+  }
+
   async function selectLocation(sceneId: string, loc: ProductionLocationDoc) {
     setLocal(sceneId, 'location', loc.name)
     await save(sceneId, 'location', loc.name)
@@ -285,15 +333,49 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
     const sel = scene.castIds ?? []
     return (
       <div className="flex flex-wrap gap-0.5 items-center">
-        {sel.map(cid => (
-          <span key={cid} className="text-[10px] bg-brand-900/50 text-brand-300 px-1 rounded font-mono">{cid}</span>
-        ))}
+        {sel.map(cid => {
+          const key = `${scene.id}-${cid}`
+          const revealed = revealedCast.has(key)
+          const name = cast.find(c => c.castId === cid)?.characterName
+          return (
+            <button
+              key={cid}
+              type="button"
+              title="Click to reveal character name"
+              onClick={() => toggleRevealCast(key)}
+              className="text-[10px] bg-brand-900/50 text-brand-300 px-1 rounded font-mono hover:bg-brand-800/70 transition-colors max-w-[90px] truncate"
+            >{revealed && name ? name : cid}</button>
+          )
+        })}
         {canEdit && (
           <button
             ref={el => { castBtnRefs.current[scene.id] = el }}
             onClick={() => openCastDropdown(scene.id)}
             className="text-[10px] text-zinc-500 hover:text-zinc-300 px-1 rounded border border-dashed border-zinc-700 hover:border-zinc-500"
           >{sel.length === 0 ? '+ cast' : '±'}</button>
+        )}
+      </div>
+    )
+  }
+
+  function itemCell(scene: ProductionSceneDoc, field: ItemField) {
+    const items = itemCollections[field]
+    const sel = (scene[field] as string[] | undefined) ?? []
+    const selectedItems = sel.map(id => items.find(it => it.id === id)).filter(Boolean) as ProductionCostumeDoc[]
+    const kindLabel = ITEM_KINDS.find(k => k.field === field)!.label.toLowerCase()
+    return (
+      <div className="flex flex-wrap gap-0.5 items-center">
+        {selectedItems.map(it => (
+          <span key={it.id} title={it.characterName} className="text-[10px] bg-zinc-800 text-zinc-300 px-1 rounded max-w-[90px] truncate">
+            {it.characterName || '—'}
+          </span>
+        ))}
+        {canEdit && (
+          <button
+            ref={el => { itemBtnRefs.current[`${field}-${scene.id}`] = el }}
+            onClick={() => openItemPicker(field, scene.id)}
+            className="text-[10px] text-zinc-500 hover:text-zinc-300 px-1 rounded border border-dashed border-zinc-700 hover:border-zinc-500"
+          >{sel.length === 0 ? `+ ${kindLabel}` : '±'}</button>
         )}
       </div>
     )
@@ -361,6 +443,38 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
       )
     : null
 
+  // Costume/Make-up/Props picker — same pattern as cast, one shared portal
+  const itemDropdown = itemPicker && itemPickerPos
+    ? createPortal(
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setItemPicker(null)} />
+          <div
+            className="fixed z-50 bg-zinc-800 border border-white/10 rounded-xl shadow-xl p-2 min-w-[220px]"
+            style={{ top: itemPickerPos.top, left: itemPickerPos.left }}
+          >
+            {(() => {
+              const { field, sceneId } = itemPicker
+              const items = itemCollections[field]
+              const kind = ITEM_KINDS.find(k => k.field === field)!
+              const scene = scenes.find(s => s.id === sceneId)
+              const sel = (scene?.[field] as string[] | undefined) ?? []
+              return items.length === 0 ? (
+                <p className="text-xs text-zinc-500 px-2 py-1">Add {kind.label.toLowerCase()} items in the {kind.label} tab first</p>
+              ) : items.map(it => (
+                <label key={it.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-700/50 rounded cursor-pointer text-sm">
+                  <input type="checkbox" checked={sel.includes(it.id)}
+                    onChange={() => toggleItemId(sceneId, field, it.id)} className="accent-brand-500" />
+                  <span className="text-zinc-200">{it.characterName || <span className="text-zinc-500">Untitled</span>}</span>
+                </label>
+              ))
+            })()}
+            <button onClick={() => setItemPicker(null)} className="w-full text-xs text-zinc-500 mt-1 hover:text-zinc-300 py-0.5 pt-2 border-t border-white/10">Done</button>
+          </div>
+        </>,
+        document.body,
+      )
+    : null
+
   if (scenes.length === 0) {
     return (
       <div className="space-y-4">
@@ -381,6 +495,7 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
     <div className="space-y-4">
       {castDropdown}
       {locDropdown}
+      {itemDropdown}
 
       {/* ── Mobile card view (< md) ─────────────────────────────────── */}
       <div className="md:hidden space-y-3">
@@ -443,13 +558,10 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
                     <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Cast</p>
                     {castCell(scene)}
                   </div>
-                  {(['props', 'makeup', 'costume'] as const).map(f => (
-                    <div key={f}>
-                      <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">
-                        {f === 'makeup' ? 'Make-up' : f.charAt(0).toUpperCase() + f.slice(1)}
-                      </p>
-                      <EditInput value={get(scene.id, f, scene[f])} canEdit={canEdit}
-                        onChange={v => setLocal(scene.id, f, v)} onBlur={v => save(scene.id, f, v)} />
+                  {ITEM_KINDS.map(k => (
+                    <div key={k.field}>
+                      <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">{k.label}</p>
+                      {itemCell(scene, k.field)}
                     </div>
                   ))}
                   <div>
@@ -475,7 +587,7 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
         <table className="w-full min-w-[1000px] border-collapse">
           <thead>
             <tr className="border-b border-white/10">
-              {['#', 'D/N', 'I/E', 'Pages', 'Location', 'Description', 'Cast', 'Props', 'Make-up', 'Costume', 'Notes', ''].map(h => (
+              {['#', 'D/N', 'I/E', 'Pages', 'Location', 'Description', 'Cast', 'Costume', 'Make-up', 'Props', 'Notes', ''].map(h => (
                 <th key={h} className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-2 py-2 whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -555,12 +667,9 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
                   </td>
                   {/* Cast */}
                   <td className="px-2 py-1.5">{castCell(scene)}</td>
-                  {/* Props, Make-up, Costume */}
-                  {(['props', 'makeup', 'costume'] as const).map(f => (
-                    <td key={f} className="px-1 py-1">
-                      <AutoInput value={get(scene.id, f, scene[f] ?? '')} canEdit={canEdit}
-                        onChange={v => setLocal(scene.id, f, v)} onBlur={v => save(scene.id, f, v)} />
-                    </td>
+                  {/* Costume, Make-up, Props */}
+                  {ITEM_KINDS.map(k => (
+                    <td key={k.field} className="px-2 py-1.5">{itemCell(scene, k.field)}</td>
                   ))}
                   {/* Notes */}
                   <td className="px-1 py-1">

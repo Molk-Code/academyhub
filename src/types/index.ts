@@ -1059,9 +1059,9 @@ export interface ProductionSceneDoc {
   description: string
   castIds: number[]
   pages?: number        // eighths of a script page: 1=1/8, 8=1 page, 9=1 1/8, etc.
-  props: string
-  makeup: string
-  costume: string
+  costumeIds?: string[] // refs into productions/{id}/costumes
+  makeupIds?: string[]  // refs into productions/{id}/makeup
+  propsIds?: string[]   // refs into productions/{id}/props
   notes: string
 }
 
@@ -1087,13 +1087,14 @@ export interface ProductionShotDoc {
 export interface ProductionCostumeDoc {
   id: string
   order: number
-  characterName: string
+  characterName: string   // character (or item, for props) this entry is for
   description: string
-  scenes: string        // comma-separated scene numbers or free text
-  status: 'planned' | 'sourced' | 'ready' | 'on_set'
   responsible: string
   notes: string
 }
+
+export type ProductionMakeupDoc = ProductionCostumeDoc
+export type ProductionPropsDoc  = ProductionCostumeDoc
 
 export interface LocationMove {
   id: string

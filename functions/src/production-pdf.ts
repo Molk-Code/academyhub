@@ -26,12 +26,15 @@ export const exportProductionPdf = functions.https.onCall(async (data, context) 
     prod.isPublic === true
   if (!canAccess) throw new functions.https.HttpsError('permission-denied', 'Access denied.')
 
-  const [scenesSnap, castSnap, daysSnap, crewSnap, locSnap] = await Promise.all([
+  const [scenesSnap, castSnap, daysSnap, crewSnap, locSnap, costumeSnap, makeupSnap, propsSnap] = await Promise.all([
     db.collection(`productions/${productionId}/scenes`).orderBy('sceneNumber').get(),
     db.collection(`productions/${productionId}/cast`).orderBy('castId').get(),
     db.collection(`productions/${productionId}/shootingDays`).orderBy('dayNumber').get(),
     db.collection(`productions/${productionId}/crew`).get(),
     db.collection(`productions/${productionId}/locations`).get(),
+    db.collection(`productions/${productionId}/costumes`).get(),
+    db.collection(`productions/${productionId}/makeup`).get(),
+    db.collection(`productions/${productionId}/props`).get(),
   ])
 
   const scenes    = scenesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
@@ -39,10 +42,19 @@ export const exportProductionPdf = functions.https.onCall(async (data, context) 
   const days      = daysSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
   const crew      = crewSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
   const locations = locSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+  const costumes  = costumeSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+  const makeupItems = makeupSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+  const propsItems  = propsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
   const locById: Record<string, any> = Object.fromEntries(locations.map((l: any) => [l.id, l]))
 
   const castMap: Record<number, string> = {}
   cast.forEach((c: any) => { castMap[c.castId] = c.characterName })
+
+  const costumeMap: Record<string, string> = Object.fromEntries(costumes.map((c: any) => [c.id, c.characterName]))
+  const makeupMap: Record<string, string> = Object.fromEntries(makeupItems.map((c: any) => [c.id, c.characterName]))
+  const propsMap: Record<string, string> = Object.fromEntries(propsItems.map((c: any) => [c.id, c.characterName]))
+  const itemNames = (ids: string[] | undefined, map: Record<string, string>) =>
+    ((ids ?? []) as string[]).map(id => map[id]).filter(Boolean).join(', ')
 
   const pdfBuffer: Buffer = await new Promise((resolve, reject) => {
     const doc  = new PDFDocument({ margin: 0, size: 'A4' })
@@ -133,8 +145,8 @@ export const exportProductionPdf = functions.https.onCall(async (data, context) 
 
       // 9 columns: #, I/E, D/N, Location, Description, Cast, Props, Make-up, Costume
       // Total CW = 499
-      const HCOLS   = ['#', 'I/E', 'D/N', 'LOCATION', 'DESCRIPTION', 'CAST', 'PROPS', 'MAKE-UP', 'COSTUME']
-      const HWIDTHS = [20,   24,    22,    68,          100,           64,     52,      74,         75]
+      const HCOLS   = ['#', 'I/E', 'D/N', 'LOCATION', 'DESCRIPTION', 'CAST', 'COSTUME', 'MAKE-UP', 'PROPS']
+      const HWIDTHS = [20,   24,    22,    68,          100,           64,     75,        74,        52]
       // Sum: 20+24+22+68+100+64+52+74+75 = 499 ✓
       const WRAP_COLS = new Set([3, 4, 5, 6, 7, 8]) // location, description, cast, props, makeup, costume
 
@@ -165,9 +177,9 @@ export const exportProductionPdf = functions.https.onCall(async (data, context) 
           locationDisplay,
           scene.description ?? '',
           castNames,
-          scene.props ?? '',
-          scene.makeup ?? '',
-          scene.costume ?? '',
+          itemNames(scene.costumeIds, costumeMap),
+          itemNames(scene.makeupIds, makeupMap),
+          itemNames(scene.propsIds, propsMap),
         ]
 
         // Auto-size row height based on wrapping columns

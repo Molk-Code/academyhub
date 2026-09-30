@@ -606,9 +606,13 @@ function BudgetOverview({ period, productions }: { period: ProductionPeriodDoc; 
 
 // ── Teacher page ──────────────────────────────────────────────────────────────
 
-export default function TeacherProductionPeriod({ embedded = false }: { embedded?: boolean }) {
+export default function TeacherProductionPeriod({
+  embedded = false, cohortId: cohortIdProp,
+}: { embedded?: boolean; cohortId?: string }) {
   const { data: cohorts } = useCollection<CohortDoc>('cohorts', [orderBy('name', 'asc')])
-  const [cohortId, setCohortId] = useState('')
+  const [internalCohortId, setInternalCohortId] = useState('')
+  const cohortId = embedded ? (cohortIdProp ?? '') : internalCohortId
+  const setCohortId = embedded ? (() => {}) : setInternalCohortId
 
   const { data: periods, loading: periodsLoading } = useCollection<ProductionPeriodDoc>(
     'production_periods',
@@ -671,8 +675,8 @@ export default function TeacherProductionPeriod({ embedded = false }: { embedded
   )
 
   useEffect(() => {
-    if (cohorts.length && !cohortId) setCohortId(cohorts[0].id)
-  }, [cohorts, cohortId])
+    if (!embedded && cohorts.length && !cohortId) setCohortId(cohorts[0].id)
+  }, [embedded, cohorts, cohortId])
 
   useEffect(() => {
     if (periods.length && !selectedPeriodId) setSelectedPeriodId(periods[0].id)
@@ -728,6 +732,14 @@ export default function TeacherProductionPeriod({ embedded = false }: { embedded
 
   if (!cohortId && cohorts.length === 0) return <LoadingSpinner />
 
+  if (embedded && !cohortId) {
+    return (
+      <div className="text-center py-16 text-zinc-500 text-sm">
+        Select a class above to view its production period.
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -752,7 +764,7 @@ export default function TeacherProductionPeriod({ embedded = false }: { embedded
       </div>
 
       {/* Cohort picker */}
-      {cohorts.length > 1 && (
+      {!embedded && cohorts.length > 1 && (
         <div className="flex items-center gap-2">
           <label className="text-xs text-zinc-500 font-medium">Cohort:</label>
           <select value={cohortId} onChange={e => { setCohortId(e.target.value); setSelectedPeriodId(null) }}

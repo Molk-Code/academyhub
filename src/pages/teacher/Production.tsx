@@ -296,9 +296,15 @@ export default function TeacherProduction() {
                     <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                       <Users className="w-3.5 h-3.5" /> {cohort.name}
                       <span className="font-normal normal-case text-zinc-600">{cohortTeams.length} crew{cohortTeams.length !== 1 ? 's' : ''}</span>
+                      <button
+                        onClick={() => { setCohortId(cohort.id); setSelectedTeamId(null); setTeamPanel('new'); setTeamError(null) }}
+                        className="ml-auto flex items-center gap-1 text-[11px] normal-case font-medium text-brand-400 hover:text-brand-300 transition-colors"
+                      >
+                        <Plus className="w-3 h-3" /> Add crew
+                      </button>
                     </h2>
                     {cohortTeams.length === 0 ? (
-                      <p className="text-xs text-zinc-600 pl-1">No crews yet — select this class to add one.</p>
+                      <p className="text-xs text-zinc-600 pl-1">No crews yet.</p>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {cohortTeams.map(team => (
@@ -526,7 +532,7 @@ export default function TeacherProduction() {
       )}
 
       {/* ── Period tab ─────────────────────────────────────────────────────── */}
-      {tab === 'period' && <TeacherProductionPeriod embedded />}
+      {tab === 'period' && <TeacherProductionPeriod embedded cohortId={cohortId} />}
 
       {/* ── Productions tab ────────────────────────────────────────────────── */}
       {tab === 'productions' && (

@@ -300,8 +300,12 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
   }
 
   async function selectLocation(sceneId: string, loc: ProductionLocationDoc) {
-    setLocal(sceneId, 'location', loc.name)
-    await save(sceneId, 'location', loc.name)
+    const scene = scenes.find(s => s.id === sceneId)
+    if (scene && !scene.location?.trim()) {
+      const scriptName = loc.scriptName || loc.name
+      setLocal(sceneId, 'location', scriptName)
+      await save(sceneId, 'location', scriptName)
+    }
     await updateDoc(doc(db, `productions/${productionId}/scenes`, sceneId), { locationId: loc.id, updatedAt: serverTimestamp() })
     setLocOpen(null)
   }
@@ -389,14 +393,31 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
             className="fixed z-50 bg-zinc-800 border border-white/10 rounded-xl shadow-xl p-2 min-w-[240px]"
             style={{ top: locPos.top, left: locPos.left }}
           >
-            <p className="text-xs text-zinc-500 px-2 pb-1.5 font-medium">Link location</p>
+            {(() => {
+              const scene = scenes.find(s => s.id === locOpen)
+              const linkedLoc = scene?.locationId ? locations.find(l => l.id === scene.locationId) : null
+              if (!linkedLoc) return null
+              const addr = [linkedLoc.address, linkedLoc.zipCode, linkedLoc.state].filter(Boolean).join(', ')
+              return (
+                <div className="px-2 pb-2 mb-1.5 border-b border-white/10">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Real place</p>
+                  <p className="text-sm text-zinc-200 font-medium">{linkedLoc.name}</p>
+                  {addr && <p className="text-xs text-zinc-400 mt-0.5">{addr}</p>}
+                </div>
+              )
+            })()}
+            <p className="text-xs text-zinc-500 px-2 pb-1.5 font-medium">
+              {scenes.find(s => s.id === locOpen)?.locationId ? 'Change location' : 'Link location'}
+            </p>
             {locations.length === 0
               ? <p className="text-xs text-zinc-500 px-2 py-1">Add locations in the Locations tab first</p>
               : locations.map(loc => (
                 <button key={loc.id} onClick={() => selectLocation(locOpen!, loc)}
                   className="w-full text-left flex flex-col gap-0.5 px-2 py-2 hover:bg-zinc-700/50 rounded-lg">
-                  <span className="text-sm text-zinc-200">{loc.name}</span>
-                  {loc.address && <span className="text-xs text-zinc-500">{loc.address}</span>}
+                  <span className="text-sm text-zinc-200">{loc.scriptName || loc.name}</span>
+                  {(loc.name || loc.address) && (
+                    <span className="text-xs text-zinc-500">{[loc.name, loc.address].filter(Boolean).join(' — ')}</span>
+                  )}
                 </button>
               ))
             }
@@ -519,7 +540,7 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
                 {ieBadge(scene)}
                 <div className="flex-1 min-w-0 flex items-center gap-1">
                   <EditInput value={get(scene.id, 'location', scene.location)} placeholder="Location"
-                    canEdit={canEdit} onChange={v => { setLocal(scene.id, 'location', v); if (scene.locationId) clearLocationLink(scene.id) }} onBlur={v => save(scene.id, 'location', v)} />
+                    canEdit={canEdit} onChange={v => setLocal(scene.id, 'location', v)} onBlur={v => save(scene.id, 'location', v)} />
                   {canEdit && locations.length > 0 && (
                     <button ref={el => { locBtnRefs.current[scene.id] = el }} onClick={() => openLocDropdown(scene.id)}
                       className={cn('p-1 rounded flex-shrink-0 transition-colors', scene.locationId ? 'text-brand-400' : 'text-zinc-600 hover:text-brand-400')}>
@@ -649,7 +670,7 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
                         placeholder="Location"
                         minW="min-w-[100px]"
                         canEdit={canEdit}
-                        onChange={v => { setLocal(scene.id, 'location', v); if (scene.locationId) clearLocationLink(scene.id) }}
+                        onChange={v => setLocal(scene.id, 'location', v)}
                         onBlur={v => save(scene.id, 'location', v)}
                       />
                       {canEdit && locations.length > 0 && (

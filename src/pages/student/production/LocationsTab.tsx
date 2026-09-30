@@ -9,9 +9,9 @@ import LoadingSpinner from '@/components/common/LoadingSpinner'
 interface Props { productionId: string; canEdit: boolean }
 
 interface LocForm {
-  name: string; address: string; zipCode: string; state: string; notes: string
+  scriptName: string; name: string; address: string; zipCode: string; state: string; notes: string
 }
-const empty: LocForm = { name: '', address: '', zipCode: '', state: '', notes: '' }
+const empty: LocForm = { scriptName: '', name: '', address: '', zipCode: '', state: '', notes: '' }
 
 function AddressFields({ form, setForm }: {
   form: LocForm; setForm: (f: LocForm) => void
@@ -59,8 +59,9 @@ export function LocationsTab({ productionId, canEdit }: Props) {
   const [newForm,   setNewForm]   = useState<LocForm>(empty)
 
   async function addLocation() {
-    if (!newForm.name.trim()) return
+    if (!newForm.scriptName.trim() || !newForm.name.trim()) return
     await addDoc(collection(db, `productions/${productionId}/locations`), {
+      scriptName: newForm.scriptName.trim(),
       name: newForm.name.trim(),
       address: newForm.address.trim(),
       zipCode: newForm.zipCode.trim(),
@@ -72,8 +73,9 @@ export function LocationsTab({ productionId, canEdit }: Props) {
   }
 
   async function saveEdit(id: string) {
-    if (!editForm.name.trim()) return
+    if (!editForm.scriptName.trim() || !editForm.name.trim()) return
     await updateDoc(doc(db, `productions/${productionId}/locations`, id), {
+      scriptName: editForm.scriptName.trim(),
       name:    editForm.name.trim(),
       address: editForm.address.trim(),
       zipCode: editForm.zipCode.trim(),
@@ -95,7 +97,7 @@ export function LocationsTab({ productionId, canEdit }: Props) {
       <div>
         <h2 className="text-zinc-100 font-semibold text-base mb-1">Filming Locations</h2>
         <p className="text-zinc-500 text-sm">
-          Define locations with addresses. Link them to scenes in Script Breakdown. Addresses are used for sunrise/sunset and weather data in the schedule.
+          Define locations with a script name (how it reads in the screenplay) and the real place's name and address. Link them to scenes in Script Breakdown. Addresses are used for sunrise/sunset and weather data in the schedule.
         </p>
       </div>
 
@@ -113,9 +115,14 @@ export function LocationsTab({ productionId, canEdit }: Props) {
                 <input
                   autoFocus
                   className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-brand-500/30"
-                  value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                  placeholder="Location name…"
+                  value={editForm.scriptName} onChange={e => setEditForm({ ...editForm, scriptName: e.target.value })}
+                  placeholder="Location name in script (e.g. CHURCH)…"
                   onKeyDown={e => { if (e.key === 'Escape') setEditingId(null) }}
+                />
+                <input
+                  className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-brand-500/30"
+                  value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                  placeholder="Real place name…"
                 />
                 <AddressFields form={editForm} setForm={setEditForm} />
                 <div className="flex gap-2 pt-1">
@@ -131,8 +138,8 @@ export function LocationsTab({ productionId, canEdit }: Props) {
               <div key={loc.id} className="flex items-start gap-3 px-5 py-3.5 group">
                 <MapPin className="w-4 h-4 text-brand-400 flex-shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-zinc-200 font-medium">{loc.name}</p>
-                  {fullAddress(loc) && <p className="text-xs text-zinc-400 mt-0.5">{fullAddress(loc)}</p>}
+                  <p className="text-sm text-zinc-200 font-medium">{loc.scriptName || loc.name}</p>
+                  <p className="text-xs text-zinc-400 mt-0.5">{loc.name}{fullAddress(loc) ? ` — ${fullAddress(loc)}` : ''}</p>
                   {loc.notes && <p className="text-xs text-zinc-500 italic mt-0.5">{loc.notes}</p>}
                 </div>
                 {canEdit && (
@@ -141,6 +148,7 @@ export function LocationsTab({ productionId, canEdit }: Props) {
                       onClick={() => {
                         setEditingId(loc.id)
                         setEditForm({
+                          scriptName: loc.scriptName ?? '',
                           name:    loc.name,
                           address: loc.address ?? '',
                           zipCode: loc.zipCode ?? '',
@@ -169,11 +177,16 @@ export function LocationsTab({ productionId, canEdit }: Props) {
               <input
                 autoFocus
                 className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-brand-500/30"
-                value={newForm.name} onChange={e => setNewForm({ ...newForm, name: e.target.value })}
-                placeholder="Location name…"
+                value={newForm.scriptName} onChange={e => setNewForm({ ...newForm, scriptName: e.target.value })}
+                placeholder="Location name in script (e.g. CHURCH)…"
                 onKeyDown={e => {
                   if (e.key === 'Escape') { setAdding(false); setNewForm(empty) }
                 }}
+              />
+              <input
+                className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-brand-500/30"
+                value={newForm.name} onChange={e => setNewForm({ ...newForm, name: e.target.value })}
+                placeholder="Real place name…"
               />
               <AddressFields form={newForm} setForm={setNewForm} />
               <div className="flex gap-2 pt-1">

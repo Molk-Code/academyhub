@@ -193,6 +193,7 @@ async function exportXLS(
   // Rows from the locations subcollection (have addresses)
   const locRows: (string | number)[][] = locations.map(l => [
     (scenesByLocId.get(l.id) ?? []).join(', '),
+    l.scriptName || l.name,
     l.name,
     '',
     [l.address, l.zipCode, l.state].filter(Boolean).join(', '),
@@ -205,12 +206,12 @@ async function exportXLS(
     unlinkedLocMap.get(s.location)!.scenes.push(s.sceneNumber)
   })
   unlinkedLocMap.forEach((v, name) => {
-    locRows.push([v.scenes.join(', '), name, v.intExt, '', ''])
+    locRows.push([v.scenes.join(', '), name, '', v.intExt, '', ''])
   })
   addSheet('Locations', `Locations — ${production.title}`,
-    ['Scene/s', 'Location', 'INT/EXT', 'Address', 'Notes'],
+    ['Scene/s', 'Script Name', 'Real Name', 'INT/EXT', 'Address', 'Notes'],
     locRows,
-    [14, 32, 10, 52, 28])
+    [14, 26, 26, 10, 46, 24])
 
   // ── Actors ───────────────────────────────────────────────────────────────────
   addSheet('Actors', `Actors — ${production.title}`,

@@ -362,10 +362,11 @@ export default function ShotLogTab({ productionId, productionTitle, scenes, shot
 
       takes.forEach(take => {
         const takeNum  = String(take.takeNumber).padStart(2, '0')
-        // Filename encodes scene + shot + shot-type abbreviation + take
+        // Base filename (no extension — camera format varies: .braw, .mov, .mp4, .r3d…)
+        // encodes scene + shot + shot-type abbreviation + take
         const fileName = abbr
-          ? `SC${sceneNum}_SH${shotNum}_${abbr}_T${takeNum}.mp4`
-          : `SC${sceneNum}_SH${shotNum}_T${takeNum}.mp4`
+          ? `SC${sceneNum}_SH${shotNum}_${abbr}_T${takeNum}`
+          : `SC${sceneNum}_SH${shotNum}_T${takeNum}`
         const slate    = `SC${sceneNum}_SH${shotNum}_T${takeNum}`
         const isGood   = take.rating === 'ok' || take.rating === 'best'
         const comments = [
@@ -640,11 +641,11 @@ export default function ShotLogTab({ productionId, productionTitle, scenes, shot
             <div className="bg-white/5 rounded-xl p-3 mb-3 space-y-1.5">
               <p className="text-xs text-zinc-400 font-semibold">📋 How to sync CSV with DaVinci</p>
               <p className="text-xs text-zinc-300 font-medium">1. Rename the actual video files before importing</p>
-              <p className="text-xs text-zinc-500">In Finder, rename each raw clip to match the CSV's <span className="text-zinc-300">File Name</span> column exactly (e.g. <code className="bg-white/10 px-1 rounded text-zinc-300">SC01_SH02_CU_T02.mp4</code>). This must happen <span className="text-zinc-300">before</span> import — DaVinci's filename match checks the real file name on disk, not the Clip Name you can rename later inside DaVinci (Clip Attributes only changes the display label, not what the CSV import matches against).</p>
+              <p className="text-xs text-zinc-500">In Finder, rename each raw clip's base name to match the CSV's <span className="text-zinc-300">File Name</span> column (e.g. <code className="bg-white/10 px-1 rounded text-zinc-300">SC01_SH02_CU_T02</code>) — keep the camera's original extension as-is (<code className="bg-white/10 px-1 rounded text-zinc-300">.braw</code>, <code className="bg-white/10 px-1 rounded text-zinc-300">.mov</code>, <code className="bg-white/10 px-1 rounded text-zinc-300">.r3d</code>, etc.); do not change it. This must happen <span className="text-zinc-300">before</span> import — DaVinci's filename match checks the real file name on disk, not the Clip Name you can rename later inside DaVinci (Clip Attributes only changes the display label, not what the CSV import matches against).</p>
               <p className="text-xs text-zinc-300 font-medium">2. Import the renamed footage into DaVinci</p>
               <p className="text-xs text-zinc-500">Sort the Media Pool by <span className="text-zinc-300">Date Created</span> so clips appear in shooting order.</p>
               <p className="text-xs text-zinc-300 font-medium">3. Import the CSV</p>
-              <p className="text-xs text-zinc-500">Select the clips in the Media Pool, then <code className="bg-white/10 px-1 rounded text-zinc-300">File → Import Metadata To → Media Pool</code>, pick the CSV, and check <span className="text-zinc-300">Match using filename</span> — DaVinci matches each row to the clip by its real file name and writes Slate, Shot Type, Scene, Take and Good Take onto the clip.</p>
+              <p className="text-xs text-zinc-500">Select the clips in the Media Pool, then <code className="bg-white/10 px-1 rounded text-zinc-300">File → Import Metadata To → Media Pool</code>, pick the CSV, and check both <span className="text-zinc-300">Match using filename</span> and <span className="text-zinc-300">Ignore file extensions when matching</span> (the CSV has no extension, since camera formats vary) — DaVinci matches each row to the clip by its real file name and writes Slate, Shot Type, Scene, Take and Good Take onto the clip.</p>
             </div>
             <div className="flex gap-2 mt-2">
               <button onClick={() => setShowWrap(false)}

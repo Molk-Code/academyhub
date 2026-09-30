@@ -1042,10 +1042,11 @@ export interface ProductionDoc {
 
 export interface ProductionLocationDoc {
   id: string
-  name: string
-  address: string    // street address
-  zipCode?: string   // postal / zip code
-  state?: string     // city / municipality / region
+  scriptName?: string // how this location reads in the script (e.g. "CHURCH")
+  name: string         // real-world venue name
+  address: string      // street address
+  zipCode?: string     // postal / zip code
+  state?: string       // city / municipality / region
   notes?: string
 }
 

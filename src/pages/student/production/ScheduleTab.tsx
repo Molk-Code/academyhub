@@ -203,18 +203,18 @@ async function exportCallSheet(
   dayScenes.forEach((sc, i) => {
     const castNums = (sc.castIds ?? []).join(', ')
     const scLoc    = sc.locationId ? locById[sc.locationId] : null
-    const addrCell = scLoc
-      ? [scLoc.address, scLoc.zipCode, scLoc.state].filter(Boolean).join(', ') || sc.intExt
-      : sc.intExt
+    const addr     = scLoc ? [scLoc.address, scLoc.zipCode, scLoc.state].filter(Boolean).join(', ') : ''
+    const nameCell = scLoc?.name || sc.intExt
+    const addrCell = scLoc ? addr : sc.intExt
 
     cell(r, 0, sc.sceneNumber,                  whiteB); merge(r, 0, r + 1, 0); fill(r, 0, r + 1, 0, whiteB)
     cell(r, 1, (sc.location ?? '').toUpperCase(), whiteB); merge(r, 1, r, 6); fill(r, 1, r, 6, whiteB)
     cell(r, 7, castNums, white); merge(r, 7, r, 8)
     cell(r, 9, sc.dayNight === 'Night' ? 'N' : 'D', white)
     cell(r, 10, sc.pages ? fmtPages(sc.pages) : '', white)
-    cell(r, 11, addrCell, white); merge(r, 11, r, 15); fill(r, 11, r, 15, white)
+    cell(r, 11, nameCell, white); merge(r, 11, r, 15); fill(r, 11, r, 15, white)
     cell(r + 1, 1, sc.description ?? '', italicSt); merge(r + 1, 1, r + 1, 10); fill(r + 1, 1, r + 1, 10, italicSt)
-    cell(r + 1, 11, sc.intExt, white); merge(r + 1, 11, r + 1, 15); fill(r + 1, 11, r + 1, 15, white)
+    cell(r + 1, 11, addrCell, white); merge(r + 1, 11, r + 1, 15); fill(r + 1, 11, r + 1, 15, white)
     r += 2
 
     // Location move after this scene
@@ -564,20 +564,20 @@ async function exportCallSheetPDF(
     const sc = dayScenes[i]
     const castNums = sc ? (sc.castIds??[]).join(', ') : ''
     const scLoc = sc?.locationId ? locById[sc.locationId] : null
-    const addr = scLoc
-      ? [scLoc.address, scLoc.zipCode, scLoc.state].filter(Boolean).join(', ') || (sc?.intExt??'')
-      : (sc?.intExt??'')
-    // Row A: scene number + location name + cast + D/N + pages + address
+    const addr = scLoc ? [scLoc.address, scLoc.zipCode, scLoc.state].filter(Boolean).join(', ') : ''
+    const nameCell = sc ? (scLoc?.name || sc.intExt) : ''
+    const addrCell = sc ? (scLoc ? addr : sc.intExt) : ''
+    // Row A: scene number + location name + cast + D/N + pages + real place name
     C(0,  0,  RH, sc ? String(sc.sceneNumber)            : '', { bold:true, align:'C' })
     C(1,  6,  RH, sc ? (sc.location??'').toUpperCase()   : '', { bold:true, align:'C' })
     C(7,  8,  RH, castNums,                                     { align:'C' })
     C(9,  9,  RH, sc ? (sc.dayNight==='Night'?'N':'D')   : '', { align:'C' })
     C(10, 10, RH, sc ? (sc.pages?fmtPages(sc.pages):'')  : '', { align:'C' })
-    C(11, 15, RH, addr,                                         { align:'C' })
+    C(11, 15, RH, nameCell,                                     { align:'C' })
     y += RH
-    // Row B: description + INT/EXT
+    // Row B: description + address
     C(1,  10, RH, sc ? (sc.description??'')              : '', { italic:true, sz:7, align:'L' })
-    C(11, 15, RH, sc ? (sc.intExt??'')                   : '', { align:'C' })
+    C(11, 15, RH, addrCell,                                     { align:'C' })
     y += RH
     // Location move after this scene
     if (sc) {
@@ -776,6 +776,22 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
 
   useEffect(() => {
     const controller = new AbortController()
+    // Shared across all days in this effect run, so we only prompt for the
+    // browser's location once even if several days have no location set.
+    let currentPosPromise: Promise<{ lat: number; lon: number } | null> | null = null
+    function getCurrentPos(): Promise<{ lat: number; lon: number } | null> {
+      if (!currentPosPromise) {
+        currentPosPromise = new Promise(resolve => {
+          if (!navigator.geolocation) { resolve(null); return }
+          navigator.geolocation.getCurrentPosition(
+            pos => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+            () => resolve(null),
+            { timeout: 8000, maximumAge: 600000 },
+          )
+        })
+      }
+      return currentPosPromise
+    }
     async function fetchForDay(day: ProductionShootingDayDoc) {
       if (!day.date) return
       const daySceneIds = day.sceneIds ?? []
@@ -790,16 +806,24 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
         dayScenes.map(s => s.location).find(Boolean) ||
         ''
       ).trim()
-      if (!addrQuery) return
       try {
-        // 1. Geocode
-        const geoRes  = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addrQuery)}&format=json&limit=1`,
-          { signal: controller.signal },
-        )
-        const geoData = await geoRes.json()
-        if (!geoData.length) return
-        const { lat, lon } = geoData[0]
+        // 1. Geocode — or, if no location is set for this day, fall back to
+        // the browser's current position
+        let lat: number | string, lon: number | string
+        if (addrQuery) {
+          const geoRes  = await fetch(
+            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addrQuery)}&format=json&limit=1`,
+            { signal: controller.signal },
+          )
+          const geoData = await geoRes.json()
+          if (!geoData.length) return
+          ;({ lat, lon } = geoData[0])
+        } else {
+          const pos = await getCurrentPos()
+          if (!pos) return
+          lat = pos.lat
+          lon = pos.lon
+        }
 
         // 2. Sunrise / sunset
         const ssRes  = await fetch(

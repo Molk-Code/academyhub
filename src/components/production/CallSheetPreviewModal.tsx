@@ -114,7 +114,11 @@ export function CallSheetPreviewModal({
                     <div key={sc.id} className="flex items-start gap-2 px-2.5 py-2 bg-zinc-800/40 rounded-lg text-xs">
                       <span className="font-mono text-zinc-300 w-5 flex-shrink-0">{sc.sceneNumber}</span>
                       <span className="text-zinc-500 flex-shrink-0">{sc.intExt}·{sc.dayNight === 'Day' ? 'D' : 'N'}</span>
-                      <span className="text-zinc-300 flex-1">{sc.location || '—'}{loc?.address ? ` · ${loc.address}` : ''}</span>
+                      <span className="text-zinc-300 flex-1">
+                        {sc.location || '—'}
+                        {loc?.name && <span className="text-zinc-400"> · {loc.name}</span>}
+                        {loc?.address && <span className="text-zinc-500"> · {loc.address}</span>}
+                      </span>
                       {(sc.castIds ?? []).length > 0 && <span className="text-zinc-500 flex-shrink-0">Cast: {(sc.castIds ?? []).join(',')}</span>}
                       {scShots.length > 0 && <span className="text-sky-500 flex-shrink-0">{scShots.length} shots</span>}
                     </div>

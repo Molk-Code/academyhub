@@ -167,8 +167,8 @@ export const exportProductionPdf = functions.https.onCall(async (data, context) 
       scenes.forEach((scene, idx) => {
         const castNames  = ((scene.castIds ?? []) as number[]).map(id => castMap[id] ?? String(id)).join(', ')
         const linkedLoc  = scene.locationId ? locById[scene.locationId] : null
-        const locationDisplay = linkedLoc?.address
-          ? `${scene.location ?? ''} — ${linkedLoc.address}`
+        const locationDisplay = linkedLoc
+          ? `${scene.location ?? ''} — ${[linkedLoc.name, linkedLoc.address].filter(Boolean).join(', ')}`
           : (scene.location ?? '')
         const cells = [
           String(scene.sceneNumber ?? ''),
@@ -338,8 +338,8 @@ export const exportProductionPdf = functions.https.onCall(async (data, context) 
           const castStr    = ((scene.castIds ?? []) as number[])
             .map((id: number) => castMap[id] ?? String(id)).join(', ')
           const scLinkedLoc  = scene.locationId ? locById[scene.locationId] : null
-          const scLocDisplay = scLinkedLoc?.address
-            ? `${(scene.location ?? '').toUpperCase()}  ·  ${scLinkedLoc.address}`
+          const scLocDisplay = scLinkedLoc
+            ? `${(scene.location ?? '').toUpperCase()}  ·  ${[scLinkedLoc.name, scLinkedLoc.address].filter(Boolean).join(', ')}`
             : (scene.location ?? '').toUpperCase()
           const descText = scene.description ?? ''
 

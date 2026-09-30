@@ -776,23 +776,6 @@ export default function ProductionEditor() {
 
           {/* Actions row — scrollable on small screens */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {/* Visibility */}
-            {canEdit && isOwner && (
-              <button
-                onClick={togglePublic}
-                title={production.isPublic ? 'Shared — click to make private' : 'Private — click to share'}
-                className={cn(
-                  'flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-medium border transition-colors',
-                  production.isPublic
-                    ? 'bg-emerald-950/40 border-emerald-800/50 text-emerald-400'
-                    : 'bg-zinc-800 border-white/10 text-zinc-400 hover:text-zinc-200',
-                )}
-              >
-                {production.isPublic ? <Globe className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-                <span className="hidden sm:inline">{production.isPublic ? 'Shared' : 'Private'}</span>
-              </button>
-            )}
-
             {/* Share / Collaborators */}
             <div className="relative">
               <button
@@ -904,6 +887,34 @@ export default function ProductionEditor() {
                       {unsharedTeams.length === 0 && (production.sharedTeams ?? []).length === 0 && (
                         <p className="text-xs text-zinc-500">No crews in your class yet.</p>
                       )}
+                    </div>
+                  )}
+
+                  {/* Full class */}
+                  {canEdit && isOwner && (
+                    <div className="border-t border-white/10 pt-3">
+                      <button
+                        onClick={togglePublic}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-zinc-800/60 transition-colors"
+                      >
+                        {production.isPublic
+                          ? <Globe className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                          : <Lock className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />}
+                        <span className="text-xs font-semibold text-zinc-300 flex-1 text-left">Full Class</span>
+                        <span className="text-[10px] text-zinc-500">view only</span>
+                        <div className={cn(
+                          'relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors',
+                          production.isPublic ? 'bg-emerald-600' : 'bg-zinc-700',
+                        )}>
+                          <span className={cn(
+                            'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform',
+                            production.isPublic ? 'translate-x-[18px]' : 'translate-x-1',
+                          )} />
+                        </div>
+                      </button>
+                      <p className="text-[10px] text-zinc-500 px-2.5 mt-1">
+                        {production.isPublic ? 'Everyone in your class can view this production.' : 'Only editors and crew viewers above can see this production.'}
+                      </p>
                     </div>
                   )}
 

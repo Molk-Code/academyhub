@@ -7,7 +7,7 @@ import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, where, orderBy } from '@/hooks/useFirestore'
 import type { CohortDoc, UserDoc, ProductionTeamDoc, Commandment, ChatChannelDoc, ProductionDoc } from '@/types'
-import { Plus, Trash2, Check, X, Pencil, Users, Clapperboard, Film, Clock, Globe, Lock, CalendarRange } from 'lucide-react'
+import { Plus, Trash2, Check, X, Pencil, Users, Clapperboard, Film, Clock, Globe, Lock, CalendarRange, ArrowLeft } from 'lucide-react'
 import TeacherProductionPeriod from '@/pages/teacher/ProductionPeriod'
 import { cn } from '@/lib/utils'
 import { nanoid } from 'nanoid'
@@ -81,6 +81,15 @@ export default function TeacherProduction() {
 
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
   const selectedTeam = teams.find(t => t.id === selectedTeamId) ?? null
+  const [manageMode, setManageMode] = useState(false)
+
+  function openCrewManager(targetCohortId: string, teamId: string | null) {
+    setCohortId(targetCohortId)
+    setSelectedTeamId(teamId)
+    setManageMode(true)
+    setTeamPanel(null)
+    setTeamError(null)
+  }
 
   const [teamPanel, setTeamPanel] = useState<'new' | 'edit' | null>(null)
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null)
@@ -241,7 +250,7 @@ export default function TeacherProduction() {
         </div>
         <select
           value={cohortId}
-          onChange={e => { setCohortId(e.target.value); setSelectedTeamId(null) }}
+          onChange={e => { setCohortId(e.target.value); setSelectedTeamId(null); setManageMode(false) }}
           className="input w-48"
         >
           <option value="">All classes</option>
@@ -283,7 +292,45 @@ export default function TeacherProduction() {
       {/* ── Crews tab ──────────────────────────────────────────────────────── */}
       {tab === 'crews' && (
         <>
-          {!cohortId ? (
+          {!manageMode ? (
+            cohortId ? (
+              /* Single-class browse */
+              <div>
+                <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <Users className="w-3.5 h-3.5" /> {cohorts.find(c => c.id === cohortId)?.name}
+                  <span className="font-normal normal-case text-zinc-600">{teams.length} crew{teams.length !== 1 ? 's' : ''}</span>
+                  <button
+                    onClick={() => openCrewManager(cohortId, null)}
+                    className="ml-auto flex items-center gap-1 text-[11px] normal-case font-medium text-brand-400 hover:text-brand-300 transition-colors"
+                  >
+                    <Pencil className="w-3 h-3" /> Add/Edit Crew
+                  </button>
+                </h2>
+                {teams.length === 0 ? (
+                  <p className="text-xs text-zinc-600 pl-1">No crews yet.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {teams.map(team => (
+                      <button
+                        key={team.id}
+                        onClick={() => openCrewManager(cohortId, team.id)}
+                        className="w-full text-left rounded-2xl border border-white/10 bg-zinc-900 hover:border-white/20 p-4 transition-all group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style={{ background: team.color + '22', border: `2px solid ${team.color}` }}>
+                            {team.emoji}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-zinc-100 truncate">{team.name}</p>
+                            <p className="text-xs text-zinc-400">{team.memberIds.length} members · {team.commandments.length} commandments</p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
             /* All-classes overview: teams grouped by cohort */
             <div className="space-y-6">
               {cohorts.length === 0 && (
@@ -297,10 +344,10 @@ export default function TeacherProduction() {
                       <Users className="w-3.5 h-3.5" /> {cohort.name}
                       <span className="font-normal normal-case text-zinc-600">{cohortTeams.length} crew{cohortTeams.length !== 1 ? 's' : ''}</span>
                       <button
-                        onClick={() => { setCohortId(cohort.id); setSelectedTeamId(null); setTeamPanel('new'); setTeamError(null) }}
+                        onClick={() => openCrewManager(cohort.id, null)}
                         className="ml-auto flex items-center gap-1 text-[11px] normal-case font-medium text-brand-400 hover:text-brand-300 transition-colors"
                       >
-                        <Plus className="w-3 h-3" /> Add crew
+                        <Pencil className="w-3 h-3" /> Add/Edit Crew
                       </button>
                     </h2>
                     {cohortTeams.length === 0 ? (
@@ -310,7 +357,7 @@ export default function TeacherProduction() {
                         {cohortTeams.map(team => (
                           <button
                             key={team.id}
-                            onClick={() => { setCohortId(cohort.id); setSelectedTeamId(team.id) }}
+                            onClick={() => openCrewManager(cohort.id, team.id)}
                             className="w-full text-left rounded-2xl border border-white/10 bg-zinc-900 hover:border-white/20 p-4 transition-all group"
                           >
                             <div className="flex items-center gap-3">
@@ -330,8 +377,16 @@ export default function TeacherProduction() {
                 )
               })}
             </div>
+            )
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div>
+              <button
+                onClick={() => setManageMode(false)}
+                className="mb-4 flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back to crews
+              </button>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Team list */}
               <div className="space-y-3">
                 {teams.map(team => (
@@ -526,6 +581,7 @@ export default function TeacherProduction() {
                   <p className="text-zinc-400 text-sm">Select a team to edit it.</p>
                 </div>
               )}
+              </div>
             </div>
           )}
         </>

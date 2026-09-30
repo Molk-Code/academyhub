@@ -63,12 +63,14 @@ function buildConflicts(allocations: PeriodAllocationDoc[]): Set<string> {
 
 // ── Period form (create / edit) ───────────────────────────────────────────────
 
-function PeriodForm({ cohortId, existing, onClose }: {
+function PeriodForm({ cohortId, cohorts, existing, onClose }: {
   cohortId: string
+  cohorts: CohortDoc[]
   existing: ProductionPeriodDoc | null
   onClose: () => void
 }) {
   const { profile } = useAuth()
+  const [formCohortId,       setFormCohortId]       = useState(existing?.cohortId ?? cohortId)
   const [title,              setTitle]              = useState(existing?.title ?? '')
   const [startDate,          setStartDate]          = useState(existing?.startDate ?? '')
   const [endDate,            setEndDate]            = useState(existing?.endDate ?? '')
@@ -81,7 +83,7 @@ function PeriodForm({ cohortId, existing, onClose }: {
 
   async function handleSave() {
     if (!title.trim() || !startDate || !endDate) return
-    if (!cohortId) { setError('No cohort selected. Please select a cohort first.'); return }
+    if (!formCohortId) { setError('No class selected. Please choose a class first.'); return }
     setSaving(true)
     setError(null)
 
@@ -98,7 +100,7 @@ function PeriodForm({ cohortId, existing, onClose }: {
 
     const payload = {
       title:   title.trim(),
-      cohortId,
+      cohortId: formCohortId,
       startDate,
       endDate,
       notes:   notes.trim(),
@@ -135,6 +137,19 @@ function PeriodForm({ cohortId, existing, onClose }: {
           </button>
         </div>
         <div className="p-5 space-y-4">
+          <div>
+            <label className="label">Class</label>
+            {existing ? (
+              <p className="text-sm text-zinc-300 bg-zinc-800/60 border border-white/10 rounded-lg px-3 py-2">
+                {cohorts.find(c => c.id === formCohortId)?.name ?? 'Unknown class'}
+              </p>
+            ) : (
+              <select value={formCohortId} onChange={e => setFormCohortId(e.target.value)} className="input">
+                <option value="">Select a class…</option>
+                {cohorts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            )}
+          </div>
           <div>
             <label className="label">Title</label>
             <input
@@ -191,7 +206,7 @@ function PeriodForm({ cohortId, existing, onClose }: {
           </div>
         )}
         <div className="flex items-center gap-2 px-5 py-4 border-t border-white/10">
-          <button onClick={handleSave} disabled={saving || !title.trim() || !startDate || !endDate}
+          <button onClick={handleSave} disabled={saving || !title.trim() || !startDate || !endDate || !formCohortId}
             className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-brand-600 text-white hover:bg-brand-500 rounded-xl transition-colors disabled:opacity-50">
             <Check className="w-3.5 h-3.5" /> {existing ? 'Save' : 'Create'}
           </button>
@@ -616,11 +631,16 @@ export default function TeacherProductionPeriod({
 
   const { data: periods, loading: periodsLoading } = useCollection<ProductionPeriodDoc>(
     'production_periods',
-    cohortId ? [where('cohortId', '==', cohortId), orderBy('startDate', 'desc')] : [],
-    !!cohortId,
+    cohortId ? [where('cohortId', '==', cohortId), orderBy('startDate', 'desc')] : [orderBy('startDate', 'desc')],
+    embedded || !!cohortId,
+    cohortId,
   )
   const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null)
   const period = periods.find(p => p.id === selectedPeriodId) ?? periods[0] ?? null
+  // The class the currently-open period actually belongs to — used to scope
+  // productions/students once a period is selected, independent of the
+  // outer "all classes" filter.
+  const periodCohortId = period?.cohortId || cohortId
 
   const { data: allocations } = useCollection<PeriodAllocationDoc>(
     period ? `production_periods/${period.id}/allocations` : 'production_periods/none/allocations',
@@ -631,8 +651,9 @@ export default function TeacherProductionPeriod({
 
   const { data: allProductionsRaw } = useCollection<ProductionDoc>(
     'productions',
-    cohortId ? [where('cohortId', '==', cohortId)] : [],
-    !!cohortId,
+    periodCohortId ? [where('cohortId', '==', periodCohortId)] : [],
+    !!periodCohortId,
+    periodCohortId,
   )
   // Only show productions linked to the current period
   const allProductions = period
@@ -670,8 +691,9 @@ export default function TeacherProductionPeriod({
   const colorMap = useMemo(() => buildColorMap(allProductions), [allProductions])
   const { data: students } = useCollection<UserDoc>(
     'users',
-    cohortId ? [where('cohortId', '==', cohortId), where('role', '==', 'student')] : [],
-    !!cohortId,
+    periodCohortId ? [where('cohortId', '==', periodCohortId), where('role', '==', 'student')] : [],
+    !!periodCohortId,
+    periodCohortId,
   )
 
   useEffect(() => {
@@ -732,14 +754,6 @@ export default function TeacherProductionPeriod({
 
   if (!cohortId && cohorts.length === 0) return <LoadingSpinner />
 
-  if (embedded && !cohortId) {
-    return (
-      <div className="text-center py-16 text-zinc-500 text-sm">
-        Select a class above to view its production period.
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -789,7 +803,11 @@ export default function TeacherProductionPeriod({
             <div className="flex items-center gap-2 flex-1 flex-wrap">
               <select value={selectedPeriodId ?? ''} onChange={e => setSelectedPeriodId(e.target.value)}
                 className="bg-zinc-800 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-brand-500/30">
-                {periods.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                {periods.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}{!cohortId ? ` — ${cohorts.find(c => c.id === p.cohortId)?.name ?? ''}` : ''}
+                  </option>
+                ))}
               </select>
               {period && (
                 <>
@@ -845,6 +863,7 @@ export default function TeacherProductionPeriod({
       {showPeriodForm && (
         <PeriodForm
           cohortId={cohortId}
+          cohorts={cohorts}
           existing={editingPeriod}
           onClose={() => { setShowPeriodForm(false); setEditingPeriod(null) }}
         />

@@ -8,8 +8,8 @@ service firebase.storage {
     }
 
     function isTeacherOrAdmin() {
-      return request.auth.token.role == 'teacher'
-          || request.auth.token.role == 'admin';
+      return request.auth.token.get('role', '') == 'teacher'
+          || request.auth.token.get('role', '') == 'admin';
     }
 
     // ── Subject / lesson resources (teacher-uploaded) ─────────────────────

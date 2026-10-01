@@ -78,11 +78,32 @@ function extractLines(items: any[]): string[] {
   })
 }
 
-// pdfjs's own worker→main-thread fallback only kicks in on an explicit
-// Worker 'error' event or a thrown exception — if the worker script loads
-// but its ready/test handshake message never arrives (seen in some
-// browser/CSP combinations), getDocument() just hangs forever with no error
-// at all. Bound it with our own timeout so parsing always settles either way.
+// pdfjs normally hands text extraction off to a real Web Worker, talking to
+// it over postMessage. Its own worker→main-thread fallback only kicks in on
+// an explicit Worker 'error' event or a thrown exception — if the worker
+// script loads but its ready/test handshake message never arrives (seen in
+// some browser/CSP combinations), getDocument() just hangs forever with no
+// error at all. Screenplay PDFs are small and parsing them is fast (well
+// under a second even on the main thread), so there's no real upside to the
+// worker here — importing its module directly and registering it as
+// pdfjs's "main-thread worker" (a documented hook, normally used for
+// Node.js) skips the real Worker and the postMessage handshake entirely,
+// removing that whole failure mode.
+let mainThreadWorkerReady: Promise<void> | null = null
+function ensureMainThreadWorker(): Promise<void> {
+  if (!mainThreadWorkerReady) {
+    mainThreadWorkerReady = import(
+      /* @vite-ignore */
+      new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
+    ).then(workerModule => {
+      ;(globalThis as any).pdfjsWorker = workerModule
+    })
+  }
+  return mainThreadWorkerReady
+}
+
+// Safety net in case the above still ends up slow/stuck for some reason —
+// parsing should always settle, successfully or not.
 function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout?: () => void): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -98,10 +119,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout?: () => void)
 
 export async function parseScreenplayPDF(file: File): Promise<ParsedScene[]> {
   const pdfjsLib = await import('pdfjs-dist')
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.mjs',
-    import.meta.url,
-  ).toString()
+  await ensureMainThreadWorker()
 
   const arrayBuffer = await file.arrayBuffer()
   const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer })

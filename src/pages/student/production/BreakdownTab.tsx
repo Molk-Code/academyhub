@@ -301,10 +301,13 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
 
   async function selectLocation(sceneId: string, loc: ProductionLocationDoc) {
     const scene = scenes.find(s => s.id === sceneId)
-    if (scene && !scene.location?.trim()) {
-      const scriptName = loc.scriptName || loc.name
-      setLocal(sceneId, 'location', scriptName)
-      await save(sceneId, 'location', scriptName)
+    // Only auto-fill from the location's own script name — never fall back to
+    // the real place name, or the breakdown ends up showing the real location
+    // instead of a script term. If the location has no script name recorded
+    // yet, leave the field for the user to type themselves.
+    if (scene && !scene.location?.trim() && loc.scriptName?.trim()) {
+      setLocal(sceneId, 'location', loc.scriptName)
+      await save(sceneId, 'location', loc.scriptName)
     }
     await updateDoc(doc(db, `productions/${productionId}/scenes`, sceneId), { locationId: loc.id, updatedAt: serverTimestamp() })
     setLocOpen(null)
@@ -400,7 +403,7 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
               const addr = [linkedLoc.address, linkedLoc.zipCode, linkedLoc.state].filter(Boolean).join(', ')
               return (
                 <div className="px-2 pb-2 mb-1.5 border-b border-white/10">
-                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Real place</p>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Address</p>
                   <p className="text-sm text-zinc-200 font-medium">{linkedLoc.name}</p>
                   {addr && <p className="text-xs text-zinc-400 mt-0.5">{addr}</p>}
                 </div>

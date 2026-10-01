@@ -32,9 +32,9 @@ type Tab = 'script' | 'breakdown' | 'crew' | 'cast' | 'shots' | 'locations' | 'c
 const TABS: { id: Tab; label: string }[] = [
   { id: 'script',    label: 'Script' },
   { id: 'breakdown', label: 'Script Breakdown' },
+  { id: 'shots',     label: 'Shot List' },
   { id: 'crew',      label: 'Crew' },
   { id: 'cast',      label: 'Cast' },
-  { id: 'shots',     label: 'Shot List' },
   { id: 'locations', label: 'Locations' },
   { id: 'costume',   label: 'Costume' },
   { id: 'makeup',    label: 'Make-up' },

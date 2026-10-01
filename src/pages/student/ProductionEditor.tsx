@@ -627,8 +627,9 @@ export default function ProductionEditor() {
             setParsedScenes(detected)
             setShowImportModal(true)
           }
-        } catch {
-          // silently skip parsing if PDF text extraction fails
+        } catch (e) {
+          // skip scene auto-detection if PDF text extraction fails or times out
+          console.error('Screenplay parsing failed:', e)
         } finally {
           setParsing(false)
         }

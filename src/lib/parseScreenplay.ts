@@ -78,6 +78,24 @@ function extractLines(items: any[]): string[] {
   })
 }
 
+// pdfjs's own worker→main-thread fallback only kicks in on an explicit
+// Worker 'error' event or a thrown exception — if the worker script loads
+// but its ready/test handshake message never arrives (seen in some
+// browser/CSP combinations), getDocument() just hangs forever with no error
+// at all. Bound it with our own timeout so parsing always settles either way.
+function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout?: () => void): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      onTimeout?.()
+      reject(new Error('Screenplay parsing timed out'))
+    }, ms)
+    promise.then(
+      v => { clearTimeout(timer); resolve(v) },
+      e => { clearTimeout(timer); reject(e) },
+    )
+  })
+}
+
 export async function parseScreenplayPDF(file: File): Promise<ParsedScene[]> {
   const pdfjsLib = await import('pdfjs-dist')
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -86,7 +104,8 @@ export async function parseScreenplayPDF(file: File): Promise<ParsedScene[]> {
   ).toString()
 
   const arrayBuffer = await file.arrayBuffer()
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer })
+  const pdf = await withTimeout(loadingTask.promise, 20000, () => loadingTask.destroy())
 
   const lines: string[] = []
   for (let p = 1; p <= pdf.numPages; p++) {

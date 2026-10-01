@@ -348,7 +348,40 @@ export default function StudentProduction() {
         </button>
       </div>
 
-      {prodTab === 'crew' && !myTeam && (
+      {/* Admin/teacher preview has no specific student identity, so "you're
+          not assigned" can't be truthfully claimed — show this class's
+          crews instead of a false personal empty-state. */}
+      {prodTab === 'crew' && !myTeam && previewCohortId && (
+        <div className="space-y-3">
+          <p className="text-zinc-500 text-sm text-center py-2">
+            Preview mode doesn't simulate a specific student, so crew membership can't be shown here. This class's crews:
+          </p>
+          {teams.length === 0 ? (
+            <div className="card text-center py-16">
+              <p className="text-5xl mb-4">🎬</p>
+              <h2 className="text-xl font-bold text-white mb-2">No crews in this class yet</h2>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {teams.map(team => (
+                <div key={team.id} className="rounded-2xl border border-white/10 bg-zinc-900 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style={{ background: team.color + '22', border: `2px solid ${team.color}` }}>
+                      {team.emoji}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-zinc-100 truncate">{team.name}</p>
+                      <p className="text-xs text-zinc-400">{team.memberIds.length} members</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {prodTab === 'crew' && !myTeam && !previewCohortId && (
         <div className="card text-center py-16">
           <p className="text-5xl mb-4">🎬</p>
           <h2 className="text-xl font-bold text-white mb-2">Not assigned to a crew yet</h2>

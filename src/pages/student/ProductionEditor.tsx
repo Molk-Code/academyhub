@@ -6,7 +6,7 @@ import {
 } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
-import { uploadResumableWithQuota } from '@/lib/uploadWithQuota'
+import { uploadScreenplayViaFunction } from '@/lib/uploadWithQuota'
 import { useAuth } from '@/contexts/AuthContext'
 import { useDocument, useCollection, where, orderBy } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
@@ -599,11 +599,10 @@ export default function ProductionEditor() {
 
   async function uploadScreenplay(file: File) {
     if (!id) return
-    const path = `productions/${id}/screenplay.pdf`
     setUploadProgress(0)
     setParsedScenes(null)
     setImportSuccess(false)
-    uploadResumableWithQuota(file, path, { contentType: 'application/pdf' }, pct => setUploadProgress(pct))
+    uploadScreenplayViaFunction(file, id, pct => setUploadProgress(pct))
       .then(async url => {
         await updateDoc(doc(db, 'productions', id), {
           screenplayUrl: url,

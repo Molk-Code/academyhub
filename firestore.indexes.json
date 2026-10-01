@@ -99,6 +99,14 @@
       ]
     },
     {
+      "collectionGroup": "equipment_bookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "returnDate", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "food_box_orders",
       "queryScope": "COLLECTION",
       "fields": [

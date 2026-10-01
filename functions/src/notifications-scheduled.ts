@@ -80,6 +80,48 @@ export const sendInventoryReturnReminders = functions.pubsub
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// sendEquipmentBookingOverdueReminders — daily reminder to the booking student
+// for checked-out equipment bookings past their return date. Skips bookings
+// already tracked in inventory_projects (linkedProjectId set) — those are
+// covered by sendInventoryReturnReminders above, so this only fills the gap
+// for checked-out bookings a teacher never converted into an inventory
+// project.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const sendEquipmentBookingOverdueReminders = functions.pubsub
+  .schedule('0 8 * * *')
+  .timeZone('Europe/Stockholm')
+  .onRun(async () => {
+    const todayStr = new Date().toISOString().slice(0, 10)
+
+    const overdueSnap = await db.collection('equipment_bookings')
+      .where('status', '==', 'checked-out')
+      .where('returnDate', '<', todayStr)
+      .get()
+
+    for (const bookingDoc of overdueSnap.docs) {
+      const booking = bookingDoc.data()
+      if (booking.linkedProjectId) continue  // already covered by the inventory reminder
+      if (!booking.studentId) continue
+
+      const overdueDays = Math.round((Date.parse(todayStr) - Date.parse(booking.returnDate)) / 86400000)
+      const projectName = booking.projectName || 'your booking'
+      const title = '🚨 Equipment overdue'
+      const body  = `Equipment for "${projectName}" is ${overdueDays} day${overdueDays === 1 ? '' : 's'} overdue`
+      const opts  = { title, body, url: '/booking/equipment' }
+
+      const userSnap = await db.collection('users').doc(booking.studentId).get()
+      const tokens: string[] = (userSnap.data()?.fcmTokens ?? []) as string[]
+
+      await Promise.all([
+        sendPush(tokens, { ...opts, tag: `equipment-overdue-${bookingDoc.id}` }),
+        saveNotifications([booking.studentId], opts),
+      ])
+    }
+    return null
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
 // sendEventInviteNotifications — callable: send invite push to invitees
 // ─────────────────────────────────────────────────────────────────────────────
 

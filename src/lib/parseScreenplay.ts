@@ -7,7 +7,9 @@ export interface ParsedScene {
 }
 
 // Matches any line starting with (optional scene number +) INT./EXT.
-const HEADING_START_RE = /^(?:[\d.]+\s+)?(INT\.?\/EXT\.?|EXT\.?\/INT\.?|INT\.?|EXT\.?)\s+(.+)/i
+// The scene number prefix may be terminated by a period, colon, or just
+// whitespace (e.g. "1.", "1:", "1 " all seen in the wild).
+const HEADING_START_RE = /^(?:[\d.]+[.:]?\s+)?(INT\.?\/EXT\.?|EXT\.?\/INT\.?|INT\.?|EXT\.?)\s+(.+)/i
 
 const TIME_WORDS = 'DAY|NIGHT|DAWN|DUSK|SUNDOWN|SUNSET|SUNRISE|CONTINUOUS|LATER|MOMENTS LATER|KVÄLL|MORGON|DAG|NATT|EFTERMIDDAG'
 const TIME_FIRST_RE = new RegExp(`^(${TIME_WORDS})[,\\s]+(.+)`, 'i')
@@ -22,7 +24,10 @@ function normalizeDayNight(raw: string): 'Day' | 'Night' {
   return ['NIGHT', 'DUSK', 'SUNDOWN', 'SUNSET', 'KVÄLL', 'NATT'].includes(up) ? 'Night' : 'Day'
 }
 
-function parseRemainder(remainder: string): { location: string; dayNight: 'Day' | 'Night' } {
+function parseRemainder(remainderRaw: string): { location: string; dayNight: 'Day' | 'Night' } {
+  // Some screenplay formats separate INT./EXT. from the location with a
+  // dash (e.g. "INT. — KITCHEN — DAY") rather than just a space — strip it.
+  const remainder = remainderRaw.replace(/^[-–—]+\s*/, '')
   const first = remainder.match(TIME_FIRST_RE)
   if (first) return { location: first[2].trim(), dayNight: normalizeDayNight(first[1]) }
 

@@ -44,6 +44,16 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'shotlog',   label: 'Shot Log' },
 ]
 
+// iOS/iPadOS's embedded PDF viewer inside an <iframe> frequently only
+// renders the first page and won't scroll further — a long-standing WebKit
+// limitation, not something fixable from the page itself. iPadOS Safari
+// reports as "MacIntel" with touch support (real Macs report 0 touch
+// points), which is how it's told apart from desktop Safari.
+const isIOS = typeof navigator !== 'undefined' && (
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+)
+
 function getProductionReadiness(
   scenes: ProductionSceneDoc[],
   crew: ProductionCrewAssignmentDoc[],
@@ -1189,18 +1199,25 @@ export default function ProductionEditor() {
                   </div>
                 )}
 
-                {/* PDF preview — iframe on desktop, tap-to-open card on mobile */}
-                <iframe
-                  src={production.screenplayUrl}
-                  title="Screenplay"
-                  className="hidden md:block w-full rounded-xl border border-white/10 bg-zinc-900"
-                  style={{ height: '78vh' }}
-                />
+                {/* PDF preview — iframe on desktop, tap-to-open card on mobile
+                    and on iOS/iPadOS always (iframe-embedded PDFs there only
+                    show page 1, regardless of screen size) */}
+                {!isIOS && (
+                  <iframe
+                    src={production.screenplayUrl}
+                    title="Screenplay"
+                    className="hidden md:block w-full rounded-xl border border-white/10 bg-zinc-900"
+                    style={{ height: '78vh' }}
+                  />
+                )}
                 <a
                   href={production.screenplayUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="md:hidden flex items-center gap-3 w-full bg-zinc-800/60 border border-white/10 rounded-2xl px-5 py-6 text-left hover:bg-zinc-800 transition-colors"
+                  className={cn(
+                    'flex items-center gap-3 w-full bg-zinc-800/60 border border-white/10 rounded-2xl px-5 py-6 text-left hover:bg-zinc-800 transition-colors',
+                    !isIOS && 'md:hidden',
+                  )}
                 >
                   <FileText className="w-8 h-8 text-rose-400 flex-shrink-0" />
                   <div>

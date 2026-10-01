@@ -393,7 +393,7 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setLocOpen(null)} />
           <div
-            className="fixed z-50 bg-zinc-800 border border-white/10 rounded-xl shadow-xl p-2 min-w-[240px]"
+            className="fixed z-50 bg-zinc-800 border border-white/10 rounded-xl shadow-xl p-2 min-w-[240px] max-h-[85vh] overflow-y-auto"
             style={{ top: locPos.top, left: locPos.left }}
           >
             {(() => {
@@ -412,18 +412,20 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
             <p className="text-xs text-zinc-500 px-2 pb-1.5 font-medium">
               {scenes.find(s => s.id === locOpen)?.locationId ? 'Change location' : 'Link location'}
             </p>
-            {locations.length === 0
-              ? <p className="text-xs text-zinc-500 px-2 py-1">Add locations in the Locations tab first</p>
-              : locations.map(loc => (
-                <button key={loc.id} onClick={() => selectLocation(locOpen!, loc)}
-                  className="w-full text-left flex flex-col gap-0.5 px-2 py-2 hover:bg-zinc-700/50 rounded-lg">
-                  <span className="text-sm text-zinc-200">{loc.scriptName || loc.name}</span>
-                  {(loc.name || loc.address) && (
-                    <span className="text-xs text-zinc-500">{[loc.name, loc.address].filter(Boolean).join(' — ')}</span>
-                  )}
-                </button>
-              ))
-            }
+            <div className="max-h-[40vh] overflow-y-auto">
+              {locations.length === 0
+                ? <p className="text-xs text-zinc-500 px-2 py-1">Add locations in the Locations tab first</p>
+                : locations.map(loc => (
+                  <button key={loc.id} onClick={() => selectLocation(locOpen!, loc)}
+                    className="w-full text-left flex flex-col gap-0.5 px-2 py-2 hover:bg-zinc-700/50 rounded-lg">
+                    <span className="text-sm text-zinc-200">{loc.scriptName || loc.name}</span>
+                    {(loc.name || loc.address) && (
+                      <span className="text-xs text-zinc-500">{[loc.name, loc.address].filter(Boolean).join(' — ')}</span>
+                    )}
+                  </button>
+                ))
+              }
+            </div>
             {(() => {
               const scene = scenes.find(s => s.id === locOpen)
               return scene?.locationId ? (
@@ -446,20 +448,22 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setCastOpen(null)} />
           <div
-            className="fixed z-50 bg-zinc-800 border border-white/10 rounded-xl shadow-xl p-2 min-w-[200px]"
+            className="fixed z-50 bg-zinc-800 border border-white/10 rounded-xl shadow-xl p-2 min-w-[200px] max-h-[85vh] overflow-y-auto"
             style={{ top: castPos.top, left: castPos.left }}
           >
-            {cast.length === 0
-              ? <p className="text-xs text-zinc-500 px-2 py-1">Add cast members first</p>
-              : cast.map(c => (
-                <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-700/50 rounded cursor-pointer text-sm">
-                  <input type="checkbox" checked={(scenes.find(s => s.id === castOpen)?.castIds ?? []).includes(c.castId)}
-                    onChange={() => toggleCastId(castOpen!, c.castId)} className="accent-brand-500" />
-                  <span className="text-zinc-400 font-mono text-xs w-4">{c.castId}</span>
-                  <span className="text-zinc-200">{c.characterName}</span>
-                </label>
-              ))
-            }
+            <div className="max-h-[50vh] overflow-y-auto">
+              {cast.length === 0
+                ? <p className="text-xs text-zinc-500 px-2 py-1">Add cast members first</p>
+                : cast.map(c => (
+                  <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-700/50 rounded cursor-pointer text-sm">
+                    <input type="checkbox" checked={(scenes.find(s => s.id === castOpen)?.castIds ?? []).includes(c.castId)}
+                      onChange={() => toggleCastId(castOpen!, c.castId)} className="accent-brand-500" />
+                    <span className="text-zinc-400 font-mono text-xs w-4">{c.castId}</span>
+                    <span className="text-zinc-200">{c.characterName}</span>
+                  </label>
+                ))
+              }
+            </div>
             <button onClick={() => setCastOpen(null)} className="w-full text-xs text-zinc-500 mt-1 hover:text-zinc-300 py-0.5 pt-2 border-t border-white/10">Done</button>
           </div>
         </>,
@@ -473,7 +477,7 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setItemPicker(null)} />
           <div
-            className="fixed z-50 bg-zinc-800 border border-white/10 rounded-xl shadow-xl p-2 min-w-[220px]"
+            className="fixed z-50 bg-zinc-800 border border-white/10 rounded-xl shadow-xl p-2 min-w-[220px] max-h-[85vh] overflow-y-auto"
             style={{ top: itemPickerPos.top, left: itemPickerPos.left }}
           >
             {(() => {
@@ -482,15 +486,19 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
               const kind = ITEM_KINDS.find(k => k.field === field)!
               const scene = scenes.find(s => s.id === sceneId)
               const sel = (scene?.[field] as string[] | undefined) ?? []
-              return items.length === 0 ? (
-                <p className="text-xs text-zinc-500 px-2 py-1">Add {kind.label.toLowerCase()} items in the {kind.label} tab first</p>
-              ) : items.map(it => (
-                <label key={it.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-700/50 rounded cursor-pointer text-sm">
-                  <input type="checkbox" checked={sel.includes(it.id)}
-                    onChange={() => toggleItemId(sceneId, field, it.id)} className="accent-brand-500" />
-                  <span className="text-zinc-200">{it.characterName || <span className="text-zinc-500">Untitled</span>}</span>
-                </label>
-              ))
+              return (
+                <div className="max-h-[50vh] overflow-y-auto">
+                  {items.length === 0 ? (
+                    <p className="text-xs text-zinc-500 px-2 py-1">Add {kind.label.toLowerCase()} items in the {kind.label} tab first</p>
+                  ) : items.map(it => (
+                    <label key={it.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-700/50 rounded cursor-pointer text-sm">
+                      <input type="checkbox" checked={sel.includes(it.id)}
+                        onChange={() => toggleItemId(sceneId, field, it.id)} className="accent-brand-500" />
+                      <span className="text-zinc-200">{it.characterName || <span className="text-zinc-500">Untitled</span>}</span>
+                    </label>
+                  ))}
+                </div>
+              )
             })()}
             <button onClick={() => setItemPicker(null)} className="w-full text-xs text-zinc-500 mt-1 hover:text-zinc-300 py-0.5 pt-2 border-t border-white/10">Done</button>
           </div>

@@ -27,7 +27,7 @@ export const exportProductionPdf = functions.https.onCall(async (data, context) 
     (prod.sharedCohortIds ?? []).includes(claims.cohortId)
   if (!canAccess) throw new functions.https.HttpsError('permission-denied', 'Access denied.')
 
-  const [scenesSnap, castSnap, daysSnap, crewSnap, locSnap, costumeSnap, makeupSnap, propsSnap] = await Promise.all([
+  const [scenesSnap, castSnap, daysSnap, crewSnap, locSnap, costumeSnap, makeupSnap, propsSnap, shotsSnap] = await Promise.all([
     db.collection(`productions/${productionId}/scenes`).orderBy('sceneNumber').get(),
     db.collection(`productions/${productionId}/cast`).orderBy('castId').get(),
     db.collection(`productions/${productionId}/shootingDays`).orderBy('dayNumber').get(),
@@ -36,6 +36,7 @@ export const exportProductionPdf = functions.https.onCall(async (data, context) 
     db.collection(`productions/${productionId}/costumes`).get(),
     db.collection(`productions/${productionId}/makeup`).get(),
     db.collection(`productions/${productionId}/props`).get(),
+    db.collection(`productions/${productionId}/shots`).get(),
   ])
 
   const scenes    = scenesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
@@ -46,6 +47,7 @@ export const exportProductionPdf = functions.https.onCall(async (data, context) 
   const costumes  = costumeSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
   const makeupItems = makeupSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
   const propsItems  = propsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+  const shots     = shotsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
   const locById: Record<string, any> = Object.fromEntries(locations.map((l: any) => [l.id, l]))
 
   const castMap: Record<number, string> = {}
@@ -282,6 +284,52 @@ export const exportProductionPdf = functions.https.onCall(async (data, context) 
           doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(cx, y, CW3[i], rh).stroke()
           fitCell(cell, cx, y, CW3[i], rh, 'Helvetica', 8, '#1e293b')
           cx += CW3[i]
+        })
+        y += rh
+      })
+      y += 20
+    }
+
+    // ── Shot List ─────────────────────────────────────────────────────────────
+    if (shots.length > 0) {
+      addPageIfNeeded(60)
+      sectionHead('Shot List')
+
+      const sceneNumById: Record<string, number> = Object.fromEntries(scenes.map((s: any) => [s.id, s.sceneNumber]))
+      const sortedShots = [...shots].sort((a: any, b: any) => {
+        const sn = (sceneNumById[a.sceneId] ?? 0) - (sceneNumById[b.sceneId] ?? 0)
+        return sn !== 0 ? sn : (a.shotNumber ?? 0) - (b.shotNumber ?? 0)
+      })
+
+      const SC = ['SCENE', 'SHOT', 'SUBJECT', 'SIZE', 'ANGLE', 'MOVEMENT', 'NOTES']
+      const SCW = [40, 36, CW - 40 - 36 - 70 - 70 - 70 - 90, 70, 70, 70, 90]
+      const rh = 18
+      let cx = M
+      doc.rect(M, y, CW, rh).fill('#1e293b')
+      SC.forEach((h, i) => {
+        doc.fillColor('#94a3b8').fontSize(7).font('Helvetica-Bold')
+           .text(h, cx + 3, y + 5, { width: SCW[i] - 6, lineBreak: false })
+        cx += SCW[i]
+      })
+      y += rh
+
+      sortedShots.forEach((shot: any, idx: number) => {
+        addPageIfNeeded(rh)
+        const cells = [
+          String(sceneNumById[shot.sceneId] ?? '–'),
+          String(shot.shotNumber ?? '–'),
+          shot.subject || '–',
+          shot.size || '–',
+          shot.angle || '–',
+          shot.movement || '–',
+          shot.notes || '–',
+        ]
+        cx = M
+        if (idx % 2 === 0) doc.rect(M, y, CW, rh).fill('#f8fafc')
+        cells.forEach((cell: string, i: number) => {
+          doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(cx, y, SCW[i], rh).stroke()
+          fitCell(cell, cx, y, SCW[i], rh, 'Helvetica', 8, '#1e293b')
+          cx += SCW[i]
         })
         y += rh
       })

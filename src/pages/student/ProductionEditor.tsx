@@ -96,6 +96,12 @@ async function exportXLS(
   const propsById   = Object.fromEntries(propsItems.map(c => [c.id, c]))
   const itemNames = (ids: string[] | undefined, byId: Record<string, ProductionCostumeDoc>) =>
     (ids ?? []).map(id => byId[id]?.characterName).filter(Boolean).join(', ')
+  const scenesForItem = (itemId: string, field: 'costumeIds' | 'makeupIds' | 'propsIds') =>
+    scenes
+      .filter(s => ((s[field] as string[] | undefined) ?? []).includes(itemId))
+      .map(s => s.sceneNumber)
+      .sort((a, b) => a - b)
+      .join(', ')
 
   const sortedScenes = [...scenes].sort((a, b) => a.sceneNumber - b.sceneNumber)
   const sortedCast   = [...cast].sort((a, b) => a.castId - b.castId)
@@ -219,23 +225,26 @@ async function exportXLS(
     sortedCast.map(c => [c.castId, c.characterName, c.actorName, (c.scenes ?? []).join(', ')]),
     [7, 28, 28, 28])
 
-  // ── Props ─────────────────────────────────────────────────────────────────────
-  addSheet('Props', `Props — ${production.title}`,
-    ['Scene', 'Props'],
-    sortedScenes.filter(s => (s.propsIds ?? []).length > 0).map(s => [s.sceneNumber, itemNames(s.propsIds, propsById)]),
-    [8, 56])
+  // ── Costume ───────────────────────────────────────────────────────────────────
+  addSheet('Costume', `Costume — ${production.title}`,
+    ['Character', 'Description', 'Scenes', 'Responsible', 'Notes'],
+    [...costumes].sort((a, b) => a.order - b.order)
+      .map(it => [it.characterName, it.description, scenesForItem(it.id, 'costumeIds'), it.responsible, it.notes]),
+    [24, 40, 16, 24, 36])
 
   // ── Make-Up ───────────────────────────────────────────────────────────────────
   addSheet('Make-Up', `Make-Up — ${production.title}`,
-    ['Scene', 'Character', 'Make-Up'],
-    sortedScenes.filter(s => (s.makeupIds ?? []).length > 0).map(s => [s.sceneNumber, castNames(s.castIds), itemNames(s.makeupIds, makeupById)]),
-    [8, 28, 46])
+    ['Character', 'Description', 'Scenes', 'Responsible', 'Notes'],
+    [...makeupItems].sort((a, b) => a.order - b.order)
+      .map(it => [it.characterName, it.description, scenesForItem(it.id, 'makeupIds'), it.responsible, it.notes]),
+    [24, 40, 16, 24, 36])
 
-  // ── Costume ───────────────────────────────────────────────────────────────────
-  addSheet('Costume', `Costume — ${production.title}`,
-    ['Scene', 'Character', 'Costume'],
-    sortedScenes.filter(s => (s.costumeIds ?? []).length > 0).map(s => [s.sceneNumber, castNames(s.castIds), itemNames(s.costumeIds, costumeById)]),
-    [8, 28, 46])
+  // ── Props ─────────────────────────────────────────────────────────────────────
+  addSheet('Props', `Props — ${production.title}`,
+    ['Item', 'Description', 'Scenes', 'Responsible', 'Notes'],
+    [...propsItems].sort((a, b) => a.order - b.order)
+      .map(it => [it.characterName, it.description, scenesForItem(it.id, 'propsIds'), it.responsible, it.notes]),
+    [24, 40, 16, 24, 36])
 
   // ── Schedule — 2-row per scene matching the call-sheet format ─────────────────
   {

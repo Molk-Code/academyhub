@@ -278,6 +278,12 @@ export default function StudentLayout() {
   }
 
   function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+    // Every visibility check below defaults to "shown" when nav_visibility
+    // hasn't loaded yet (`!== false` on an undefined value is true) — so
+    // without this guard, items an admin hid for students render fully
+    // visible and clickable for a brief moment on every page load/refresh,
+    // until the settings doc arrives. Render nothing until it's known.
+    if (navVisLoading) return null
     const vis = navVis?.student
     return (
       <>

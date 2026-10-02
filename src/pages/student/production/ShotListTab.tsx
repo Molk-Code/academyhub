@@ -5,12 +5,7 @@ import { useCollection, orderBy } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
 import type { ProductionShotDoc, ProductionSceneDoc, ProductionShootingDayDoc } from '@/types'
 import { Plus, Trash2, Camera, Clock } from 'lucide-react'
-
-function parseTime(t: string | undefined): number | null {
-  const m = /^(\d{1,2}):(\d{2})$/.exec((t ?? '').trim())
-  if (!m) return null
-  return parseInt(m[1]) * 60 + parseInt(m[2])
-}
+import { parseTime, shootDurationMinutes } from '@/components/production/CallSheetPreviewModal'
 
 function fmtMinutes(m: number): string {
   if (m < 60) return `${Math.round(m)} min`
@@ -45,7 +40,9 @@ export function ShotListTab({ productionId, canEdit }: Props) {
       const rts  = parseTime(day.rtsTime ?? day.startTime)
       const wrap = parseTime(day.endTime)
       if (rts === null || wrap === null) continue
-      const available = (wrap - rts) - (day.lunchDuration ?? 0)
+      // Overnight shoot (e.g. 19:00–01:00): wrap reads numerically smaller
+      // than rts even though it's later in wall-clock time.
+      const available = shootDurationMinutes(rts, wrap) - (day.lunchDuration ?? 0)
       if (available <= 0) continue
       const daySceneIds = day.sceneIds ?? []
       const totalShots = shots.filter(sh => daySceneIds.includes(sh.sceneId)).length

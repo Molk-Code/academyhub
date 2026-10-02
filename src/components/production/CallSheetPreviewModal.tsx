@@ -22,6 +22,33 @@ export function getStartEnd(day: ProductionShootingDayDoc): { startTime: string;
   return parsed ?? { startTime: '', endTime: '' }
 }
 
+// A shooting day can cross midnight (e.g. 19:00–01:00 for a night shoot) —
+// when that happens, endMin is numerically smaller than startMin even
+// though it's later in wall-clock time. These helpers put such times back
+// on one linear timeline so duration/range checks work the same as for a
+// same-day shoot, instead of producing a negative or nonsensical result.
+
+// Shifts an overnight end time past midnight (e.g. 01:00 → 25:00 = 1500) so
+// it's comparable to/subtractable from the start time. Same-day shoots are
+// returned unchanged.
+export function effectiveEndMinutes(startMin: number, endMin: number): number {
+  return endMin < startMin ? endMin + 1440 : endMin
+}
+
+// Total shoot duration in minutes, correctly handling an overnight shoot.
+export function shootDurationMinutes(startMin: number, endMin: number): number {
+  return effectiveEndMinutes(startMin, endMin) - startMin
+}
+
+// Normalizes a time-of-day point (RTS, lunch start, …) that may fall after
+// midnight onto the same timeline as [startMin, effectiveEndMinutes], so it
+// can be range-checked with plain comparisons — e.g. for a 19:00–01:00
+// shoot, a 00:30 RTS becomes 24:30 (1470), correctly landing inside the
+// window instead of registering as "before start".
+export function normalizeToShootWindow(pointMin: number, startMin: number, endMin: number): number {
+  return (endMin < startMin && pointMin < startMin) ? pointMin + 1440 : pointMin
+}
+
 export function CallSheetPreviewModal({
   productionTitle, day, dayNumber, totalDays, dayScenes, allCast, crew, crewRoles, locations, shots, sunriseSunset,
   onDownload, onDownloadPDF, onClose,
@@ -45,7 +72,7 @@ export function CallSheetPreviewModal({
   const sMin = parseTime(startTime), eMin = parseTime(endTime)
   const lunchMin = day.lunchDuration ?? 0
   const workHrsStr = sMin !== null && eMin !== null
-    ? `${(((eMin - sMin) - lunchMin) / 60).toFixed(1)}h${lunchMin ? ` (${lunchMin} min lunch)` : ''}`
+    ? `${((shootDurationMinutes(sMin, eMin) - lunchMin) / 60).toFixed(1)}h${lunchMin ? ` (${lunchMin} min lunch)` : ''}`
     : (day.workHours || '—')
   const dateStr = day.date
     ? new Date(day.date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })

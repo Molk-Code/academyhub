@@ -8,7 +8,11 @@ import type {
   ProductionCrewAssignmentDoc, ProductionLocationDoc, CrewRoleDoc, ProductionShotDoc,
 } from '@/types'
 import { Plus, Trash2, CalendarDays, X, AlertTriangle, MapPin, Check, Clock, FileSpreadsheet, Loader2, Bell } from 'lucide-react'
-import { CallSheetPreviewModal, parseTime as _parseTime, getStartEnd as _getStartEnd } from '@/components/production/CallSheetPreviewModal'
+import {
+  CallSheetPreviewModal,
+  parseTime as _parseTime, getStartEnd as _getStartEnd,
+  shootDurationMinutes, normalizeToShootWindow, effectiveEndMinutes,
+} from '@/components/production/CallSheetPreviewModal'
 
 const SCENE_STRIP_BG: Record<string, string> = {
   'INT-Day':   'bg-sky-900/40 border-sky-700/50',
@@ -102,7 +106,7 @@ async function exportCallSheet(
   const sMin = parseTime(startTime), eMin = parseTime(endTime)
   const lunchMin = day.lunchDuration ?? 0
   const workHrsStr = sMin !== null && eMin !== null
-    ? `${(((eMin - sMin) - lunchMin) / 60).toFixed(1)} H${lunchMin ? ` (${lunchMin} min lunch)` : ''}`
+    ? `${((shootDurationMinutes(sMin, eMin) - lunchMin) / 60).toFixed(1)} H${lunchMin ? ` (${lunchMin} min lunch)` : ''}`
     : (day.workHours || '—')
   const daysCastIds = new Set(dayScenes.flatMap(s => s.castIds ?? []))
   const daysCast = allCast.filter(c => daysCastIds.has(c.castId)).sort((a, b) => a.castId - b.castId)
@@ -414,7 +418,7 @@ async function exportCallSheetPDF(
   const sMin = parseTime(startTime), eMin = parseTime(endTime)
   const lunchMin = day.lunchDuration ?? 0
   const workHrsStr = sMin !== null && eMin !== null
-    ? `${(((eMin - sMin) - lunchMin) / 60).toFixed(1)} H${lunchMin ? ` (${lunchMin} min lunch)` : ''}`
+    ? `${((shootDurationMinutes(sMin, eMin) - lunchMin) / 60).toFixed(1)} H${lunchMin ? ` (${lunchMin} min lunch)` : ''}`
     : (day.workHours || '—')
   const callTime = startTime || '—'
   const rts = day.rtsTime || startTime || '—'
@@ -865,16 +869,26 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
           const endMin   = parseTime(dayEnd)
           if (startMin !== null && endMin !== null) {
             try {
+              // An overnight shoot (end time < start time, e.g. 19:00–01:00)
+              // needs the next calendar day's hourly data too, or the hours
+              // after midnight are simply missing from a single-day query.
+              const isOvernight = endMin < startMin
+              const wxEndDate = isOvernight
+                ? (() => { const d = new Date(day.date + 'T00:00:00'); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10) })()
+                : day.date
+              const effEnd = effectiveEndMinutes(startMin, endMin)
               const hrRes  = await fetch(
-                `${wxBase}?latitude=${lat}&longitude=${lon}&hourly=temperature_2m&start_date=${day.date}&end_date=${day.date}&timezone=Europe/Stockholm`,
+                `${wxBase}?latitude=${lat}&longitude=${lon}&hourly=temperature_2m&start_date=${day.date}&end_date=${wxEndDate}&timezone=Europe/Stockholm`,
                 { signal: controller.signal },
               )
               const hrData = await hrRes.json()
               const times: string[] = hrData?.hourly?.time ?? []
               const temps: number[] = hrData?.hourly?.temperature_2m ?? []
               const filtered = times.reduce<number[]>((acc, t, i) => {
-                const h = parseInt(t.split('T')[1] ?? '0')
-                if (h * 60 >= startMin && h * 60 < endMin && temps[i] != null) acc.push(temps[i])
+                const [datePart, timePart] = t.split('T')
+                const h = parseInt(timePart ?? '0')
+                const minuteOfTimeline = (datePart === day.date ? 0 : 1440) + h * 60
+                if (minuteOfTimeline >= startMin && minuteOfTimeline < effEnd && temps[i] != null) acc.push(temps[i])
                 return acc
               }, [])
               if (filtered.length > 0)
@@ -1026,7 +1040,7 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
       const e = parseTime(get(day.id, 'endTime', endTime))
       if (s === null || e === null) { result[day.id] = null; continue }
       const lunchMin = Number(get(day.id, 'lunchDuration', day.lunchDuration != null ? String(day.lunchDuration) : '0')) || 0
-      result[day.id] = ((e - s) - lunchMin) / 60
+      result[day.id] = (shootDurationMinutes(s, e) - lunchMin) / 60
     }
     return result
   }, [days, edits])
@@ -1065,13 +1079,19 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
     const result: Record<string, { rtsOutOfRange: boolean; lunchOutOfRange: boolean; lunchLate: boolean }> = {}
     for (const day of days) {
       const { startTime, endTime } = getStartEnd(day)
-      const s   = parseTime(get(day.id, 'startTime', startTime))
-      const e   = parseTime(get(day.id, 'endTime', endTime))
-      const rts = parseTime(get(day.id, 'rtsTime', day.rtsTime ?? ''))
-      const lunchStart = parseTime(get(day.id, 'lunchStart', day.lunchStart ?? ''))
+      const s = parseTime(get(day.id, 'startTime', startTime))
+      const e = parseTime(get(day.id, 'endTime', endTime))
+      const eEff = s !== null && e !== null ? effectiveEndMinutes(s, e) : null
+      const rtsRaw        = parseTime(get(day.id, 'rtsTime', day.rtsTime ?? ''))
+      const lunchStartRaw = parseTime(get(day.id, 'lunchStart', day.lunchStart ?? ''))
+      // Overnight shoot (e.g. 19:00–01:00): an RTS/lunch time after midnight
+      // reads numerically smaller than the start time, even though it falls
+      // inside the window — normalize it onto the same timeline first.
+      const rts        = rtsRaw        !== null && s !== null && e !== null ? normalizeToShootWindow(rtsRaw, s, e)        : rtsRaw
+      const lunchStart = lunchStartRaw !== null && s !== null && e !== null ? normalizeToShootWindow(lunchStartRaw, s, e) : lunchStartRaw
       result[day.id] = {
-        rtsOutOfRange:   rts !== null && s !== null && e !== null && (rts < s || rts > e),
-        lunchOutOfRange: lunchStart !== null && s !== null && e !== null && (lunchStart < s || lunchStart > e),
+        rtsOutOfRange:   rts !== null && s !== null && eEff !== null && (rts < s || rts > eEff),
+        lunchOutOfRange: lunchStart !== null && s !== null && eEff !== null && (lunchStart < s || lunchStart > eEff),
         lunchLate:       lunchStart !== null && s !== null && (lunchStart - s) > 240,
       }
     }

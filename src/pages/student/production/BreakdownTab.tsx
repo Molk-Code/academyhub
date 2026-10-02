@@ -156,6 +156,30 @@ function EditTextarea({
   )
 }
 
+// Position + max-height for a portal-rendered picker dropdown, anchored to
+// a trigger button. These panels use `position: fixed`, which is
+// viewport-relative — unlike `position: absolute`, it must NOT be offset by
+// window.scrollX/Y (that was the bug: on a scrolled-down page the panel
+// opened far below the visible viewport, with no way to reach it even
+// though its own content scrolled fine). This also flips the panel above
+// the button and caps its height to whichever side has more room, so a
+// long list (many cast/costume/location entries) always stays fully
+// reachable on screen.
+interface DropdownPos { left: number; top?: number; bottom?: number; maxHeight: number }
+
+function computeDropdownPos(btn: HTMLElement, panelWidth = 240): DropdownPos {
+  const rect   = btn.getBoundingClientRect()
+  const margin = 8
+  const spaceBelow = window.innerHeight - rect.bottom - margin
+  const spaceAbove = rect.top - margin
+  const left = Math.max(margin, Math.min(rect.left, window.innerWidth - panelWidth - margin))
+
+  if (spaceBelow < 160 && spaceAbove > spaceBelow) {
+    return { left, bottom: window.innerHeight - rect.top + 4, maxHeight: Math.max(120, spaceAbove - 4) }
+  }
+  return { left, top: rect.bottom + 4, maxHeight: Math.max(120, spaceBelow - 4) }
+}
+
 interface Props { productionId: string; canEdit: boolean }
 
 export function BreakdownTab({ productionId, canEdit }: Props) {
@@ -183,11 +207,11 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
 
   const [edits,       setEdits]       = useState<Record<string, Record<string, any>>>({})
   const [castOpen,    setCastOpen]    = useState<string | null>(null)
-  const [castPos,     setCastPos]     = useState<{ top: number; left: number } | null>(null)
+  const [castPos,     setCastPos]     = useState<DropdownPos | null>(null)
   const [locOpen,     setLocOpen]     = useState<string | null>(null)
-  const [locPos,      setLocPos]      = useState<{ top: number; left: number } | null>(null)
+  const [locPos,      setLocPos]      = useState<DropdownPos | null>(null)
   const [itemPicker,    setItemPicker]    = useState<{ field: ItemField; sceneId: string } | null>(null)
-  const [itemPickerPos, setItemPickerPos] = useState<{ top: number; left: number } | null>(null)
+  const [itemPickerPos, setItemPickerPos] = useState<DropdownPos | null>(null)
   const [revealedCast, setRevealedCast]   = useState<Set<string>>(new Set())
   const [expanded,    setExpanded]    = useState<Set<string>>(new Set())
   const castBtnRefs = useRef<Record<string, HTMLButtonElement | null>>({})
@@ -272,30 +296,21 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
   function openCastDropdown(sceneId: string) {
     if (castOpen === sceneId) { setCastOpen(null); return }
     const btn = castBtnRefs.current[sceneId]
-    if (btn) {
-      const rect = btn.getBoundingClientRect()
-      setCastPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX })
-    }
+    if (btn) setCastPos(computeDropdownPos(btn, 200))
     setCastOpen(sceneId)
   }
 
   function openLocDropdown(sceneId: string) {
     if (locOpen === sceneId) { setLocOpen(null); return }
     const btn = locBtnRefs.current[sceneId]
-    if (btn) {
-      const rect = btn.getBoundingClientRect()
-      setLocPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX })
-    }
+    if (btn) setLocPos(computeDropdownPos(btn, 240))
     setLocOpen(sceneId)
   }
 
   function openItemPicker(field: ItemField, sceneId: string) {
     if (itemPicker?.field === field && itemPicker.sceneId === sceneId) { setItemPicker(null); return }
     const btn = itemBtnRefs.current[`${field}-${sceneId}`]
-    if (btn) {
-      const rect = btn.getBoundingClientRect()
-      setItemPickerPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX })
-    }
+    if (btn) setItemPickerPos(computeDropdownPos(btn, 220))
     setItemPicker({ field, sceneId })
   }
 
@@ -393,8 +408,8 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setLocOpen(null)} />
           <div
-            className="fixed z-50 bg-zinc-800 border border-white/10 rounded-xl shadow-xl p-2 min-w-[240px] max-h-[85vh] overflow-y-auto"
-            style={{ top: locPos.top, left: locPos.left }}
+            className="fixed z-50 bg-zinc-800 border border-white/10 rounded-xl shadow-xl p-2 min-w-[240px] overflow-y-auto"
+            style={{ top: locPos.top, bottom: locPos.bottom, left: locPos.left, maxHeight: locPos.maxHeight }}
           >
             {(() => {
               const scene = scenes.find(s => s.id === locOpen)
@@ -412,20 +427,18 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
             <p className="text-xs text-zinc-500 px-2 pb-1.5 font-medium">
               {scenes.find(s => s.id === locOpen)?.locationId ? 'Change location' : 'Link location'}
             </p>
-            <div className="max-h-[40vh] overflow-y-auto">
-              {locations.length === 0
-                ? <p className="text-xs text-zinc-500 px-2 py-1">Add locations in the Locations tab first</p>
-                : locations.map(loc => (
-                  <button key={loc.id} onClick={() => selectLocation(locOpen!, loc)}
-                    className="w-full text-left flex flex-col gap-0.5 px-2 py-2 hover:bg-zinc-700/50 rounded-lg">
-                    <span className="text-sm text-zinc-200">{loc.scriptName || loc.name}</span>
-                    {(loc.name || loc.address) && (
-                      <span className="text-xs text-zinc-500">{[loc.name, loc.address].filter(Boolean).join(' — ')}</span>
-                    )}
-                  </button>
-                ))
-              }
-            </div>
+            {locations.length === 0
+              ? <p className="text-xs text-zinc-500 px-2 py-1">Add locations in the Locations tab first</p>
+              : locations.map(loc => (
+                <button key={loc.id} onClick={() => selectLocation(locOpen!, loc)}
+                  className="w-full text-left flex flex-col gap-0.5 px-2 py-2 hover:bg-zinc-700/50 rounded-lg">
+                  <span className="text-sm text-zinc-200">{loc.scriptName || loc.name}</span>
+                  {(loc.name || loc.address) && (
+                    <span className="text-xs text-zinc-500">{[loc.name, loc.address].filter(Boolean).join(' — ')}</span>
+                  )}
+                </button>
+              ))
+            }
             {(() => {
               const scene = scenes.find(s => s.id === locOpen)
               return scene?.locationId ? (
@@ -448,22 +461,20 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setCastOpen(null)} />
           <div
-            className="fixed z-50 bg-zinc-800 border border-white/10 rounded-xl shadow-xl p-2 min-w-[200px] max-h-[85vh] overflow-y-auto"
-            style={{ top: castPos.top, left: castPos.left }}
+            className="fixed z-50 bg-zinc-800 border border-white/10 rounded-xl shadow-xl p-2 min-w-[200px] overflow-y-auto"
+            style={{ top: castPos.top, bottom: castPos.bottom, left: castPos.left, maxHeight: castPos.maxHeight }}
           >
-            <div className="max-h-[50vh] overflow-y-auto">
-              {cast.length === 0
-                ? <p className="text-xs text-zinc-500 px-2 py-1">Add cast members first</p>
-                : cast.map(c => (
-                  <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-700/50 rounded cursor-pointer text-sm">
-                    <input type="checkbox" checked={(scenes.find(s => s.id === castOpen)?.castIds ?? []).includes(c.castId)}
-                      onChange={() => toggleCastId(castOpen!, c.castId)} className="accent-brand-500" />
-                    <span className="text-zinc-400 font-mono text-xs w-4">{c.castId}</span>
-                    <span className="text-zinc-200">{c.characterName}</span>
-                  </label>
-                ))
-              }
-            </div>
+            {cast.length === 0
+              ? <p className="text-xs text-zinc-500 px-2 py-1">Add cast members first</p>
+              : cast.map(c => (
+                <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-700/50 rounded cursor-pointer text-sm">
+                  <input type="checkbox" checked={(scenes.find(s => s.id === castOpen)?.castIds ?? []).includes(c.castId)}
+                    onChange={() => toggleCastId(castOpen!, c.castId)} className="accent-brand-500" />
+                  <span className="text-zinc-400 font-mono text-xs w-4">{c.castId}</span>
+                  <span className="text-zinc-200">{c.characterName}</span>
+                </label>
+              ))
+            }
             <button onClick={() => setCastOpen(null)} className="w-full text-xs text-zinc-500 mt-1 hover:text-zinc-300 py-0.5 pt-2 border-t border-white/10">Done</button>
           </div>
         </>,
@@ -477,8 +488,8 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setItemPicker(null)} />
           <div
-            className="fixed z-50 bg-zinc-800 border border-white/10 rounded-xl shadow-xl p-2 min-w-[220px] max-h-[85vh] overflow-y-auto"
-            style={{ top: itemPickerPos.top, left: itemPickerPos.left }}
+            className="fixed z-50 bg-zinc-800 border border-white/10 rounded-xl shadow-xl p-2 min-w-[220px] overflow-y-auto"
+            style={{ top: itemPickerPos.top, bottom: itemPickerPos.bottom, left: itemPickerPos.left, maxHeight: itemPickerPos.maxHeight }}
           >
             {(() => {
               const { field, sceneId } = itemPicker
@@ -486,19 +497,15 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
               const kind = ITEM_KINDS.find(k => k.field === field)!
               const scene = scenes.find(s => s.id === sceneId)
               const sel = (scene?.[field] as string[] | undefined) ?? []
-              return (
-                <div className="max-h-[50vh] overflow-y-auto">
-                  {items.length === 0 ? (
-                    <p className="text-xs text-zinc-500 px-2 py-1">Add {kind.label.toLowerCase()} items in the {kind.label} tab first</p>
-                  ) : items.map(it => (
-                    <label key={it.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-700/50 rounded cursor-pointer text-sm">
-                      <input type="checkbox" checked={sel.includes(it.id)}
-                        onChange={() => toggleItemId(sceneId, field, it.id)} className="accent-brand-500" />
-                      <span className="text-zinc-200">{it.characterName || <span className="text-zinc-500">Untitled</span>}</span>
-                    </label>
-                  ))}
-                </div>
-              )
+              return items.length === 0 ? (
+                <p className="text-xs text-zinc-500 px-2 py-1">Add {kind.label.toLowerCase()} items in the {kind.label} tab first</p>
+              ) : items.map(it => (
+                <label key={it.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-700/50 rounded cursor-pointer text-sm">
+                  <input type="checkbox" checked={sel.includes(it.id)}
+                    onChange={() => toggleItemId(sceneId, field, it.id)} className="accent-brand-500" />
+                  <span className="text-zinc-200">{it.characterName || <span className="text-zinc-500">Untitled</span>}</span>
+                </label>
+              ))
             })()}
             <button onClick={() => setItemPicker(null)} className="w-full text-xs text-zinc-500 mt-1 hover:text-zinc-300 py-0.5 pt-2 border-t border-white/10">Done</button>
           </div>

@@ -9,13 +9,34 @@ service cloud.firestore {
     }
 
     function role() {
-      return request.auth.token.role;
+      // .get() with a default — a bare `.role` access throws when the custom
+      // claim isn't set at all, which (since `||` only short-circuits on a
+      // determining true/false, not on an error) poisons every isStudent()/
+      // isTeacher()/isAdmin() check built on it into a hard permission-denied
+      // instead of a clean false. Some accounts in this project genuinely
+      // don't have the claim set (see docRole() below) — this must never throw.
+      return request.auth.token.get('role', '');
     }
 
+    // Fallback: read role from Firestore user doc (for accounts without custom claims)
+    function docRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    // Trusts docRole() (the Firestore user doc) as a fallback here, unlike
+    // isTeacher()/isAdmin() below — safe specifically because 'student' is
+    // the floor of privilege: a doc self-declaring it can't grant anything
+    // beyond a brand-new account's own default role.
     function isStudent() {
-      return isSignedIn() && role() == 'student';
+      return isSignedIn() && (role() == 'student' || docRole() == 'student');
     }
 
+    // Deliberately claim-only (no docRole() fallback) — the users/{uid}
+    // `create` rule lets a new account set its own `role` field to anything
+    // with no server-side validation, so trusting docRole() for an
+    // elevated-privilege check would let a signup self-grant staff access.
+    // isStaff() below predates this distinction and already carries that
+    // exposure; not widening it further here.
     function isTeacher() {
       return isSignedIn() && role() == 'teacher';
     }
@@ -26,11 +47,6 @@ service cloud.firestore {
 
     function isTeacherOrAdmin() {
       return isTeacher() || isAdmin();
-    }
-
-    // Fallback: read role from Firestore user doc (for accounts without custom claims)
-    function docRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
     function isStaff() {

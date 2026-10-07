@@ -609,6 +609,13 @@ export default function ProductionEditor() {
 
   async function uploadScreenplay(file: File) {
     if (!id) return
+    // Only ask when there's an existing breakdown to protect — nothing to
+    // reset on a production with no scenes yet, so skip straight to Yes.
+    const resetBreakdown = scenes.length === 0 || confirm(
+      "Do you want to reset the script breakdown?\n\n" +
+      'Yes: review scenes detected in the new script, and import them in place of the current ones.\n' +
+      'No: the new script uploads, but your current script breakdown — and every other production tab — stays exactly as it is.',
+    )
     setUploadProgress(0)
     setParsedScenes(null)
     setImportSuccess(false)
@@ -620,12 +627,15 @@ export default function ProductionEditor() {
           updatedAt: serverTimestamp(),
         })
         setUploadProgress(null)
+        if (!resetBreakdown) return // keep the existing breakdown — skip parsing entirely
         setParsing(true)
         try {
           const detected = await parseScreenplayPDF(file)
           if (detected.length > 0) {
             setParsedScenes(detected)
             setShowImportModal(true)
+          } else {
+            alert('No scene headings were detected in the new script — the existing breakdown has not been changed.')
           }
         } catch (e) {
           // skip scene auto-detection if PDF text extraction fails or times out
@@ -1372,7 +1382,7 @@ function SceneImportModal({
         </div>
 
         <p className="px-4 pt-3 text-xs text-zinc-400">
-          {scenes.length} scene heading{scenes.length !== 1 ? 's' : ''} detected. Select which to import into Script Breakdown.
+          {scenes.length} scene heading{scenes.length !== 1 ? 's' : ''} detected. Select which to import — importing replaces the current Script Breakdown scenes with your selection.
         </p>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-1.5">

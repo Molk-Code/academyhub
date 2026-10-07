@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useDocument, useCollection, where, orderBy } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
 import type { ProductionDoc, UserDoc, ProductionFeedbackDoc, ProductionTeamDoc, ProductionSceneDoc, ProductionCastDoc, ProductionShotDoc, ProductionShootingDayDoc, ProductionCrewAssignmentDoc, ProductionLocationDoc, ProductionPeriodDoc, ProductionCostumeDoc, ProductionMakeupDoc, ProductionPropsDoc, CohortDoc } from '@/types'
-import { ArrowLeft, Users, Globe, Trash2, MessageSquare, X, Send, ChevronDown, Download, FileSpreadsheet, UserPlus, Eye, Loader2, FileText, Upload, Sparkles, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Users, Globe, Trash2, MessageSquare, X, Send, ChevronDown, Download, FileSpreadsheet, UserPlus, Eye, Loader2, FileText, Upload, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { parseScreenplayPDF, type ParsedScene } from '@/lib/parseScreenplay'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import Avatar from '@/components/common/Avatar'
@@ -501,8 +501,6 @@ export default function ProductionEditor() {
   const [titleVal, setTitleVal] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [parsing, setParsing] = useState(false)
-  const [parsedScenes, setParsedScenes] = useState<ParsedScene[] | null>(null)
-  const [showImportModal, setShowImportModal] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importSuccess, setImportSuccess] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -511,6 +509,11 @@ export default function ProductionEditor() {
   // dialog is unreliable or a silent no-op in standalone/installed-PWA
   // mode on iOS, which this app explicitly supports installing as.
   const [pendingScreenplayFile, setPendingScreenplayFile] = useState<File | null>(null)
+  const [pendingRemoveScreenplay, setPendingRemoveScreenplay] = useState(false)
+  // Replaces window.alert() in this same flow, for the same reliability
+  // reason — alert() shares confirm()'s silent-no-op behavior in
+  // standalone/installed-PWA mode on iOS.
+  const [uploadNotice, setUploadNotice] = useState<{ type: 'error' | 'info'; text: string } | null>(null)
 
   const { data: production, loading } = useDocument<ProductionDoc>('productions', id ?? '')
 
@@ -624,8 +627,8 @@ export default function ProductionEditor() {
   async function uploadScreenplay(file: File, resetBreakdown: boolean) {
     if (!id) return
     setUploadProgress(0)
-    setParsedScenes(null)
     setImportSuccess(false)
+    setUploadNotice(null)
     uploadScreenplayViaFunction(file, id, pct => setUploadProgress(pct))
       .then(async url => {
         await updateDoc(doc(db, 'productions', id), {
@@ -638,23 +641,23 @@ export default function ProductionEditor() {
         setParsing(true)
         try {
           const detected = await parseScreenplayPDF(file)
+          setParsing(false)
           if (detected.length > 0) {
-            setParsedScenes(detected)
-            setShowImportModal(true)
+            await handleImportScenes(detected)
           } else {
-            alert('No scene headings were detected in the new script — the existing breakdown has not been changed.')
+            setUploadNotice({ type: 'info', text: 'No scene headings were detected in the new script — the existing breakdown has not been changed.' })
           }
         } catch (e) {
           // skip scene auto-detection if PDF text extraction fails or times out
           console.error('Screenplay parsing failed:', e)
-        } finally {
           setParsing(false)
+          setUploadNotice({ type: 'error', text: "Couldn't scan the new script for scenes — the existing breakdown has not been changed." })
         }
       })
       .catch(err => {
         setUploadProgress(null)
         console.error('Upload failed:', err)
-        alert(err.message ?? 'Upload failed.')
+        setUploadNotice({ type: 'error', text: err.message ?? 'Upload failed.' })
       })
   }
 
@@ -664,6 +667,9 @@ export default function ProductionEditor() {
     await Promise.all(snap.docs.map(d => deleteDoc(d.ref)))
   }
 
+  // Replaces the script breakdown's scenes wholesale with the given list —
+  // used both for a confirmed screenplay-upload reset and (not currently,
+  // but kept general) any other bulk-replace entry point.
   async function handleImportScenes(selected: ParsedScene[]) {
     if (!id) return
     setImporting(true)
@@ -684,16 +690,19 @@ export default function ProductionEditor() {
       })
     }
     setImporting(false)
-    setShowImportModal(false)
     setImportSuccess(true)
     setActiveTab('breakdown')
   }
 
   async function removeScreenplay() {
-    if (!id || !confirm('Remove the screenplay and its scenes from this production?')) return
+    setPendingRemoveScreenplay(true)
+  }
+
+  async function confirmRemoveScreenplay() {
+    if (!id) return
+    setPendingRemoveScreenplay(false)
     await updateDoc(doc(db, 'productions', id), { screenplayUrl: '', screenplayName: '' })
     await deleteAllScenes()
-    setParsedScenes(null)
     setImportSuccess(false)
   }
 
@@ -1187,7 +1196,7 @@ export default function ProductionEditor() {
                 </div>
 
                 {/* Status messages */}
-                {(uploadProgress !== null || parsing || importSuccess || (parsedScenes && !showImportModal && !importSuccess && parsedScenes.length > 0)) && (
+                {(uploadProgress !== null || parsing || importing || importSuccess) && (
                   <div className="flex flex-wrap items-center gap-3">
                     {uploadProgress !== null && (
                       <div className="flex items-center gap-2">
@@ -1204,16 +1213,30 @@ export default function ProductionEditor() {
                         <Loader2 className="w-3 h-3 animate-spin" /> Parsing screenplay…
                       </span>
                     )}
+                    {importing && (
+                      <span className="flex items-center gap-1.5 text-xs text-brand-400">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Importing scenes…
+                      </span>
+                    )}
                     {importSuccess && (
                       <span className="flex items-center gap-1.5 text-xs text-emerald-400">
                         <CheckCircle2 className="w-3 h-3" /> Scenes imported to Script Breakdown
                       </span>
                     )}
-                    {parsedScenes && !showImportModal && !importSuccess && parsedScenes.length > 0 && (
-                      <button onClick={() => setShowImportModal(true)} className="flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 transition-colors">
-                        <Sparkles className="w-3 h-3" /> Import {parsedScenes.length} detected scenes
-                      </button>
-                    )}
+                  </div>
+                )}
+                {uploadNotice && (
+                  <div className={cn(
+                    'flex items-start gap-2 text-xs rounded-xl px-3 py-2 border',
+                    uploadNotice.type === 'error'
+                      ? 'bg-rose-950/40 border-rose-800/50 text-rose-300'
+                      : 'bg-amber-950/40 border-amber-800/50 text-amber-300',
+                  )}>
+                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span className="flex-1">{uploadNotice.text}</span>
+                    <button onClick={() => setUploadNotice(null)} className="text-current opacity-60 hover:opacity-100 flex-shrink-0">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 )}
 
@@ -1247,7 +1270,7 @@ export default function ProductionEditor() {
             ) : canEdit ? (
               /* ── Empty state upload zone ── */
               <div className="w-full flex flex-col items-center justify-center" style={{ minHeight: '50vh' }}>
-                {(uploadProgress !== null || parsing) && (
+                {(uploadProgress !== null || parsing || importing) && (
                   <div className="mb-4 flex flex-col items-center gap-2">
                     {uploadProgress !== null && (
                       <div className="flex items-center gap-2">
@@ -1262,6 +1285,25 @@ export default function ProductionEditor() {
                         <Loader2 className="w-3 h-3 animate-spin" /> Parsing screenplay…
                       </span>
                     )}
+                    {importing && (
+                      <span className="flex items-center gap-1.5 text-xs text-brand-400">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Importing scenes…
+                      </span>
+                    )}
+                  </div>
+                )}
+                {uploadNotice && (
+                  <div className={cn(
+                    'mb-4 flex items-start gap-2 text-xs rounded-xl px-3 py-2 border max-w-sm md:max-w-md',
+                    uploadNotice.type === 'error'
+                      ? 'bg-rose-950/40 border-rose-800/50 text-rose-300'
+                      : 'bg-amber-950/40 border-amber-800/50 text-amber-300',
+                  )}>
+                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span className="flex-1">{uploadNotice.text}</span>
+                    <button onClick={() => setUploadNotice(null)} className="text-current opacity-60 hover:opacity-100 flex-shrink-0">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 )}
                 <label
@@ -1341,16 +1383,6 @@ export default function ProductionEditor() {
         <div className="fixed inset-0 z-20" onClick={() => setShowCollabs(false)} />
       )}
 
-      {/* ── Screenplay import modal ──────────────────────────────────── */}
-      {showImportModal && parsedScenes && (
-        <SceneImportModal
-          scenes={parsedScenes}
-          importing={importing}
-          onImport={handleImportScenes}
-          onClose={() => setShowImportModal(false)}
-        />
-      )}
-
       {/* ── Reset-breakdown confirmation (new/replaced screenplay) ──────── */}
       {pendingScreenplayFile && (
         <ResetBreakdownModal
@@ -1361,6 +1393,17 @@ export default function ProductionEditor() {
             uploadScreenplay(file, reset)
           }}
           onCancel={() => setPendingScreenplayFile(null)}
+        />
+      )}
+
+      {/* ── Remove-screenplay confirmation ───────────────────────────────── */}
+      {pendingRemoveScreenplay && (
+        <ConfirmModal
+          title="Remove screenplay?"
+          body="This removes the screenplay and every scene in the script breakdown. Other production tabs (crew, cast, shots, locations, costume, make-up, props, schedule, budget, shot log) are not affected."
+          confirmLabel="Remove screenplay"
+          onConfirm={confirmRemoveScreenplay}
+          onCancel={() => setPendingRemoveScreenplay(false)}
         />
       )}
     </div>
@@ -1381,7 +1424,7 @@ function ResetBreakdownModal({
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-brand-400" />
-            <h2 className="font-semibold text-white">Reset script breakdown?</h2>
+            <h2 className="font-semibold text-white">Import scenes from new script?</h2>
           </div>
           <button onClick={onCancel} className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors">
             <X className="w-4 h-4" />
@@ -1389,14 +1432,14 @@ function ResetBreakdownModal({
         </div>
         <div className="p-4 space-y-3">
           <p className="text-sm text-zinc-300 truncate" title={fileName}>Uploading <span className="font-medium text-zinc-100">{fileName}</span>.</p>
-          <p className="text-sm text-zinc-400">Do you want to reset the script breakdown to match this version?</p>
+          <p className="text-sm text-zinc-400">Do you want to import scenes and replace the script breakdown with this new script version?</p>
           <div className="space-y-2 pt-1">
             <button
               onClick={() => onChoose(true)}
               className="w-full text-left p-3 rounded-xl border border-brand-500/30 bg-brand-500/10 hover:bg-brand-500/15 transition-colors"
             >
-              <p className="text-sm font-medium text-brand-300">Yes — reset breakdown</p>
-              <p className="text-xs text-zinc-500 mt-0.5">Review scenes detected in the new script, and import them in place of the current ones.</p>
+              <p className="text-sm font-medium text-brand-300">Yes — replace breakdown</p>
+              <p className="text-xs text-zinc-500 mt-0.5">Detected scenes from the new script replace the current Script Breakdown scenes.</p>
             </button>
             <button
               onClick={() => onChoose(false)}
@@ -1412,89 +1455,32 @@ function ResetBreakdownModal({
   )
 }
 
-// ── SceneImportModal ──────────────────────────────────────────────────────────
-function SceneImportModal({
-  scenes, importing, onImport, onClose,
+// ── ConfirmModal — generic destructive-action confirm (not window.confirm,
+// which is unreliable in standalone/installed-PWA mode on iOS) ──────────────
+function ConfirmModal({
+  title, body, confirmLabel, onConfirm, onCancel,
 }: {
-  scenes: ParsedScene[]
-  importing: boolean
-  onImport: (selected: ParsedScene[]) => void
-  onClose: () => void
+  title: string
+  body: string
+  confirmLabel: string
+  onConfirm: () => void
+  onCancel: () => void
 }) {
-  const [selected, setSelected] = useState<Set<number>>(new Set(scenes.map((_, i) => i)))
-
-  function toggle(i: number) {
-    setSelected(prev => {
-      const next = new Set(prev)
-      next.has(i) ? next.delete(i) : next.add(i)
-      return next
-    })
-  }
-
-  const selectedScenes = scenes.filter((_, i) => selected.has(i))
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onCancel}>
+      <div className="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-brand-400" />
-            <h2 className="font-semibold text-white">Import Scenes from Screenplay</h2>
-          </div>
-          <button onClick={onClose} className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors">
+          <h2 className="font-semibold text-white">{title}</h2>
+          <button onClick={onCancel} className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
-
-        <p className="px-4 pt-3 text-xs text-zinc-400">
-          {scenes.length} scene heading{scenes.length !== 1 ? 's' : ''} detected. Select which to import — importing replaces the current Script Breakdown scenes with your selection.
-        </p>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-1.5">
-          {scenes.map((scene, i) => (
-            <label
-              key={i}
-              className={cn(
-                'flex items-start gap-3 p-2.5 rounded-xl cursor-pointer transition-colors border',
-                selected.has(i)
-                  ? 'bg-brand-500/10 border-brand-500/30'
-                  : 'bg-zinc-800/40 border-transparent hover:bg-zinc-800/70',
-              )}
-            >
-              <input
-                type="checkbox"
-                checked={selected.has(i)}
-                onChange={() => toggle(i)}
-                className="mt-0.5 accent-brand-500"
-              />
-              <div className="flex-1">
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="text-[10px] font-mono bg-zinc-700 px-1.5 py-0.5 rounded text-zinc-300 flex-shrink-0">{scene.intExt}</span>
-                  <span className="text-[10px] text-zinc-500 flex-shrink-0">{scene.dayNight}</span>
-                </div>
-                <p className="text-sm text-zinc-200 font-medium">{scene.location}</p>
-                <p className="text-[10px] text-zinc-600 mt-0.5">{scene.headingRaw}</p>
-              </div>
-            </label>
-          ))}
-        </div>
-
-        <div className="p-4 border-t border-white/10 flex items-center justify-between gap-3">
-          <button
-            onClick={() => setSelected(selected.size === scenes.length ? new Set() : new Set(scenes.map((_, i) => i)))}
-            className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
-          >
-            {selected.size === scenes.length ? 'Deselect all' : 'Select all'}
-          </button>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
-            <button
-              onClick={() => onImport(selectedScenes)}
-              disabled={importing || selectedScenes.length === 0}
-              className="btn-primary px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-40"
-            >
-              {importing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              Import {selectedScenes.length} scene{selectedScenes.length !== 1 ? 's' : ''}
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-zinc-400">{body}</p>
+          <div className="flex justify-end gap-2">
+            <button onClick={onCancel} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
+            <button onClick={onConfirm} className="px-4 py-2 text-sm rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-medium transition-colors">
+              {confirmLabel}
             </button>
           </div>
         </div>

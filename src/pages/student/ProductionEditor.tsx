@@ -506,6 +506,11 @@ export default function ProductionEditor() {
   const [importing, setImporting] = useState(false)
   const [importSuccess, setImportSuccess] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  // Holds a file the user picked to upload, pending the reset-breakdown
+  // choice below. A custom in-app modal (not window.confirm) — the native
+  // dialog is unreliable or a silent no-op in standalone/installed-PWA
+  // mode on iOS, which this app explicitly supports installing as.
+  const [pendingScreenplayFile, setPendingScreenplayFile] = useState<File | null>(null)
 
   const { data: production, loading } = useDocument<ProductionDoc>('productions', id ?? '')
 
@@ -607,15 +612,17 @@ export default function ProductionEditor() {
     setTitleEditing(false)
   }
 
-  async function uploadScreenplay(file: File) {
+  // Entry point for all 3 upload triggers (both file inputs + drag-drop).
+  // Always routes through the custom confirm modal rather than deciding
+  // in-place — never skips asking, even when the client's cached `scenes`
+  // list happens to read empty because its Firestore listener hasn't
+  // delivered its first snapshot yet.
+  function selectScreenplayFile(file: File) {
+    setPendingScreenplayFile(file)
+  }
+
+  async function uploadScreenplay(file: File, resetBreakdown: boolean) {
     if (!id) return
-    // Only ask when there's an existing breakdown to protect — nothing to
-    // reset on a production with no scenes yet, so skip straight to Yes.
-    const resetBreakdown = scenes.length === 0 || confirm(
-      "Do you want to reset the script breakdown?\n\n" +
-      'Yes: review scenes detected in the new script, and import them in place of the current ones.\n' +
-      'No: the new script uploads, but your current script breakdown — and every other production tab — stays exactly as it is.',
-    )
     setUploadProgress(0)
     setParsedScenes(null)
     setImportSuccess(false)
@@ -1170,7 +1177,7 @@ export default function ProductionEditor() {
                     <>
                       <label className="cursor-pointer p-1 text-zinc-500 hover:text-zinc-200 transition-colors flex-shrink-0" title="Replace screenplay">
                         <Upload className="w-3.5 h-3.5" />
-                        <input type="file" accept="application/pdf" className="hidden" onChange={e => e.target.files?.[0] && uploadScreenplay(e.target.files[0])} />
+                        <input type="file" accept="application/pdf" className="hidden" onChange={e => e.target.files?.[0] && selectScreenplayFile(e.target.files[0])} />
                       </label>
                       <button onClick={removeScreenplay} className="p-1 text-zinc-500 hover:text-rose-400 transition-colors flex-shrink-0" title="Remove screenplay">
                         <X className="w-3.5 h-3.5" />
@@ -1271,7 +1278,7 @@ export default function ProductionEditor() {
                     e.preventDefault()
                     setDragOver(false)
                     const file = e.dataTransfer.files[0]
-                    if (file?.type === 'application/pdf') uploadScreenplay(file)
+                    if (file?.type === 'application/pdf') selectScreenplayFile(file)
                   }}
                 >
                   <FileText className={cn('w-10 h-10 transition-colors', dragOver ? 'text-brand-400' : 'text-zinc-600 group-hover:text-brand-400')} />
@@ -1282,7 +1289,7 @@ export default function ProductionEditor() {
                     <p className="text-sm text-zinc-500 mt-1 hidden md:block">Drag & drop or tap — PDF format</p>
                     <p className="text-sm text-zinc-500 mt-1 md:hidden">Tap to select a PDF</p>
                   </div>
-                  <input type="file" accept="application/pdf" className="hidden" onChange={e => e.target.files?.[0] && uploadScreenplay(e.target.files[0])} />
+                  <input type="file" accept="application/pdf" className="hidden" onChange={e => e.target.files?.[0] && selectScreenplayFile(e.target.files[0])} />
                 </label>
               </div>
             ) : (
@@ -1343,6 +1350,64 @@ export default function ProductionEditor() {
           onClose={() => setShowImportModal(false)}
         />
       )}
+
+      {/* ── Reset-breakdown confirmation (new/replaced screenplay) ──────── */}
+      {pendingScreenplayFile && (
+        <ResetBreakdownModal
+          fileName={pendingScreenplayFile.name}
+          onChoose={reset => {
+            const file = pendingScreenplayFile
+            setPendingScreenplayFile(null)
+            uploadScreenplay(file, reset)
+          }}
+          onCancel={() => setPendingScreenplayFile(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── ResetBreakdownModal ───────────────────────────────────────────────────────
+function ResetBreakdownModal({
+  fileName, onChoose, onCancel,
+}: {
+  fileName: string
+  onChoose: (resetBreakdown: boolean) => void
+  onCancel: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onCancel}>
+      <div className="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-brand-400" />
+            <h2 className="font-semibold text-white">Reset script breakdown?</h2>
+          </div>
+          <button onClick={onCancel} className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-4 space-y-3">
+          <p className="text-sm text-zinc-300 truncate" title={fileName}>Uploading <span className="font-medium text-zinc-100">{fileName}</span>.</p>
+          <p className="text-sm text-zinc-400">Do you want to reset the script breakdown to match this version?</p>
+          <div className="space-y-2 pt-1">
+            <button
+              onClick={() => onChoose(true)}
+              className="w-full text-left p-3 rounded-xl border border-brand-500/30 bg-brand-500/10 hover:bg-brand-500/15 transition-colors"
+            >
+              <p className="text-sm font-medium text-brand-300">Yes — reset breakdown</p>
+              <p className="text-xs text-zinc-500 mt-0.5">Review scenes detected in the new script, and import them in place of the current ones.</p>
+            </button>
+            <button
+              onClick={() => onChoose(false)}
+              className="w-full text-left p-3 rounded-xl border border-white/10 bg-zinc-800/60 hover:bg-zinc-800 transition-colors"
+            >
+              <p className="text-sm font-medium text-zinc-200">No — keep current breakdown</p>
+              <p className="text-xs text-zinc-500 mt-0.5">The new script uploads, but Script Breakdown and every other production tab stay exactly as they are.</p>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { doc, updateDoc, addDoc, deleteDoc, collection } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
@@ -6,6 +6,40 @@ import { cn } from '@/lib/utils'
 import type { ProductionShotDoc, ProductionSceneDoc, ProductionShootingDayDoc } from '@/types'
 import { Plus, Trash2, Camera, Clock } from 'lucide-react'
 import { parseTime, shootDurationMinutes } from '@/components/production/CallSheetPreviewModal'
+
+// Auto-growing textarea — typing past the visible width wraps and grows the
+// row instead of scrolling the text sideways out of view in a fixed-height
+// <input>.
+function AutoGrowInput({
+  value, placeholder, onChange, onBlur,
+}: {
+  value: string; placeholder: string
+  onChange: (v: string) => void; onBlur: (v: string) => void
+}) {
+  const taRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (!taRef.current) return
+    taRef.current.style.height = 'auto'
+    taRef.current.style.height = `${taRef.current.scrollHeight}px`
+  }, [value])
+
+  return (
+    <textarea
+      ref={taRef}
+      rows={1}
+      className="bg-transparent w-full focus:bg-zinc-800/80 rounded px-2 py-1 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500/30 resize-none overflow-hidden transition-colors"
+      value={value}
+      placeholder={placeholder}
+      onChange={e => {
+        onChange(e.target.value)
+        e.target.style.height = 'auto'
+        e.target.style.height = `${e.target.scrollHeight}px`
+      }}
+      onBlur={e => onBlur(e.target.value)}
+    />
+  )
+}
 
 function fmtMinutes(m: number): string {
   if (m < 60) return `${Math.round(m)} min`
@@ -157,12 +191,11 @@ export function ShotListTab({ productionId, canEdit }: Props) {
                       <div>
                         <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Subject</p>
                         {canEdit ? (
-                          <input
-                            className="bg-transparent w-full focus:bg-zinc-800/80 rounded px-2 py-1 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500/30"
+                          <AutoGrowInput
                             value={get(shot.id, 'subject', shot.subject)}
                             placeholder="Subject…"
-                            onChange={e => setLocal(shot.id, 'subject', e.target.value)}
-                            onBlur={e => save(shot.id, 'subject', e.target.value)}
+                            onChange={v => setLocal(shot.id, 'subject', v)}
+                            onBlur={v => save(shot.id, 'subject', v)}
                           />
                         ) : (
                           <span className="text-sm text-zinc-200">{shot.subject || '—'}</span>
@@ -185,12 +218,11 @@ export function ShotListTab({ productionId, canEdit }: Props) {
                       <div>
                         <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Notes</p>
                         {canEdit ? (
-                          <input
-                            className="bg-transparent w-full focus:bg-zinc-800/80 rounded px-2 py-1 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500/30"
+                          <AutoGrowInput
                             value={get(shot.id, 'notes', shot.notes)}
                             placeholder="Notes…"
-                            onChange={e => setLocal(shot.id, 'notes', e.target.value)}
-                            onBlur={e => save(shot.id, 'notes', e.target.value)}
+                            onChange={v => setLocal(shot.id, 'notes', v)}
+                            onBlur={v => save(shot.id, 'notes', v)}
                           />
                         ) : (
                           <span className="text-sm text-zinc-300">{shot.notes || '—'}</span>
@@ -219,12 +251,11 @@ export function ShotListTab({ productionId, canEdit }: Props) {
                         <td className="px-3 py-2 w-12 text-xs font-mono text-zinc-400">{shot.shotNumber}</td>
                         <td className="px-2 py-1.5 min-w-[120px]">
                           {canEdit ? (
-                            <input
-                              className="bg-transparent w-full focus:bg-zinc-800/80 rounded px-2 py-1 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500/30"
+                            <AutoGrowInput
                               value={get(shot.id, 'subject', shot.subject)}
                               placeholder="Subject…"
-                              onChange={e => setLocal(shot.id, 'subject', e.target.value)}
-                              onBlur={e => save(shot.id, 'subject', e.target.value)}
+                              onChange={v => setLocal(shot.id, 'subject', v)}
+                              onBlur={v => save(shot.id, 'subject', v)}
                             />
                           ) : (
                             <span className="text-sm text-zinc-200">{shot.subject || '—'}</span>
@@ -241,12 +272,11 @@ export function ShotListTab({ productionId, canEdit }: Props) {
                         </td>
                         <td className="px-2 py-1.5 min-w-[120px]">
                           {canEdit ? (
-                            <input
-                              className="bg-transparent w-full focus:bg-zinc-800/80 rounded px-2 py-1 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500/30"
+                            <AutoGrowInput
                               value={get(shot.id, 'notes', shot.notes)}
                               placeholder="Notes…"
-                              onChange={e => setLocal(shot.id, 'notes', e.target.value)}
-                              onBlur={e => save(shot.id, 'notes', e.target.value)}
+                              onChange={v => setLocal(shot.id, 'notes', v)}
+                              onBlur={v => save(shot.id, 'notes', v)}
                             />
                           ) : (
                             <span className="text-sm text-zinc-300">{shot.notes || '—'}</span>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
@@ -12,6 +12,38 @@ interface LocForm {
   scriptName: string; name: string; address: string; zipCode: string; state: string; notes: string
 }
 const empty: LocForm = { scriptName: '', name: '', address: '', zipCode: '', state: '', notes: '' }
+
+// Auto-growing textarea — typing past the visible width wraps and grows the
+// row instead of scrolling the text sideways out of view in a fixed-height
+// <input>.
+function AutoGrowInput({
+  value, placeholder, onChange,
+}: {
+  value: string; placeholder: string; onChange: (v: string) => void
+}) {
+  const taRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (!taRef.current) return
+    taRef.current.style.height = 'auto'
+    taRef.current.style.height = `${taRef.current.scrollHeight}px`
+  }, [value])
+
+  return (
+    <textarea
+      ref={taRef}
+      rows={1}
+      className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-brand-500/30 resize-none overflow-hidden"
+      value={value}
+      placeholder={placeholder}
+      onChange={e => {
+        onChange(e.target.value)
+        e.target.style.height = 'auto'
+        e.target.style.height = `${e.target.scrollHeight}px`
+      }}
+    />
+  )
+}
 
 function AddressFields({ form, setForm }: {
   form: LocForm; setForm: (f: LocForm) => void
@@ -35,9 +67,8 @@ function AddressFields({ form, setForm }: {
           placeholder="City / State"
         />
       </div>
-      <input
-        className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-brand-500/30"
-        value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
+      <AutoGrowInput
+        value={form.notes} onChange={v => setForm({ ...form, notes: v })}
         placeholder="Notes (optional)…"
       />
     </>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { doc, updateDoc, addDoc, deleteDoc, collection, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
@@ -29,6 +29,40 @@ interface Props {
 
 const parseTime = _parseTime
 const getStartEnd = _getStartEnd
+
+// Auto-growing textarea — typing past the visible width wraps and grows the
+// row instead of scrolling the text sideways out of view in a fixed-height
+// <input>.
+function AutoGrowInput({
+  value, placeholder, className, onChange, onBlur,
+}: {
+  value: string; placeholder: string; className?: string
+  onChange: (v: string) => void; onBlur: (v: string) => void
+}) {
+  const taRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (!taRef.current) return
+    taRef.current.style.height = 'auto'
+    taRef.current.style.height = `${taRef.current.scrollHeight}px`
+  }, [value])
+
+  return (
+    <textarea
+      ref={taRef}
+      rows={1}
+      className={cn(className, 'resize-none overflow-hidden')}
+      value={value}
+      placeholder={placeholder}
+      onChange={e => {
+        onChange(e.target.value)
+        e.target.style.height = 'auto'
+        e.target.style.height = `${e.target.scrollHeight}px`
+      }}
+      onBlur={e => onBlur(e.target.value)}
+    />
+  )
+}
 
 function fmtPages(eighths: number): string {
   if (!eighths) return ''
@@ -1251,10 +1285,11 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
                           onChange={e => { setLocal(day.id, 'lunchDuration', e.target.value); saveDay(day.id, 'lunchDuration', e.target.value ? Number(e.target.value) : '') }} />
                         <span className="text-[10px] text-zinc-500">min</span>
                       </div>
-                      <input className="bg-zinc-800/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-brand-500/30 w-full sm:flex-1"
+                      <AutoGrowInput
+                        className="bg-zinc-800/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-brand-500/30 w-full sm:flex-1"
                         value={get(day.id, 'notes', day.notes)} placeholder="Day notes…"
-                        onChange={e => setLocal(day.id, 'notes', e.target.value)}
-                        onBlur={e => saveDay(day.id, 'notes', e.target.value)} />
+                        onChange={v => setLocal(day.id, 'notes', v)}
+                        onBlur={v => saveDay(day.id, 'notes', v)} />
                     </div>
                   </div>
                 ) : (

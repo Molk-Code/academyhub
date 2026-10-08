@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { addDoc, collection, deleteDoc, doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
@@ -7,6 +7,9 @@ import type { ProductionCostumeDoc, ProductionCastDoc, ProductionSceneDoc } from
 import { Plus, Trash2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
+// Plain single-line input — kept for the Character/Item name field, which
+// needs the datalist autocomplete (<textarea> doesn't support `list` at
+// all, so that field can't use the auto-growing variant below).
 function InlineInput({
   value, placeholder, canEdit, onChange, onBlur, className = '', list,
 }: {
@@ -27,6 +30,47 @@ function InlineInput({
     />
   ) : (
     <span className={cn('text-sm text-zinc-200 px-2', className)}>
+      {value || <span className="text-zinc-600">—</span>}
+    </span>
+  )
+}
+
+// Auto-growing textarea for the longer free-text columns (Description,
+// Responsible, Notes) — typing past the visible width now wraps and grows
+// the row instead of the text scrolling out of view in a fixed-height input.
+function InlineTextarea({
+  value, placeholder, canEdit, onChange, onBlur, className = '',
+}: {
+  value: string; placeholder: string; canEdit: boolean
+  onChange: (v: string) => void; onBlur: (v: string) => void; className?: string
+}) {
+  const taRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (!taRef.current) return
+    taRef.current.style.height = 'auto'
+    taRef.current.style.height = `${taRef.current.scrollHeight}px`
+  }, [value])
+
+  return canEdit ? (
+    <textarea
+      ref={taRef}
+      rows={1}
+      className={cn(
+        'bg-transparent w-full focus:bg-zinc-800/80 rounded px-2 py-1 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500/30 resize-none overflow-hidden transition-colors',
+        className,
+      )}
+      value={value}
+      placeholder={placeholder}
+      onChange={e => {
+        onChange(e.target.value)
+        e.target.style.height = 'auto'
+        e.target.style.height = `${e.target.scrollHeight}px`
+      }}
+      onBlur={e => onBlur(e.target.value)}
+    />
+  ) : (
+    <span className={cn('text-sm text-zinc-200 px-2 whitespace-pre-wrap', className)}>
       {value || <span className="text-zinc-600">—</span>}
     </span>
   )
@@ -172,7 +216,7 @@ export function ItemTab({
                     />
                   </td>
                   <td className="px-1 py-2">
-                    <InlineInput
+                    <InlineTextarea
                       value={get(it.id, 'description', it.description)}
                       placeholder="Describe…"
                       canEdit={canEdit}
@@ -192,7 +236,7 @@ export function ItemTab({
                     )}
                   </td>
                   <td className="px-1 py-2">
-                    <InlineInput
+                    <InlineTextarea
                       value={get(it.id, 'responsible', it.responsible)}
                       placeholder="Who's responsible"
                       canEdit={canEdit}
@@ -201,7 +245,7 @@ export function ItemTab({
                     />
                   </td>
                   <td className="px-1 py-2">
-                    <InlineInput
+                    <InlineTextarea
                       value={get(it.id, 'notes', it.notes)}
                       placeholder="Notes…"
                       canEdit={canEdit}

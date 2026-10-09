@@ -11,6 +11,28 @@ interface SelectedElement {
   tag: string
 }
 
+// Auto-detect device type and whether the app is running installed (PWA)
+// vs in a normal browser tab — surfaced on the report so bugs that are
+// specific to e.g. iOS standalone mode (where window.confirm/alert silently
+// no-op) or to mobile layouts aren't a guessing game for whoever triages it.
+function detectDeviceInfo() {
+  const ua = navigator.userAgent
+  const isTablet = /iPad|Tablet/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1)
+  const isMobile = !isTablet && /Mobi|Android|iPhone|iPod/i.test(ua)
+  const deviceType: 'mobile' | 'tablet' | 'desktop' = isTablet ? 'tablet' : isMobile ? 'mobile' : 'desktop'
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: fullscreen)').matches ||
+    (navigator as unknown as { standalone?: boolean }).standalone === true
+  return {
+    deviceType,
+    displayMode: (isStandalone ? 'standalone' : 'browser') as 'standalone' | 'browser',
+    userAgent: ua,
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+  }
+}
+
 function describeElement(el: Element): string {
   const tag = el.tagName.toLowerCase()
   const id = el.id ? `#${el.id}` : ''
@@ -100,6 +122,7 @@ export default function BugReportButton() {
         description: description.trim(),
         status: 'open',
         createdAt: serverTimestamp(),
+        ...detectDeviceInfo(),
       })
       setDone(true)
       setTimeout(cancel, 1800)

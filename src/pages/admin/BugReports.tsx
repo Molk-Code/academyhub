@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { updateDoc, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
-import { Bug, Copy, Check, ChevronDown, Circle, CheckCircle2, XCircle, Clock, Trash2 } from 'lucide-react'
+import { Bug, Copy, Check, ChevronDown, Circle, CheckCircle2, XCircle, Clock, Trash2, Smartphone, Tablet, Monitor, AppWindow, Globe } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { Timestamp } from 'firebase/firestore'
 
@@ -18,7 +18,14 @@ interface BugReportDoc {
   description: string
   status: 'open' | 'in_progress' | 'resolved' | 'wont_fix'
   createdAt: Timestamp
+  deviceType?: 'mobile' | 'tablet' | 'desktop'
+  displayMode?: 'standalone' | 'browser'
+  userAgent?: string
+  viewportWidth?: number
+  viewportHeight?: number
 }
+
+const DEVICE_ICON = { mobile: Smartphone, tablet: Tablet, desktop: Monitor } as const
 
 const STATUS_CONFIG = {
   open:        { label: 'Open',        icon: Circle,        color: 'text-amber-400',  bg: 'bg-amber-500/10 border-amber-500/20' },
@@ -28,11 +35,16 @@ const STATUS_CONFIG = {
 } as const
 
 function buildClaudePrompt(r: BugReportDoc): string {
+  const device = r.deviceType
+    ? `${r.deviceType}${r.viewportWidth ? ` (${r.viewportWidth}×${r.viewportHeight})` : ''}, ${r.displayMode === 'standalone' ? 'installed PWA' : 'browser tab'}`
+    : 'unknown'
   return `## Bug Report
 
 **Reported by:** ${r.displayName} (${r.role})
 **Page:** ${r.page}
 **Date:** ${r.createdAt?.toDate?.().toISOString?.() ?? 'unknown'}
+**Device:** ${device}
+${r.userAgent ? `**User agent:** ${r.userAgent}` : ''}
 
 **Element:** \`${r.elementPath}\`
 ${r.elementText ? `**Element text:** "${r.elementText}"` : ''}
@@ -69,6 +81,18 @@ function StatusBadge({ status }: { status: BugReportDoc['status'] }) {
     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.color}`}>
       <Icon className="w-3 h-3" />
       {cfg.label}
+    </span>
+  )
+}
+
+function DeviceBadge({ report }: { report: BugReportDoc }) {
+  if (!report.deviceType) return null
+  const DeviceIcon = DEVICE_ICON[report.deviceType]
+  const ModeIcon = report.displayMode === 'standalone' ? AppWindow : Globe
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-zinc-500" title={report.userAgent}>
+      <DeviceIcon className="w-3 h-3" />
+      <ModeIcon className="w-3 h-3" />
     </span>
   )
 }
@@ -115,6 +139,7 @@ function ReportCard({ report }: { report: BugReportDoc }) {
             <span className="text-xs text-zinc-500">{report.page}</span>
             <span className="text-xs text-zinc-600">·</span>
             <span className="text-xs text-zinc-600">{timeAgo}</span>
+            <DeviceBadge report={report} />
           </div>
           <p className="text-sm text-zinc-100 leading-snug line-clamp-2">{report.description}</p>
           <p className="text-xs text-zinc-500 mt-1">
@@ -137,6 +162,20 @@ function ReportCard({ report }: { report: BugReportDoc }) {
                   "{report.elementText.slice(0, 120)}{report.elementText.length > 120 ? '…' : ''}"
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Device info */}
+          {report.deviceType && (
+            <div className="bg-zinc-800/60 border border-white/5 rounded-xl px-3 py-2.5 space-y-1">
+              <p className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">Device</p>
+              <p className="text-xs text-zinc-300 capitalize">
+                {report.deviceType}
+                {report.viewportWidth ? ` · ${report.viewportWidth}×${report.viewportHeight}` : ''}
+                {' · '}
+                {report.displayMode === 'standalone' ? 'Installed app (PWA)' : 'Browser tab'}
+              </p>
+              {report.userAgent && <p className="text-[11px] text-zinc-600 font-mono break-all">{report.userAgent}</p>}
             </div>
           )}
 

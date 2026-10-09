@@ -1,4 +1,4 @@
-import { Bug, Circle, Clock, CheckCircle2, XCircle } from 'lucide-react'
+import { Bug, Circle, Clock, CheckCircle2, XCircle, MessageCircle } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { Timestamp } from 'firebase/firestore'
 import { useAuth } from '@/contexts/AuthContext'
@@ -10,6 +10,7 @@ interface BugReportDoc {
   description: string
   status: 'open' | 'in_progress' | 'resolved' | 'wont_fix'
   createdAt: Timestamp
+  messages?: { text: string; at: Timestamp; by: string }[]
 }
 
 const STATUS_CONFIG = {
@@ -32,7 +33,7 @@ function StatusBadge({ status }: { status: BugReportDoc['status'] }) {
 
 export default function MyBugReports() {
   const { profile } = useAuth()
-  const { data: reports, loading } = useCollection<BugReportDoc>(
+  const { data: reports, loading, error } = useCollection<BugReportDoc>(
     'bug_reports',
     profile ? [where('uid', '==', profile.uid), orderBy('createdAt', 'desc')] : [],
     !!profile,
@@ -49,7 +50,11 @@ export default function MyBugReports() {
         </p>
       </div>
 
-      {loading ? (
+      {error ? (
+        <div className="text-center py-16 text-rose-400 text-sm">
+          Couldn't load your bug reports: {error.message}
+        </div>
+      ) : loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
             <div key={i} className="h-20 bg-zinc-900 rounded-2xl animate-pulse" />
@@ -76,6 +81,18 @@ export default function MyBugReports() {
                   <span className="text-xs text-zinc-600">{timeAgo}</span>
                 </div>
                 <p className="text-sm text-zinc-200 leading-relaxed whitespace-pre-wrap">{r.description}</p>
+                {r.messages && r.messages.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-white/8 space-y-2">
+                    {r.messages.map((m, i) => (
+                      <div key={i} className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-3 py-2">
+                        <p className="text-xs text-blue-300 font-medium flex items-center gap-1 mb-0.5">
+                          <MessageCircle className="w-3 h-3" /> {m.by}
+                        </p>
+                        <p className="text-sm text-zinc-200">{m.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           })}

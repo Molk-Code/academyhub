@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { updateDoc, deleteDoc, doc } from 'firebase/firestore'
+import { updateDoc, deleteDoc, doc, arrayUnion, Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
-import { Bug, Copy, Check, ChevronDown, Circle, CheckCircle2, XCircle, Clock, Trash2, Smartphone, Tablet, Monitor, AppWindow, Globe } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import { Bug, Copy, Check, ChevronDown, Circle, CheckCircle2, XCircle, Clock, Trash2, Smartphone, Tablet, Monitor, AppWindow, Globe, Send, MessageCircle } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
-import type { Timestamp } from 'firebase/firestore'
 
 interface BugReportDoc {
   id: string
@@ -23,6 +23,7 @@ interface BugReportDoc {
   userAgent?: string
   viewportWidth?: number
   viewportHeight?: number
+  messages?: { text: string; at: Timestamp; by: string }[]
 }
 
 const DEVICE_ICON = { mobile: Smartphone, tablet: Tablet, desktop: Monitor } as const
@@ -98,9 +99,12 @@ function DeviceBadge({ report }: { report: BugReportDoc }) {
 }
 
 function ReportCard({ report }: { report: BugReportDoc }) {
+  const { profile } = useAuth()
   const [expanded, setExpanded] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [messageText, setMessageText] = useState('')
+  const [sending, setSending] = useState(false)
 
   async function setStatus(status: BugReportDoc['status']) {
     setUpdating(true)
@@ -108,6 +112,20 @@ function ReportCard({ report }: { report: BugReportDoc }) {
       await updateDoc(doc(db, 'bug_reports', report.id), { status })
     } finally {
       setUpdating(false)
+    }
+  }
+
+  async function sendMessage() {
+    const text = messageText.trim()
+    if (!text || sending) return
+    setSending(true)
+    try {
+      await updateDoc(doc(db, 'bug_reports', report.id), {
+        messages: arrayUnion({ text, at: Timestamp.now(), by: profile?.displayName ?? 'Staff' }),
+      })
+      setMessageText('')
+    } finally {
+      setSending(false)
     }
   }
 
@@ -183,6 +201,41 @@ function ReportCard({ report }: { report: BugReportDoc }) {
           <div>
             <p className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium mb-1.5">Description</p>
             <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">{report.description}</p>
+          </div>
+
+          {/* Messages to reporter */}
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium mb-1.5 flex items-center gap-1.5">
+              <MessageCircle className="w-3 h-3" /> Messages to {report.displayName}
+            </p>
+            {report.messages && report.messages.length > 0 && (
+              <div className="space-y-2 mb-2">
+                {report.messages.map((m, i) => (
+                  <div key={i} className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-3 py-2">
+                    <p className="text-sm text-zinc-200">{m.text}</p>
+                    <p className="text-[11px] text-zinc-500 mt-1">
+                      {m.by} {m.at?.toDate ? `· ${formatDistanceToNow(m.at.toDate(), { addSuffix: true })}` : ''}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <input
+                value={messageText}
+                onChange={e => setMessageText(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') sendMessage() }}
+                placeholder="e.g. Refresh your browser and try again…"
+                className="flex-1 bg-zinc-800 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500/50"
+              />
+              <button
+                onClick={sendMessage}
+                disabled={!messageText.trim() || sending}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Send className="w-3.5 h-3.5" /> Send
+              </button>
+            </div>
           </div>
 
           {/* Claude Code prompt */}

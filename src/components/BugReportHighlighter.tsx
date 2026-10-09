@@ -45,7 +45,7 @@ export default function BugReportHighlighter() {
 
     function tryHighlight() {
       if (cancelled) return
-      if (!triedTab && data.tabLabel) { clickMatchingTab(data.tabLabel); triedTab = true }
+      if (!triedTab && data.tabLabel) { triedTab = clickMatchingTab(data.tabLabel) }
       let el: Element | null = null
       try { el = document.querySelector(data.selector) } catch { /* stale/invalid selector */ }
 

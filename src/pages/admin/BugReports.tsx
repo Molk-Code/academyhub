@@ -201,6 +201,7 @@ function ReportCard({ report }: { report: BugReportDoc }) {
                 )}
               </div>
               {report.elementPath && <p className="text-xs text-amber-300 font-mono">{report.elementPath}</p>}
+              {report.elementTabLabel && <p className="text-[11px] text-zinc-500">On tab: {report.elementTabLabel}</p>}
               {report.elementText && (
                 <p className="text-xs text-zinc-500 italic">
                   "{report.elementText.slice(0, 120)}{report.elementText.length > 120 ? '…' : ''}"

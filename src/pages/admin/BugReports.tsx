@@ -129,6 +129,11 @@ function ReportCard({ report }: { report: BugReportDoc }) {
     }
   }
 
+  async function removeMessage(index: number) {
+    const next = (report.messages ?? []).filter((_, i) => i !== index)
+    await updateDoc(doc(db, 'bug_reports', report.id), { messages: next })
+  }
+
   async function handleDelete() {
     if (!confirm('Delete this bug report? This cannot be undone.')) return
     setDeleting(true)
@@ -211,11 +216,20 @@ function ReportCard({ report }: { report: BugReportDoc }) {
             {report.messages && report.messages.length > 0 && (
               <div className="space-y-2 mb-2">
                 {report.messages.map((m, i) => (
-                  <div key={i} className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-3 py-2">
-                    <p className="text-sm text-zinc-200">{m.text}</p>
-                    <p className="text-[11px] text-zinc-500 mt-1">
-                      {m.by} {m.at?.toDate ? `· ${formatDistanceToNow(m.at.toDate(), { addSuffix: true })}` : ''}
-                    </p>
+                  <div key={i} className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-3 py-2 flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm text-zinc-200">{m.text}</p>
+                      <p className="text-[11px] text-zinc-500 mt-1">
+                        {m.by} {m.at?.toDate ? `· ${formatDistanceToNow(m.at.toDate(), { addSuffix: true })}` : ''}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => removeMessage(i)}
+                      title="Remove message"
+                      className="p-1 text-zinc-500 hover:text-rose-400 transition-colors rounded flex-shrink-0"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 ))}
               </div>

@@ -1258,12 +1258,12 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <input type="time" className="bg-zinc-800/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-brand-500/30 w-24 [color-scheme:dark]"
-                          value={get(day.id, 'startTime', fallbackStart)}
+                          value={get(day.id, 'startTime', day.startTime ?? '')}
                           onChange={e => setLocal(day.id, 'startTime', e.target.value)}
                           onBlur={e => saveDay(day.id, 'startTime', e.target.value)} />
                         <span className="text-zinc-600 text-xs">–</span>
                         <input type="time" className="bg-zinc-800/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-brand-500/30 w-24 [color-scheme:dark]"
-                          value={get(day.id, 'endTime', fallbackEnd)}
+                          value={get(day.id, 'endTime', day.endTime ?? '')}
                           onChange={e => setLocal(day.id, 'endTime', e.target.value)}
                           onBlur={e => saveDay(day.id, 'endTime', e.target.value)} />
                       </div>

@@ -223,8 +223,8 @@ export function ItemTab({
         </div>
       )}
 
-      <div className="bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-zinc-900 border border-white/10 rounded-2xl overflow-x-auto">
+        <table className="w-full min-w-[900px] text-sm">
           <thead>
             <tr className="border-b border-white/10">
               <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider w-44">{nameLabel}</th>

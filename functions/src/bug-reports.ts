@@ -42,6 +42,7 @@ export const onBugReportUpdated = functions.firestore
     const msg = STATUS_MESSAGE[after.status]
     if (!msg || !after.uid) return null
 
-    await pushToUser(after.uid, msg.title, msg.body, '/profile', 'bug-report-update')
+    const url = after.role === 'teacher' ? '/teacher/bug-reports' : '/bug-reports'
+    await pushToUser(after.uid, msg.title, msg.body, url, 'bug-report-update')
     return null
   })

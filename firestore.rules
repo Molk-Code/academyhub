@@ -778,7 +778,8 @@ service cloud.firestore {
         && request.resource.data.description is string
         && request.resource.data.description.size() > 0
         && request.resource.data.description.size() <= 2000;
-      allow read, update: if isAdmin();
+      allow read: if isAdmin() || isSelf(resource.data.uid);
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
   }

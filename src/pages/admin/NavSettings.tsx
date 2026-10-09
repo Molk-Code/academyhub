@@ -7,7 +7,7 @@ import {
   Clapperboard, Trophy, FolderOpen, BookMarked, Film,
   QrCode, ListChecks, FlaskConical, Users, SlidersHorizontal,
   LayoutDashboard, User, UtensilsCrossed, Car, CalendarRange,
-  Video, CircleDot, Package, Plus, Trash2, ExternalLink, Pencil, X, Check, UserRound, ClipboardCheck,
+  Video, CircleDot, Package, Plus, Trash2, ExternalLink, Pencil, X, Check, UserRound, ClipboardCheck, Bug,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
@@ -33,6 +33,7 @@ const FEATURES: Feature[] = [
   { id: 'prizes',           label: 'Prizes',              icon: Trophy,          student: true,  teacher: true  },
   { id: 'resources',        label: 'Resources',           icon: FolderOpen,      student: true,  teacher: true  },
   { id: 'guide',            label: 'School Guide',        icon: BookMarked,      student: true,  teacher: true  },
+  { id: 'bugReports',       label: 'Bug Reports',         icon: Bug,             student: true,  teacher: true  },
   // ── Teacher only ─────────────────────────────────────────────────────────────
   { id: 'students',         label: 'Students',            icon: Users,           student: false, teacher: true  },
   { id: 'notebook',         label: 'Notebook',            icon: BookMarked,      student: false, teacher: true  },

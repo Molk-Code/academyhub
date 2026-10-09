@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Calendar, BookOpen,
   Trophy, LogOut, ArrowLeft, QrCode, ClipboardList, DoorOpen,
   MessageSquare, Clapperboard, Film, FolderOpen, Menu, X, ListChecks, User, ChevronDown, CalendarRange, Package,
-  Car, UtensilsCrossed, RefreshCw, ArrowDown, ClipboardCheck,
+  Car, UtensilsCrossed, RefreshCw, ArrowDown, ClipboardCheck, Bug,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
@@ -54,6 +54,7 @@ const PRIMARY_NAV: NavItem[] = [
   { to: '/assignments', icon: ClipboardList,   label: 'Assignments', featureId: 'assignments',                          tierFeature: 'assignments' },
   { to: '/resources',   icon: FolderOpen,      label: 'Resources',   featureId: 'resources',                            tierFeature: 'resources'   },
   { to: '/guide',       icon: BookOpen,        label: 'School Guide', featureId: 'guide',                                tierFeature: 'faq'         },
+  { to: '/bug-reports', icon: Bug,             label: 'Bug Reports', featureId: 'bugReports'                                                       },
 ]
 
 function SidebarGroup({ label, icon, defaultOpen = false, children }: {

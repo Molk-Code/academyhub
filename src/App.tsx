@@ -46,6 +46,7 @@ const ProductionEditor      = lazy(() => import('@/pages/student/ProductionEdito
 const StudentProduction     = lazy(() => import('@/pages/student/Production'))
 const StudentProductionPeriod = lazy(() => import('@/pages/student/ProductionPeriod'))
 const StudentGuide          = lazy(() => import('@/pages/student/Guide'))
+const MyBugReports          = lazy(() => import('@/pages/MyBugReports'))
 const StudentVideoLibrary   = lazy(() => import('@/pages/student/VideoLibrary'))
 const VideoLab              = lazy(() => import('@/pages/student/VideoLab'))
 const VideoLabPlayer        = lazy(() => import('@/pages/student/VideoLabPlayer'))
@@ -162,6 +163,7 @@ export default function App() {
             <Route path="/semester"          element={<Navigate to="/dashboard" replace />} />
             <Route path="/food-boxes"        element={<FeatureGate feature="food_box"><FoodBoxOrder standalone /></FeatureGate>} />
             <Route path="/vehicles"          element={<FeatureGate feature="vehicles"><VehicleBooking /></FeatureGate>} />
+            <Route path="/bug-reports"       element={<MyBugReports />} />
           </Route>
 
           {/* ── Teacher ─────────────────────────────────────────────────── */}
@@ -202,6 +204,7 @@ export default function App() {
             <Route path="/teacher/equipment-requests"         element={<FeatureGate feature="equipment" redirectTo="/teacher"><EquipmentRequests /></FeatureGate>} />
             <Route path="/teacher/notebook"                   element={<Notebook />} />
             <Route path="/teacher/guest-teachers"            element={<GuestTeacherBank />} />
+            <Route path="/teacher/bug-reports"               element={<MyBugReports />} />
           </Route>
 
           {/* ── Admin ───────────────────────────────────────────────────── */}

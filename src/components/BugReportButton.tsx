@@ -10,6 +10,17 @@ interface SelectedElement {
   text: string
   tag: string
   selector: string
+  tabLabel: string
+}
+
+// Many pages (e.g. the production editor) switch between sub-views with
+// client-side tab state that isn't reflected in the URL — so navigating back
+// to the reported page alone can land on the wrong sub-view. Grab the active
+// tab's visible label (this codebase's convention for an active tab button)
+// so the admin "Go to element" flow can click it back into place first.
+function activeTabLabel(): string {
+  const el = document.querySelector('button.bg-brand-600')
+  return el?.textContent?.trim().slice(0, 60) ?? ''
 }
 
 // Auto-detect device type and whether the app is running installed (PWA)
@@ -98,6 +109,7 @@ export default function BugReportButton() {
       text: target.textContent?.trim().slice(0, 120) ?? '',
       tag: target.tagName.toLowerCase(),
       selector: cssPath(target),
+      tabLabel: activeTabLabel(),
     })
     setMode('describing')
   }, [])
@@ -145,6 +157,7 @@ export default function BugReportButton() {
         elementText: selected?.text ?? '',
         elementTag: selected?.tag ?? '',
         elementSelector: selected?.selector ?? '',
+        elementTabLabel: selected?.tabLabel ?? '',
         description: description.trim(),
         status: 'open',
         createdAt: serverTimestamp(),

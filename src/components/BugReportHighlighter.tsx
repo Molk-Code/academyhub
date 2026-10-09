@@ -5,10 +5,21 @@ const STORAGE_KEY = 'bugReportHighlight'
 const MAX_AGE_MS = 20000
 const MAX_ATTEMPTS = 30
 
-export function requestHighlight(page: string, selector: string) {
+export function requestHighlight(page: string, selector: string, tabLabel?: string) {
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ page, selector, ts: Date.now() }))
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ page, selector, tabLabel, ts: Date.now() }))
   } catch { /* storage unavailable — highlight is a nice-to-have, safe to skip */ }
+}
+
+// Finds a tab-like button by its exact visible text and clicks it — used to
+// switch a tabbed page (e.g. the production editor) back to the sub-view the
+// reporter was on, since that's client-side state not reflected in the URL.
+function clickMatchingTab(label: string) {
+  const buttons = document.querySelectorAll('button')
+  for (const btn of buttons) {
+    if (btn.textContent?.trim() === label) { btn.click(); return true }
+  }
+  return false
 }
 
 // Mounted once near the app root. After navigating to a reported page, looks
@@ -23,16 +34,18 @@ export default function BugReportHighlighter() {
     try { raw = sessionStorage.getItem(STORAGE_KEY) } catch { return }
     if (!raw) return
 
-    let data: { page: string; selector: string; ts: number }
+    let data: { page: string; selector: string; tabLabel?: string; ts: number }
     try { data = JSON.parse(raw) } catch { return }
     if (location.pathname !== data.page) return
     if (Date.now() - data.ts > MAX_AGE_MS) { try { sessionStorage.removeItem(STORAGE_KEY) } catch {}; return }
 
     let cancelled = false
     let attempts = 0
+    let triedTab = false
 
     function tryHighlight() {
       if (cancelled) return
+      if (!triedTab && data.tabLabel) { clickMatchingTab(data.tabLabel); triedTab = true }
       let el: Element | null = null
       try { el = document.querySelector(data.selector) } catch { /* stale/invalid selector */ }
 

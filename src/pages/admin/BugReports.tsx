@@ -18,6 +18,7 @@ interface BugReportDoc {
   elementText: string
   elementTag: string
   elementSelector?: string
+  elementTabLabel?: string
   description: string
   status: 'open' | 'in_progress' | 'resolved' | 'wont_fix'
   createdAt: Timestamp
@@ -140,7 +141,7 @@ function ReportCard({ report }: { report: BugReportDoc }) {
 
   function goToElement() {
     if (!report.elementSelector) return
-    requestHighlight(report.page, report.elementSelector)
+    requestHighlight(report.page, report.elementSelector, report.elementTabLabel)
     navigate(report.page)
   }
 

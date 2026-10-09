@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { updateDoc, deleteDoc, doc, arrayUnion, Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
 import { useAuth } from '@/contexts/AuthContext'
-import { Bug, Copy, Check, ChevronDown, Circle, CheckCircle2, XCircle, Clock, Trash2, Smartphone, Tablet, Monitor, AppWindow, Globe, Send, MessageCircle } from 'lucide-react'
+import { Bug, Copy, Check, ChevronDown, Circle, CheckCircle2, XCircle, Clock, Trash2, Smartphone, Tablet, Monitor, AppWindow, Globe, Send, MessageCircle, Crosshair } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
+import { requestHighlight } from '@/components/BugReportHighlighter'
 
 interface BugReportDoc {
   id: string
@@ -15,6 +17,7 @@ interface BugReportDoc {
   elementPath: string
   elementText: string
   elementTag: string
+  elementSelector?: string
   description: string
   status: 'open' | 'in_progress' | 'resolved' | 'wont_fix'
   createdAt: Timestamp
@@ -100,6 +103,7 @@ function DeviceBadge({ report }: { report: BugReportDoc }) {
 
 function ReportCard({ report }: { report: BugReportDoc }) {
   const { profile } = useAuth()
+  const navigate = useNavigate()
   const [expanded, setExpanded] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -132,6 +136,12 @@ function ReportCard({ report }: { report: BugReportDoc }) {
   async function removeMessage(index: number) {
     const next = (report.messages ?? []).filter((_, i) => i !== index)
     await updateDoc(doc(db, 'bug_reports', report.id), { messages: next })
+  }
+
+  function goToElement() {
+    if (!report.elementSelector) return
+    requestHighlight(report.page, report.elementSelector)
+    navigate(report.page)
   }
 
   async function handleDelete() {
@@ -177,8 +187,18 @@ function ReportCard({ report }: { report: BugReportDoc }) {
         <div className="border-t border-white/8 px-5 py-4 space-y-4">
           {/* Element info */}
           {(report.elementPath || report.elementText) && (
-            <div className="bg-zinc-800/60 border border-white/5 rounded-xl px-3 py-2.5 space-y-1">
-              <p className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">Element</p>
+            <div className="bg-zinc-800/60 border border-white/5 rounded-xl px-3 py-2.5 space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">Element</p>
+                {report.elementSelector && (
+                  <button
+                    onClick={goToElement}
+                    className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 transition-colors"
+                  >
+                    <Crosshair className="w-3 h-3" /> Go to element
+                  </button>
+                )}
+              </div>
               {report.elementPath && <p className="text-xs text-amber-300 font-mono">{report.elementPath}</p>}
               {report.elementText && (
                 <p className="text-xs text-zinc-500 italic">

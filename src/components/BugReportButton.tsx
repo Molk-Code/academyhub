@@ -9,6 +9,7 @@ interface SelectedElement {
   path: string
   text: string
   tag: string
+  selector: string
 }
 
 // Auto-detect device type and whether the app is running installed (PWA)
@@ -31,6 +32,29 @@ function detectDeviceInfo() {
     viewportWidth: window.innerWidth,
     viewportHeight: window.innerHeight,
   }
+}
+
+// Builds a CSS selector that can re-locate this exact element later (from
+// an id ancestor, or the document root, down through nth-child indices) —
+// used by the admin view's "Go to element" to scroll to and highlight the
+// spot the reporter actually clicked.
+function cssPath(el: Element): string {
+  const parts: string[] = []
+  let node: Element | null = el
+  while (node && node.nodeType === Node.ELEMENT_NODE && node !== document.body) {
+    let selector = node.nodeName.toLowerCase()
+    if (node.id) {
+      parts.unshift(`#${CSS.escape(node.id)}`)
+      break
+    }
+    let nth = 1
+    let sibling = node.previousElementSibling
+    while (sibling) { nth++; sibling = sibling.previousElementSibling }
+    selector += `:nth-child(${nth})`
+    parts.unshift(selector)
+    node = node.parentElement
+  }
+  return parts.join(' > ')
 }
 
 function describeElement(el: Element): string {
@@ -73,6 +97,7 @@ export default function BugReportButton() {
       path: describeElement(target),
       text: target.textContent?.trim().slice(0, 120) ?? '',
       tag: target.tagName.toLowerCase(),
+      selector: cssPath(target),
     })
     setMode('describing')
   }, [])
@@ -119,6 +144,7 @@ export default function BugReportButton() {
         elementPath: selected?.path ?? '',
         elementText: selected?.text ?? '',
         elementTag: selected?.tag ?? '',
+        elementSelector: selected?.selector ?? '',
         description: description.trim(),
         status: 'open',
         createdAt: serverTimestamp(),

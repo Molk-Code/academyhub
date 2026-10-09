@@ -21,6 +21,7 @@ import SuperAdmin from '@/pages/SuperAdmin'
 import SchoolSignup from '@/pages/SchoolSignup'
 
 import NotificationInit from '@/components/NotificationInit'
+import BugReportHighlighter from '@/components/BugReportHighlighter'
 import FeatureGate from '@/components/FeatureGate'
 import UpgradePage from '@/pages/UpgradePage'
 
@@ -122,6 +123,7 @@ export default function App() {
     <MicrosoftAuthProvider>
       <BrowserRouter>
         <NotificationInit />
+        <BugReportHighlighter />
         <Routes>
           {/* ── Public ──────────────────────────────────────────────────── */}
           <Route path="/login"         element={<Login />} />

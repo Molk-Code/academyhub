@@ -7,31 +7,74 @@ import type { ProductionCostumeDoc, ProductionCastDoc, ProductionSceneDoc } from
 import { Plus, Trash2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-// Plain single-line input — kept for the Character/Item name field, which
-// needs the datalist autocomplete (<textarea> doesn't support `list` at
-// all, so that field can't use the auto-growing variant below).
-function InlineInput({
-  value, placeholder, canEdit, onChange, onBlur, className = '', list,
+// Auto-growing textarea with a custom autocomplete dropdown — used for the
+// Character/Item name field, which needs suggestions but also needs to wrap
+// instead of scrolling horizontally (native <input list=…> can't wrap, and
+// <textarea> doesn't support the `list` attribute at all).
+function InlineCombo({
+  value, placeholder, canEdit, onChange, onBlur, className = '', options,
 }: {
   value: string; placeholder: string; canEdit: boolean
-  onChange: (v: string) => void; onBlur: (v: string) => void; className?: string; list?: string
+  onChange: (v: string) => void; onBlur: (v: string) => void; className?: string; options: string[]
 }) {
-  return canEdit ? (
-    <input
-      list={list}
-      className={cn(
-        'bg-transparent w-full focus:bg-zinc-800/80 rounded px-2 py-1 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500/30',
-        className,
+  const [open, setOpen] = useState(false)
+  const taRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (!taRef.current) return
+    taRef.current.style.height = 'auto'
+    taRef.current.style.height = `${taRef.current.scrollHeight}px`
+  }, [value])
+
+  if (!canEdit) {
+    return (
+      <span className={cn('text-sm text-zinc-200 px-2 whitespace-pre-wrap', className)}>
+        {value || <span className="text-zinc-600">—</span>}
+      </span>
+    )
+  }
+
+  const matches = options.filter(o => o !== value && o.toLowerCase().includes(value.toLowerCase()))
+
+  return (
+    <div className="relative">
+      <textarea
+        ref={taRef}
+        rows={1}
+        className={cn(
+          'bg-transparent w-full focus:bg-zinc-800/80 rounded px-2 py-1 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-brand-500/30 resize-none overflow-hidden transition-colors',
+          className,
+        )}
+        value={value}
+        placeholder={placeholder}
+        onFocus={() => setOpen(true)}
+        onChange={e => {
+          onChange(e.target.value)
+          setOpen(true)
+          e.target.style.height = 'auto'
+          e.target.style.height = `${e.target.scrollHeight}px`
+        }}
+        onBlur={e => {
+          setTimeout(() => setOpen(false), 150)
+          onBlur(e.target.value)
+        }}
+        onKeyDown={e => { if (e.key === 'Escape') setOpen(false) }}
+      />
+      {open && matches.length > 0 && (
+        <div className="absolute z-20 top-full left-0 mt-1 w-max min-w-full max-w-xs bg-zinc-800 border border-white/10 rounded-lg shadow-lg overflow-hidden">
+          {matches.slice(0, 8).map(opt => (
+            <button
+              key={opt}
+              type="button"
+              className="block w-full text-left px-3 py-1.5 text-sm text-zinc-200 hover:bg-brand-500/20"
+              onMouseDown={e => { e.preventDefault(); onChange(opt); onBlur(opt) }}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
       )}
-      value={value}
-      placeholder={placeholder}
-      onChange={e => onChange(e.target.value)}
-      onBlur={e => onBlur(e.target.value)}
-    />
-  ) : (
-    <span className={cn('text-sm text-zinc-200 px-2', className)}>
-      {value || <span className="text-zinc-600">—</span>}
-    </span>
+    </div>
   )
 }
 
@@ -170,16 +213,8 @@ export function ItemTab({
     )
   }
 
-  const listId = `${collectionName}-chars-${productionId}`
-
   return (
     <div className="space-y-4">
-      {characterNames.length > 0 && (
-        <datalist id={listId}>
-          {characterNames.map(name => <option key={name} value={name} />)}
-        </datalist>
-      )}
-
       {canEdit && (
         <div className="flex justify-end">
           <button onClick={addItem} className="btn-primary flex items-center gap-2 py-2 px-4 text-sm">
@@ -206,8 +241,8 @@ export function ItemTab({
               return (
                 <tr key={it.id} className="hover:bg-white/3 transition-colors align-middle">
                   <td className="px-2 py-2">
-                    <InlineInput
-                      list={characterNames.length > 0 ? listId : undefined}
+                    <InlineCombo
+                      options={characterNames}
                       value={get(it.id, 'characterName', it.characterName)}
                       placeholder={namePlaceholder}
                       canEdit={canEdit}

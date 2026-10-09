@@ -192,11 +192,11 @@ export function ItemTab({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-white/10">
-              <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider w-36">{nameLabel}</th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">Description</th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider w-32">Appears in scenes</th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider w-32">Responsible</th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">Notes</th>
+              <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider w-44">{nameLabel}</th>
+              <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider min-w-[200px]">Description</th>
+              <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider w-28">Appears in scenes</th>
+              <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider w-40">Responsible</th>
+              <th className="px-3 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider min-w-[200px]">Notes</th>
               {canEdit && <th className="w-10" />}
             </tr>
           </thead>
@@ -205,7 +205,7 @@ export function ItemTab({
               const itemScenes = scenesFor(it.id)
               return (
                 <tr key={it.id} className="hover:bg-white/3 transition-colors align-middle">
-                  <td className="px-1 py-2">
+                  <td className="px-2 py-2">
                     <InlineInput
                       list={characterNames.length > 0 ? listId : undefined}
                       value={get(it.id, 'characterName', it.characterName)}
@@ -215,7 +215,7 @@ export function ItemTab({
                       onBlur={v => save(it.id, 'characterName', v)}
                     />
                   </td>
-                  <td className="px-1 py-2">
+                  <td className="px-2 py-2">
                     <InlineTextarea
                       value={get(it.id, 'description', it.description)}
                       placeholder="Describe…"
@@ -235,7 +235,7 @@ export function ItemTab({
                       </div>
                     )}
                   </td>
-                  <td className="px-1 py-2">
+                  <td className="px-2 py-2">
                     <InlineTextarea
                       value={get(it.id, 'responsible', it.responsible)}
                       placeholder="Who's responsible"
@@ -244,7 +244,7 @@ export function ItemTab({
                       onBlur={v => save(it.id, 'responsible', v)}
                     />
                   </td>
-                  <td className="px-1 py-2">
+                  <td className="px-2 py-2">
                     <InlineTextarea
                       value={get(it.id, 'notes', it.notes)}
                       placeholder="Notes…"

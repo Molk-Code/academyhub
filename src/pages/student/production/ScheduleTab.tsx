@@ -1252,17 +1252,20 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
                         <input type="date"
                           className={cn('bg-zinc-800/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500/30 w-full [color-scheme:dark]', get(day.id, 'date', day.date) ? 'text-zinc-200' : 'text-transparent')}
                           value={get(day.id, 'date', day.date)}
-                          onChange={e => { setLocal(day.id, 'date', e.target.value); saveDay(day.id, 'date', e.target.value) }}
+                          onChange={e => setLocal(day.id, 'date', e.target.value)}
+                          onBlur={e => saveDay(day.id, 'date', e.target.value)}
                         />
                       </div>
                       <div className="flex items-center gap-1.5">
                         <input type="time" className="bg-zinc-800/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-brand-500/30 w-24 [color-scheme:dark]"
                           value={get(day.id, 'startTime', fallbackStart)}
-                          onChange={e => { setLocal(day.id, 'startTime', e.target.value); saveDay(day.id, 'startTime', e.target.value) }} />
+                          onChange={e => setLocal(day.id, 'startTime', e.target.value)}
+                          onBlur={e => saveDay(day.id, 'startTime', e.target.value)} />
                         <span className="text-zinc-600 text-xs">–</span>
                         <input type="time" className="bg-zinc-800/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-brand-500/30 w-24 [color-scheme:dark]"
                           value={get(day.id, 'endTime', fallbackEnd)}
-                          onChange={e => { setLocal(day.id, 'endTime', e.target.value); saveDay(day.id, 'endTime', e.target.value) }} />
+                          onChange={e => setLocal(day.id, 'endTime', e.target.value)}
+                          onBlur={e => saveDay(day.id, 'endTime', e.target.value)} />
                       </div>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2">
@@ -1270,19 +1273,22 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
                         <span className="text-[10px] font-bold text-emerald-500 tracking-widest w-8 flex-shrink-0">RTS</span>
                         <input type="time" className="bg-zinc-800/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 w-24 [color-scheme:dark]"
                           value={get(day.id, 'rtsTime', day.rtsTime ?? '')}
-                          onChange={e => { setLocal(day.id, 'rtsTime', e.target.value); saveDay(day.id, 'rtsTime', e.target.value) }} />
+                          onChange={e => setLocal(day.id, 'rtsTime', e.target.value)}
+                          onBlur={e => saveDay(day.id, 'rtsTime', e.target.value)} />
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] font-bold text-amber-400 tracking-widest w-12 flex-shrink-0">LUNCH</span>
                         <input type="time" className="bg-zinc-800/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-amber-500/30 w-24 [color-scheme:dark]"
                           placeholder="Start"
                           value={get(day.id, 'lunchStart', day.lunchStart ?? '')}
-                          onChange={e => { setLocal(day.id, 'lunchStart', e.target.value); saveDay(day.id, 'lunchStart', e.target.value) }} />
+                          onChange={e => setLocal(day.id, 'lunchStart', e.target.value)}
+                          onBlur={e => saveDay(day.id, 'lunchStart', e.target.value)} />
                         <input type="number" min={0} step={5}
                           className="bg-zinc-800/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-amber-500/30 w-16 [color-scheme:dark]"
                           placeholder="min"
                           value={get(day.id, 'lunchDuration', day.lunchDuration != null ? String(day.lunchDuration) : '')}
-                          onChange={e => { setLocal(day.id, 'lunchDuration', e.target.value); saveDay(day.id, 'lunchDuration', e.target.value ? Number(e.target.value) : '') }} />
+                          onChange={e => setLocal(day.id, 'lunchDuration', e.target.value)}
+                          onBlur={e => saveDay(day.id, 'lunchDuration', e.target.value ? Number(e.target.value) : '')} />
                         <span className="text-[10px] text-zinc-500">min</span>
                       </div>
                       <AutoGrowInput

@@ -337,6 +337,13 @@ export default function ProductionEditor() {
     setPendingScreenplayFile(file)
   }
 
+  // Some mobile file providers (Drive, scanner apps, certain Files apps)
+  // report an empty or wrong MIME type for PDFs — trust the extension too,
+  // not just file.type, or a real PDF can silently fail this check.
+  function isPdfFile(file: File): boolean {
+    return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+  }
+
   async function uploadScreenplay(file: File, resetBreakdown: boolean) {
     if (!id) return
     setUploadProgress(0)
@@ -899,7 +906,7 @@ export default function ProductionEditor() {
                     <>
                       <label className="cursor-pointer p-1 text-zinc-500 hover:text-zinc-200 transition-colors flex-shrink-0" title="Replace screenplay">
                         <Upload className="w-3.5 h-3.5" />
-                        <input type="file" accept="application/pdf" className="hidden" onChange={e => e.target.files?.[0] && selectScreenplayFile(e.target.files[0])} />
+                        <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={e => e.target.files?.[0] && selectScreenplayFile(e.target.files[0])} />
                       </label>
                       <button onClick={removeScreenplay} className="p-1 text-zinc-500 hover:text-rose-400 transition-colors flex-shrink-0" title="Remove screenplay">
                         <X className="w-3.5 h-3.5" />
@@ -1033,7 +1040,9 @@ export default function ProductionEditor() {
                     e.preventDefault()
                     setDragOver(false)
                     const file = e.dataTransfer.files[0]
-                    if (file?.type === 'application/pdf') selectScreenplayFile(file)
+                    if (!file) return
+                    if (isPdfFile(file)) selectScreenplayFile(file)
+                    else setUploadNotice({ type: 'error', text: `"${file.name}" doesn't look like a PDF — please select a PDF file.` })
                   }}
                 >
                   <FileText className={cn('w-10 h-10 transition-colors', dragOver ? 'text-brand-400' : 'text-zinc-600 group-hover:text-brand-400')} />
@@ -1044,7 +1053,7 @@ export default function ProductionEditor() {
                     <p className="text-sm text-zinc-500 mt-1 hidden md:block">Drag & drop or tap — PDF format</p>
                     <p className="text-sm text-zinc-500 mt-1 md:hidden">Tap to select a PDF</p>
                   </div>
-                  <input type="file" accept="application/pdf" className="hidden" onChange={e => e.target.files?.[0] && selectScreenplayFile(e.target.files[0])} />
+                  <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={e => e.target.files?.[0] && selectScreenplayFile(e.target.files[0])} />
                 </label>
               </div>
             ) : (

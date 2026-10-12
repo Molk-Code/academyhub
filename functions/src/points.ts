@@ -1,5 +1,5 @@
 import { admin, functions, db, requireTeacherOrAdmin } from './lib'
-import { sendPush, pushToTeachersAndAdmins } from './notifications-core'
+import { sendPush, saveNotifications, pushToTeachersAndAdmins } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // processRedemption — validate and record a prize claim
@@ -317,28 +317,18 @@ export const fulfillClaim = functions.https.onCall(async (data, context) => {
     }
   })
 
-  // Push notification to student
+  // Notify student — in-app always, push only if they have a registered device
   const studentSnap = await db.collection('users').doc(claim.studentId as string).get()
   const tokens: string[] = studentSnap.data()?.fcmTokens ?? []
-  if (tokens.length > 0) {
-    const prizeSnap = await db.collection('prizes').doc(claim.prizeId as string).get()
-    const prizeTitle = prizeSnap.data()?.title ?? 'your prize'
-    if (action === 'fulfilled') {
-      await sendPush(tokens, {
-        title: '🎉 Prize ready!',
-        body:  `Your claim for "${prizeTitle}" has been fulfilled. Enjoy!`,
-        url:   '/prizes',
-        tag:   'prize-claim',
-      })
-    } else {
-      await sendPush(tokens, {
-        title: '❌ Prize claim rejected',
-        body:  `Your claim for "${prizeTitle}" was rejected. Your points have been refunded.`,
-        url:   '/prizes',
-        tag:   'prize-claim',
-      })
-    }
-  }
+  const prizeSnap = await db.collection('prizes').doc(claim.prizeId as string).get()
+  const prizeTitle = prizeSnap.data()?.title ?? 'your prize'
+  const opts = action === 'fulfilled'
+    ? { title: '🎉 Prize ready!', body: `Your claim for "${prizeTitle}" has been fulfilled. Enjoy!`, url: '/prizes' }
+    : { title: '❌ Prize claim rejected', body: `Your claim for "${prizeTitle}" was rejected. Your points have been refunded.`, url: '/prizes' }
+  await Promise.all([
+    tokens.length > 0 ? sendPush(tokens, { ...opts, tag: 'prize-claim' }) : Promise.resolve(),
+    saveNotifications([claim.studentId as string], opts),
+  ])
 
   return { success: true }
 })

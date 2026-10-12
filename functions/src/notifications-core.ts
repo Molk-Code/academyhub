@@ -206,7 +206,11 @@ export async function pushToTeachersAndAdmins(title: string, body: string, url: 
 export async function pushToStudent(studentId: string, title: string, body: string) {
   const snap = await db.collection('users').doc(studentId).get()
   const tokens: string[] = snap.data()?.fcmTokens ?? []
-  await sendPush(tokens, { title, body, url: '/my-bookings', tag: 'booking-update' })
+  const opts = { title, body, url: '/my-bookings' }
+  await Promise.all([
+    sendPush(tokens, { ...opts, tag: 'booking-update' }),
+    saveNotifications([studentId], opts),
+  ])
 }
 
 export async function pushToUser(uid: string, title: string, body: string, url: string, tag?: string) {

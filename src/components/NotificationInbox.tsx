@@ -26,7 +26,7 @@ export default function NotificationInbox() {
 
   const { data: notifications } = useCollection<NotificationDoc>(
     'notifications',
-    profile ? [where('uid', '==', profile.uid), orderBy('createdAt', 'desc'), limit(20)] : [],
+    profile ? [where('uid', '==', profile.uid), orderBy('createdAt', 'desc'), limit(4)] : [],
     !!profile,
   )
 

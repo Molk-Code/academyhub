@@ -1,6 +1,13 @@
 import { functions, db } from './lib'
 import { sendPush, saveNotifications, pushToAdmins } from './notifications-core'
 
+async function pushAndSave(studentId: string, tokens: string[], opts: { title: string; body: string; url: string; tag: string }) {
+  await Promise.all([
+    sendPush(tokens, opts),
+    saveNotifications([studentId], opts),
+  ])
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // onEquipmentBookingCreated — notify teachers/admins of new equipment requests
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,7 +26,7 @@ export const onEquipmentBookingCreated = functions.firestore
       // Notify the student before deleting so they know why it was rejected
       const studentSnap = await db.collection('users').doc(booking.studentId as string).get()
       const tokens: string[] = studentSnap.data()?.fcmTokens ?? []
-      await sendPush(tokens, {
+      await pushAndSave(booking.studentId as string, tokens, {
         title: '⚠️ Equipment booking limit reached',
         body: 'You already have 5 pending requests. Cancel or wait for one to be confirmed before adding more.',
         url: '/booking/equipment',
@@ -45,7 +52,7 @@ export const onEquipmentBookingCreated = functions.firestore
       if (equip.filmYear2Only && programYear !== 2) {
         await snap.ref.delete()
         const tokens: string[] = studentData?.fcmTokens ?? []
-        await sendPush(tokens, {
+        await pushAndSave(booking.studentId as string, tokens, {
           title: '🚫 Booking rejected',
           body: `"${equip.name}" is only available to Year 2 students`,
           url: '/booking/equipment',
@@ -56,7 +63,7 @@ export const onEquipmentBookingCreated = functions.firestore
       if (equip.allowedCohortIds?.length > 0 && studentData?.cohortId && !equip.allowedCohortIds.includes(studentData.cohortId)) {
         await snap.ref.delete()
         const tokens: string[] = studentData?.fcmTokens ?? []
-        await sendPush(tokens, {
+        await pushAndSave(booking.studentId as string, tokens, {
           title: '🚫 Booking rejected',
           body: `"${equip.name}" is not available for your class`,
           url: '/booking/equipment',

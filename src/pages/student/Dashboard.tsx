@@ -683,7 +683,10 @@ export default function StudentDashboard() {
                 {myTeam.emoji} {myTeam.name} — Today's Commandment
               </p>
             </div>
-            <p className="text-lg font-bold leading-snug">{dailyCommandment.text}</p>
+            <p className="text-lg font-bold leading-snug">
+              {dailyCommandment.text}
+              {dailyCommandment.description && <span className="font-normal opacity-90"> — remember {dailyCommandment.description}</span>}
+            </p>
           </div>
         </Link>
       )}

@@ -605,6 +605,7 @@ export interface ChatChannelDoc {
 export interface Commandment {
   id: string
   text: string
+  description?: string
   order: number
 }
 

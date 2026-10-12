@@ -451,7 +451,10 @@ export default function StudentProduction() {
                 <span className="text-4xl font-black opacity-30 leading-none mt-1">
                   {String(sortedCommandments.indexOf(dailyCommandment) + 1).padStart(2, '0')}
                 </span>
-                <p className="text-xl font-bold leading-snug">{dailyCommandment.text}</p>
+                <p className="text-xl font-bold leading-snug">
+                  {dailyCommandment.text}
+                  {dailyCommandment.description && <span className="font-normal opacity-90"> — remember {dailyCommandment.description}</span>}
+                </p>
               </div>
             </div>
           )}
@@ -474,7 +477,10 @@ export default function StudentProduction() {
                     >
                       {i + 1}
                     </span>
-                    <p className="text-zinc-200 font-medium leading-relaxed pt-1.5">{cmd.text}</p>
+                    <div className="pt-1.5">
+                      <p className="text-zinc-200 font-medium leading-relaxed">{cmd.text}</p>
+                      {cmd.description && <p className="text-zinc-400 text-sm mt-1">{cmd.description}</p>}
+                    </div>
                   </div>
                 ))}
               </div>

@@ -100,6 +100,7 @@ export default function TeacherProduction() {
   const [cmdEditing, setCmdEditing] = useState<string | null>(null)
   const [cmdAdding, setCmdAdding] = useState(false)
   const [cmdText, setCmdText] = useState('')
+  const [cmdDesc, setCmdDesc] = useState('')
   const [savingCmd, setSavingCmd] = useState(false)
 
   const assignedIds = useMemo(() => new Set(teams.flatMap(t => t.memberIds)), [teams])
@@ -217,14 +218,15 @@ export default function TeacherProduction() {
     const cmds = selectedTeam.commandments ?? []
     let updated: Commandment[]
     if (cmdEditing) {
-      updated = cmds.map(c => c.id === cmdEditing ? { ...c, text: cmdText.trim() } : c)
+      updated = cmds.map(c => c.id === cmdEditing ? { ...c, text: cmdText.trim(), description: cmdDesc.trim() } : c)
     } else {
-      updated = [...cmds, { id: nanoid(), text: cmdText.trim(), order: cmds.length }]
+      updated = [...cmds, { id: nanoid(), text: cmdText.trim(), description: cmdDesc.trim(), order: cmds.length }]
     }
     await updateDoc(doc(db, 'production_teams', selectedTeam.id), { commandments: updated })
     setCmdEditing(null)
     setCmdAdding(false)
     setCmdText('')
+    setCmdDesc('')
     setSavingCmd(false)
   }
 
@@ -528,23 +530,31 @@ export default function TeacherProduction() {
                     <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
                       <h3 className="font-semibold text-zinc-100">Commandments</h3>
                       {!cmdAdding && !cmdEditing && (
-                        <button onClick={() => { setCmdAdding(true); setCmdText('') }} className="btn-secondary py-1.5 text-xs gap-1.5">
+                        <button onClick={() => { setCmdAdding(true); setCmdText(''); setCmdDesc('') }} className="btn-secondary py-1.5 text-xs gap-1.5">
                           <Plus className="w-3.5 h-3.5" /> Add
                         </button>
                       )}
                     </div>
                     {cmdAdding && (
-                      <div className="px-5 py-3 bg-zinc-900/50 border-b border-white/8 flex items-center gap-2">
+                      <div className="px-5 py-3 bg-zinc-900/50 border-b border-white/8 space-y-2">
                         <input
                           autoFocus
-                          className="input py-2 text-sm flex-1"
+                          className="input py-2 text-sm w-full"
                           value={cmdText}
                           onChange={e => setCmdText(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && saveCommandment()}
-                          placeholder="Write the commandment…"
+                          placeholder="Write the commandment… (e.g. Engagement)"
                         />
-                        <button onClick={saveCommandment} disabled={savingCmd || !cmdText.trim()} className="p-2 text-emerald-500 hover:text-emerald-600 transition-colors"><Check className="w-4 h-4" /></button>
-                        <button onClick={() => setCmdAdding(false)} className="p-2 text-zinc-400 hover:text-zinc-400 transition-colors"><X className="w-4 h-4" /></button>
+                        <input
+                          className="input py-2 text-sm w-full"
+                          value={cmdDesc}
+                          onChange={e => setCmdDesc(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && saveCommandment()}
+                          placeholder="What this means… (e.g. showing up on time, being involved, etc.)"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => setCmdAdding(false)} className="p-2 text-zinc-400 hover:text-zinc-300 transition-colors"><X className="w-4 h-4" /></button>
+                          <button onClick={saveCommandment} disabled={savingCmd || !cmdText.trim()} className="p-2 text-emerald-500 hover:text-emerald-600 transition-colors"><Check className="w-4 h-4" /></button>
+                        </div>
                       </div>
                     )}
                     <ul className="divide-y divide-slate-100">
@@ -554,16 +564,22 @@ export default function TeacherProduction() {
                             {(i + 1).toString().padStart(2, '0')}
                           </span>
                           {cmdEditing === cmd.id ? (
-                            <>
-                              <input autoFocus className="input py-1.5 text-sm flex-1" value={cmdText} onChange={e => setCmdText(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveCommandment()} />
-                              <button onClick={saveCommandment} className="p-1.5 text-emerald-500 hover:text-emerald-600 transition-colors"><Check className="w-4 h-4" /></button>
-                              <button onClick={() => setCmdEditing(null)} className="p-1.5 text-zinc-400 hover:text-zinc-400 transition-colors"><X className="w-4 h-4" /></button>
-                            </>
+                            <div className="flex-1 space-y-2">
+                              <input autoFocus className="input py-1.5 text-sm w-full" value={cmdText} onChange={e => setCmdText(e.target.value)} placeholder="Commandment" />
+                              <input className="input py-1.5 text-sm w-full" value={cmdDesc} onChange={e => setCmdDesc(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveCommandment()} placeholder="What this means…" />
+                              <div className="flex justify-end gap-1">
+                                <button onClick={() => setCmdEditing(null)} className="p-1.5 text-zinc-400 hover:text-zinc-300 transition-colors"><X className="w-4 h-4" /></button>
+                                <button onClick={saveCommandment} className="p-1.5 text-emerald-500 hover:text-emerald-600 transition-colors"><Check className="w-4 h-4" /></button>
+                              </div>
+                            </div>
                           ) : (
                             <>
-                              <span className="flex-1 text-sm text-zinc-200 pt-0.5">{cmd.text}</span>
+                              <div className="flex-1 pt-0.5">
+                                <p className="text-sm text-zinc-200">{cmd.text}</p>
+                                {cmd.description && <p className="text-xs text-zinc-400 mt-0.5">{cmd.description}</p>}
+                              </div>
                               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => { setCmdEditing(cmd.id); setCmdText(cmd.text); setCmdAdding(false) }} className="p-1.5 text-zinc-400 hover:text-zinc-300 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                                <button onClick={() => { setCmdEditing(cmd.id); setCmdText(cmd.text); setCmdDesc(cmd.description ?? ''); setCmdAdding(false) }} className="p-1.5 text-zinc-400 hover:text-zinc-300 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
                                 <button onClick={() => deleteCommandment(cmd.id)} className="p-1.5 text-zinc-400 hover:text-rose-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                               </div>
                             </>

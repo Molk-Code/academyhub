@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { doc, updateDoc, addDoc, deleteDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { doc, updateDoc, addDoc, deleteDoc, collection, serverTimestamp, getDocs, query, where, writeBatch } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
@@ -278,9 +278,25 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
       location: '', description: '', castIds: [], costumeIds: [], makeupIds: [], propsIds: [], notes: '',
     })
   }
+  // Deleting just the scene doc left its shots orphaned (still counted in
+  // the Schedule tab's per-day shot total forever, invisibly, since the
+  // scene they belonged to no longer renders) and left the scene's id
+  // stuck in any shootingDay.sceneIds that had scheduled it — so cascade
+  // both here.
   async function deleteScene(id: string) {
     if (!confirm('Delete this scene?')) return
-    await deleteDoc(doc(db, `productions/${productionId}/scenes`, id))
+    const [shotsSnap, daysSnap] = await Promise.all([
+      getDocs(query(collection(db, `productions/${productionId}/shots`), where('sceneId', '==', id))),
+      getDocs(collection(db, `productions/${productionId}/shootingDays`)),
+    ])
+    const batch = writeBatch(db)
+    shotsSnap.docs.forEach(d => batch.delete(d.ref))
+    daysSnap.docs.forEach(d => {
+      const sceneIds = (d.data().sceneIds ?? []) as string[]
+      if (sceneIds.includes(id)) batch.update(d.ref, { sceneIds: sceneIds.filter(sid => sid !== id) })
+    })
+    batch.delete(doc(db, `productions/${productionId}/scenes`, id))
+    await batch.commit()
   }
   async function moveScene(id: string, dir: 'up' | 'down') {
     if (!canEdit) return

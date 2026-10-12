@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   doc, updateDoc, deleteDoc, addDoc, collection, serverTimestamp, arrayUnion, arrayRemove,
-  getDocs, deleteField,
+  getDocs, deleteField, writeBatch,
 } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
@@ -381,10 +381,24 @@ export default function ProductionEditor() {
       })
   }
 
+  // Also cascades to shots and shootingDays.sceneIds — otherwise a reset
+  // import leaves orphaned shots that stay invisible but keep inflating the
+  // Schedule tab's per-day shot totals forever.
   async function deleteAllScenes() {
     if (!id) return
-    const snap = await getDocs(collection(db, 'productions', id, 'scenes'))
-    await Promise.all(snap.docs.map(d => deleteDoc(d.ref)))
+    const [scenesSnap, shotsSnap, daysSnap] = await Promise.all([
+      getDocs(collection(db, 'productions', id, 'scenes')),
+      getDocs(collection(db, 'productions', id, 'shots')),
+      getDocs(collection(db, 'productions', id, 'shootingDays')),
+    ])
+    const batch = writeBatch(db)
+    scenesSnap.docs.forEach(d => batch.delete(d.ref))
+    shotsSnap.docs.forEach(d => batch.delete(d.ref))
+    daysSnap.docs.forEach(d => {
+      const sceneIds = (d.data().sceneIds ?? []) as string[]
+      if (sceneIds.length > 0) batch.update(d.ref, { sceneIds: [] })
+    })
+    await batch.commit()
   }
 
   // Replaces the script breakdown's scenes wholesale with the given list —

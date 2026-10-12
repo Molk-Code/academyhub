@@ -77,6 +77,24 @@ function EquipmentStatusTab({
   const [search, setSearch] = useState('')
   const filtered = equipment.filter(e => e.name?.toLowerCase().includes(search.toLowerCase()))
 
+  // Group order: damaged/missing first, then checked-out (incl. overdue), then available — alphabetical within each group.
+  const statusPriority = (status: 'damaged' | 'missing' | 'checked-out' | 'available') =>
+    status === 'damaged' || status === 'missing' ? 0 : status === 'checked-out' ? 1 : 2
+
+  const rows = useMemo(() => {
+    return filtered
+      .map(e => {
+        const activeItem = allItems.find(i => (i.equipmentId === e.id || i.equipmentName === e.name) && i.status !== 'returned')
+        const proj = activeItem ? projectMap[activeItem.projectId] : undefined
+        const status: 'damaged' | 'missing' | 'checked-out' | 'available' =
+          activeItem?.status === 'damaged' ? 'damaged' :
+          activeItem?.status === 'missing' ? 'missing' :
+          activeItem?.status === 'checked-out' ? 'checked-out' : 'available'
+        return { equipment: e, activeItem, proj, status }
+      })
+      .sort((a, b) => statusPriority(a.status) - statusPriority(b.status) || a.equipment.name.localeCompare(b.equipment.name))
+  }, [filtered, allItems, projectMap])
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <input
@@ -96,9 +114,7 @@ function EquipmentStatusTab({
             </tr>
           </thead>
           <tbody>
-            {filtered.map(e => {
-              const activeItem = allItems.find(i => (i.equipmentId === e.id || i.equipmentName === e.name) && i.status !== 'returned')
-              const proj = activeItem ? projectMap[activeItem.projectId] : undefined
+            {rows.map(({ equipment: e, activeItem, proj }) => {
               const { dot, label, color } = getStatusDisplay(activeItem, proj)
               return (
                 <tr key={e.id} style={{ borderBottom: '1px solid #1a1a25' }}>
@@ -116,7 +132,7 @@ function EquipmentStatusTab({
             })}
           </tbody>
         </table>
-        {filtered.length === 0 && <div style={{ textAlign: 'center', padding: '2.5rem', color: '#4a4a60', fontSize: '.85rem' }}>No equipment found</div>}
+        {rows.length === 0 && <div style={{ textAlign: 'center', padding: '2.5rem', color: '#4a4a60', fontSize: '.85rem' }}>No equipment found</div>}
       </div>
     </div>
   )

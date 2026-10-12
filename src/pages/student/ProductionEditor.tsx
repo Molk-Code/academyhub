@@ -206,7 +206,6 @@ export default function ProductionEditor() {
   const [showExports, setShowExports]   = useState(false)
   const [exportingPdf, setExportingPdf] = useState(false)
   const [exportingXls, setExportingXls] = useState(false)
-  const [repairStatus, setRepairStatus] = useState<string | null>(null) // TEMP: one-off orphaned-shots repair, remove button + this + runRepair after use
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [addCollabQuery, setAddCollabQuery] = useState('')
   const [addCollabError, setAddCollabError] = useState('')
@@ -427,21 +426,6 @@ export default function ProductionEditor() {
     setImporting(false)
     setImportSuccess(true)
     setActiveTab('breakdown')
-  }
-
-  // TEMP: one-off repair for productions with orphaned shots/sceneIds from
-  // before deleteScene/deleteAllScenes cascaded. Remove this + the button +
-  // repairOrphanedShots (functions/src/_tmp-repair-orphaned-shots.ts) after use.
-  async function runRepair() {
-    if (!id) return
-    setRepairStatus('Running…')
-    try {
-      const fn = httpsCallable(functions, 'repairOrphanedShots')
-      const res: any = await fn({ productionId: id })
-      setRepairStatus(`Deleted ${res.data.deletedShotIds.length} orphaned shots; updated ${res.data.dayUpdates.length} days.`)
-    } catch (err: any) {
-      setRepairStatus(`Error: ${err.message}`)
-    }
   }
 
   async function removeScreenplay() {
@@ -863,17 +847,6 @@ export default function ProductionEditor() {
               {exportingXls ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
               <span className="hidden sm:inline">{exportingXls ? 'Exporting…' : 'Export Breakdown'}</span>
             </button>
-
-            {/* TEMP: one-off orphaned-shots repair button, remove after use */}
-            {isTeacherOrAdmin && (
-              <button
-                onClick={runRepair}
-                className="flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-medium border bg-amber-900/40 border-amber-500/40 text-amber-300"
-                title="TEMP: repair orphaned shots"
-              >
-                {repairStatus ?? 'Repair shots'}
-              </button>
-            )}
 
             {/* Teacher feedback */}
             {isTeacherOrAdmin && (

@@ -197,6 +197,7 @@ export default function EquipmentBookingPage() {
   )
 
   const [cart, setCart] = useState<Map<string, CartEntry>>(new Map())
+  const [draftQty, setDraftQty] = useState<Map<string, number>>(new Map())
   const [view, setView] = useState<ViewMode>('browse')
   const [cancellingId, setCancellingId] = useState<string | null>(null)
 
@@ -271,15 +272,28 @@ export default function EquipmentBookingPage() {
   const weekDiscountActive = rentalDays >= 5
   const totalPrice = cartList.reduce((sum, { item, quantity }) => sum + item.priceInclVat * quantity * chargeableDays, 0)
 
-  function addToCart(item: EquipmentDoc) {
+  function addToCart(item: EquipmentDoc, qty: number = 1) {
     setCart(prev => {
       const next = new Map(prev)
       if (next.has(item.id)) {
         const entry = next.get(item.id)!
-        next.set(item.id, { ...entry, quantity: entry.quantity + 1 })
+        next.set(item.id, { ...entry, quantity: entry.quantity + qty })
       } else {
-        next.set(item.id, { item, quantity: 1 })
+        next.set(item.id, { item, quantity: qty })
       }
+      return next
+    })
+    setDraftQty(prev => {
+      const next = new Map(prev)
+      next.delete(item.id)
+      return next
+    })
+  }
+
+  function updateDraftQty(id: string, delta: number) {
+    setDraftQty(prev => {
+      const next = new Map(prev)
+      next.set(id, Math.max(1, (next.get(id) ?? 1) + delta))
       return next
     })
   }
@@ -846,7 +860,7 @@ export default function EquipmentBookingPage() {
               <div className="product-grid">
                 {filtered.map(item => {
                   const inCart = cart.has(item.id)
-                  const qty = cart.get(item.id)?.quantity ?? 1
+                  const qty = draftQty.get(item.id) ?? 1
                   const outOfStock = item.available <= 0
                   const locked = isItemLocked(item)
                   const budgetBlocked = !inCart && isOverEquipmentBudget(item)
@@ -892,16 +906,16 @@ export default function EquipmentBookingPage() {
                         <div className="product-actions">
                           {!disabled && !inCart && (
                             <div className="qty-selector">
-                              <button className="day-btn" onClick={() => {/* min 1 */}}>−</button>
+                              <button className="day-btn" onClick={() => updateDraftQty(item.id, -1)}>−</button>
                               <span className="day-count">{qty}</span>
-                              <button className="day-btn">+</button>
+                              <button className="day-btn" onClick={() => updateDraftQty(item.id, 1)}>+</button>
                             </div>
                           )}
                           <button
                             className={`add-to-cart-btn${inCart ? ' in-cart' : ''}`}
                             disabled={disabled || (needsProduction && !selectedProductionId)}
                             title={needsProduction && !selectedProductionId ? 'Select a production first' : undefined}
-                            onClick={() => inCart ? removeFromCart(item.id) : addToCart(item)}
+                            onClick={() => inCart ? removeFromCart(item.id) : addToCart(item, qty)}
                           >
                             {inCart ? <><Check size={14} /> In Cart</> : '+ Add'}
                           </button>

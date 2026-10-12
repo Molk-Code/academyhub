@@ -176,4 +176,15 @@ export const TMP_EQUIPMENT_PRICES: Record<string, number> = {
   "Hob Kokplatta": 100,
   "Power Cable Nätkabel": 25,
   "Power Cable Apparatkabel": 25,
+  // Aliases for our exact item names where the vendor site uses a shorter/differently-punctuated name
+  "Bmpcc 6k - Kit": 1200,
+  "Seetec 15,6 Monitor w. Case": 700,
+  "TV-Logic 7 Field Monitor": 500,
+  "Atomos Shinobi 7 Directors Monitor": 500,
+  "Folkvagn Dolly Kit (Leveler, 2 stands, 2 clamps, 2 straps, Ladder)": 1200,
+  "Zoom H5 (SD-Card, 2x Rechargeable AA-batteries)": 500,
+  // SDI-Cable (Long) / Sdi-Cable (Short) intentionally left unmatched: the
+  // vendor site has a single undifferentiated "SDI-Cable" at 80 kr/day and
+  // we carry two distinct length variants at different prices (77 / 55) —
+  // picking one number for both would be a guess, not a sync.
 }

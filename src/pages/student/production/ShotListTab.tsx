@@ -51,6 +51,30 @@ const SIZE_OPTS     = ['Wide', 'Medium', 'Close-up', 'Extreme Close-up', 'Insert
 const ANGLE_OPTS    = ['Eye level', 'High angle', 'Low angle', 'Ground level', "Bird's eye", 'Dutch']
 const MOVEMENT_OPTS = ['Static', 'Pan', 'Tilt', 'Track', 'Dolly', 'Zoom', 'Handheld', 'Crane', 'Drone']
 
+// Hoisted to module scope — defining this inside ShotListTab's render body
+// gave it a new function identity on every keystroke (any edits-state
+// update re-renders the parent), so React unmounted/remounted every <select>
+// on each change, which could drop the very click that triggered it and
+// made picking a new option feel like it needed several tries.
+function SelectField({
+  id, field, value, displayValue, options, canEdit, onChange,
+}: {
+  id: string; field: string; value: string; displayValue: string; options: string[]
+  canEdit: boolean; onChange: (id: string, field: string, value: string) => void
+}) {
+  return canEdit ? (
+    <select
+      className="bg-zinc-800/60 border border-white/10 rounded-lg px-2 py-1 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-brand-500/30 w-full"
+      value={displayValue}
+      onChange={e => onChange(id, field, e.target.value)}
+    >
+      {options.map(o => <option key={o} value={o}>{o}</option>)}
+    </select>
+  ) : (
+    <span className="text-xs text-zinc-300">{value || '—'}</span>
+  )
+}
+
 interface Props { productionId: string; canEdit: boolean }
 
 export function ShotListTab({ productionId, canEdit }: Props) {
@@ -125,18 +149,9 @@ export function ShotListTab({ productionId, canEdit }: Props) {
     await deleteDoc(doc(db, `productions/${productionId}/shots`, id))
   }
 
-  function SelectField({ id, field, value, options }: { id: string; field: string; value: string; options: string[] }) {
-    return canEdit ? (
-      <select
-        className="bg-zinc-800/60 border border-white/10 rounded-lg px-2 py-1 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-brand-500/30 w-full"
-        value={get(id, field, value)}
-        onChange={e => { setLocal(id, field, e.target.value); save(id, field, e.target.value) }}
-      >
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-    ) : (
-      <span className="text-xs text-zinc-300">{value || '—'}</span>
-    )
+  function handleSelectChange(id: string, field: string, value: string) {
+    setLocal(id, field, value)
+    save(id, field, value)
   }
 
   return (
@@ -204,15 +219,15 @@ export function ShotListTab({ productionId, canEdit }: Props) {
                       <div className="grid grid-cols-3 gap-2">
                         <div>
                           <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Size</p>
-                          <SelectField id={shot.id} field="size" value={shot.size} options={SIZE_OPTS} />
+                          <SelectField id={shot.id} field="size" value={shot.size} displayValue={get(shot.id, 'size', shot.size)} options={SIZE_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
                         </div>
                         <div>
                           <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Angle</p>
-                          <SelectField id={shot.id} field="angle" value={shot.angle} options={ANGLE_OPTS} />
+                          <SelectField id={shot.id} field="angle" value={shot.angle} displayValue={get(shot.id, 'angle', shot.angle)} options={ANGLE_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
                         </div>
                         <div>
                           <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Movement</p>
-                          <SelectField id={shot.id} field="movement" value={shot.movement} options={MOVEMENT_OPTS} />
+                          <SelectField id={shot.id} field="movement" value={shot.movement} displayValue={get(shot.id, 'movement', shot.movement)} options={MOVEMENT_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
                         </div>
                       </div>
                       <div>
@@ -262,13 +277,13 @@ export function ShotListTab({ productionId, canEdit }: Props) {
                           )}
                         </td>
                         <td className="px-2 py-1.5 min-w-[110px]">
-                          <SelectField id={shot.id} field="size" value={shot.size} options={SIZE_OPTS} />
+                          <SelectField id={shot.id} field="size" value={shot.size} displayValue={get(shot.id, 'size', shot.size)} options={SIZE_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
                         </td>
                         <td className="px-2 py-1.5 min-w-[110px]">
-                          <SelectField id={shot.id} field="angle" value={shot.angle} options={ANGLE_OPTS} />
+                          <SelectField id={shot.id} field="angle" value={shot.angle} displayValue={get(shot.id, 'angle', shot.angle)} options={ANGLE_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
                         </td>
                         <td className="px-2 py-1.5 min-w-[100px]">
-                          <SelectField id={shot.id} field="movement" value={shot.movement} options={MOVEMENT_OPTS} />
+                          <SelectField id={shot.id} field="movement" value={shot.movement} displayValue={get(shot.id, 'movement', shot.movement)} options={MOVEMENT_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
                         </td>
                         <td className="px-2 py-1.5 min-w-[120px]">
                           {canEdit ? (

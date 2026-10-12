@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   doc, updateDoc, deleteDoc, addDoc, collection, serverTimestamp, arrayUnion, arrayRemove,
@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useDocument, useCollection, where, orderBy } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
 import type { ProductionDoc, UserDoc, ProductionFeedbackDoc, ProductionTeamDoc, ProductionSceneDoc, ProductionCastDoc, ProductionShotDoc, ProductionShootingDayDoc, ProductionCrewAssignmentDoc, ProductionLocationDoc, ProductionPeriodDoc, ProductionCostumeDoc, ProductionMakeupDoc, ProductionPropsDoc, CohortDoc } from '@/types'
-import { ArrowLeft, Users, Globe, Trash2, MessageSquare, X, Send, ChevronDown, Download, FileSpreadsheet, UserPlus, Eye, Loader2, FileText, Upload, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Users, Globe, Trash2, MessageSquare, X, Send, ChevronDown, Download, FileSpreadsheet, UserPlus, Eye, Loader2, FileText, Upload, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react'
 import { parseScreenplayPDF, type ParsedScene } from '@/lib/parseScreenplay'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import Avatar from '@/components/common/Avatar'
@@ -466,10 +466,13 @@ export default function ProductionEditor() {
     await addCollaboratorUser(addCollabSuggestions[0])
   }
 
+  // Also used to re-sync an already-shared team: viewerIds is a point-in-time
+  // snapshot of membership at share time, so anyone added to the crew after
+  // the initial share never gets access on their own — re-running this for
+  // an already-shared team merges in anyone new (arrayUnion is idempotent,
+  // so already-granted members are unaffected).
   async function shareTeam(team: ProductionTeamDoc) {
     if (!id || !production) return
-    const alreadyShared = (production.sharedTeams ?? []).some(t => t.teamId === team.id)
-    if (alreadyShared) return
     const memberViewers = (team.memberIds ?? []).filter(uid => !allCollabIds.includes(uid))
     const updates: Record<string, any> = {
       sharedTeams: arrayUnion({ teamId: team.id, teamName: team.name }),
@@ -486,6 +489,19 @@ export default function ProductionEditor() {
       sharedTeams: arrayRemove({ teamId, teamName }),
     })
   }
+
+  // viewerIds only captures a shared crew's membership at share time (see
+  // shareTeam above) — self-heal it whenever the owner opens the Share
+  // panel, so anyone added to the crew since then quietly regains access
+  // without needing to notice and click the per-team sync button.
+  useEffect(() => {
+    if (!showCollabs || !canEdit || !isOwner || !production) return
+    for (const t of production.sharedTeams ?? []) {
+      const liveTeam = cohortTeams.find(ct => ct.id === t.teamId)
+      if (liveTeam) shareTeam(liveTeam)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCollabs])
 
   async function linkPeriod(periodId: string) {
     if (!id) return
@@ -633,17 +649,29 @@ export default function ProductionEditor() {
                       {/* Currently shared teams */}
                       {(production.sharedTeams ?? []).length > 0 && (
                         <div className="space-y-1">
-                          {(production.sharedTeams ?? []).map(t => (
-                            <div key={t.teamId} className="flex items-center gap-2 bg-amber-950/20 border border-amber-900/30 rounded-lg px-2.5 py-1.5">
-                              <span className="text-xs text-amber-300 flex-1">{t.teamName}</span>
-                              <button
-                                onClick={() => unshareTeam(t.teamId, t.teamName)}
-                                className="text-zinc-500 hover:text-rose-400 transition-colors"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ))}
+                          {(production.sharedTeams ?? []).map(t => {
+                            const liveTeam = cohortTeams.find(ct => ct.id === t.teamId)
+                            return (
+                              <div key={t.teamId} className="flex items-center gap-2 bg-amber-950/20 border border-amber-900/30 rounded-lg px-2.5 py-1.5">
+                                <span className="text-xs text-amber-300 flex-1">{t.teamName}</span>
+                                {liveTeam && (
+                                  <button
+                                    onClick={() => shareTeam(liveTeam)}
+                                    title="Sync crew members — grants access to anyone added to this crew since it was shared"
+                                    className="text-zinc-500 hover:text-amber-300 transition-colors"
+                                  >
+                                    <RefreshCw className="w-3 h-3" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => unshareTeam(t.teamId, t.teamName)}
+                                  className="text-zinc-500 hover:text-rose-400 transition-colors"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
 

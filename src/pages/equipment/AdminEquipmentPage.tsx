@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect } from 'react'
 import { collection, addDoc, doc, serverTimestamp, getDoc, setDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { httpsCallable } from 'firebase/functions'
+import { db, functions } from '@/lib/firebase'
 import { useCollection } from '@/hooks/useFirestore'
 import type { EquipmentCategoryDoc, EquipmentBookingDoc } from '@/types'
 import { Package, ToggleRight, ToggleLeft } from 'lucide-react'
+import { TMP_EQUIPMENT_PRICES } from './tmpEquipmentPrices'
 import { DEFAULT_CATEGORIES } from './adminEquipmentShared'
 import { CatalogTab } from './EquipmentCatalogTab'
 import { BookingsTab } from './EquipmentBookingsTab'
@@ -58,6 +60,23 @@ export default function AdminEquipmentPage() {
     const next = !pricingEnabled
     setPricingEnabled(next)
     await setDoc(doc(db, 'settings', 'equipment'), { pricingEnabled: next }, { merge: true })
+  }
+
+  // TEMPORARY: one-off vendor price sync. Remove this + the button below +
+  // tmpEquipmentPrices.ts + the tmpSyncEquipmentPrices callable after use.
+  const [syncState, setSyncState] = useState<'idle' | 'running' | 'done'>('idle')
+  const [syncResult, setSyncResult] = useState<any>(null)
+  async function runPriceSync(dryRun: boolean) {
+    setSyncState('running')
+    try {
+      const fn = httpsCallable(functions, 'tmpSyncEquipmentPrices')
+      const res: any = await fn({ prices: TMP_EQUIPMENT_PRICES, dryRun })
+      setSyncResult(res.data)
+    } catch (err: any) {
+      setSyncResult({ error: err.message })
+    } finally {
+      setSyncState('done')
+    }
   }
 
   const tabs: { id: AdminTab; label: string; badge?: number }[] = [
@@ -123,8 +142,27 @@ export default function AdminEquipmentPage() {
               <span className="hidden sm:inline">Prices</span>
               <span className="sm:hidden">Kr</span>
             </button>
+            <button
+              onClick={() => runPriceSync(true)}
+              disabled={syncState === 'running'}
+              style={{ padding: '5px 10px', borderRadius: 10, background: 'rgba(251,191,36,.12)', border: '1px solid #b45309', cursor: 'pointer', fontSize: '.75rem', fontWeight: 600, color: '#fbbf24', whiteSpace: 'nowrap' }}
+            >
+              {syncState === 'running' ? 'Checking…' : 'Preview price sync'}
+            </button>
+            <button
+              onClick={() => runPriceSync(false)}
+              disabled={syncState === 'running'}
+              style={{ padding: '5px 10px', borderRadius: 10, background: 'rgba(251,191,36,.2)', border: '1px solid #b45309', cursor: 'pointer', fontSize: '.75rem', fontWeight: 700, color: '#fbbf24', whiteSpace: 'nowrap' }}
+            >
+              Apply price sync
+            </button>
           </div>
         </div>
+        {syncResult && (
+          <pre style={{ margin: '0 20px 12px', padding: 12, background: '#111118', border: '1px solid #2a2a3a', borderRadius: 10, fontSize: '.7rem', color: '#a0a0b0', maxHeight: 300, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
+            {JSON.stringify(syncResult, null, 2)}
+          </pre>
+        )}
       </header>
 
       <div className="main">

@@ -84,13 +84,15 @@ function EquipmentStatusTab({
   const rows = useMemo(() => {
     return filtered
       .map(e => {
-        const activeItem = allItems.find(i => (i.equipmentId === e.id || i.equipmentName === e.name) && i.status !== 'returned')
+        const matching = allItems.filter(i => (i.equipmentId === e.id || i.equipmentName === e.name) && i.status !== 'returned')
+        const activeItem = matching[0]
         const proj = activeItem ? projectMap[activeItem.projectId] : undefined
         const status: 'damaged' | 'missing' | 'checked-out' | 'available' =
           activeItem?.status === 'damaged' ? 'damaged' :
           activeItem?.status === 'missing' ? 'missing' :
           activeItem?.status === 'checked-out' ? 'checked-out' : 'available'
-        return { equipment: e, activeItem, proj, status }
+        const checkedOutCount = matching.filter(i => i.status === 'checked-out').length
+        return { equipment: e, activeItem, proj, status, checkedOutCount }
       })
       .sort((a, b) => statusPriority(a.status) - statusPriority(b.status) || a.equipment.name.localeCompare(b.equipment.name))
   }, [filtered, allItems, projectMap])
@@ -114,11 +116,13 @@ function EquipmentStatusTab({
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ equipment: e, activeItem, proj }) => {
+            {rows.map(({ equipment: e, activeItem, proj, checkedOutCount }) => {
               const { dot, label, color } = getStatusDisplay(activeItem, proj)
               return (
                 <tr key={e.id} style={{ borderBottom: '1px solid #1a1a25' }}>
-                  <td style={{ padding: '.5rem .75rem', color: '#f0f0f5', fontWeight: 600 }}>{e.name}</td>
+                  <td style={{ padding: '.5rem .75rem', color: '#f0f0f5', fontWeight: 600 }}>
+                    {e.name}{checkedOutCount > 1 ? <span style={{ color: '#6a6a80', fontWeight: 700 }}> ×{checkedOutCount}</span> : ''}
+                  </td>
                   <td style={{ padding: '.5rem .75rem', color: '#f97316', fontSize: '.7rem', fontWeight: 700 }}>{e.category}</td>
                   <td style={{ padding: '.5rem .75rem' }}><span style={{ color }}>{dot} {label}</span></td>
                   <td style={{ padding: '.5rem .75rem', color: '#6a6a80' }}>

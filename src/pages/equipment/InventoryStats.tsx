@@ -5,6 +5,7 @@ import { useDocument } from '@/hooks/useFirestore'
 import {
   BarChart2, Package, TrendingUp, XCircle, AlertTriangle,
 } from 'lucide-react'
+import { calcRentalDays, billableDays } from '@/lib/productionBudget'
 import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, UserDoc, CohortDoc } from '@/types'
 import './molkom.css'
 
@@ -19,6 +20,7 @@ const TABS = [
   { id: 'manual',           label: 'Manual Checkouts' },
   { id: 'borrowers',        label: 'Borrowers' },
   { id: 'projects',         label: 'Projects' },
+  { id: 'budget',           label: 'Budget' },
 ]
 
 function today() { return new Date().toISOString().slice(0, 10) }
@@ -307,6 +309,68 @@ function ProjectsTab({
   )
 }
 
+function ProjectBudgetTab({
+  projects, allItems, equipment, onOpenProject,
+}: {
+  projects: InventoryProjectDoc[]
+  allItems: Item[]
+  equipment: EquipmentDoc[]
+  onOpenProject: (id: string) => void
+}) {
+  const equipmentById   = useMemo(() => Object.fromEntries(equipment.map(e => [e.id, e])), [equipment])
+  const equipmentByName = useMemo(() => Object.fromEntries(equipment.map(e => [e.name, e])), [equipment])
+
+  const rows = useMemo(() => {
+    return projects.map(p => {
+      const pItems = allItems.filter(i => i.projectId === p.id)
+      const days = billableDays(calcRentalDays(p.checkoutDate, p.returnDate))
+      const cost = pItems.reduce((sum, i) => {
+        const eq = equipmentById[i.equipmentId] ?? equipmentByName[i.equipmentName]
+        return sum + (eq?.priceInclVat ?? 0) * days
+      }, 0)
+      return { project: p, itemCount: pItems.length, cost }
+    }).sort((a, b) => b.cost - a.cost)
+  }, [projects, allItems, equipmentById, equipmentByName])
+
+  const total = rows.reduce((sum, r) => sum + r.cost, 0)
+
+  if (rows.length === 0) return <Empty msg="No projects yet" />
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ fontSize: '.85rem', color: '#6a6a80' }}>
+        Total across {rows.length} project{rows.length !== 1 ? 's' : ''}: <span style={{ color: '#f0f0f5', fontWeight: 700 }}>{total.toLocaleString('sv-SE')} kr</span>
+      </div>
+      <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 12, overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid #2a2a3a' }}>
+              {['#', 'Project', 'Dates', 'Items', 'Cost'].map(h => (
+                <th key={h} style={{ textAlign: h === 'Cost' || h === 'Items' ? 'right' : 'left', padding: '.5rem .75rem', color: '#6a6a80', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.project.id} style={{ borderBottom: '1px solid #1a1a25' }}>
+                <td style={{ padding: '.5rem .75rem', color: '#4a4a60', fontFamily: 'monospace' }}>#{i + 1}</td>
+                <td style={{ padding: '.5rem .75rem' }}>
+                  <button onClick={() => onOpenProject(r.project.id)} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600, fontSize: 'inherit' }}>
+                    {r.project.name}
+                  </button>
+                </td>
+                <td style={{ padding: '.5rem .75rem', color: '#4a4a60', fontSize: '.75rem' }}>{r.project.checkoutDate ? `${r.project.checkoutDate} → ${r.project.returnDate}` : '—'}</td>
+                <td style={{ padding: '.5rem .75rem', color: '#6a6a80', textAlign: 'right' }}>{r.itemCount}</td>
+                <td style={{ padding: '.5rem .75rem', color: '#f0f0f5', fontWeight: 700, textAlign: 'right' }}>{r.cost > 0 ? `${r.cost.toLocaleString('sv-SE')} kr` : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 function Empty({ msg }: { msg: string }) {
   return (
     <div className="inv-empty">{msg}</div>
@@ -547,6 +611,7 @@ export function StatsContent({
         />}
         {activeTab === 'borrowers' && <BorrowersTab users={users} projects={visibleBorrowerProjects} allItems={allItems} cohortNames={cohortNames} />}
         {activeTab === 'projects'  && <ProjectsTab projects={projects} allItems={allItems} onOpenProject={onOpenProject} />}
+        {activeTab === 'budget'    && <ProjectBudgetTab projects={projects} allItems={allItems} equipment={equipment} onOpenProject={onOpenProject} />}
       </div>
     </>
   )

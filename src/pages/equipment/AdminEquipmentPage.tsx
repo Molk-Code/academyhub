@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { collection, addDoc, doc, serverTimestamp, getDoc, setDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { httpsCallable } from 'firebase/functions'
+import { db, functions } from '@/lib/firebase'
 import { useCollection } from '@/hooks/useFirestore'
 import type { EquipmentCategoryDoc, EquipmentBookingDoc } from '@/types'
 import { Package, ToggleRight, ToggleLeft } from 'lucide-react'
@@ -58,6 +59,21 @@ export default function AdminEquipmentPage() {
     const next = !pricingEnabled
     setPricingEnabled(next)
     await setDoc(doc(db, 'settings', 'equipment'), { pricingEnabled: next }, { merge: true })
+  }
+
+  // TEMP: one-off fix for the equipment.available counter thrown off by
+  // deleting a test project that still had a checked-out item. Remove this +
+  // the button below + tmpFixEquipmentAvailable after use.
+  const [fixStatus, setFixStatus] = useState<string | null>(null)
+  async function runAvailableFix() {
+    setFixStatus('Running…')
+    try {
+      const fn = httpsCallable(functions, 'tmpFixEquipmentAvailable')
+      await fn({ equipmentId: 'FVZ1ll9KyLch2BL8Zff9', available: 1 })
+      setFixStatus('Done')
+    } catch (err: any) {
+      setFixStatus(`Error: ${err.message}`)
+    }
   }
 
   const tabs: { id: AdminTab; label: string; badge?: number }[] = [
@@ -122,6 +138,12 @@ export default function AdminEquipmentPage() {
               {pricingEnabled ? <ToggleRight size={15} color="#4cd964" /> : <ToggleLeft size={15} color="#4a4a60" />}
               <span className="hidden sm:inline">Prices</span>
               <span className="sm:hidden">Kr</span>
+            </button>
+            <button
+              onClick={runAvailableFix}
+              style={{ padding: '5px 10px', borderRadius: 10, background: 'rgba(251,191,36,.12)', border: '1px solid #b45309', cursor: 'pointer', fontSize: '.75rem', fontWeight: 600, color: '#fbbf24', whiteSpace: 'nowrap' }}
+            >
+              {fixStatus ?? 'Fix 50w Worklight available'}
             </button>
           </div>
         </div>

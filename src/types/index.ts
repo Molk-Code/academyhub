@@ -365,7 +365,7 @@ export interface EquipmentCategoryDoc {
 }
 export type EquipmentBookingStatus = 'pending' | 'confirmed' | 'denied' | 'checked-out' | 'returned' | 'cancelled'
 export type InventoryProjectStatus = 'active' | 'checked-out' | 'returned' | 'archived'
-export type InventoryItemStatus = 'checked-out' | 'returned' | 'damaged' | 'missing'
+export type InventoryItemStatus = 'pending' | 'checked-out' | 'returned' | 'damaged' | 'missing'
 
 export interface EquipmentDoc {
   id: string

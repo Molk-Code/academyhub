@@ -43,6 +43,7 @@ function ProjectCard({
   const returned   = items.filter(i => i.status === 'returned').length
   const missing    = items.filter(i => i.status === 'missing').length
   const damaged    = items.filter(i => i.status === 'damaged').length
+  const pending    = items.filter(i => i.status === 'pending').length
   const total      = items.length
 
   const statusClass =
@@ -83,6 +84,7 @@ function ProjectCard({
       {/* Item summary bar */}
       {total > 0 && (
         <div style={{ display: 'flex', gap: 8, marginTop: '.5rem', flexWrap: 'wrap' }}>
+          {pending > 0 && <span style={{ fontSize: '.7rem', fontWeight: 700, color: '#f97316' }}>⏳ {pending} pending</span>}
           {checkedOut > 0 && <span style={{ fontSize: '.7rem', fontWeight: 700, color: '#f97316' }}>📦 {checkedOut} out</span>}
           {returned   > 0 && <span style={{ fontSize: '.7rem', fontWeight: 600, color: '#4cd964' }}>✓ {returned} returned</span>}
           {missing    > 0 && <span style={{ fontSize: '.7rem', fontWeight: 700, color: '#ff4757' }}>? {missing} missing</span>}
@@ -220,6 +222,11 @@ function CreateProjectForm({
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
+      // Items imported from an accepted equipment booking start as "pending"
+      // instead of immediately checked-out — each one needs to be physically
+      // handled (condition checked, handed over) before it actually leaves
+      // availability. Manually-added items (preset or typed) keep the
+      // previous immediate-checkout behavior.
       const checkoutTimestamp = new Date().toISOString()
       const assignedTo = borrowers[0] ?? ''
       for (const item of presetItems) {
@@ -227,14 +234,14 @@ function CreateProjectForm({
           await addDoc(collection(db, `inventory_projects/${ref.id}/items`), {
             equipmentId: item.equipmentId,
             equipmentName: item.equipmentName,
-            checkoutTimestamp,
+            checkoutTimestamp: fromBooking ? '' : checkoutTimestamp,
             checkinTimestamp: '',
-            status: 'checked-out',
+            status: fromBooking ? 'pending' : 'checked-out',
             damageNotes: '',
             assignedTo,
           })
         }
-        if (item.equipmentId && item.quantity > 0) {
+        if (!fromBooking && item.equipmentId && item.quantity > 0) {
           await updateDoc(doc(db, 'equipment', item.equipmentId), { available: increment(-item.quantity) })
         }
       }

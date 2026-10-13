@@ -60,6 +60,7 @@ export function ProjectDetail({
   const returnedCount = items.filter(i => i.status === 'returned').length
   const checkedOutCount = items.filter(i => i.status === 'checked-out').length
   const missingCount = items.filter(i => i.status === 'missing').length
+  const pendingCount = items.filter(i => i.status === 'pending').length
 
   // Listen to remote check-in signals from mobile
   useEffect(() => {
@@ -234,6 +235,17 @@ export function ProjectDetail({
     setDamageEdit(prev => { const n = { ...prev }; delete n[itemId]; return n })
   }
 
+  // Imported-from-booking items start as "pending" so each one gets handled
+  // (condition checked, handed over) before it's actually checked out.
+  async function checkOutItem(item: InventoryItemDoc) {
+    clearInlineDamage(item.id)
+    await updateDoc(doc(db, `inventory_projects/${project.id}/items`, item.id), {
+      status: 'checked-out',
+      checkoutTimestamp: new Date().toISOString(),
+    })
+    if (item.equipmentId) await adjustEquipmentAvailable(item.equipmentId, -1)
+  }
+
   async function returnItem(item: InventoryItemDoc) {
     clearInlineDamage(item.id)
     await updateDoc(doc(db, `inventory_projects/${project.id}/items`, item.id), {
@@ -284,8 +296,9 @@ export function ProjectDetail({
   async function removeItem(item: InventoryItemDoc) {
     await deleteDoc(doc(db, `inventory_projects/${project.id}/items`, item.id))
     // Deleting a not-yet-returned item would otherwise permanently understate
-    // availability — give the unit back unless it was already returned.
-    if (item.equipmentId && item.status !== 'returned') await adjustEquipmentAvailable(item.equipmentId, 1)
+    // availability — give the unit back unless it was already returned, or
+    // was still pending (never decremented in the first place).
+    if (item.equipmentId && item.status !== 'returned' && item.status !== 'pending') await adjustEquipmentAvailable(item.equipmentId, 1)
   }
 
   async function markAllReturned() {
@@ -340,7 +353,8 @@ export function ProjectDetail({
   const itemStatusClass = (s: string) =>
     s === 'checked-out' ? 'item-status-checked-out' :
     s === 'returned' ? 'item-status-returned' :
-    s === 'damaged' ? 'item-status-damaged' : 'item-status-missing'
+    s === 'damaged' ? 'item-status-damaged' :
+    s === 'pending' ? 'item-status-pending' : 'item-status-missing'
 
   const statusRowClass = (s: string) => `status-row-${s}`
 
@@ -581,6 +595,7 @@ export function ProjectDetail({
       {/* Return summary */}
       {items.length > 0 && (
         <div className="return-summary-bar">
+          {pendingCount > 0 && <span className="return-stat pending"><Clock size={14} /> {pendingCount} pending</span>}
           <span className="return-stat returned"><Check size={14} /> {returnedCount} returned</span>
           <span className="return-stat checked-out"><Package size={14} /> {checkedOutCount} out</span>
           {missingCount > 0 && <span className="return-stat missing"><AlertTriangle size={14} /> {missingCount} missing</span>}
@@ -614,6 +629,11 @@ export function ProjectDetail({
                   <span className={`project-item-status ${itemStatusClass(item.status)}`}>{item.status}</span>
                 )}
                 <div className="item-action-btns">
+                  {item.status === 'pending' && (
+                    <button className="item-checkout-btn" title="Check Out" onClick={() => checkOutItem(item)}>
+                      <Package size={14} /> Check Out
+                    </button>
+                  )}
                   {item.status === 'checked-out' && (
                     <>
                       <button className="item-return-btn" title="Return" onClick={() => returnItem(item)}>

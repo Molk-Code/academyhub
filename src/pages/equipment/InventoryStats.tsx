@@ -77,9 +77,9 @@ function EquipmentStatusTab({
   const [search, setSearch] = useState('')
   const filtered = equipment.filter(e => e.name?.toLowerCase().includes(search.toLowerCase()))
 
-  // Group order: damaged/missing first, then checked-out (incl. overdue), then available — alphabetical within each group.
-  const statusPriority = (status: 'damaged' | 'missing' | 'checked-out' | 'available') =>
-    status === 'damaged' || status === 'missing' ? 0 : status === 'checked-out' ? 1 : 2
+  // Group order: damaged/missing first, then pending checkout, then checked-out (incl. overdue), then available — alphabetical within each group.
+  const statusPriority = (status: 'damaged' | 'missing' | 'pending' | 'checked-out' | 'available') =>
+    status === 'damaged' || status === 'missing' ? 0 : status === 'pending' ? 1 : status === 'checked-out' ? 2 : 3
 
   const rows = useMemo(() => {
     return filtered
@@ -87,9 +87,10 @@ function EquipmentStatusTab({
         const matching = allItems.filter(i => (i.equipmentId === e.id || i.equipmentName === e.name) && i.status !== 'returned')
         const activeItem = matching[0]
         const proj = activeItem ? projectMap[activeItem.projectId] : undefined
-        const status: 'damaged' | 'missing' | 'checked-out' | 'available' =
+        const status: 'damaged' | 'missing' | 'pending' | 'checked-out' | 'available' =
           activeItem?.status === 'damaged' ? 'damaged' :
           activeItem?.status === 'missing' ? 'missing' :
+          activeItem?.status === 'pending' ? 'pending' :
           activeItem?.status === 'checked-out' ? 'checked-out' : 'available'
         const checkedOutCount = matching.filter(i => i.status === 'checked-out').length
         return { equipment: e, activeItem, proj, status, checkedOutCount }
@@ -146,6 +147,7 @@ function getStatusDisplay(item?: Item, proj?: InventoryProjectDoc) {
   if (!item) return { dot: '🟢', label: 'Available', color: '#4ade80' }
   if (item.status === 'damaged')     return { dot: '🟠', label: 'Damaged',    color: '#fbbf24' }
   if (item.status === 'missing')     return { dot: '⚫', label: 'Missing',    color: '#a1a1aa' }
+  if (item.status === 'pending')     return { dot: '🟡', label: 'Pending Checkout', color: '#f97316' }
   if (item.status === 'checked-out') {
     const overdue = proj && proj.returnDate < today()
     if (overdue) return { dot: '🔴', label: 'Overdue',     color: '#f87171' }
@@ -272,6 +274,7 @@ function ProjectsTab({
     const out     = pItems.filter(i => i.status === 'checked-out').length
     const missing = pItems.filter(i => i.status === 'missing').length
     const damaged = pItems.filter(i => i.status === 'damaged').length
+    const pending = pItems.filter(i => i.status === 'pending').length
 
     const statusColor =
       p.status === 'active'       ? '#4ade80' :
@@ -289,6 +292,7 @@ function ProjectsTab({
           </span>
         </td>
         <td style={{ padding: '.5rem .75rem', fontSize: '.75rem' }}>
+          {pending > 0 && <span style={{ color: '#f97316', marginRight: 8 }}>{pending} pending</span>}
           {out > 0 && <span style={{ color: '#f97316', marginRight: 8 }}>{out} out</span>}
           {missing > 0 && <span style={{ color: '#f87171', marginRight: 8 }}>{missing} missing</span>}
           {damaged > 0 && <span style={{ color: '#fbbf24' }}>{damaged} damaged</span>}

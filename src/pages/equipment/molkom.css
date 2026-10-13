@@ -234,12 +234,14 @@
 .molkom-app .return-stat.returned{color:#f26419}
 .molkom-app .return-stat.checked-out{color:#4da6ff}
 .molkom-app .return-stat.missing{color:#ff4757}
+.molkom-app .return-stat.pending{color:#f97316}
 .molkom-app .project-items-list{display:flex;flex-direction:column;gap:.25rem}
 .molkom-app .project-item-row{display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;background:#1a1a25;border:1px solid #2a2a3a;border-radius:6px;border-left:3px solid #2a2a3a}
 .molkom-app .project-item-row.status-row-checked-out{border-left-color:#4da6ff}
 .molkom-app .project-item-row.status-row-returned{border-left-color:#f26419}
 .molkom-app .project-item-row.status-row-damaged{border-left-color:#ffa502}
 .molkom-app .project-item-row.status-row-missing{border-left-color:#ff4757}
+.molkom-app .project-item-row.status-row-pending{border-left-color:#f97316}
 .molkom-app .project-item-name{flex:1;font-size:.85rem;font-weight:500;color:#f0f0f5}
 .molkom-app .project-item-time{font-size:.75rem;color:#6a6a80;font-family:monospace}
 .molkom-app .project-item-status{padding:.15rem .5rem;border-radius:50px;font-size:.65rem;font-weight:700;text-transform:uppercase}
@@ -247,7 +249,10 @@
 .molkom-app .item-status-returned{background:rgba(242,100,25,.15);color:#f26419}
 .molkom-app .item-status-damaged{background:rgba(255,165,2,.15);color:#ffa502}
 .molkom-app .item-status-missing{background:rgba(255,71,87,.15);color:#ff4757}
+.molkom-app .item-status-pending{background:rgba(249,115,22,.15);color:#f97316}
 .molkom-app .item-action-btns{display:flex;gap:.25rem;flex-shrink:0}
+.molkom-app .item-checkout-btn{display:flex;align-items:center;gap:.3rem;padding:0 .6rem;height:32px;border-radius:6px;color:#fff;background:#f97316;border:none;font-size:.78rem;font-weight:600;white-space:nowrap;cursor:pointer;transition:all .25s ease}
+.molkom-app .item-checkout-btn:hover{background:#ea7317}
 .molkom-app .item-return-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:#4cd964;cursor:pointer;background:none;border:none;transition:all .25s ease}
 .molkom-app .item-return-btn:hover{background:rgba(76,217,100,.15);transform:scale(1.1)}
 .molkom-app .item-damage-toggle-btn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:4px;color:#6a6a80;cursor:pointer;background:none;border:none;transition:all .25s ease}

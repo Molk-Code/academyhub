@@ -5,11 +5,26 @@ import { useCollection } from '@/hooks/useFirestore'
 import type { EquipmentDoc, EquipmentCategoryDoc, CohortDoc } from '@/types'
 import {
   Search, X, Plus, Package, QrCode, Pencil, Trash2, Loader2, AlertTriangle,
+  LayoutGrid, Camera, Wrench, Lightbulb, Mic, MapPin, BookOpen, type LucideIcon,
 } from 'lucide-react'
 import { EquipmentImg, catStyle } from './adminEquipmentShared'
 import { InfoModal } from './EquipmentInfoModal'
 import { ItemForm } from './EquipmentItemForm'
 import { QRModal } from './EquipmentQRModal'
+
+// Known categories get a matching icon; anything custom (e.g. a school's own
+// added category) falls back to a generic package icon.
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  CAMERA: Camera,
+  GRIP: Wrench,
+  LIGHTS: Lightbulb,
+  SOUND: Mic,
+  LOCATION: MapPin,
+  BOOKS: BookOpen,
+}
+function categoryIcon(name: string): LucideIcon {
+  return CATEGORY_ICONS[name] ?? Package
+}
 
 export function CatalogTab({ categories, pricingEnabled }: { categories: EquipmentCategoryDoc[]; pricingEnabled: boolean }) {
   const { data: equipmentRaw } = useCollection<EquipmentDoc>('equipment')
@@ -52,12 +67,17 @@ export function CatalogTab({ categories, pricingEnabled }: { categories: Equipme
     <>
       <div className="toolbar" style={{ marginBottom: 0 }}>
         <div className="category-filter" style={{ flexWrap: 'wrap' }}>
-          <button className={`category-btn${category === 'ALL' ? ' active' : ''}`} onClick={() => setCategory('ALL')}>ALL</button>
-          {sortedCats.map(cat => (
-            <button key={cat.name} className={`category-btn${category === cat.name ? ' active' : ''}`} onClick={() => setCategory(cat.name)}>
-              {cat.name}
-            </button>
-          ))}
+          <button className={`category-btn${category === 'ALL' ? ' active' : ''}`} onClick={() => setCategory('ALL')}>
+            <LayoutGrid size={14} /> ALL
+          </button>
+          {sortedCats.map(cat => {
+            const Icon = categoryIcon(cat.name)
+            return (
+              <button key={cat.name} className={`category-btn${category === cat.name ? ' active' : ''}`} onClick={() => setCategory(cat.name)}>
+                <Icon size={14} /> {cat.name}
+              </button>
+            )
+          })}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div className="search-bar" style={{ flex: 1, minWidth: 180 }}>

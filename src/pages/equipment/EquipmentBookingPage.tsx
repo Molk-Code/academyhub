@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom'
 import {
   ShoppingCart, X, Search, Package, Calendar, Check,
   AlertTriangle, ChevronDown, ChevronRight, CheckCircle2, Clock, Truck, RotateCcw, XCircle, Lock, Trash2, Send,
+  LayoutGrid, Camera as CameraIcon, Wrench, Lightbulb, Mic, MapPin, BookOpen, MoreHorizontal, type LucideIcon,
 } from 'lucide-react'
 import { optimizeImageUrl } from '@/lib/cloudinary'
 import './molkom.css'
@@ -21,6 +22,17 @@ function EquipmentImg({ url, name, fallback }: { url: string | undefined | null;
 
 type EquipmentCategory = 'ALL' | 'CAMERA' | 'GRIP' | 'LIGHTS' | 'SOUND' | 'LOCATION' | 'BOOKS' | 'OTHER'
 type ViewMode = 'browse' | 'checkout' | 'success' | 'my-bookings'
+
+const CATEGORY_ICONS: Record<EquipmentCategory, LucideIcon> = {
+  ALL: LayoutGrid,
+  CAMERA: CameraIcon,
+  GRIP: Wrench,
+  LIGHTS: Lightbulb,
+  SOUND: Mic,
+  LOCATION: MapPin,
+  BOOKS: BookOpen,
+  OTHER: MoreHorizontal,
+}
 
 interface ProductionReadiness {
   isReady: boolean
@@ -819,16 +831,20 @@ export default function EquipmentBookingPage() {
           <>
             <div className="toolbar">
               <div className="category-filter">
-                {CATEGORIES.map(cat => (
-                  <button
-                    key={cat}
-                    className={`category-btn${category === cat ? ' active' : ''}`}
-                    onClick={() => setCategory(cat)}
-                  >
-                    {cat}
-                    <span className="category-count">{categoryCounts[cat] ?? 0}</span>
-                  </button>
-                ))}
+                {CATEGORIES.map(cat => {
+                  const Icon = CATEGORY_ICONS[cat]
+                  return (
+                    <button
+                      key={cat}
+                      className={`category-btn${category === cat ? ' active' : ''}`}
+                      onClick={() => setCategory(cat)}
+                    >
+                      <Icon size={14} />
+                      {cat}
+                      <span className="category-count">{categoryCounts[cat] ?? 0}</span>
+                    </button>
+                  )
+                })}
               </div>
               <div className="search-bar">
                 <span className="search-icon"><Search size={16} /></span>

@@ -23,6 +23,7 @@ import SchoolSignup from '@/pages/SchoolSignup'
 import NotificationInit from '@/components/NotificationInit'
 import BugReportHighlighter from '@/components/BugReportHighlighter'
 import FeatureGate from '@/components/FeatureGate'
+import NavVisibilityGate from '@/components/NavVisibilityGate'
 import UpgradePage from '@/pages/UpgradePage'
 
 // ── Shared lazy ─────────────────────────────────────────────────────────────
@@ -151,7 +152,7 @@ export default function App() {
             <Route path="/booking/equipment" element={<FeatureGate feature="equipment"><EquipmentBookingPage /></FeatureGate>} />
             <Route path="/my-bookings"       element={<MyBookings />} />
             <Route path="/resources"    element={<FeatureGate feature="resources"><StudentResources /></FeatureGate>} />
-            <Route path="/chat"         element={<ChatPage />} />
+            <Route path="/chat"         element={<NavVisibilityGate featureId="chat" role="student" redirectTo="/dashboard"><ChatPage /></NavVisibilityGate>} />
             <Route path="/production"            element={<FeatureGate feature="production"><StudentProduction /></FeatureGate>} />
             <Route path="/production/planning"     element={<Navigate to="/production" replace />} />
             <Route path="/production/planning/:id" element={<FeatureGate feature="production"><ProductionEditor /></FeatureGate>} />
@@ -190,7 +191,7 @@ export default function App() {
             <Route path="/teacher/prizes"            element={<FeatureGate feature="prizes" redirectTo="/teacher"><PrizeManager /></FeatureGate>} />
             <Route path="/teacher/room-bookings"     element={<FeatureGate feature="booking" redirectTo="/teacher"><BookingOverview /></FeatureGate>} />
             <Route path="/teacher/resources"         element={<FeatureGate feature="resources" redirectTo="/teacher"><TeacherResources /></FeatureGate>} />
-            <Route path="/teacher/chat"              element={<ChatPage />} />
+            <Route path="/teacher/chat"              element={<NavVisibilityGate featureId="chat" role="teacher" redirectTo="/teacher"><ChatPage /></NavVisibilityGate>} />
             <Route path="/teacher/production"                   element={<FeatureGate feature="production" redirectTo="/teacher"><TeacherProduction /></FeatureGate>} />
             <Route path="/teacher/production/planning"         element={<Navigate to="/teacher/production" replace />} />
             <Route path="/teacher/production/planning/:id"     element={<FeatureGate feature="production" redirectTo="/teacher"><ProductionEditor /></FeatureGate>} />

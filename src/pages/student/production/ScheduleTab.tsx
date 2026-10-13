@@ -149,6 +149,55 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
   const [notifyingCrew,   setNotifyingCrew]   = useState(false)
   const [draggingSceneId, setDraggingSceneId] = useState<string | null>(null)
   const [dragOverDayId,   setDragOverDayId]   = useState<string | null>(null)
+  const dragScrollParentRef = useRef<HTMLElement | Window | null>(null)
+
+  // Native HTML5 drag-and-drop doesn't auto-scroll the page, so a shooting
+  // day below the fold was impossible to drop a scene onto — dragging the
+  // pointer near the top/bottom edge of the scrollable area now scrolls it.
+  useEffect(() => {
+    if (!draggingSceneId) return
+    const EDGE = 80
+    const MAX_SPEED = 18
+    let dy = 0
+    let raf = 0
+
+    function onDragOver(e: DragEvent) {
+      const y = e.clientY
+      const vh = window.innerHeight
+      if (y < EDGE) dy = -MAX_SPEED * (1 - y / EDGE)
+      else if (y > vh - EDGE) dy = MAX_SPEED * (1 - (vh - y) / EDGE)
+      else dy = 0
+    }
+
+    function tick() {
+      if (dy !== 0) {
+        const target = dragScrollParentRef.current
+        if (target instanceof Window) target.scrollBy(0, dy)
+        else target?.scrollBy(0, dy)
+      }
+      raf = requestAnimationFrame(tick)
+    }
+
+    window.addEventListener('dragover', onDragOver)
+    raf = requestAnimationFrame(tick)
+    return () => {
+      window.removeEventListener('dragover', onDragOver)
+      cancelAnimationFrame(raf)
+    }
+  }, [draggingSceneId])
+
+  // Walk up from the dragged element to find its nearest scrollable
+  // ancestor (the layout's main content pane, not window/body, actually
+  // scrolls in this app) — fall back to the window if none is found.
+  function findScrollParent(node: HTMLElement | null): HTMLElement | Window {
+    let el = node?.parentElement ?? null
+    while (el) {
+      const style = getComputedStyle(el)
+      if (/(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight) return el
+      el = el.parentElement
+    }
+    return window
+  }
   const [sunriseSunset, setSunriseSunset] = useState<Record<string, {
     sunrise: string; sunset: string; weather?: string; temp?: string
   } | null>>({})
@@ -504,7 +553,11 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
     return (
       <div
         draggable={isDraggable}
-        onDragStart={isDraggable ? e => { e.dataTransfer.effectAllowed = 'move'; setDraggingSceneId(scene.id) } : undefined}
+        onDragStart={isDraggable ? e => {
+          e.dataTransfer.effectAllowed = 'move'
+          dragScrollParentRef.current = findScrollParent(e.currentTarget)
+          setDraggingSceneId(scene.id)
+        } : undefined}
         onDragEnd={isDraggable ? () => { setDraggingSceneId(null); setDragOverDayId(null) } : undefined}
         className={cn(
           'flex items-start gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-medium group/strip',

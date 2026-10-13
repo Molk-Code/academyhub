@@ -159,7 +159,6 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
     const EDGE = 80
     const MAX_SPEED = 18
     let dy = 0
-    let raf = 0
 
     function onDragOver(e: DragEvent) {
       const y = e.clientY
@@ -169,20 +168,20 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
       else dy = 0
     }
 
-    function tick() {
-      if (dy !== 0) {
-        const target = dragScrollParentRef.current
-        if (target instanceof Window) target.scrollBy(0, dy)
-        else target?.scrollBy(0, dy)
-      }
-      raf = requestAnimationFrame(tick)
-    }
+    // setInterval rather than requestAnimationFrame — rAF is fully paused
+    // in a backgrounded/hidden tab, and a drag that scrolls while the tab
+    // loses visibility (e.g. an OS overlay) would otherwise just stall.
+    const timer = setInterval(() => {
+      if (dy === 0) return
+      const target = dragScrollParentRef.current
+      if (target instanceof Window) target.scrollBy(0, dy)
+      else target?.scrollBy(0, dy)
+    }, 16)
 
     window.addEventListener('dragover', onDragOver)
-    raf = requestAnimationFrame(tick)
     return () => {
       window.removeEventListener('dragover', onDragOver)
-      cancelAnimationFrame(raf)
+      clearInterval(timer)
     }
   }, [draggingSceneId])
 

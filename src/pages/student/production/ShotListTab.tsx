@@ -126,11 +126,15 @@ export function ShotListTab({ productionId, canEdit }: Props) {
     if (!canEdit) return
     await updateDoc(doc(db, `productions/${productionId}/shots`, id), { [field]: value })
     setEdits(prev => {
+      // Only clear the local override if it still matches what this call
+      // just wrote — a newer edit (e.g. the user picking a different select
+      // option before this write finished) may have superseded it, and an
+      // out-of-order resolution here would otherwise erase that newer value
+      // and snap the field back to the stale pre-edit value from Firestore.
+      if (prev[id]?.[field] !== value) return prev
       const next = { ...prev }
-      if (next[id]) {
-        const { [field]: _, ...rest } = next[id]
-        Object.keys(rest).length === 0 ? delete next[id] : (next[id] = rest)
-      }
+      const { [field]: _, ...rest } = next[id]
+      Object.keys(rest).length === 0 ? delete next[id] : (next[id] = rest)
       return next
     })
   }

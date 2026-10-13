@@ -18,7 +18,7 @@ const STATUS_COLORS: Record<FoodBoxOrderDoc['status'], string> = {
 
 function mealSummary(order: FoodBoxOrderDoc) {
   const parts = [
-    order.morningStudents?.length ? `☕ ${order.morningStudents.length}` : '',
+    order.morningStudents?.length ? `🏠 ${order.morningStudents.length}` : '',
     order.lunchStudents?.length   ? `🥗 ${order.lunchStudents.length}`   : '',
     order.dinnerStudents?.length  ? `🍽️ ${order.dinnerStudents.length}`  : '',
   ].filter(Boolean)
@@ -194,7 +194,7 @@ function OrderRow({ order }: { order: FoodBoxOrderDoc }) {
           <div className="space-y-3 text-sm">
             {order.morningStudents?.length > 0 && (
               <div>
-                <p className="font-medium text-zinc-300">☕ Morning ({order.morningStudents.length})</p>
+                <p className="font-medium text-zinc-300">🏠 Internat ({order.morningStudents.length})</p>
                 <StudentList names={order.morningStudents} />
                 {order.morningDiet && <p className="text-zinc-500 mt-1 text-xs">Diet: {order.morningDiet}</p>}
               </div>

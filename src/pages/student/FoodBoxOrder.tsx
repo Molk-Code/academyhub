@@ -25,6 +25,7 @@ function minPickupDateStr(leadDays: number): string {
 interface FormState {
   date: string
   pickupTime: string
+  morningStudents: string[]
   lunchStudents: string[]
   lunchCanHeat: '' | 'yes' | 'no'
   dinnerStudents: string[]
@@ -37,6 +38,7 @@ interface FormState {
 const EMPTY: FormState = {
   date: minPickupDateStr(5),
   pickupTime: '',
+  morningStudents: [],
   lunchStudents: [],
   lunchCanHeat: '',
   dinnerStudents: [],
@@ -44,6 +46,13 @@ const EMPTY: FormState = {
   otherNotes: '',
   contactPerson: '',
   phoneNumber: '',
+}
+
+// The kitchen needs full names to avoid mixing up students who share a
+// first name — require at least a first and last word before a name can
+// be added.
+function hasFullName(name: string): boolean {
+  return name.trim().split(/\s+/).filter(Boolean).length >= 2
 }
 
 function StudentInput({
@@ -54,12 +63,18 @@ function StudentInput({
   onChange: (names: string[]) => void
 }) {
   const [input, setInput] = useState('')
+  const [error, setError] = useState('')
 
   function add() {
     const name = input.trim()
     if (!name || selected.includes(name)) return
+    if (!hasFullName(name)) {
+      setError('Please enter both first and last name.')
+      return
+    }
     onChange([...selected, name])
     setInput('')
+    setError('')
   }
 
   return (
@@ -68,10 +83,10 @@ function StudentInput({
         <input
           type="text"
           value={input}
-          onChange={e => setInput(e.target.value)}
+          onChange={e => { setInput(e.target.value); setError('') }}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
           className="input flex-1"
-          placeholder="Type a name and press Enter…"
+          placeholder="Full name (first and last), then press Enter…"
         />
         <button
           type="button"
@@ -81,6 +96,8 @@ function StudentInput({
           <Plus className="w-4 h-4" /> Add
         </button>
       </div>
+
+      {error && <p className="text-xs text-rose-500">{error}</p>}
 
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
@@ -117,7 +134,7 @@ export default function FoodBoxOrder({ standalone = false }: { standalone?: bool
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!profile) return
-    if (!form.lunchStudents.length && !form.dinnerStudents.length) return
+    if (!form.morningStudents.length && !form.lunchStudents.length && !form.dinnerStudents.length) return
 setSubmitting(true)
     setStatus('idle')
     try {
@@ -128,7 +145,7 @@ setSubmitting(true)
         cohortId:        cohortId ?? null,
         date:            form.date,
         pickupTime:      form.pickupTime || null,
-        morningStudents: [],
+        morningStudents: form.morningStudents,
         morningDiet:     '',
         lunchStudents:   form.lunchStudents,
         lunchCanHeat:    form.lunchCanHeat === '' ? null : form.lunchCanHeat === 'yes',
@@ -228,6 +245,15 @@ setSubmitting(true)
           </div>
         </div>
 
+        {/* Internat */}
+        <div className="bg-zinc-900 rounded-2xl border border-white/10 p-5 space-y-3">
+          <p className="text-sm font-semibold text-zinc-200">🏠 Internat</p>
+          <StudentInput
+            selected={form.morningStudents}
+            onChange={v => set('morningStudents', v)}
+          />
+        </div>
+
         {/* Lunchbox */}
         <div className="bg-zinc-900 rounded-2xl border border-white/10 p-5 space-y-3">
           <p className="text-sm font-semibold text-zinc-200">🥗 Lunchbox</p>
@@ -304,8 +330,11 @@ setSubmitting(true)
               value={form.contactPerson}
               onChange={e => set('contactPerson', e.target.value)}
               className="input w-full"
-              placeholder="Your name"
+              placeholder="Full name (first and last)"
             />
+            {form.contactPerson.trim() && !hasFullName(form.contactPerson) && (
+              <p className="text-xs text-rose-500 mt-1">Please enter both first and last name.</p>
+            )}
           </div>
           <div>
             <label className="label text-xs">Phone number *</label>
@@ -322,8 +351,8 @@ setSubmitting(true)
 
         <button
           type="submit"
-          disabled={submitting || tooSoon || !form.date || !form.contactPerson || !form.phoneNumber ||
-            (!form.lunchStudents.length && !form.dinnerStudents.length)}
+          disabled={submitting || tooSoon || !form.date || !hasFullName(form.contactPerson) || !form.phoneNumber ||
+            (!form.morningStudents.length && !form.lunchStudents.length && !form.dinnerStudents.length)}
           className="w-full btn-primary py-3 text-base disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {submitting ? 'Submitting…' : 'Submit Food Box Order'}

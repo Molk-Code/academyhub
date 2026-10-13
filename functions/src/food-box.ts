@@ -1,14 +1,19 @@
-import * as path from 'path'
 import { functions, db, getResend, getEmailConfig, requireTeacherOrAdmin, PDFDocument } from './lib'
 import { getOrCreateBookingsChannel, postToBookingsChannel, pushToAdmins, pushToStudent } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// generateFoodBoxPdf — Swedish PDF for the admin export
+// generateFoodBoxPdf — Swedish kitchen pickup checklist, modeled on the
+// school's own paper form ("Beställningslista för avhämtning från köket"):
+// a plain printable form with Kontaktperson/Mobilnummer/Datum/Tid fields, an
+// "Önskad måltid" summary (package + headcount + heat-up question), and a
+// Namn / Internat / Lunch / Middag checkbox table — rather than a styled
+// digital receipt — so kitchen staff can work from something that matches
+// what they're used to.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function generateFoodBoxPdf(d: any): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 0, size: 'A4' })
+    const doc = new PDFDocument({ margin: 48, size: 'A4' })
     const bufs: Buffer[] = []
     doc.on('data', (c: Buffer) => bufs.push(c))
     doc.on('end',  () => resolve(Buffer.concat(bufs)))
@@ -19,162 +24,164 @@ function generateFoodBoxPdf(d: any): Promise<Buffer> {
     const M  = 48
     const CW = PW - M * 2
 
-    const logoPath = path.join(__dirname, '../assets/fire.png')
-
     const effectiveDate = d.adminDate       ?? d.date       ?? d.pickupDate ?? ''
     const effectiveTime = d.adminPickupTime ?? d.pickupTime ?? ''
     const adminModified = !!(d.adminDate || d.adminPickupTime)
 
-    // ── Dark header band ─────────────────────────────────────────────────────
-    doc.rect(0, 0, PW, 110).fill('#0f172a')
+    const morningStudents: string[] = d.morningStudents ?? []
+    const lunchStudents:   string[] = d.lunchStudents   ?? []
+    const dinnerStudents:  string[] = d.dinnerStudents  ?? []
 
-    const logoY = 22, logoH = 48
-    doc.image(logoPath, M, logoY, { width: logoH, height: logoH })
-    doc.fillColor('#ffffff').fontSize(22).font('Helvetica-Bold')
-       .text('CineForge', M + logoH + 8, logoY + (logoH / 2) - 13)
-    doc.fillColor('rgba(255,255,255,0.50)').fontSize(10).font('Helvetica')
-       .text('Food Box Order', M + logoH + 8, logoY + logoH - 13)
+    let y = M
 
-    // Status pill
-    const statusLabel = d.status === 'confirmed' ? 'CONFIRMED' : d.status === 'cancelled' ? 'CANCELLED' : 'PENDING'
+    // ── Title ────────────────────────────────────────────────────────────────
+    doc.fillColor('#000000').fontSize(17).font('Helvetica-Bold')
+       .text('Beställningslista för avhämtning från köket', M, y, { width: CW })
+    y = doc.y + 8
+
+    // Status pill, top-right of the title
+    const statusLabel = d.status === 'confirmed' ? 'BEKRÄFTAD' : d.status === 'cancelled' ? 'AVBOKAD' : 'VÄNTAR'
     const statusColor = d.status === 'confirmed' ? '#10b981' : d.status === 'cancelled' ? '#ef4444' : '#f59e0b'
-    doc.roundedRect(PW - M - 90, 36, 90, 24, 4).fill(statusColor)
-    doc.fillColor('#ffffff').fontSize(10).font('Helvetica-Bold')
-       .text(statusLabel, PW - M - 90, 43, { width: 90, align: 'center' })
+    doc.roundedRect(PW - M - 80, M, 80, 20, 4).fill(statusColor)
+    doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold')
+       .text(statusLabel, PW - M - 80, M + 5, { width: 80, align: 'center' })
 
-    // ── Accent stripe ────────────────────────────────────────────────────────
-    doc.rect(0, 110, PW, 3).fill('#f97316')
+    // Yellow lead-time banner, same as the paper form
+    const bannerH = 20
+    doc.rect(M, y, CW, bannerH).fill('#fff6a3')
+    doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold')
+       .text('Beställningen är inlämnad till köket', M + 8, y + 5)
+    y += bannerH + 16
 
-    // ── Body helpers ─────────────────────────────────────────────────────────
-    let y = 136
+    // ── Contact / date / time fields ────────────────────────────────────────
+    function filledField(label: string, value: string, x: number, w: number) {
+      doc.fillColor('#000000').fontSize(10).font('Helvetica')
+         .text(`${label}: `, x, y, { continued: true })
+         .font('Helvetica-Bold').text(value || '–')
+    }
+    filledField('Kontaktperson', d.contactPerson || '–', M, CW / 2)
+    doc.fillColor('#000000').fontSize(10).font('Helvetica')
+       .text('Mobilnummer: ', M + CW / 2, y, { continued: true })
+       .font('Helvetica-Bold').text(d.phoneNumber || '–')
+    y = doc.y + 10
 
-    function sectionHead(title: string) {
-      doc.fillColor('#0f172a').fontSize(9).font('Helvetica-Bold')
-         .text(title.toUpperCase(), M, y, { characterSpacing: 1.2 })
-      y = doc.y + 3
-      doc.rect(M, y, CW, 1).fill('#e2e8f0')
+    filledField('Datum för avhämtning', effectiveDate || '–', M, CW)
+    y = doc.y + 10
+    filledField('Tid för avhämtning', effectiveTime || '–', M, CW)
+    y = doc.y + 18
+
+    // ── Checkbox + line-drawing helpers ─────────────────────────────────────
+    function checkbox(x: number, cy: number, checked: boolean) {
+      const s = 10
+      doc.rect(x, cy, s, s).stroke('#000000')
+      if (checked) {
+        doc.moveTo(x + 2, cy + 5).lineTo(x + 4, cy + 8).lineTo(x + 8, cy + 2).stroke('#000000')
+      }
+    }
+
+    // ── "Önskad måltid" summary ─────────────────────────────────────────────
+    doc.fillColor('#000000').fontSize(11).font('Helvetica-Bold').text('Önskad måltid:', M, y)
+    y = doc.y + 8
+
+    function mealPackage(label: string, students: string[], canHeat: boolean | null) {
+      checkbox(M, y, students.length > 0)
+      doc.fillColor('#000000').fontSize(10).font('Helvetica')
+         .text(label, M + 16, y - 1)
+      doc.text(`Antal personer: ${students.length}`, M + 160, y - 1)
+      y += 18
+      doc.text('Möjlighet att värma matlådan?', M + 16, y)
+      doc.text('Ja', M + 200, y, { continued: false })
+      checkbox(M + 218, y - 1, canHeat === true)
+      doc.text('Nej', M + 240, y)
+      checkbox(M + 262, y - 1, canHeat === false)
+      y += 22
+    }
+
+    mealPackage('Lunchpaket', lunchStudents, d.lunchCanHeat)
+    mealPackage('Middagspaket', dinnerStudents, d.dinnerCanHeat)
+    y += 4
+
+    // ── Namn / Internat / Lunch / Middag table ──────────────────────────────
+    const names = Array.from(new Set([...morningStudents, ...lunchStudents, ...dinnerStudents])).sort((a, b) => a.localeCompare(b, 'sv'))
+
+    const colName = M
+    const colNameW = CW - 240
+    const col1 = M + colNameW
+    const col2 = col1 + 80
+    const col3 = col2 + 80
+    const colW = 80
+    const rowH = 22
+    const headerH = 24
+
+    function tableHeader() {
+      doc.rect(M, y, CW, headerH).fill('#f1f5f9')
+      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold')
+         .text('Namn', colName + 6, y + 7)
+         .text('Internat', col1, y + 7, { width: colW, align: 'center' })
+         .text('Lunch', col2, y + 7, { width: colW, align: 'center' })
+         .text('Middag', col3, y + 7, { width: colW, align: 'center' })
+      doc.rect(M, y, CW, headerH).stroke('#cbd5e1')
+      y += headerH
+    }
+
+    tableHeader()
+
+    if (names.length === 0) {
+      doc.fillColor('#64748b').fontSize(9).font('Helvetica-Oblique')
+         .text('Inga namn tillagda', colName + 6, y + 7)
+      y += rowH
+    } else {
+      for (const name of names) {
+        if (y + rowH > PH - 70) {
+          doc.addPage()
+          y = M
+          tableHeader()
+        }
+        doc.rect(M, y, CW, rowH).stroke('#e2e8f0')
+        doc.fillColor('#000000').fontSize(10).font('Helvetica')
+           .text(name, colName + 6, y + 6, { width: colNameW - 10 })
+        const cbY = y + 6
+        checkbox(col1 + colW / 2 - 5, cbY, morningStudents.includes(name))
+        checkbox(col2 + colW / 2 - 5, cbY, lunchStudents.includes(name))
+        checkbox(col3 + colW / 2 - 5, cbY, dinnerStudents.includes(name))
+        y += rowH
+      }
+    }
+    y += 16
+
+    // ── Notes (diet, other notes) ───────────────────────────────────────────
+    const notes = [
+      d.morningDiet?.trim() ? `Internat – specialkost: ${d.morningDiet.trim()}` : '',
+      d.lunchDiet?.trim()   ? `Lunch – specialkost: ${d.lunchDiet.trim()}`     : '',
+      d.dinnerDiet?.trim()  ? `Middag – specialkost: ${d.dinnerDiet.trim()}`   : '',
+      d.otherNotes?.trim()  ? `Övrigt: ${d.otherNotes.trim()}`                 : '',
+    ].filter(Boolean)
+    if (notes.length > 0) {
+      if (y + notes.length * 14 + 10 > PH - 70) { doc.addPage(); y = M }
+      doc.fillColor('#000000').fontSize(9).font('Helvetica')
+      for (const note of notes) {
+        doc.text(note, M, y, { width: CW })
+        y = doc.y + 4
+      }
       y += 10
     }
 
-    function field(label: string, value: string) {
-      doc.fillColor('#64748b').fontSize(8).font('Helvetica')
-         .text(label.toUpperCase(), M, y, { characterSpacing: 0.8, width: CW })
-      y = doc.y + 2
-      doc.fillColor('#0f172a').fontSize(12).font('Helvetica-Bold')
-         .text(value || '–', M, y, { width: CW })
-      y = doc.y + 14
-    }
-
-    function fieldPair(l1: string, v1: string, l2: string, v2: string) {
-      const hw = CW / 2 - 8
-      doc.fillColor('#64748b').fontSize(8).font('Helvetica')
-         .text(l1.toUpperCase(), M, y, { characterSpacing: 0.8, width: hw })
-      const ly = doc.y + 2
-      doc.fillColor('#0f172a').fontSize(12).font('Helvetica-Bold')
-         .text(v1 || '–', M, ly, { width: hw })
-      const endL = doc.y
-      doc.fillColor('#64748b').fontSize(8).font('Helvetica')
-         .text(l2.toUpperCase(), M + CW / 2, y, { characterSpacing: 0.8, width: hw })
-      const ry = doc.y + 2
-      doc.fillColor('#0f172a').fontSize(12).font('Helvetica-Bold')
-         .text(v2 || '–', M + CW / 2, ry, { width: hw })
-      y = Math.max(endL, doc.y) + 14
-    }
-
-    function studentList(label: string, students: string[]) {
-      if (!students.length) return
-      doc.fillColor('#64748b').fontSize(8).font('Helvetica')
-         .text(label.toUpperCase(), M, y, { characterSpacing: 0.8, width: CW })
-      y = doc.y + 2
-      doc.fillColor('#0f172a').fontSize(10).font('Helvetica')
-         .text(students.join(', '), M, y, { width: CW })
-      y = doc.y + 10
-    }
-
-    function heatField(canHeat: boolean | null) {
-      const val = canHeat === true ? 'Ja' : canHeat === false ? 'Nej' : '–'
-      doc.fillColor('#64748b').fontSize(8).font('Helvetica')
-         .text('KAN VÄRMA MATEN', M, y, { characterSpacing: 0.8 })
-      y = doc.y + 2
-      doc.fillColor('#0f172a').fontSize(12).font('Helvetica-Bold')
-         .text(val, M, y)
-      y = doc.y + 14
-    }
-
-    // ── Order details ────────────────────────────────────────────────────────
-    sectionHead('Orderdetaljer')
-    field('Student', d.studentName || '–')
-    fieldPair('Datum', effectiveDate, 'Upphämtningstid', effectiveTime || '–')
-
-    // ── Morning ──────────────────────────────────────────────────────────────
-    const morningStudents: string[] = d.morningStudents ?? []
-    if (morningStudents.length > 0 || d.morningDiet?.trim()) {
-      y += 4
-      sectionHead(`Morgonkaffe / te  (${morningStudents.length} personer)`)
-      studentList('Studenter', morningStudents)
-      if (d.morningDiet?.trim()) field('Specialkost', d.morningDiet)
-    }
-
-    // ── Lunch ────────────────────────────────────────────────────────────────
-    const lunchStudents: string[] = d.lunchStudents ?? []
-    if (lunchStudents.length > 0 || d.lunchDiet?.trim()) {
-      y += 4
-      sectionHead(`Lunchlåda  (${lunchStudents.length} personer)`)
-      studentList('Studenter', lunchStudents)
-      heatField(d.lunchCanHeat)
-      if (d.lunchDiet?.trim()) field('Specialkost', d.lunchDiet)
-    }
-
-    // ── Dinner ───────────────────────────────────────────────────────────────
-    const dinnerStudents: string[] = d.dinnerStudents ?? []
-    if (dinnerStudents.length > 0 || d.dinnerDiet?.trim()) {
-      y += 4
-      sectionHead(`Middagslåda  (${dinnerStudents.length} personer)`)
-      studentList('Studenter', dinnerStudents)
-      heatField(d.dinnerCanHeat)
-      if (d.dinnerDiet?.trim()) field('Specialkost', d.dinnerDiet)
-    }
-
-    // ── Other notes ──────────────────────────────────────────────────────────
-    if (d.otherNotes?.trim()) {
-      y += 4
-      sectionHead('Övriga anteckningar')
-      doc.fillColor('#374151').fontSize(11).font('Helvetica')
-         .text(d.otherNotes, M, y, { width: CW })
-      y = doc.y + 14
-    }
-
-    // ── Contact ──────────────────────────────────────────────────────────────
-    y += 4
-    sectionHead('Kontaktuppgifter')
-    fieldPair('Kontaktperson', d.contactPerson || '–', 'Telefonnummer', d.phoneNumber || '–')
-
-    // ── Admin-confirmed date/time notice ─────────────────────────────────────
-    if (d.status === 'confirmed' || adminModified) {
-      y += 6
-      const noticeH = adminModified ? 52 : 36
+    // ── Admin-confirmed date/time notice ────────────────────────────────────
+    if (adminModified) {
+      if (y + 40 > PH - 70) { doc.addPage(); y = M }
+      const noticeH = 36
       doc.roundedRect(M, y, CW, noticeH, 6).fill('#f0fdf4')
       doc.rect(M, y, 4, noticeH).fill('#10b981')
       doc.fillColor('#14532d').fontSize(9).font('Helvetica-Bold')
-         .text('Datum och tid bekräftad av admin', M + 14, y + 8, { width: CW - 20 })
-      if (adminModified) {
-        doc.fillColor('#166534').fontSize(9).font('Helvetica')
-           .text(`Datum: ${effectiveDate}${effectiveTime ? `  ·  Upphämtningstid: ${effectiveTime}` : ''}`, M + 14, y + 22, { width: CW - 20 })
-        doc.fillColor('#166534').fontSize(8).font('Helvetica')
-           .text('(Admin har justerat datum/tid från ursprunglig beställning)', M + 14, y + 36, { width: CW - 20 })
-      } else {
-        doc.fillColor('#166534').fontSize(9).font('Helvetica')
-           .text(`Datum: ${effectiveDate}${effectiveTime ? `  ·  Upphämtningstid: ${effectiveTime}` : ''}`, M + 14, y + 22, { width: CW - 20 })
-      }
+         .text('Admin har justerat datum/tid från ursprunglig beställning', M + 14, y + 8, { width: CW - 20 })
+      doc.fillColor('#166534').fontSize(9).font('Helvetica')
+         .text(`Datum: ${effectiveDate}  ·  Tid: ${effectiveTime || '–'}`, M + 14, y + 21, { width: CW - 20 })
       y += noticeH + 10
     }
 
     // ── Footer ───────────────────────────────────────────────────────────────
-    doc.rect(0, PH - 36, PW, 36).fill('#0f172a')
-    doc.fillColor('rgba(255,255,255,0.4)').fontSize(8).font('Helvetica')
-       .text(`Generated by CineForge  ·  ${new Date().toLocaleDateString('en-SE')}`, M, PH - 22, { width: CW })
-    doc.fillColor('rgba(255,255,255,0.4)').fontSize(8)
-       .text(`Order ID: ${d.id ?? ''}`, M, PH - 22, { width: CW, align: 'right' })
+    doc.fillColor('#94a3b8').fontSize(7).font('Helvetica')
+       .text(`Genererad av CineForge  ·  ${new Date().toLocaleDateString('sv-SE')}  ·  Order-ID: ${d.id ?? ''}`, M, PH - 28, { width: CW })
 
     doc.end()
   })
@@ -304,7 +311,7 @@ export const onFoodBoxOrderCreated = functions.firestore
     await snap.ref.update({ notifSent: true })
     const d = snap.data()
     const meals = [
-      (d.morningStudents?.length > 0) ? `☕ Morgon ×${d.morningStudents.length}` : '',
+      (d.morningStudents?.length > 0) ? `🏠 Internat ×${d.morningStudents.length}` : '',
       (d.lunchStudents?.length   > 0) ? `🥗 Lunch ×${d.lunchStudents.length}`   : '',
       (d.dinnerStudents?.length  > 0) ? `🍽️ Middag ×${d.dinnerStudents.length}`  : '',
     ].filter(Boolean).join('  ·  ')
@@ -411,7 +418,7 @@ export const exportFoodBoxPdf = functions.https.onCall(async (data, context) => 
   const snap = await db.collection('food_box_orders').doc(orderId).get()
   if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Order not found.')
 
-  const order = snap.data()!
+  const order = { ...snap.data()!, id: snap.id }
   const pdfBuffer = await generateFoodBoxPdf(order)
   return { pdf: pdfBuffer.toString('base64') }
 })

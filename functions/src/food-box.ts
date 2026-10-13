@@ -13,7 +13,11 @@ import { getOrCreateBookingsChannel, postToBookingsChannel, pushToAdmins, pushTo
 
 function generateFoodBoxPdf(d: any): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 48, size: 'A4' })
+    // Smaller bottom margin than top/left/right so the footer (drawn at an
+    // explicit y near the physical page bottom) has room — PDFKit auto-adds
+    // a page if a .text() call falls outside the configured margin box, even
+    // with an explicit y.
+    const doc = new PDFDocument({ margins: { top: 48, bottom: 10, left: 48, right: 48 }, size: 'A4' })
     const bufs: Buffer[] = []
     doc.on('data', (c: Buffer) => bufs.push(c))
     doc.on('end',  () => resolve(Buffer.concat(bufs)))

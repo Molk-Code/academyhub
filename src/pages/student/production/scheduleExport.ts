@@ -426,7 +426,34 @@ export async function exportCallSheetPDF(
   const RH = 6.0  // row height mm
   let y = 8
 
+  // jsPDF never auto-paginates — without this, anything that doesn't fit on
+  // the single starting page (production notes, half the crew list, etc. on
+  // any call sheet with a non-trivial scene/cast/crew count) is drawn below
+  // the visible page and is simply gone from the exported PDF.
+  const PAGE_H = 210 // a4 landscape page height, mm
+  const BOTTOM_MARGIN = 10
+  const TOP_MARGIN = 8
+  function ensureSpace(h: number): boolean {
+    if (y + h > PAGE_H - BOTTOM_MARGIN) {
+      doc.addPage()
+      y = TOP_MARGIN
+      return true
+    }
+    return false
+  }
+
   type CO = { fill?: [number,number,number], tc?: [number,number,number], sz?: number, bold?: boolean, italic?: boolean, align?: 'L'|'C'|'R', border?: boolean, onlyBottom?: boolean, onlyTopBottom?: boolean }
+
+  // jsPDF's `maxWidth` option on .text() word-wraps onto extra lines rather
+  // than clipping — with every row drawn at a fixed height, a wrapped
+  // second line just gets painted over by the next row's background fill,
+  // so long text silently "disappears". Truncate to one line instead.
+  function fitText(text: string, maxWidth: number): string {
+    if (doc.getTextWidth(text) <= maxWidth) return text
+    let t = text
+    while (t.length > 1 && doc.getTextWidth(t + '…') > maxWidth) t = t.slice(0, -1)
+    return t.length < text.length ? `${t}…` : t
+  }
 
   // Draw a filled+bordered cell
   function C(col: number, toCol: number, h: number, text: string, opts: CO = {}) {
@@ -443,7 +470,7 @@ export async function exportCallSheetPDF(
       doc.setTextColor(...tc)
       const ty = y + h*0.5 + sz*0.176  // vertical centering
       const tx = align==='C' ? xx+ww/2 : align==='R' ? xx+ww-1.5 : xx+1.5
-      doc.text(text, tx, ty, { align: align==='C'?'center':align==='R'?'right':'left', maxWidth: ww-2.5 })
+      doc.text(fitText(text, ww-2.5), tx, ty, { align: align==='C'?'center':align==='R'?'right':'left' })
     }
   }
   // Draw at an absolute y (for multi-column rows drawn in parallel)
@@ -510,6 +537,7 @@ export async function exportCallSheetPDF(
 
   // ── Rows 9-12: CALL block (4 rows tall) ──────────────────────────────────────
   const callH = RH * 4
+  ensureSpace(callH)
   C(0, 4, callH, 'Call times may vary. Contact 1st AD for details.', { sz:8, align:'C' })
   C(5, 5, callH, '', { border:false })  // gap
   // Draw CALL and time side by side in large text
@@ -530,13 +558,16 @@ export async function exportCallSheetPDF(
   C(0, 15, RH*0.5, '', { border:false, onlyBottom:true }); y += RH*0.5
 
   // ── Scene table header ────────────────────────────────────────────────────────
-  C(0,  0,  RH, 'SCENES',             { fill:GRAY, bold:true, sz:8 })
-  C(1,  6,  RH, 'SET AND DESCRIPTION',{ fill:GRAY, bold:true, sz:8 })
-  C(7,  8,  RH, 'CHARACTER #',        { fill:GRAY, bold:true, sz:8 })
-  C(9,  9,  RH, 'D/N',               { fill:GRAY, bold:true, sz:8 })
-  C(10, 10, RH, 'PAGES',              { fill:GRAY, bold:true, sz:8 })
-  C(11, 15, RH, 'LOCATION / ADDRESS', { fill:GRAY, bold:true, sz:8 })
-  y += RH
+  function drawSceneHeader() {
+    C(0,  0,  RH, 'SCENES',             { fill:GRAY, bold:true, sz:8 })
+    C(1,  6,  RH, 'SET AND DESCRIPTION',{ fill:GRAY, bold:true, sz:8 })
+    C(7,  8,  RH, 'CHARACTER #',        { fill:GRAY, bold:true, sz:8 })
+    C(9,  9,  RH, 'D/N',               { fill:GRAY, bold:true, sz:8 })
+    C(10, 10, RH, 'PAGES',              { fill:GRAY, bold:true, sz:8 })
+    C(11, 15, RH, 'LOCATION / ADDRESS', { fill:GRAY, bold:true, sz:8 })
+    y += RH
+  }
+  drawSceneHeader()
 
   // ── Scene rows (2 rows per scene) ────────────────────────────────────────────
   const movesMap = Object.fromEntries((day.locationMoves??[]).map(m=>[m.afterSceneId,m]))
@@ -548,6 +579,8 @@ export async function exportCallSheetPDF(
     const addr = scLoc ? [scLoc.address, scLoc.zipCode, scLoc.state].filter(Boolean).join(', ') : ''
     const nameCell = sc ? (scLoc?.name || sc.intExt) : ''
     const addrCell = sc ? (scLoc ? addr : sc.intExt) : ''
+    const move = sc ? movesMap[sc.id] : null
+    if (ensureSpace(RH * 2 + (move ? RH : 0))) drawSceneHeader()
     // Row A: scene number + location name + cast + D/N + pages + real place name
     C(0,  0,  RH, sc ? String(sc.sceneNumber)            : '', { bold:true, align:'C' })
     C(1,  6,  RH, sc ? (sc.location??'').toUpperCase()   : '', { bold:true, align:'C' })
@@ -561,18 +594,16 @@ export async function exportCallSheetPDF(
     C(11, 15, RH, addrCell,                                     { align:'C' })
     y += RH
     // Location move after this scene
-    if (sc) {
-      const move = movesMap[sc.id]
-      if (move) {
-        const lbl = `LOCATION MOVE  ${move.minutes} min${move.note ? `  ${move.note}` : ''}`
-        C(0, 15, RH, lbl, { fill:[255,243,205], tc:[146,64,14], bold:true, sz:8, align:'L' })
-        y += RH
-      }
+    if (move) {
+      const lbl = `LOCATION MOVE  ${move.minutes} min${move.note ? `  ${move.note}` : ''}`
+      C(0, 15, RH, lbl, { fill:[255,243,205], tc:[146,64,14], bold:true, sz:8, align:'L' })
+      y += RH
     }
   }
 
   // ── Total pages row ──────────────────────────────────────────────────────────
   const totalEighths = dayScenes.reduce((s,sc)=>s+(sc.pages??0),0)
+  ensureSpace(RH)
   for (let i=0; i<9; i++) C(i,i, RH, '', { border:false, onlyBottom:true })
   C(9,  10, RH, 'TOTAL PAGES', { fill:GRAY, bold:true, sz:8 })
   C(11, 15, RH, totalEighths ? fmtPages(totalEighths) : '', { align:'C' })
@@ -582,20 +613,25 @@ export async function exportCallSheetPDF(
   C(0, 15, RH*0.5, '', { border:false, onlyBottom:true }); y += RH*0.5
 
   // ── Cast header ──────────────────────────────────────────────────────────────
-  C(0,  0,  RH, '#',                   { fill:GRAY, bold:true, sz:8 })
-  C(1,  2,  RH, 'CHARACTER',           { fill:GRAY, bold:true, sz:8 })
-  C(3,  6,  RH, 'ACTOR / ACTRESS',     { fill:GRAY, bold:true, sz:8 })
-  C(7,  7,  RH, 'SWHF',               { fill:GRAY, bold:true, sz:7 })
-  C(8,  8,  RH, 'MU',                 { fill:GRAY, bold:true, sz:7 })
-  C(9,  10, RH, 'SET',                { fill:GRAY, bold:true, sz:8 })
-  C(11, 11, RH, 'MINOR?',             { fill:GRAY, bold:true, sz:7 })
-  C(12, 15, RH, 'SPECIAL INSTRUCTIONS',{ fill:GRAY, bold:true, sz:8 })
-  y += RH
+  function drawCastHeader() {
+    C(0,  0,  RH, '#',                   { fill:GRAY, bold:true, sz:8 })
+    C(1,  2,  RH, 'CHARACTER',           { fill:GRAY, bold:true, sz:8 })
+    C(3,  6,  RH, 'ACTOR / ACTRESS',     { fill:GRAY, bold:true, sz:8 })
+    C(7,  7,  RH, 'SWHF',               { fill:GRAY, bold:true, sz:7 })
+    C(8,  8,  RH, 'MU',                 { fill:GRAY, bold:true, sz:7 })
+    C(9,  10, RH, 'SET',                { fill:GRAY, bold:true, sz:8 })
+    C(11, 11, RH, 'MINOR?',             { fill:GRAY, bold:true, sz:7 })
+    C(12, 15, RH, 'SPECIAL INSTRUCTIONS',{ fill:GRAY, bold:true, sz:8 })
+    y += RH
+  }
+  ensureSpace(RH)
+  drawCastHeader()
 
   // ── Cast rows ────────────────────────────────────────────────────────────────
   const castSlots = Math.max(daysCast.length, 5)
   for (let i=0; i<castSlots; i++) {
     const cd = daysCast[i]
+    if (ensureSpace(RH)) drawCastHeader()
     C(0,  0,  RH, cd ? String(cd.castId)       : '', { align:'C' })
     C(1,  2,  RH, cd ? (cd.characterName??'') : '', { align:'L', sz:7 })
     C(3,  6,  RH, cd ? (cd.actorName??'')     : '', { align:'L', sz:7 })
@@ -611,6 +647,7 @@ export async function exportCallSheetPDF(
   C(0, 15, RH*0.5, '', { border:false, onlyTopBottom:true }); y += RH*0.5
 
   // ── Production notes ─────────────────────────────────────────────────────────
+  ensureSpace(RH * 5) // header + body, kept together on one page
   C(0, 15, RH, 'PRODUCTION NOTES', { fill:GRAY, bold:true, sz:8 }); y += RH
   C(0, 7,  RH*4, ''); C(8, 15, RH*4, ''); y += RH*4
 
@@ -618,18 +655,23 @@ export async function exportCallSheetPDF(
   C(0, 15, RH*0.5, '', { border:false, onlyTopBottom:true }); y += RH*0.5
 
   // ── Crew table header ────────────────────────────────────────────────────────
-  C(0,  3,  RH, 'POSITION', { fill:GRAY, bold:true, sz:8 })
-  C(4,  7,  RH, 'NAME',     { fill:GRAY, bold:true, sz:8 })
-  C(8,  8,  RH, '')
-  C(9,  11, RH, 'POSITION', { fill:GRAY, bold:true, sz:8 })
-  C(12, 15, RH, 'NAME',     { fill:GRAY, bold:true, sz:8 })
-  y += RH
+  function drawCrewHeader() {
+    C(0,  3,  RH, 'POSITION', { fill:GRAY, bold:true, sz:8 })
+    C(4,  7,  RH, 'NAME',     { fill:GRAY, bold:true, sz:8 })
+    C(8,  8,  RH, '')
+    C(9,  11, RH, 'POSITION', { fill:GRAY, bold:true, sz:8 })
+    C(12, 15, RH, 'NAME',     { fill:GRAY, bold:true, sz:8 })
+    y += RH
+  }
+  ensureSpace(RH)
+  drawCrewHeader()
 
   // ── Crew rows (2-column) ──────────────────────────────────────────────────────
   const half = Math.max(Math.ceil(crewInOrder.length/2), 10)
   for (let i=0; i<half; i++) {
     const left  = crewInOrder[i]
     const right = crewInOrder[half+i]
+    if (ensureSpace(RH)) drawCrewHeader()
     C(0,  3,  RH, left?.roleName??'',     { bold:!!left?.roleName, sz:7, align:'L' })
     C(4,  7,  RH, left?.assignedName??'', { sz:7, align:'L' })
     C(8,  8,  RH, '', { border:false })
@@ -639,6 +681,7 @@ export async function exportCallSheetPDF(
   }
 
   // ── Footer ───────────────────────────────────────────────────────────────────
+  ensureSpace(RH*0.4 + 4)
   C(0, 15, RH*0.4, '', { border:false, onlyBottom:true }); y += RH*0.4
   doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(128,128,128)
   doc.text(`Generated by CineForge  |  ${productionTitle}  |  ${dateStr}`, ML+W/2, y+2, { align:'center' })

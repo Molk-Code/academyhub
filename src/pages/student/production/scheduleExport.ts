@@ -538,8 +538,14 @@ export async function exportCallSheetPDF(
   // ── Rows 9-12: CALL block (4 rows tall) ──────────────────────────────────────
   const callH = RH * 4
   ensureSpace(callH)
-  C(0, 4, callH, 'Call times may vary. Contact 1st AD for details.', { sz:8, align:'C' })
+  // Gap cells (border:false) are fill-only — draw them BEFORE any
+  // neighboring box's border so the gap's fill can never paint over a
+  // border that was already drawn right along that same boundary line
+  // (this is exactly what ate the CALL/time divider before: a later
+  // fill landing on an already-stroked edge erases it).
   C(5, 5, callH, '', { border:false })  // gap
+  C(10,10, callH, '', { border:false })  // gap
+  C(0, 4, callH, 'Call times may vary. Contact 1st AD for details.', { sz:8, align:'C' })
   // Draw CALL and time side by side in large text. Filled separately but
   // stroked as ONE outer box + one explicit divider — two independent
   // full-rect strokes sharing the same boundary line left that line
@@ -554,7 +560,6 @@ export async function exportCallSheetPDF(
   doc.setFontSize(18); doc.setFont('helvetica','bold'); doc.setTextColor(...BLACK)
   doc.text('CALL', callX+callW/2, y+callH/2+3.2, {align:'center'})
   doc.text(callTime, callLabelX+callLabelW/2, y+callH/2+3.2, {align:'center'})
-  C(10,10, callH, '', { border:false })  // gap
   C(11,15, callH, day.notes||'', { sz:9, align:'C' })
   y += callH
 

@@ -18,6 +18,8 @@ import { BudgetOverview } from './BudgetOverview'
 
 // ── Teacher page ──────────────────────────────────────────────────────────────
 
+const ALL_PERIODS_ID = '__all__'
+
 export default function TeacherProductionPeriod({
   embedded = false, cohortId: cohortIdProp,
 }: { embedded?: boolean; cohortId?: string }) {
@@ -33,7 +35,34 @@ export default function TeacherProductionPeriod({
     cohortId,
   )
   const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null)
-  const period = periods.find(p => p.id === selectedPeriodId) ?? periods[0] ?? null
+  const isAllSelected = selectedPeriodId === ALL_PERIODS_ID
+
+  // "All Periods" has no single doc to read dates/workingDays/budget off of —
+  // synthesize one spanning every period's date range so MasterCalendar and
+  // BudgetOverview can work unmodified.
+  const virtualAllPeriod = useMemo<ProductionPeriodDoc | null>(() => {
+    if (!periods.length) return null
+    const starts = periods.map(p => p.startDate).filter(Boolean).sort()
+    const ends   = periods.map(p => p.endDate).filter(Boolean).sort()
+    return {
+      id: ALL_PERIODS_ID,
+      title: 'All Periods',
+      cohortId: cohortId || periods[0].cohortId,
+      startDate: starts[0] ?? '',
+      endDate: ends[ends.length - 1] ?? '',
+      workingDays: Array.from(new Set(periods.flatMap(p => p.workingDays ?? []))),
+      createdBy: '',
+      notes: '',
+      budgetCurrency: periods[0]?.budgetCurrency,
+      // Deliberately no budgetPerProduction — a single cap would be
+      // misleading when periods may have set different ones.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periods, cohortId])
+
+  const period = isAllSelected
+    ? virtualAllPeriod
+    : periods.find(p => p.id === selectedPeriodId) ?? periods[0] ?? null
   // The class the currently-open period actually belongs to — used to scope
   // productions/students once a period is selected, independent of the
   // outer "all classes" filter.
@@ -52,10 +81,14 @@ export default function TeacherProductionPeriod({
     !!periodCohortId,
     periodCohortId,
   )
-  // Only show productions linked to the current period
-  const allProductions = period
-    ? allProductionsRaw.filter(p => p.periodId === period.id)
-    : []
+  // Only show productions linked to the current period — or, in "All
+  // Periods" mode, linked to any period at all for this cohort.
+  const periodIds = useMemo(() => new Set(periods.map(p => p.id)), [periods])
+  const allProductions = isAllSelected
+    ? allProductionsRaw.filter(p => p.periodId && periodIds.has(p.periodId))
+    : period
+      ? allProductionsRaw.filter(p => p.periodId === period.id)
+      : []
 
   // Load shooting days + crew for each linked production
   const [prodDayData, setProdDayData] = useState<Record<string, {
@@ -139,16 +172,21 @@ export default function TeacherProductionPeriod({
   }, [allProductions, prodDayData, colorMap])
 
   async function handleToggleWorkingDay(date: string) {
-    if (!period) return
-    const isWorking = period.workingDays.includes(date)
+    // In "All Periods" mode there's no single doc to toggle — resolve which
+    // real period's date range the clicked date actually falls within.
+    const targetPeriod = isAllSelected
+      ? periods.find(p => p.startDate && p.endDate && p.startDate <= date && date <= p.endDate)
+      : period
+    if (!targetPeriod) return
+    const isWorking = targetPeriod.workingDays.includes(date)
     const { arrayUnion, arrayRemove } = await import('firebase/firestore')
-    await updateDoc(doc(db, 'production_periods', period.id), {
+    await updateDoc(doc(db, 'production_periods', targetPeriod.id), {
       workingDays: isWorking ? arrayRemove(date) : arrayUnion(date),
     })
   }
 
   async function handleDeletePeriod() {
-    if (!period || !confirm(`Delete "${period.title}"? This will remove all allocations.`)) return
+    if (!period || isAllSelected || !confirm(`Delete "${period.title}"? This will remove all allocations.`)) return
     // Delete subcollection allocations first (client-side batch)
     const { getDocs, writeBatch } = await import('firebase/firestore')
     const batch = writeBatch(db)
@@ -215,8 +253,11 @@ export default function TeacherProductionPeriod({
                     {p.title}{!cohortId ? ` — ${cohorts.find(c => c.id === p.cohortId)?.name ?? ''}` : ''}
                   </option>
                 ))}
+                {periods.length > 1 && (
+                  <option value={ALL_PERIODS_ID}>📊 All Periods (overview)</option>
+                )}
               </select>
-              {period && (
+              {period && !isAllSelected && (
                 <>
                   <button onClick={() => { setEditingPeriod(period); setShowPeriodForm(true) }}
                     className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors rounded-lg hover:bg-white/5">
@@ -257,7 +298,7 @@ export default function TeacherProductionPeriod({
           )}
 
           {tab === 'crew' && (
-            <CrewView allocations={virtualAllocations} students={students} productions={allProductions} />
+            <CrewView allocations={virtualAllocations} students={students} productions={allProductions} cohortId={periodCohortId} />
           )}
 
           {tab === 'budget' && period && (

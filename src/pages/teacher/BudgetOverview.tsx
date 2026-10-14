@@ -15,6 +15,11 @@ export function BudgetOverview({ period, productions, prodDayData, crewRoles, eq
 }) {
   const currency = period.budgetCurrency || 'SEK'
   const limit    = period.budgetPerProduction ?? null
+  // A period (e.g. the synthesized "All Periods" view) may have no
+  // period-wide cap, but individual productions can still carry their own —
+  // show the column whenever there's anything to display, not just when the
+  // period itself sets a default.
+  const showBudgetColumn = limit != null || productions.some(p => p.budgetLimit != null)
   const fmt = (n: number) => n.toLocaleString('sv-SE')
 
   return (
@@ -35,7 +40,7 @@ export function BudgetOverview({ period, productions, prodDayData, crewRoles, eq
             <thead>
               <tr className="border-b border-white/10">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">Production</th>
-                {limit != null && (
+                {showBudgetColumn && (
                   <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase tracking-wider">Budget used</th>
                 )}
                 <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase tracking-wider">Type</th>
@@ -52,7 +57,7 @@ export function BudgetOverview({ period, productions, prodDayData, crewRoles, eq
                 return (
                   <tr key={prod.id} className="hover:bg-white/3 transition-colors">
                     <td className="px-4 py-3 text-zinc-200 font-medium">{prod.title}</td>
-                    {limit != null && (
+                    {showBudgetColumn && (
                       <td className="px-4 py-3 text-right">
                         {prodLimit != null ? (
                           <span className={cn('font-semibold', over ? 'text-rose-400' : 'text-emerald-400')}>

@@ -292,6 +292,7 @@ export default function TeacherProductionPeriod({
               productions={allProductions}
               allocations={virtualAllocations}
               students={students}
+              cohortId={periodCohortId}
               onCellClick={(date, prod) => setPreviewDay({ productionId: prod.id, productionTitle: prod.title, date })}
               onToggleWorkingDay={handleToggleWorkingDay}
             />

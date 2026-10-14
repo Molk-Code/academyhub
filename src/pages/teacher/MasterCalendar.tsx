@@ -1,20 +1,43 @@
 import { useMemo } from 'react'
 import { cn } from '@/lib/utils'
-import type { ProductionPeriodDoc, ProductionDoc, PeriodAllocationDoc, UserDoc } from '@/types'
+import type { ProductionPeriodDoc, ProductionDoc, PeriodAllocationDoc, UserDoc, ProductionTeamDoc } from '@/types'
 import { AlertTriangle } from 'lucide-react'
 import { eachDayOfInterval, format, isToday, parseISO } from 'date-fns'
+import { useCollection, orderBy, where } from '@/hooks/useFirestore'
 import { buildColorMap, buildConflicts } from './productionPeriodShared'
 
-export function MasterCalendar({ period, productions, allocations, students, onCellClick, onToggleWorkingDay }: {
+export function MasterCalendar({ period, productions, allocations, students, cohortId, onCellClick, onToggleWorkingDay }: {
   period: ProductionPeriodDoc
   productions: ProductionDoc[]
   allocations: PeriodAllocationDoc[]
   students: UserDoc[]
+  cohortId: string
   onCellClick: (date: string, prod: ProductionDoc) => void
   onToggleWorkingDay: (date: string) => void
 }) {
   const colorMap      = useMemo(() => buildColorMap(productions), [productions])
   const conflictDates = useMemo(() => buildConflicts(allocations), [allocations])
+
+  // Group productions by the production team their creator belongs to —
+  // same team/production relationship used in src/pages/student/Production.tsx.
+  const { data: teamsRaw } = useCollection<ProductionTeamDoc>(
+    'production_teams',
+    cohortId ? [where('cohortId', '==', cohortId), orderBy('order', 'asc')] : [],
+    !!cohortId,
+    cohortId,
+  )
+  const teams = useMemo(() => [...teamsRaw].sort((a, b) => a.order - b.order), [teamsRaw])
+
+  const groups = useMemo(() => {
+    const assignedIds = new Set<string>()
+    const teamGroups = teams.map(team => {
+      const prods = productions.filter(p => team.memberIds.includes(p.createdBy))
+      prods.forEach(p => assignedIds.add(p.id))
+      return { team, prods }
+    }).filter(g => g.prods.length > 0)
+    const unassigned = productions.filter(p => !assignedIds.has(p.id))
+    return { teamGroups, unassigned }
+  }, [teams, productions])
 
   const dates = useMemo(() => {
     if (!period.startDate || !period.endDate) return []
@@ -32,6 +55,7 @@ export function MasterCalendar({ period, productions, allocations, students, onC
   }, [allocations])
 
   const COL_W = 'w-24 min-w-[6rem]'
+  const rowProps = { dates, period, allocMap, colorMap, onCellClick, COL_W }
 
   return (
     <div className="overflow-x-auto rounded-2xl border border-white/10">
@@ -67,48 +91,25 @@ export function MasterCalendar({ period, productions, allocations, students, onC
           })}
         </div>
 
-        {/* Production rows */}
-        {productions.map(prod => {
-          const color = colorMap[prod.id]
-          return (
-            <div key={prod.id} className="flex border-b border-white/5 last:border-b-0">
-              <div className="w-44 min-w-[11rem] px-3 py-2.5 flex-shrink-0 sticky left-0 bg-zinc-950 z-10 border-r border-white/8 flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
-                <span className="text-xs text-zinc-200 truncate font-medium">{prod.title}</span>
+        {/* Production rows — grouped by production team when teams exist */}
+        {teams.length === 0 ? (
+          productions.map(prod => <ProductionRow key={prod.id} prod={prod} {...rowProps} />)
+        ) : (
+          <>
+            {groups.teamGroups.map(({ team, prods }) => (
+              <div key={team.id}>
+                <GroupHeader emoji={team.emoji} name={team.name} color={team.color} count={prods.length} />
+                {prods.map(prod => <ProductionRow key={prod.id} prod={prod} {...rowProps} />)}
               </div>
-              {dates.map(date => {
-                const ds    = format(date, 'yyyy-MM-dd')
-                const wday  = !period.workingDays.includes(ds)
-                const today = isToday(date)
-                const alloc = allocMap[prod.id]?.[ds]
-                return (
-                  <div key={ds}
-                    onClick={() => alloc && onCellClick(ds, prod)}
-                    className={cn(
-                      COL_W, 'flex-shrink-0 border-r border-white/5 last:border-r-0 min-h-[3rem] p-1 transition-colors',
-                      wday ? 'bg-zinc-900/40' : today ? 'bg-amber-950/10' : '',
-                      alloc ? 'cursor-pointer hover:bg-white/5' : '',
-                    )}
-                  >
-                    {alloc ? (
-                      <div
-                        className="rounded-lg px-1.5 py-1 text-[10px] leading-tight h-full min-h-[2.5rem] flex flex-col justify-center"
-                        style={{ background: color + '33', borderLeft: `2px solid ${color}` }}
-                      >
-                        <p className="font-semibold truncate" style={{ color }}>
-                          {alloc.startTime && alloc.endTime ? `${alloc.startTime}–${alloc.endTime}` : '●'}
-                        </p>
-                        {alloc.location && (
-                          <p className="truncate" style={{ color: color + 'bb' }}>{alloc.location}</p>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                )
-              })}
-            </div>
-          )
-        })}
+            ))}
+            {groups.unassigned.length > 0 && (
+              <div>
+                <GroupHeader name={groups.teamGroups.length > 0 ? 'Unassigned' : 'All Productions'} count={groups.unassigned.length} />
+                {groups.unassigned.map(prod => <ProductionRow key={prod.id} prod={prod} {...rowProps} />)}
+              </div>
+            )}
+          </>
+        )}
 
         {/* Conflicts row */}
         {conflictDates.size > 0 && (
@@ -128,6 +129,66 @@ export function MasterCalendar({ period, productions, allocations, students, onC
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function GroupHeader({ emoji, name, color, count }: { emoji?: string; name: string; color?: string; count: number }) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900/60 border-b border-white/5">
+      {emoji && <span className="text-sm leading-none">{emoji}</span>}
+      <span className="text-xs font-semibold" style={color ? { color } : undefined}>{name}</span>
+      <span className="text-[10px] text-zinc-500">{count} production{count !== 1 ? 's' : ''}</span>
+    </div>
+  )
+}
+
+function ProductionRow({ prod, dates, period, allocMap, colorMap, onCellClick, COL_W }: {
+  prod: ProductionDoc
+  dates: Date[]
+  period: ProductionPeriodDoc
+  allocMap: Record<string, Record<string, PeriodAllocationDoc>>
+  colorMap: Record<string, string>
+  onCellClick: (date: string, prod: ProductionDoc) => void
+  COL_W: string
+}) {
+  const color = colorMap[prod.id]
+  return (
+    <div className="flex border-b border-white/5 last:border-b-0">
+      <div className="w-44 min-w-[11rem] px-3 py-2.5 flex-shrink-0 sticky left-0 bg-zinc-950 z-10 border-r border-white/8 flex items-center gap-2">
+        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
+        <span className="text-xs text-zinc-200 truncate font-medium">{prod.title}</span>
+      </div>
+      {dates.map(date => {
+        const ds    = format(date, 'yyyy-MM-dd')
+        const wday  = !period.workingDays.includes(ds)
+        const today = isToday(date)
+        const alloc = allocMap[prod.id]?.[ds]
+        return (
+          <div key={ds}
+            onClick={() => alloc && onCellClick(ds, prod)}
+            className={cn(
+              COL_W, 'flex-shrink-0 border-r border-white/5 last:border-r-0 min-h-[3rem] p-1 transition-colors',
+              wday ? 'bg-zinc-900/40' : today ? 'bg-amber-950/10' : '',
+              alloc ? 'cursor-pointer hover:bg-white/5' : '',
+            )}
+          >
+            {alloc ? (
+              <div
+                className="rounded-lg px-1.5 py-1 text-[10px] leading-tight h-full min-h-[2.5rem] flex flex-col justify-center"
+                style={{ background: color + '33', borderLeft: `2px solid ${color}` }}
+              >
+                <p className="font-semibold truncate" style={{ color }}>
+                  {alloc.startTime && alloc.endTime ? `${alloc.startTime}–${alloc.endTime}` : '●'}
+                </p>
+                {alloc.location && (
+                  <p className="truncate" style={{ color: color + 'bb' }}>{alloc.location}</p>
+                )}
+              </div>
+            ) : null}
+          </div>
+        )
+      })}
     </div>
   )
 }

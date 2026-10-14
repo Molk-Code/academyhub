@@ -1,11 +1,20 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { doc, updateDoc, addDoc, deleteDoc, collection } from 'firebase/firestore'
+import { doc, updateDoc, addDoc, deleteDoc, collection, writeBatch } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
 import type { ProductionShotDoc, ProductionSceneDoc, ProductionShootingDayDoc } from '@/types'
-import { Plus, Trash2, Camera, Clock } from 'lucide-react'
+import { Plus, Trash2, Camera, Clock, GripVertical } from 'lucide-react'
 import { parseTime, shootDurationMinutes } from '@/components/production/CallSheetPreviewModal'
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor,
+  useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, sortableKeyboardCoordinates,
+  verticalListSortingStrategy, useSortable, arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 // Auto-growing textarea — typing past the visible width wraps and grows the
 // row instead of scrolling the text sideways out of view in a fixed-height
@@ -72,6 +81,146 @@ function SelectField({
     </select>
   ) : (
     <span className="text-xs text-zinc-300">{value || '—'}</span>
+  )
+}
+
+interface ShotRowProps {
+  shot: ProductionShotDoc
+  canEdit: boolean
+  get: (id: string, field: string, fallback: any) => any
+  setLocal: (id: string, field: string, value: any) => void
+  save: (id: string, field: string, value: any) => void
+  deleteShot: (id: string) => void
+  handleSelectChange: (id: string, field: string, value: string) => void
+}
+
+// Also hoisted to module scope for the reasons noted on SelectField above.
+function SortableShotCard({ shot, canEdit, get, setLocal, save, deleteShot, handleSelectChange }: ShotRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: shot.id })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }
+  return (
+    <div ref={setNodeRef} style={style} className="p-3 space-y-2 bg-zinc-900">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          {canEdit && (
+            <button type="button" {...attributes} {...listeners}
+              className="p-1 -ml-1 text-zinc-600 hover:text-zinc-300 cursor-grab active:cursor-grabbing touch-none">
+              <GripVertical className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <span className="text-xs font-mono text-zinc-400">Shot {shot.shotNumber}</span>
+        </div>
+        {canEdit && (
+          <button
+            onClick={() => deleteShot(shot.id)}
+            className="p-1 text-zinc-500 hover:text-rose-400 transition-colors rounded"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+      <div>
+        <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Subject</p>
+        {canEdit ? (
+          <AutoGrowInput
+            value={get(shot.id, 'subject', shot.subject)}
+            placeholder="Subject…"
+            onChange={v => setLocal(shot.id, 'subject', v)}
+            onBlur={v => save(shot.id, 'subject', v)}
+          />
+        ) : (
+          <span className="text-sm text-zinc-200">{shot.subject || '—'}</span>
+        )}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Size</p>
+          <SelectField id={shot.id} field="size" value={shot.size} displayValue={get(shot.id, 'size', shot.size)} options={SIZE_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
+        </div>
+        <div>
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Angle</p>
+          <SelectField id={shot.id} field="angle" value={shot.angle} displayValue={get(shot.id, 'angle', shot.angle)} options={ANGLE_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
+        </div>
+        <div>
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Movement</p>
+          <SelectField id={shot.id} field="movement" value={shot.movement} displayValue={get(shot.id, 'movement', shot.movement)} options={MOVEMENT_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
+        </div>
+      </div>
+      <div>
+        <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Notes</p>
+        {canEdit ? (
+          <AutoGrowInput
+            value={get(shot.id, 'notes', shot.notes)}
+            placeholder="Notes…"
+            onChange={v => setLocal(shot.id, 'notes', v)}
+            onBlur={v => save(shot.id, 'notes', v)}
+          />
+        ) : (
+          <span className="text-sm text-zinc-300">{shot.notes || '—'}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SortableShotRow({ shot, canEdit, get, setLocal, save, deleteShot, handleSelectChange }: ShotRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: shot.id })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }
+  return (
+    <tr ref={setNodeRef} style={style} className="group hover:bg-white/3 transition-colors bg-zinc-900">
+      <td className="pl-2 py-2 w-6">
+        {canEdit && (
+          <button type="button" {...attributes} {...listeners}
+            className="p-1 text-zinc-600 hover:text-zinc-300 cursor-grab active:cursor-grabbing touch-none">
+            <GripVertical className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </td>
+      <td className="px-3 py-2 w-12 text-xs font-mono text-zinc-400">{shot.shotNumber}</td>
+      <td className="px-2 py-1.5 min-w-[120px]">
+        {canEdit ? (
+          <AutoGrowInput
+            value={get(shot.id, 'subject', shot.subject)}
+            placeholder="Subject…"
+            onChange={v => setLocal(shot.id, 'subject', v)}
+            onBlur={v => save(shot.id, 'subject', v)}
+          />
+        ) : (
+          <span className="text-sm text-zinc-200">{shot.subject || '—'}</span>
+        )}
+      </td>
+      <td className="px-2 py-1.5 min-w-[110px]">
+        <SelectField id={shot.id} field="size" value={shot.size} displayValue={get(shot.id, 'size', shot.size)} options={SIZE_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
+      </td>
+      <td className="px-2 py-1.5 min-w-[110px]">
+        <SelectField id={shot.id} field="angle" value={shot.angle} displayValue={get(shot.id, 'angle', shot.angle)} options={ANGLE_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
+      </td>
+      <td className="px-2 py-1.5 min-w-[100px]">
+        <SelectField id={shot.id} field="movement" value={shot.movement} displayValue={get(shot.id, 'movement', shot.movement)} options={MOVEMENT_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
+      </td>
+      <td className="px-2 py-1.5 min-w-[120px]">
+        {canEdit ? (
+          <AutoGrowInput
+            value={get(shot.id, 'notes', shot.notes)}
+            placeholder="Notes…"
+            onChange={v => setLocal(shot.id, 'notes', v)}
+            onBlur={v => save(shot.id, 'notes', v)}
+          />
+        ) : (
+          <span className="text-sm text-zinc-300">{shot.notes || '—'}</span>
+        )}
+      </td>
+      <td className="px-2 py-2 w-8">
+        {canEdit && (
+          <button
+            onClick={() => deleteShot(shot.id)}
+            className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-rose-400 transition-all rounded"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </td>
+    </tr>
   )
 }
 
@@ -158,11 +307,66 @@ export function ShotListTab({ productionId, canEdit }: Props) {
     save(id, field, value)
   }
 
+  // Optimistic per-scene shot order while a drag-reorder write is in
+  // flight, so the list doesn't snap back to the old order for the brief
+  // moment before the live Firestore listener reflects the new shotNumbers.
+  const [localOrder, setLocalOrder] = useState<Record<string, string[]>>({})
+
+  useEffect(() => {
+    setLocalOrder(prev => {
+      if (Object.keys(prev).length === 0) return prev
+      const next = { ...prev }
+      let changed = false
+      for (const sceneId of Object.keys(prev)) {
+        const real = shots.filter(s => s.sceneId === sceneId).map(s => s.id)
+        const ordered = prev[sceneId]
+        if (real.length === ordered.length && real.every((id, i) => id === ordered[i])) {
+          delete next[sceneId]
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [shots])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  async function handleShotDragEnd(sceneId: string, sceneShots: ProductionShotDoc[], event: DragEndEvent) {
+    if (!canEdit) return
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const ids = sceneShots.map(s => s.id)
+    const oldIndex = ids.indexOf(String(active.id))
+    const newIndex = ids.indexOf(String(over.id))
+    if (oldIndex === -1 || newIndex === -1) return
+    const newIds = arrayMove(ids, oldIndex, newIndex)
+    setLocalOrder(prev => ({ ...prev, [sceneId]: newIds }))
+
+    const batch = writeBatch(db)
+    newIds.forEach((id, i) => {
+      const shotNumber = i + 1
+      const shot = sceneShots.find(s => s.id === id)
+      if (shot && shot.shotNumber !== shotNumber) {
+        batch.update(doc(db, `productions/${productionId}/shots`, id), { shotNumber })
+      }
+    })
+    await batch.commit()
+  }
+
   return (
     <div className="space-y-6">
       {scenes.map(scene => {
-        const sceneShots = shots.filter(s => s.sceneId === scene.id)
+        const sceneShotsReal = shots.filter(s => s.sceneId === scene.id)
+        const order = localOrder[scene.id]
+        const sceneShots = order
+          ? (order.map(id => sceneShotsReal.find(s => s.id === id)).filter(Boolean) as ProductionShotDoc[])
+          : sceneShotsReal
         const dnLabel = scene.dayNight === 'Day' ? 'D' : 'N'
+        const shotIds = sceneShots.map(s => s.id)
+        const rowProps = { canEdit, get, setLocal, save, deleteShot, handleSelectChange }
 
         return (
           <div key={scene.id} className="space-y-2">
@@ -193,128 +397,41 @@ export function ShotListTab({ productionId, canEdit }: Props) {
             <div className="bg-zinc-900 border border-white/10 rounded-xl overflow-hidden">
               {/* ── Mobile shot cards (< md) ───────────────────────── */}
               {sceneShots.length > 0 && (
-                <div className="md:hidden divide-y divide-white/5">
-                  {sceneShots.map(shot => (
-                    <div key={shot.id} className="p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-mono text-zinc-400">Shot {shot.shotNumber}</span>
-                        {canEdit && (
-                          <button
-                            onClick={() => deleteShot(shot.id)}
-                            className="p-1 text-zinc-500 hover:text-rose-400 transition-colors rounded"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Subject</p>
-                        {canEdit ? (
-                          <AutoGrowInput
-                            value={get(shot.id, 'subject', shot.subject)}
-                            placeholder="Subject…"
-                            onChange={v => setLocal(shot.id, 'subject', v)}
-                            onBlur={v => save(shot.id, 'subject', v)}
-                          />
-                        ) : (
-                          <span className="text-sm text-zinc-200">{shot.subject || '—'}</span>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Size</p>
-                          <SelectField id={shot.id} field="size" value={shot.size} displayValue={get(shot.id, 'size', shot.size)} options={SIZE_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Angle</p>
-                          <SelectField id={shot.id} field="angle" value={shot.angle} displayValue={get(shot.id, 'angle', shot.angle)} options={ANGLE_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Movement</p>
-                          <SelectField id={shot.id} field="movement" value={shot.movement} displayValue={get(shot.id, 'movement', shot.movement)} options={MOVEMENT_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Notes</p>
-                        {canEdit ? (
-                          <AutoGrowInput
-                            value={get(shot.id, 'notes', shot.notes)}
-                            placeholder="Notes…"
-                            onChange={v => setLocal(shot.id, 'notes', v)}
-                            onBlur={v => save(shot.id, 'notes', v)}
-                          />
-                        ) : (
-                          <span className="text-sm text-zinc-300">{shot.notes || '—'}</span>
-                        )}
-                      </div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter}
+                  onDragEnd={e => handleShotDragEnd(scene.id, sceneShots, e)}>
+                  <SortableContext items={shotIds} strategy={verticalListSortingStrategy}>
+                    <div className="md:hidden divide-y divide-white/5">
+                      {sceneShots.map(shot => (
+                        <SortableShotCard key={shot.id} shot={shot} {...rowProps} />
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </SortableContext>
+                </DndContext>
               )}
 
               {/* ── Desktop table (>= md) ──────────────────────────── */}
               {sceneShots.length > 0 && (
-                <table className="hidden md:table w-full">
-                  <thead>
-                    <tr className="border-b border-white/10 bg-zinc-900/80">
-                      {['Shot', 'Subject', 'Size', 'Angle', 'Movement', 'Notes', ''].map(h => (
-                        <th key={h} className="text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {sceneShots.map(shot => (
-                      <tr key={shot.id} className="group hover:bg-white/3 transition-colors">
-                        <td className="px-3 py-2 w-12 text-xs font-mono text-zinc-400">{shot.shotNumber}</td>
-                        <td className="px-2 py-1.5 min-w-[120px]">
-                          {canEdit ? (
-                            <AutoGrowInput
-                              value={get(shot.id, 'subject', shot.subject)}
-                              placeholder="Subject…"
-                              onChange={v => setLocal(shot.id, 'subject', v)}
-                              onBlur={v => save(shot.id, 'subject', v)}
-                            />
-                          ) : (
-                            <span className="text-sm text-zinc-200">{shot.subject || '—'}</span>
-                          )}
-                        </td>
-                        <td className="px-2 py-1.5 min-w-[110px]">
-                          <SelectField id={shot.id} field="size" value={shot.size} displayValue={get(shot.id, 'size', shot.size)} options={SIZE_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
-                        </td>
-                        <td className="px-2 py-1.5 min-w-[110px]">
-                          <SelectField id={shot.id} field="angle" value={shot.angle} displayValue={get(shot.id, 'angle', shot.angle)} options={ANGLE_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
-                        </td>
-                        <td className="px-2 py-1.5 min-w-[100px]">
-                          <SelectField id={shot.id} field="movement" value={shot.movement} displayValue={get(shot.id, 'movement', shot.movement)} options={MOVEMENT_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
-                        </td>
-                        <td className="px-2 py-1.5 min-w-[120px]">
-                          {canEdit ? (
-                            <AutoGrowInput
-                              value={get(shot.id, 'notes', shot.notes)}
-                              placeholder="Notes…"
-                              onChange={v => setLocal(shot.id, 'notes', v)}
-                              onBlur={v => save(shot.id, 'notes', v)}
-                            />
-                          ) : (
-                            <span className="text-sm text-zinc-300">{shot.notes || '—'}</span>
-                          )}
-                        </td>
-                        <td className="px-2 py-2 w-8">
-                          {canEdit && (
-                            <button
-                              onClick={() => deleteShot(shot.id)}
-                              className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-rose-400 transition-all rounded"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </td>
+                <DndContext sensors={sensors} collisionDetection={closestCenter}
+                  onDragEnd={e => handleShotDragEnd(scene.id, sceneShots, e)}>
+                  <table className="hidden md:table w-full">
+                    <thead>
+                      <tr className="border-b border-white/10 bg-zinc-900/80">
+                        {['', 'Shot', 'Subject', 'Size', 'Angle', 'Movement', 'Notes', ''].map((h, i) => (
+                          <th key={i} className="text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider px-3 py-2 whitespace-nowrap">
+                            {h}
+                          </th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <SortableContext items={shotIds} strategy={verticalListSortingStrategy}>
+                      <tbody className="divide-y divide-white/5">
+                        {sceneShots.map(shot => (
+                          <SortableShotRow key={shot.id} shot={shot} {...rowProps} />
+                        ))}
+                      </tbody>
+                    </SortableContext>
+                  </table>
+                </DndContext>
               )}
 
               {sceneShots.length === 0 && (

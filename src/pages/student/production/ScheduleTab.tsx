@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { doc, updateDoc, addDoc, deleteDoc, collection, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore'
+import { doc, updateDoc, addDoc, deleteDoc, collection, arrayUnion, arrayRemove, getDoc, writeBatch } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
@@ -147,7 +147,10 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
   const [previewDay,      setPreviewDay]      = useState<ProductionShootingDayDoc | null>(null)
   const [crewNotifyKey,   setCrewNotifyKey]   = useState<string | null>(null)
   const [notifyingCrew,   setNotifyingCrew]   = useState(false)
-  const [draggingSceneId, setDraggingSceneId] = useState<string | null>(null)
+  const [draggingSceneId, setDraggingSceneId]   = useState<string | null>(null)
+  // The day a dragged scene started in — undefined means it came from the
+  // "Unscheduled Scenes" pool rather than another day.
+  const [draggingFromDayId, setDraggingFromDayId] = useState<string | undefined>(undefined)
   const [dragOverDayId,   setDragOverDayId]   = useState<string | null>(null)
   const dragScrollParentRef = useRef<HTMLElement | Window | null>(null)
 
@@ -397,6 +400,36 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
     await updateDoc(doc(db, `productions/${productionId}/shootingDays`, dayId), { sceneIds: arrayRemove(sceneId) })
   }
 
+  // Reorder a scene within a day, or move it to a (possibly different) day
+  // at a specific position — used by drag-and-drop on already-scheduled
+  // scenes, not just dragging in from the Unscheduled pool.
+  async function moveScene(sourceDayId: string | undefined, targetDayId: string, sceneId: string, targetIndex: number) {
+    if (!canEdit) return
+    if (sourceDayId === targetDayId) {
+      const day = days.find(d => d.id === targetDayId)
+      if (!day) return
+      const without = (day.sceneIds ?? []).filter(id => id !== sceneId)
+      const clamped = Math.max(0, Math.min(targetIndex, without.length))
+      without.splice(clamped, 0, sceneId)
+      await updateDoc(doc(db, `productions/${productionId}/shootingDays`, targetDayId), { sceneIds: without })
+      return
+    }
+    const batch = writeBatch(db)
+    if (sourceDayId) {
+      const srcDay = days.find(d => d.id === sourceDayId)
+      if (srcDay) {
+        const newSrcIds = (srcDay.sceneIds ?? []).filter(id => id !== sceneId)
+        batch.update(doc(db, `productions/${productionId}/shootingDays`, sourceDayId), { sceneIds: newSrcIds })
+      }
+    }
+    const targetDay = days.find(d => d.id === targetDayId)
+    const baseIds = (targetDay?.sceneIds ?? []).filter(id => id !== sceneId)
+    const clamped = Math.max(0, Math.min(targetIndex, baseIds.length))
+    baseIds.splice(clamped, 0, sceneId)
+    batch.update(doc(db, `productions/${productionId}/shootingDays`, targetDayId), { sceneIds: baseIds })
+    await batch.commit()
+  }
+
   async function saveLocationMove(dayId: string, afterSceneId: string, minutes: number, note: string) {
     const day = days.find(d => d.id === dayId)
     if (!day) return
@@ -547,7 +580,9 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
   function SceneStrip({ scene, dayId }: { scene: ProductionSceneDoc; dayId?: string }) {
     const key = `${scene.intExt}-${scene.dayNight}`
     const linkedLoc = scene.locationId ? locById[scene.locationId] : null
-    const isDraggable = canEdit && !dayId
+    // Already-scheduled scenes are draggable too, not just the Unscheduled
+    // pool — lets a scene be reordered within its day or moved to another.
+    const isDraggable = canEdit
     const isDragging  = draggingSceneId === scene.id
     return (
       <div
@@ -556,8 +591,9 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
           e.dataTransfer.effectAllowed = 'move'
           dragScrollParentRef.current = findScrollParent(e.currentTarget)
           setDraggingSceneId(scene.id)
+          setDraggingFromDayId(dayId)
         } : undefined}
-        onDragEnd={isDraggable ? () => { setDraggingSceneId(null); setDragOverDayId(null) } : undefined}
+        onDragEnd={isDraggable ? () => { setDraggingSceneId(null); setDraggingFromDayId(undefined); setDragOverDayId(null) } : undefined}
         className={cn(
           'flex items-start gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-medium group/strip',
           SCENE_STRIP_BG[key] ?? 'bg-zinc-800/60 border-white/10',
@@ -587,14 +623,31 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
 
   return (
     <div className="space-y-6">
-      {unscheduled.length > 0 && (
+      {/* Show the pool while empty too, during a drag from a day — otherwise
+          there'd be nowhere to drop a scene back out of its day. */}
+      {(unscheduled.length > 0 || (canEdit && draggingFromDayId)) && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-zinc-400">Unscheduled Scenes</h3>
             {canEdit && <span className="text-[10px] text-zinc-600">drag into a day below</span>}
           </div>
-          <div className={cn('bg-zinc-900/50 border border-white/10 rounded-xl p-3 flex flex-wrap gap-2 transition-colors', draggingSceneId && 'border-brand-700/50')}>
+          <div
+            className={cn('bg-zinc-900/50 border border-white/10 rounded-xl p-3 flex flex-wrap gap-2 min-h-[3rem] transition-colors', draggingSceneId && 'border-brand-700/50', draggingFromDayId && 'bg-brand-900/10')}
+            onDragOver={canEdit && draggingFromDayId ? e => e.preventDefault() : undefined}
+            onDrop={canEdit && draggingFromDayId ? e => {
+              e.preventDefault()
+              const sceneId = draggingSceneId
+              const sourceDayId = draggingFromDayId
+              setDraggingSceneId(null)
+              setDraggingFromDayId(undefined)
+              setDragOverDayId(null)
+              if (sceneId && sourceDayId) removeSceneFromDay(sourceDayId, sceneId)
+            } : undefined}
+          >
             {unscheduled.map(s => <SceneStrip key={s.id} scene={s} />)}
+            {unscheduled.length === 0 && (
+              <p className="text-xs text-brand-400 py-1">Drop here to unschedule.</p>
+            )}
           </div>
         </div>
       )}
@@ -766,11 +819,16 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
                 onDragOver={canEdit && draggingSceneId ? e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverDayId(day.id) } : undefined}
                 onDragLeave={canEdit ? e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverDayId(null) } : undefined}
                 onDrop={canEdit && draggingSceneId ? e => {
+                  // Only fires for a drop on the container's own empty
+                  // space — a drop on a specific scene row is handled (and
+                  // stops propagation) below, for a precise insert position.
                   e.preventDefault()
                   const sceneId = draggingSceneId
+                  const sourceDayId = draggingFromDayId
                   setDraggingSceneId(null)
+                  setDraggingFromDayId(undefined)
                   setDragOverDayId(null)
-                  addSceneToDay(day.id, sceneId)
+                  moveScene(sourceDayId, day.id, sceneId, (day.sceneIds ?? []).length)
                 } : undefined}
               >
                 {/* Move before first scene */}
@@ -787,7 +845,29 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
                 })()}
 
                 {dayScenes.map((scene, idx) => (
-                  <div key={scene.id} className="space-y-1.5">
+                  <div key={scene.id} className="space-y-1.5"
+                    onDragOver={canEdit && draggingSceneId ? e => { e.preventDefault(); e.stopPropagation() } : undefined}
+                    onDrop={canEdit && draggingSceneId ? e => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      const rect = e.currentTarget.getBoundingClientRect()
+                      const before = e.clientY < rect.top + rect.height / 2
+                      const sceneId = draggingSceneId
+                      const sourceDayId = draggingFromDayId
+                      setDraggingSceneId(null)
+                      setDraggingFromDayId(undefined)
+                      setDragOverDayId(null)
+                      if (sceneId === scene.id) return
+                      let targetIndex = idx + (before ? 0 : 1)
+                      // Reordering within the same day: removing the dragged
+                      // scene first shifts every later index down by one.
+                      if (sourceDayId === day.id) {
+                        const curIdx = (day.sceneIds ?? []).indexOf(sceneId)
+                        if (curIdx !== -1 && curIdx < targetIndex) targetIndex -= 1
+                      }
+                      moveScene(sourceDayId, day.id, sceneId, targetIndex)
+                    } : undefined}
+                  >
                     <SceneStrip scene={scene} dayId={day.id} />
                     {(() => {
                       const move = movesMap[scene.id]

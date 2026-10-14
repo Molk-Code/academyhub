@@ -250,18 +250,16 @@ function OrderRow({ order }: { order: FoodBoxOrderDoc }) {
                 <Clock className="w-3.5 h-3.5" /> Reset
               </button>
             )}
-            {order.status === 'confirmed' && (
-              <button
-                onClick={exportPdf}
-                disabled={exporting}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 text-sm font-medium hover:bg-brand-100 transition-colors disabled:opacity-50"
-              >
-                {exporting
-                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Exporting…</>
-                  : <><Download className="w-3.5 h-3.5" /> Export PDF</>
-                }
-              </button>
-            )}
+            <button
+              onClick={exportPdf}
+              disabled={exporting}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 text-sm font-medium hover:bg-brand-100 transition-colors disabled:opacity-50"
+            >
+              {exporting
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Exporting…</>
+                : <><Download className="w-3.5 h-3.5" /> Export PDF</>
+              }
+            </button>
             <button
               onClick={handleDelete}
               disabled={deleting}

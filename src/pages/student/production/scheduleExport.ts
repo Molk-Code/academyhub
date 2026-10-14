@@ -484,8 +484,8 @@ export async function exportCallSheetPDF(
 
   // ── Row 0: Title bar ─────────────────────────────────────────────────────────
   C(0,  3,  RH, 'CALL SHEET', { bold:true, sz:11, align:'C' })
-  C(4,  11, RH, '')
-  C(12, 13, RH, `Shoot Date:  ${dateStr}`, { bold:true, sz:8, align:'L' })
+  C(4,  11, RH, `Shoot Date:  ${dateStr}`, { bold:true, sz:9, align:'C' })
+  C(12, 13, RH, '')
   C(14, 15, RH, `Day ${dayNumber} of ${totalDays}`, { bold:true, align:'C' })
   y += RH
 
@@ -540,14 +540,19 @@ export async function exportCallSheetPDF(
   ensureSpace(callH)
   C(0, 4, callH, 'Call times may vary. Contact 1st AD for details.', { sz:8, align:'C' })
   C(5, 5, callH, '', { border:false })  // gap
-  // Draw CALL and time side by side in large text
+  // Draw CALL and time side by side in large text. Filled separately but
+  // stroked as ONE outer box + one explicit divider — two independent
+  // full-rect strokes sharing the same boundary line left that line
+  // missing (the second box's fill painted over the first box's border).
   const callX = cx[6], callW = sw(6,7)
   const callLabelX = cx[8], callLabelW = sw(8,9)
-  doc.setFillColor(...WHITE); doc.rect(callX, y, callW, callH, 'F'); doc.setDrawColor(...BLACK); doc.rect(callX, y, callW, callH, 'S')
+  doc.setFillColor(...WHITE); doc.rect(callX, y, callW, callH, 'F')
+  doc.setFillColor(...WHITE); doc.rect(callLabelX, y, callLabelW, callH, 'F')
+  doc.setDrawColor(...BLACK); doc.setLineWidth(0.1)
+  doc.rect(callX, y, callW + callLabelW, callH, 'S')
+  doc.line(callLabelX, y, callLabelX, y + callH)
   doc.setFontSize(18); doc.setFont('helvetica','bold'); doc.setTextColor(...BLACK)
   doc.text('CALL', callX+callW/2, y+callH/2+3.2, {align:'center'})
-  doc.setFillColor(...WHITE); doc.rect(callLabelX, y, callLabelW, callH, 'F'); doc.setDrawColor(...BLACK); doc.rect(callLabelX, y, callLabelW, callH, 'S')
-  doc.setFontSize(18); doc.setFont('helvetica','bold')
   doc.text(callTime, callLabelX+callLabelW/2, y+callH/2+3.2, {align:'center'})
   C(10,10, callH, '', { border:false })  // gap
   C(11,15, callH, day.notes||'', { sz:9, align:'C' })

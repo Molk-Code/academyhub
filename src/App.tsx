@@ -107,6 +107,7 @@ const SemesterEvents    = lazy(() => import('@/pages/admin/SemesterEvents'))
 const QrDevices         = lazy(() => import('@/pages/admin/QrDevices'))
 const GdprDashboard     = lazy(() => import('@/pages/admin/Gdpr'))
 const BugReportsPage    = lazy(() => import('@/pages/admin/BugReports'))
+const ClientErrorsPage  = lazy(() => import('@/pages/admin/ClientErrors'))
 const AdminVideoLab     = lazy(() => import('@/pages/admin/VideoLab'))
 const ExperienceLevels  = lazy(() => import('@/pages/admin/ExperienceLevels'))
 
@@ -236,6 +237,7 @@ export default function App() {
             <Route path="/admin/qr-devices"         element={<FeatureGate feature="checkin_devices" redirectTo="/admin/users"><QrDevices /></FeatureGate>} />
             <Route path="/admin/gdpr"               element={<GdprDashboard />} />
             <Route path="/admin/bug-reports"        element={<BugReportsPage />} />
+            <Route path="/admin/client-errors"      element={<ClientErrorsPage />} />
             <Route path="/admin/experience-levels" element={<ExperienceLevels />} />
             <Route path="/admin/equipment"           element={<FeatureGate feature="equipment" redirectTo="/admin/users"><AdminEquipmentPage /></FeatureGate>} />
             <Route path="/admin/inventory"           element={<FeatureGate feature="inventory" redirectTo="/admin/users"><InventoryPage /></FeatureGate>} />

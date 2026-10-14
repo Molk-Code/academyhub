@@ -2,7 +2,7 @@
   "hosting": {
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "predeploy": ["npm run build", "node scripts/gen-build-id.mjs"],
+    "predeploy": ["node scripts/gen-build-id.mjs", "npm run build", "node scripts/copy-build-id.mjs"],
     "headers": [
       {
         "source": "**",

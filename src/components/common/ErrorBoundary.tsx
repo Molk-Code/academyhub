@@ -1,23 +1,6 @@
 import { Component, type ReactNode, type ErrorInfo } from 'react'
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
-import { db, auth } from '@/lib/firebase'
 import { reloadOnceForStaleChunk } from '@/lib/staleChunk'
-
-async function reportError(message: string, stack: string | undefined, context: string) {
-  try {
-    await addDoc(collection(db, '_client_errors'), {
-      message,
-      stack: stack ?? null,
-      context,
-      uid:   auth.currentUser?.uid ?? null,
-      url:   window.location.href,
-      ua:    navigator.userAgent,
-      ts:    serverTimestamp(),
-    })
-  } catch {
-    // Never let error reporting crash the app
-  }
-}
+import { reportClientError as reportError } from '@/lib/clientErrorReport'
 
 interface Props { children: ReactNode }
 interface State { hasError: boolean; error: Error | null }

@@ -1,26 +1,13 @@
+import './lib/polyfills'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import ErrorBoundary from './components/common/ErrorBoundary'
 import { reloadOnceForStaleChunk } from '@/lib/staleChunk'
+import { reportClientError } from '@/lib/clientErrorReport'
 import './index.css'
 import '@vidstack/react/player/styles/base.css'
-
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
-import { db, auth } from '@/lib/firebase'
-
-async function reportClientError(message: string, stack: string | undefined, context: string) {
-  try {
-    await addDoc(collection(db, '_client_errors'), {
-      message, stack: stack ?? null, context,
-      uid: auth.currentUser?.uid ?? null,
-      url: window.location.href,
-      ua:  navigator.userAgent,
-      ts:  serverTimestamp(),
-    })
-  } catch { /* never crash on reporting */ }
-}
 
 // Auto-reload on stale chunk / MIME errors; report everything else.
 window.addEventListener('unhandledrejection', (event) => {

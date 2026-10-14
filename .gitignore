@@ -30,3 +30,4 @@ ui-debug.log
 .DS_Store
 Thumbs.db
 scripts/serviceAccountKey.json
+.build-id

@@ -448,11 +448,16 @@ export async function exportCallSheetPDF(
   // than clipping — with every row drawn at a fixed height, a wrapped
   // second line just gets painted over by the next row's background fill,
   // so long text silently "disappears". Truncate to one line instead.
+  // Source text (e.g. a scene description typed across multiple lines) can
+  // also contain literal \n characters — jsPDF renders those as separate
+  // lines regardless of width/truncation, which caused the same overflow
+  // even after truncating by width, so flatten them first.
   function fitText(text: string, maxWidth: number): string {
-    if (doc.getTextWidth(text) <= maxWidth) return text
-    let t = text
+    const flat = text.replace(/\s*\n\s*/g, ' ').trim()
+    if (doc.getTextWidth(flat) <= maxWidth) return flat
+    let t = flat
     while (t.length > 1 && doc.getTextWidth(t + '…') > maxWidth) t = t.slice(0, -1)
-    return t.length < text.length ? `${t}…` : t
+    return t.length < flat.length ? `${t}…` : t
   }
 
   // Draw a filled+bordered cell
@@ -476,6 +481,36 @@ export async function exportCallSheetPDF(
   // Draw at an absolute y (for multi-column rows drawn in parallel)
   function Ca(col: number, toCol: number, ay: number, h: number, text: string, opts: CO = {}) {
     const savedY = y; y = ay; C(col, toCol, h, text, opts); y = savedY
+  }
+
+  // Like C(), but for boxes tall enough to hold more than one line (e.g.
+  // the CALL block's notes cell, which spans 4 rows) — wraps onto as many
+  // lines as fit the box's actual height instead of truncating to one.
+  function wrappedCell(col: number, toCol: number, h: number, text: string, opts: CO = {}) {
+    const { fill=[255,255,255], tc=[0,0,0], sz=9, bold=false, italic=false, align='C' } = opts
+    const xx = cx[col], ww = sw(col, toCol)
+    doc.setFillColor(...fill); doc.rect(xx, y, ww, h, 'F')
+    doc.setDrawColor(0,0,0); doc.setLineWidth(0.1); doc.rect(xx, y, ww, h, 'S')
+    const t = text.replace(/\s*\n\s*/g, ' ').trim()
+    if (!t) return
+    doc.setFontSize(sz)
+    doc.setFont('helvetica', bold && italic ? 'bolditalic' : bold ? 'bold' : italic ? 'italic' : 'normal')
+    doc.setTextColor(...tc)
+    const maxW  = ww - 4
+    const lineH = sz * 0.42 // ~1.2x line spacing, pt → mm
+    let lines: string[] = doc.splitTextToSize(t, maxW)
+    const maxLines = Math.max(1, Math.floor(h / lineH))
+    if (lines.length > maxLines) {
+      lines = lines.slice(0, maxLines)
+      lines[maxLines - 1] = fitText(`${lines[maxLines - 1]}…`, maxW)
+    }
+    const blockH = lines.length * lineH
+    let ly = y + (h - blockH) / 2 + lineH * 0.8
+    const tx = align === 'C' ? xx + ww / 2 : align === 'R' ? xx + ww - 2 : xx + 2
+    for (const line of lines) {
+      doc.text(line, tx, ly, { align: align === 'C' ? 'center' : align === 'R' ? 'right' : 'left' })
+      ly += lineH
+    }
   }
 
   const GRAY: [number,number,number] = [192,192,192]
@@ -560,7 +595,7 @@ export async function exportCallSheetPDF(
   doc.setFontSize(18); doc.setFont('helvetica','bold'); doc.setTextColor(...BLACK)
   doc.text('CALL', callX+callW/2, y+callH/2+3.2, {align:'center'})
   doc.text(callTime, callLabelX+callLabelW/2, y+callH/2+3.2, {align:'center'})
-  C(11,15, callH, day.notes||'', { sz:9, align:'C' })
+  wrappedCell(11,15, callH, day.notes||'', { sz:9, align:'C' })
   y += callH
 
   // ── Row 13-14: separators ────────────────────────────────────────────────────

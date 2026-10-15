@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Search, Pencil, Trash2, Eye, EyeOff, ClipboardList } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, Eye, EyeOff, ClipboardList, ListTodo } from 'lucide-react'
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, where } from '@/hooks/useFirestore'
 import { shortDate } from '@/lib/utils'
-import type { AssignmentDoc, SubjectDoc, CohortDoc } from '@/types'
+import type { AssignmentDoc, SubjectDoc, CohortDoc, TestDoc, ChecklistDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { cn } from '@/lib/utils'
 
@@ -16,9 +16,25 @@ export default function Assignments() {
   const { data: assignments, loading } = useCollection<AssignmentDoc>('assignments')
   const { data: subjects }             = useCollection<SubjectDoc>('subjects')
   const { data: cohorts }              = useCollection<CohortDoc>('cohorts')
+  // Tests and checklists each store their actual content in a sibling
+  // collection keyed by assignmentId, with their own edit routes keyed on
+  // THEIR OWN doc id — not the assignment id — so the generic edit link
+  // below needs to resolve the right id per type rather than always
+  // pointing at AssignmentBuilder (which would silently overwrite a
+  // test/checklist's type back to 'practical' on save).
+  const { data: tests }                = useCollection<TestDoc>('tests')
+  const { data: checklists }           = useCollection<ChecklistDoc>('checklists')
 
-  const subjectMap = useMemo(() => Object.fromEntries(subjects.map(s => [s.id, s])), [subjects])
-  const cohortMap  = useMemo(() => Object.fromEntries(cohorts.map(c => [c.id, c])), [cohorts])
+  const subjectMap   = useMemo(() => Object.fromEntries(subjects.map(s => [s.id, s])), [subjects])
+  const cohortMap    = useMemo(() => Object.fromEntries(cohorts.map(c => [c.id, c])), [cohorts])
+  const testMap      = useMemo(() => Object.fromEntries(tests.map(t => [t.assignmentId, t])), [tests])
+  const checklistMap = useMemo(() => Object.fromEntries(checklists.map(c => [c.assignmentId, c])), [checklists])
+
+  function editHref(a: AssignmentDoc): string {
+    if (a.type === 'test')      { const t = testMap[a.id];      if (t) return `/teacher/tests/${t.id}/edit` }
+    if (a.type === 'checklist') { const c = checklistMap[a.id]; if (c) return `/teacher/checklists/${c.id}/edit` }
+    return `/teacher/assignments/${a.id}/edit`
+  }
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -48,6 +64,9 @@ export default function Assignments() {
         <div className="flex items-center gap-2">
           <Link to="/teacher/tests/new" className="btn bg-zinc-700 text-zinc-100 hover:bg-zinc-600 py-2.5">
             <ClipboardList className="w-4 h-4" /> New Form/Test
+          </Link>
+          <Link to="/teacher/checklists/new" className="btn bg-zinc-700 text-zinc-100 hover:bg-zinc-600 py-2.5">
+            <ListTodo className="w-4 h-4" /> New Checklist
           </Link>
           <Link to="/teacher/assignments/new" className="btn bg-brand-600 text-white hover:bg-brand-500 py-2.5">
             <Plus className="w-4 h-4" /> New Assignment
@@ -128,7 +147,7 @@ export default function Assignments() {
                             {a.isPublished ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
                           <button
-                            onClick={() => navigate(`/teacher/assignments/${a.id}/edit`)}
+                            onClick={() => navigate(editHref(a))}
                             className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-slate-600 transition-colors"
                             title="Edit"
                           >
@@ -188,7 +207,7 @@ export default function Assignments() {
                       {a.isPublished ? 'Unpublish' : 'Publish'}
                     </button>
                     <button
-                      onClick={() => navigate(`/teacher/assignments/${a.id}/edit`)}
+                      onClick={() => navigate(editHref(a))}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
                     >
                       <Pencil className="w-3.5 h-3.5" /> Edit

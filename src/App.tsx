@@ -71,6 +71,7 @@ const TestBuilder                = lazy(() => import('@/pages/teacher/TestBuilde
 const TestGrader                 = lazy(() => import('@/pages/teacher/TestGrader'))
 const Assignments                = lazy(() => import('@/pages/teacher/Assignments'))
 const AssignmentBuilder          = lazy(() => import('@/pages/teacher/AssignmentBuilder'))
+const ChecklistBuilder           = lazy(() => import('@/pages/teacher/ChecklistBuilder'))
 const GradeBook                  = lazy(() => import('@/pages/teacher/GradeBook'))
 const PrizeManager               = lazy(() => import('@/pages/teacher/PrizeManager'))
 const SubjectManager             = lazy(() => import('@/pages/teacher/SubjectManager'))
@@ -187,6 +188,8 @@ export default function App() {
             <Route path="/teacher/assignments"             element={<Assignments />} />
             <Route path="/teacher/assignments/new"        element={<AssignmentBuilder />} />
             <Route path="/teacher/assignments/:id/edit"   element={<AssignmentBuilder />} />
+            <Route path="/teacher/checklists/new"         element={<ChecklistBuilder />} />
+            <Route path="/teacher/checklists/:id/edit"    element={<ChecklistBuilder />} />
             <Route path="/teacher/profile"            element={<Profile />} />
             <Route path="/teacher/gradebook"         element={<GradeBook />} />
             <Route path="/teacher/prizes"            element={<FeatureGate feature="prizes" redirectTo="/teacher"><PrizeManager /></FeatureGate>} />

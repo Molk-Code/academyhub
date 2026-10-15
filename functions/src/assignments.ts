@@ -273,6 +273,99 @@ export const submitTestAnswers = functions.https.onCall(async (data, context) =>
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// submitChecklist — student marks every step complete; auto-graded, no review
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const submitChecklist = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+
+  const { assignmentId, checkedItemIds } = data as {
+    assignmentId: string
+    checkedItemIds: string[]
+  }
+  if (!assignmentId) throw new functions.https.HttpsError('invalid-argument', 'assignmentId required.')
+
+  const uid = context.auth.uid
+
+  const assignSnap = await db.collection('assignments').doc(assignmentId).get()
+  if (!assignSnap.exists) throw new functions.https.HttpsError('not-found', 'Assignment not found.')
+  const assignment = assignSnap.data()!
+
+  const checklistSnap = await db.collection('checklists')
+    .where('assignmentId', '==', assignmentId)
+    .limit(1)
+    .get()
+  if (checklistSnap.empty) throw new functions.https.HttpsError('not-found', 'Checklist not found.')
+  const checklist = checklistSnap.docs[0].data()
+
+  // One submission per student — resubmitting isn't meaningful for a
+  // checklist (there's nothing to re-grade), unlike a test's attempt limit.
+  const existingSnap = await db.collection('submissions')
+    .where('assignmentId', '==', assignmentId)
+    .where('studentId', '==', uid)
+    .get()
+  if (!existingSnap.empty) {
+    throw new functions.https.HttpsError('already-exists', 'Already submitted.')
+  }
+
+  // Trust only which of the checklist's own item ids were sent — never the
+  // client's claim about what the items are.
+  const checkedSet = new Set<string>(checkedItemIds ?? [])
+  const items = (checklist.items as any[]) ?? []
+  const checklistAnswers = items.map(item => ({
+    itemId:  item.id,
+    checked: checkedSet.has(item.id),
+  }))
+  const allChecked = items.length > 0 && checklistAnswers.every(a => a.checked)
+
+  const subRef = db.collection('submissions').doc()
+  await subRef.set({
+    assignmentId,
+    studentId:        uid,
+    cohortId:          assignment.cohortId,
+    type:              'checklist',
+    status:            'graded',
+    checklistAnswers,
+    testAnswers:       null,
+    submittedAt:       admin.firestore.FieldValue.serverTimestamp(),
+    gradedAt:          admin.firestore.FieldValue.serverTimestamp(),
+    gradedBy:          'auto',
+    score:             allChecked ? 1 : 0,
+    maxScore:          1,
+    percentageScore:   allChecked ? 100 : 0,
+    passed:            allChecked,
+    feedback:          null,
+    resources:         [],
+    attemptNumber:     1,
+    pointsAwarded:     null,
+  })
+
+  if (allChecked) {
+    const pointsToAward = assignment.pointsValue as number
+    await db.runTransaction(async (tx) => {
+      const logRef = db.collection('points_log').doc()
+      tx.set(logRef, {
+        studentId:   uid,
+        points:      pointsToAward,
+        reason:      'assignment_graded',
+        referenceId: subRef.id,
+        awardedBy:   'auto',
+        createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+      })
+      tx.update(db.collection('users').doc(uid), {
+        totalPoints: admin.firestore.FieldValue.increment(pointsToAward),
+      })
+      tx.update(subRef, { pointsAwarded: pointsToAward })
+    })
+    await updateProgress(uid, assignment.cohortId as string)
+    const newTotal = ((await db.collection('users').doc(uid).get()).data()?.totalPoints ?? 0) as number
+    await checkLevelUp(uid, newTotal)
+  }
+
+  return { submissionId: subRef.id, passed: allChecked }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 // gradeShortAnswers — teacher marks short-answer questions correct/incorrect
 // ─────────────────────────────────────────────────────────────────────────────
 

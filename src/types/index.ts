@@ -8,7 +8,7 @@ export type UserRole = 'student' | 'teacher' | 'admin'
 
 export type SubmissionStatus = 'draft' | 'submitted' | 'graded'
 
-export type AssignmentType = 'practical' | 'test'
+export type AssignmentType = 'practical' | 'test' | 'checklist'
 
 export type QuestionType = 'multiple_choice' | 'multiple_select' | 'true_false' | 'short_answer' | 'ordering' | 'rating'
 
@@ -70,6 +70,25 @@ export interface TestDoc {
   shuffleQuestions: boolean
   timeLimitMinutes: number | null
   maxAttempts: number
+  isPublished?: boolean
+  createdBy?: string
+  createdAt?: import('firebase/firestore').Timestamp
+}
+
+export interface ChecklistItem {
+  id: string
+  text: string
+}
+
+export interface ChecklistAnswer {
+  itemId: string
+  checked: boolean
+}
+
+export interface ChecklistDoc {
+  id: string
+  assignmentId: string
+  items: ChecklistItem[]
   isPublished?: boolean
   createdBy?: string
   createdAt?: import('firebase/firestore').Timestamp
@@ -293,6 +312,7 @@ export interface SubmissionDoc {
   feedback: string | null
   resources: ResourceEmbed[]     // student uploads
   testAnswers: GradedAnswer[] | null
+  checklistAnswers?: ChecklistAnswer[] | null
   pointsAwarded: number | null
   attemptNumber: number
 }

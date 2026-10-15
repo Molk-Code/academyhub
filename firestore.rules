@@ -146,6 +146,14 @@ service cloud.firestore {
       // Students: no direct read access
     }
 
+    // ── Checklists — no secret data (no "correct answer" per item), so
+    // students can read the step list directly; submitChecklist (Cloud
+    // Function) still validates/writes the submission itself.
+    match /checklists/{checklistId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
+    }
+
     // ── Submissions ───────────────────────────────────────────────────────────
 
     match /submissions/{submissionId} {

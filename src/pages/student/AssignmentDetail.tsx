@@ -1,18 +1,19 @@
 import { useRef, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Clock, Trophy, Link2, Video, FileText, Youtube, PlayCircle, Upload, CheckCircle2, Loader2, X, Paperclip } from 'lucide-react'
+import { Clock, Trophy, Link2, Video, FileText, Youtube, PlayCircle, Upload, CheckCircle2, Loader2, X, Paperclip, ListTodo, Square, CheckSquare } from 'lucide-react'
 import Breadcrumb from '@/components/common/Breadcrumb'
 import { useDocument } from '@/hooks/useFirestore'
 import { useCollection, where } from '@/hooks/useFirestore'
 import { shortDate, toDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { isPast } from 'date-fns'
-import type { AssignmentDoc, SubjectDoc, SubmissionDoc } from '@/types'
+import type { AssignmentDoc, SubjectDoc, SubmissionDoc, ChecklistDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { useAuth } from '@/contexts/AuthContext'
 import { uploadFile } from '@/lib/cloudinary'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db, functions } from '@/lib/firebase'
+import { httpsCallable } from 'firebase/functions'
 
 function ResourceIcon({ type }: { type: string }) {
   if (type === 'youtube') return <Youtube className="w-4 h-4 text-rose-400" />
@@ -32,6 +33,11 @@ export default function AssignmentDetail() {
     profile ? [where('studentId', '==', profile.uid), where('assignmentId', '==', id ?? '')] : [],
     !!(profile && id),
   )
+  const { data: checklists } = useCollection<ChecklistDoc>(
+    'checklists',
+    [where('assignmentId', '==', id ?? '')],
+    !!id,
+  )
 
   // Practical submission state
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -42,6 +48,11 @@ export default function AssignmentDetail() {
   const [submitError, setSubmitError]   = useState<string | null>(null)
   const [justSubmitted, setJustSubmitted] = useState(false)
 
+  // Checklist state
+  const [checkedIds, setCheckedIds]           = useState<Set<string>>(new Set())
+  const [checklistSubmitting, setChecklistSubmitting] = useState(false)
+  const [checklistError, setChecklistError]   = useState<string | null>(null)
+
   if (loading) return <LoadingSpinner />
   if (!assignment) return (
     <div className="text-center py-16 text-zinc-500">Assignment not found.</div>
@@ -50,9 +61,35 @@ export default function AssignmentDetail() {
   const subject    = subjects.find(s => s.id === assignment.subjectId)
   const dueDate    = toDate(assignment.dueDate)
   const isOverdue  = dueDate ? isPast(dueDate) : false
-  const isTest     = assignment.type === 'test'
+  const isTest      = assignment.type === 'test'
+  const isChecklist = assignment.type === 'checklist'
+  const checklist   = checklists[0]
   const mySubmission = submissions.find(s => s.status !== 'draft')
   const alreadySubmitted = !!mySubmission
+
+  function toggleItem(itemId: string) {
+    setCheckedIds(prev => {
+      const next = new Set(prev)
+      next.has(itemId) ? next.delete(itemId) : next.add(itemId)
+      return next
+    })
+  }
+
+  async function submitChecklist() {
+    if (!id || !checklist) return
+    setChecklistSubmitting(true)
+    setChecklistError(null)
+    try {
+      const fn = httpsCallable<{ assignmentId: string; checkedItemIds: string[] }, { submissionId: string }>(functions, 'submitChecklist')
+      await fn({ assignmentId: id, checkedItemIds: [...checkedIds] })
+    } catch (err) {
+      setChecklistError('Submission failed. Please try again.')
+      setChecklistSubmitting(false)
+      return
+    }
+    setChecklistSubmitting(false)
+    setJustSubmitted(true)
+  }
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -139,6 +176,9 @@ export default function AssignmentDetail() {
         {assignment.type === 'test' && (
           <span className="badge badge-indigo">Test</span>
         )}
+        {isChecklist && (
+          <span className="badge badge-indigo">Checklist</span>
+        )}
       </div>
 
       {/* Description */}
@@ -208,8 +248,90 @@ export default function AssignmentDetail() {
         </div>
       )}
 
+      {/* Checklist action */}
+      {isChecklist && (
+        <div className="card space-y-4">
+          <h2 className="section-title">Steps</h2>
+          {!checklist ? (
+            <LoadingSpinner />
+          ) : alreadySubmitted ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-emerald-500">
+                <CheckCircle2 className="w-5 h-5" />
+                <span className="text-sm font-semibold">Completed and submitted</span>
+              </div>
+              <div className="space-y-1.5">
+                {checklist.items.map(item => {
+                  const checked = mySubmission.checklistAnswers?.find(a => a.itemId === item.id)?.checked ?? false
+                  return (
+                    <div key={item.id} className="flex items-center gap-2.5 text-sm">
+                      {checked
+                        ? <CheckSquare className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                        : <Square className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+                      }
+                      <span className={checked ? 'text-zinc-300' : 'text-zinc-500 line-through'}>{item.text}</span>
+                    </div>
+                  )
+                })}
+              </div>
+              {mySubmission.feedback && (
+                <p className="text-sm text-zinc-400 bg-zinc-800/50 rounded-xl p-3 whitespace-pre-wrap">
+                  {mySubmission.feedback}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                {checklist.items.map(item => {
+                  const checked = checkedIds.has(item.id)
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => toggleItem(item.id)}
+                      className={cn(
+                        'w-full flex items-start gap-2.5 text-sm text-left px-3 py-2 rounded-xl border transition-colors',
+                        checked ? 'border-emerald-700/40 bg-emerald-900/20' : 'border-white/8 hover:border-white/15',
+                      )}
+                    >
+                      {checked
+                        ? <CheckSquare className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                        : <Square className="w-4 h-4 text-zinc-500 flex-shrink-0 mt-0.5" />
+                      }
+                      <span className={checked ? 'text-zinc-200' : 'text-zinc-300'}>{item.text}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <p className="text-xs text-zinc-500 flex items-center gap-1.5">
+                <ListTodo className="w-3.5 h-3.5" />
+                {checkedIds.size} / {checklist.items.length} steps checked
+              </p>
+
+              {checklistError && (
+                <p className="text-sm text-rose-500">{checklistError}</p>
+              )}
+
+              <button
+                type="button"
+                disabled={checklistSubmitting || checkedIds.size < checklist.items.length}
+                onClick={submitChecklist}
+                className="btn-primary py-2.5 px-6 disabled:opacity-50 w-full sm:w-auto"
+              >
+                {checklistSubmitting
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</>
+                  : <><CheckCircle2 className="w-4 h-4" /> Mark Complete & Submit</>
+                }
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Practical submission */}
-      {!isTest && (
+      {!isTest && !isChecklist && (
         <div className="space-y-4">
 
           {justSubmitted ? (

@@ -528,7 +528,8 @@ export default function SubjectDetail() {
                 <Plus className="w-3.5 h-3.5" /> Add item
               </button>
             </div>
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px]">
               <thead>
                 <tr className="border-b border-white/8">
                   <th className="w-8 px-4 py-2.5" />
@@ -637,6 +638,7 @@ export default function SubjectDetail() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         )
       })}

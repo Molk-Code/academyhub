@@ -165,7 +165,8 @@ export default function StudentSubjectDetail() {
                 <div className={`px-5 py-3 ${subject.color}`}>
                   <h2 className="text-sm font-bold text-white tracking-wide">Semester {sem}</h2>
                 </div>
-                <table className="w-full">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[560px]">
                   <thead>
                     <tr className="border-b border-white/8">
                       <th className="w-8 px-4 py-2.5" />
@@ -210,6 +211,7 @@ export default function StudentSubjectDetail() {
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
             )
           })}

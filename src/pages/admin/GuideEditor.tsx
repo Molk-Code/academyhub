@@ -493,9 +493,9 @@ function ContactsPanel({ contacts }: { contacts: GuideContactDoc[] }) {
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-zinc-100">{c.name}</p>
                 <p className="text-xs text-zinc-400">{c.role}</p>
-                <div className="flex gap-4 mt-1 text-xs text-zinc-500">
-                  {c.phone && <span>{c.phone}</span>}
-                  {c.email && <span>{c.email}</span>}
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-zinc-500">
+                  {c.phone && <span className="whitespace-nowrap">{c.phone}</span>}
+                  {c.email && <span className="min-w-0 break-all">{c.email}</span>}
                 </div>
               </div>
               <div className="flex gap-1 flex-shrink-0">

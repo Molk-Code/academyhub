@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp,
+  collection, addDoc, setDoc, updateDoc, deleteDoc, doc, serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -52,32 +52,36 @@ export default function TeacherProduction() {
   )
 
   const { data: allTeams } = useCollection<ProductionTeamDoc>('production_teams')
-  const { data: allChannels } = useCollection<ChatChannelDoc>('chat_channels')
+  const { data: allChannels, loading: channelsLoading } = useCollection<ChatChannelDoc>('chat_channels')
   const { data: allUsers } = useCollection<UserDoc>('users')
+
+  // Crew channels use a deterministic id so concurrent writers (createTeam, this
+  // sync, other open tabs) converge on one doc instead of creating duplicates.
+  function writeCrewChannel(teamId: string, teamCohortId: string, emoji: string, name: string, order: number) {
+    return setDoc(doc(db, 'chat_channels', `crew_${teamId}`), {
+      name: `${emoji} ${name}`,
+      description: `Channel for the ${name} crew`,
+      order,
+      createdAt: serverTimestamp(),
+      createdBy: profile!.uid,
+      isPublic: false,
+      allowedRoles: [],
+      allowedCohortIds: [teamCohortId],
+      allowedTeamIds: [teamId],
+      memberIds: [],
+    })
+  }
 
   const syncedTeamIds = useRef(new Set<string>())
   useEffect(() => {
-    if (!profile || allTeams.length === 0) return
+    if (!profile || channelsLoading || allTeams.length === 0) return
     for (const team of allTeams) {
       if (syncedTeamIds.current.has(team.id)) continue
+      syncedTeamIds.current.add(team.id)
       const hasChannel = allChannels.some(ch => (ch.allowedTeamIds ?? []).includes(team.id))
-      if (!hasChannel) {
-        syncedTeamIds.current.add(team.id)
-        addDoc(collection(db, 'chat_channels'), {
-          name: `${team.emoji} ${team.name}`,
-          description: `Channel for the ${team.name} crew`,
-          order: 100 + allChannels.length,
-          createdAt: serverTimestamp(),
-          createdBy: profile.uid,
-          isPublic: false,
-          allowedRoles: [],
-          allowedCohortIds: [team.cohortId],
-          allowedTeamIds: [team.id],
-          memberIds: [],
-        })
-      }
+      if (!hasChannel) writeCrewChannel(team.id, team.cohortId, team.emoji, team.name, 100 + allChannels.length)
     }
-  }, [allTeams, allChannels, profile])
+  }, [allTeams, allChannels, channelsLoading, profile])
 
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
   const selectedTeam = teams.find(t => t.id === selectedTeamId) ?? null
@@ -139,18 +143,8 @@ export default function TeacherProduction() {
         createdAt: serverTimestamp(),
         createdBy: profile.uid,
       })
-      await addDoc(collection(db, 'chat_channels'), {
-        name: `${teamForm.emoji} ${teamForm.name.trim()}`,
-        description: `Channel for the ${teamForm.name.trim()} crew`,
-        order: 100 + teams.length,
-        createdAt: serverTimestamp(),
-        createdBy: profile.uid,
-        isPublic: false,
-        allowedRoles: [],
-        allowedCohortIds: [cohortId],
-        allowedTeamIds: [teamRef.id],
-        memberIds: [],
-      })
+      syncedTeamIds.current.add(teamRef.id)
+      await writeCrewChannel(teamRef.id, cohortId, teamForm.emoji, teamForm.name.trim(), 100 + teams.length)
       setTeamPanel(null)
       setTeamForm({ name: '', emoji: '🎬', color: TEAM_COLORS[0] })
       setSelectedTeamId(teamRef.id)
@@ -165,6 +159,11 @@ export default function TeacherProduction() {
     if (!confirm('Delete this crew? All member assignments will be lost.')) return
     if (selectedTeamId === id) setSelectedTeamId(null)
     await deleteDoc(doc(db, 'production_teams', id))
+    await Promise.all(
+      allChannels
+        .filter(ch => (ch.allowedTeamIds ?? []).includes(id))
+        .map(ch => deleteDoc(doc(db, 'chat_channels', ch.id))),
+    )
   }
 
   function startEditTeam(team: ProductionTeamDoc) {

@@ -524,11 +524,11 @@ export default function ChatPage() {
                       ? <Lock className="w-4 h-4 text-zinc-400 flex-shrink-0" />
                       : <Hash className="w-5 h-5 text-zinc-400 flex-shrink-0" />
                     }
-                    <span className="text-base font-bold text-zinc-100">{activeChannel.name}</span>
+                    <span className="text-base font-bold text-zinc-100 whitespace-nowrap truncate flex-shrink-0 max-w-[70%]">{activeChannel.name}</span>
                     {activeChannel.description && (
                       <>
-                        <span className="text-zinc-300 mx-0.5">|</span>
-                        <span className="text-sm text-zinc-500 truncate">{activeChannel.description}</span>
+                        <span className="text-zinc-300 mx-0.5 flex-shrink-0">|</span>
+                        <span className="text-sm text-zinc-500 truncate min-w-0">{activeChannel.description}</span>
                       </>
                     )}
                   </>

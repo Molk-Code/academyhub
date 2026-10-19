@@ -107,7 +107,7 @@ export default function StudentPreview() {
         </div>
 
         {/* Stats strip */}
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex flex-wrap gap-y-1 items-center gap-4 text-sm">
           <span className="flex items-center gap-1.5 text-zinc-500">
             <Users className="w-4 h-4" /> {cohortStudents.length} students
           </span>

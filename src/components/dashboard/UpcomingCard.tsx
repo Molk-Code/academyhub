@@ -19,7 +19,7 @@ export function LessonCard({ lesson, subjectColor = 'bg-brand-500', subjectTitle
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-zinc-200 truncate">{lesson.title}</p>
         {subjectTitle && <p className="text-xs text-zinc-400 mb-1">{subjectTitle}</p>}
-        <div className="flex items-center gap-3 text-xs mt-1">
+        <div className="flex flex-wrap gap-y-1 items-center gap-3 text-xs mt-1">
           <span className="flex items-center gap-1 text-orange-400 font-medium">
             <Clock className="w-3 h-3" />
             {shortDate(lesson.startTime)} · {timeStr(lesson.startTime)}–{timeStr(lesson.endTime)}
@@ -75,7 +75,7 @@ export function DeadlineCard({ assignment, subjectColor = 'bg-rose-500', subject
           )}
         </div>
         {subjectTitle && <p className="text-xs text-zinc-400 mb-1">{subjectTitle}</p>}
-        <div className="flex items-center gap-3 text-xs text-zinc-500 mt-1">
+        <div className="flex flex-wrap gap-y-1 items-center gap-3 text-xs text-zinc-500 mt-1">
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
             Due {shortDate(assignment.dueDate)}

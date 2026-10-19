@@ -411,7 +411,7 @@ export default function BookingHub() {
         )}
 
         {/* Legend */}
-        <div className="flex items-center gap-5 text-xs text-zinc-500">
+        <div className="flex flex-wrap gap-y-1 items-center gap-5 text-xs text-zinc-500">
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded bg-emerald-500 flex-shrink-0" /> Free
           </span>

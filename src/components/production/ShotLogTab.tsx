@@ -445,7 +445,7 @@ export default function ShotLogTab({ productionId, productionTitle, scenes, shot
           <div className="h-2 bg-white/10 rounded-full overflow-hidden mb-3">
             <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
           </div>
-          <div className="flex gap-4 text-xs text-zinc-400">
+          <div className="flex flex-wrap gap-y-1 gap-4 text-xs text-zinc-400">
             <span>✓ {doneShots} done</span>
             <span>★ {bestShots} best take</span>
             <span>✕ {ngShots} all-NG</span>
@@ -477,10 +477,10 @@ export default function ShotLogTab({ productionId, productionTitle, scenes, shot
         return (
           <div key={scene.id} className="mb-6">
             <div className="flex items-center gap-2 py-2 border-b border-white/10 mb-3">
-              <span className="text-xs font-bold bg-white/10 px-2 py-1 rounded">Scene {scene.sceneNumber}</span>
-              <span className="text-sm font-semibold text-zinc-200">{scene.location}</span>
-              <span className="text-xs text-zinc-400">{scene.intExt} · {scene.dayNight}</span>
-              <span className="text-xs text-zinc-500 ml-auto truncate max-w-[200px]">{scene.description}</span>
+              <span className="text-xs font-bold bg-white/10 px-2 py-1 rounded whitespace-nowrap flex-shrink-0">Scene {scene.sceneNumber}</span>
+              <span className="text-sm font-semibold text-zinc-200 min-w-0 truncate">{scene.location}</span>
+              <span className="text-xs text-zinc-400 whitespace-nowrap flex-shrink-0">{scene.intExt} · {scene.dayNight}</span>
+              <span className="text-xs text-zinc-500 ml-auto truncate min-w-0 max-w-[200px]">{scene.description}</span>
             </div>
             {sceneShots.map(shot => {
               const takes = getTakes(shot.id)

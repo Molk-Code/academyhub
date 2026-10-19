@@ -95,7 +95,7 @@ export default function StudentAssignments() {
 
           {subject && <p className="text-xs text-zinc-400 mt-0.5">{subject.iconEmoji} {subject.title}</p>}
 
-          <div className="flex items-center gap-3 text-xs text-zinc-500 mt-1.5">
+          <div className="flex flex-wrap gap-y-1 items-center gap-3 text-xs text-zinc-500 mt-1.5">
             <span className={cn('flex items-center gap-1', isOverdue && 'text-rose-500 font-medium')}>
               <Clock className="w-3 h-3" />
               Due {shortDate(a.dueDate)}

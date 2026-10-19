@@ -304,7 +304,7 @@ export default function StudentVideoLibrary() {
                 </div>
                 <div className="p-4">
                   <p className="font-semibold text-zinc-200 text-sm truncate mb-1">{video.name}</p>
-                  <div className="flex items-center gap-2 text-xs text-zinc-400">
+                  <div className="flex flex-wrap gap-y-1 items-center gap-2 text-xs text-zinc-400">
                     {subject && (
                       <span className="flex items-center gap-1">
                         {subject.iconEmoji} {subject.title}

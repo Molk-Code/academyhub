@@ -4,6 +4,7 @@ import { deleteDoc, doc, collection, addDoc, updateDoc, setDoc, serverTimestamp 
 import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Check, X,
   ToggleLeft, ToggleRight, Building2, ChevronDown, ChevronUp, Settings2, CalendarDays, Copy, ExternalLink } from 'lucide-react'
 import { db } from '@/lib/firebase'
+import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where } from '@/hooks/useFirestore'
 import type { RoomBookingDoc, RoomDoc, RoomAvailabilityWindow, BookingSettingsDoc, SemesterSettingsDoc } from '@/types'
 import { cn } from '@/lib/utils'
@@ -55,6 +56,7 @@ export default function BookingHub() {
     return d === 0 ? 6 : d - 1
   })
   const [filterRoom, setFilterRoom] = useState('')
+  const { profile } = useAuth()
   const [cancelling, setCancelling] = useState(false)
 
   const weekStart = useMemo(() => {
@@ -152,6 +154,26 @@ export default function BookingHub() {
     setCancelling(true)
     try { await deleteDoc(doc(db, 'room_bookings', booking.id)) }
     finally { setCancelling(false) }
+  }
+
+  async function bookSlot(slot: { startTime: string; endTime: string }, room: RoomDoc) {
+    if (!profile) return
+    setCancelling(true)
+    try {
+      await addDoc(collection(db, 'room_bookings'), {
+        roomId:      room.id,
+        startTime:   slot.startTime,
+        endTime:     slot.endTime,
+        date:        selectedDateStr,
+        studentId:   profile.uid,
+        studentName: profile.displayName,
+        createdAt:   serverTimestamp(),
+      })
+    } catch (e: any) {
+      alert(e.message ?? 'Could not book this slot.')
+    } finally {
+      setCancelling(false)
+    }
   }
 
   function goToday() {
@@ -394,9 +416,14 @@ export default function BookingHub() {
                               <div className="opacity-75 text-[10px] mt-0.5 truncate">{booking.studentName.split(' ').slice(1).join(' ')}</div>
                             </button>
                           ) : (
-                            <div className="w-full rounded-xl px-2 py-3.5 text-xs font-medium bg-emerald-500 border border-emerald-600 text-white">
+                            <button
+                              disabled={cancelling || isPast}
+                              onClick={() => bookSlot(slot, room)}
+                              title={isPast ? undefined : 'Click to book this slot'}
+                              className="w-full rounded-xl px-2 py-3.5 text-xs font-medium transition-all border bg-emerald-500 border-emerald-600 text-white hover:bg-emerald-600 active:bg-emerald-700 disabled:cursor-default"
+                            >
                               Free
-                            </div>
+                            </button>
                           )}
                         </td>
                       )
@@ -413,7 +440,7 @@ export default function BookingHub() {
         {/* Legend */}
         <div className="flex flex-wrap gap-y-1 items-center gap-5 text-xs text-zinc-500">
           <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-emerald-500 flex-shrink-0" /> Free
+            <span className="w-3 h-3 rounded bg-emerald-500 flex-shrink-0" /> Free (click to book)
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded bg-rose-500 flex-shrink-0" /> Booked (click to cancel)

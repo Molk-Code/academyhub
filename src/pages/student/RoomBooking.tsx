@@ -171,6 +171,8 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
         studentName: profile.displayName,
         createdAt:   serverTimestamp(),
       })
+    } catch (e: any) {
+      alert(e.message ?? 'Could not book this slot.')
     } finally {
       setActing(false)
     }

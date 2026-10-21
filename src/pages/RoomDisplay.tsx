@@ -1,6 +1,6 @@
 /**
  * Public room display page — designed for iPad/screen at room entrances.
- * Requires Firestore public read rules for: rooms, room_bookings.
+ * Requires Firestore public read rules for: rooms, room_bookings, settings/semester.
  *
  * Add to firestore.rules:
  *   match /rooms/{id}         { allow read: if true; }
@@ -9,8 +9,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { format, addDays, startOfWeek, isSameDay } from 'date-fns'
-import { useCollection, where } from '@/hooks/useFirestore'
-import type { RoomDoc, RoomBookingDoc, RoomAvailabilityWindow } from '@/types'
+import { useCollection, useDocument, where } from '@/hooks/useFirestore'
+import type { RoomDoc, RoomBookingDoc, RoomAvailabilityWindow, SemesterSettingsDoc } from '@/types'
 import { cn } from '@/lib/utils'
 
 interface TimeSlot { startTime: string; endTime: string }
@@ -39,25 +39,31 @@ function bookingKey(slot: TimeSlot, date: string, roomId: string) {
   return `${slot.startTime}_${slot.endTime}_${date}_${roomId}`
 }
 
-function roomHasSlot(room: RoomDoc, slot: TimeSlot, dateStr: string, dayNum: number): boolean {
+type SemDates = { start: string; end: string } | undefined
+
+// Mirrors RoomBooking: windows follow semester dates unless useSemesterDates === false.
+function windowCoversDate(w: RoomAvailabilityWindow, dateStr: string, dayNum: number, semDates: SemDates): boolean {
+  if (!w.days.includes(dayNum)) return false
+  const useSem = w.useSemesterDates !== false
+  if (useSem && !semDates) return true
+  const start = useSem ? semDates!.start : w.startDate
+  const end   = useSem ? semDates!.end   : w.endDate
+  return dateStr >= start && dateStr <= end
+}
+
+function roomHasSlot(room: RoomDoc, slot: TimeSlot, dateStr: string, dayNum: number, semDates: SemDates): boolean {
   return (room.availability ?? []).some((w: RoomAvailabilityWindow) =>
-    w.days.includes(dayNum) &&
-    dateStr >= w.startDate &&
-    dateStr <= w.endDate &&
+    windowCoversDate(w, dateStr, dayNum, semDates) &&
     w.startTime === slot.startTime &&
     w.endTime === slot.endTime,
   )
 }
 
-function deriveSlots(rooms: RoomDoc[], todayStr: string, todayDayNum: number): TimeSlot[] {
+function deriveSlots(rooms: RoomDoc[], todayStr: string, todayDayNum: number, semDates: SemDates): TimeSlot[] {
   const seen = new Map<string, TimeSlot>()
   for (const room of rooms) {
     for (const w of (room.availability ?? []) as RoomAvailabilityWindow[]) {
-      if (
-        w.days.includes(todayDayNum) &&
-        todayStr >= w.startDate &&
-        todayStr <= w.endDate
-      ) {
+      if (windowCoversDate(w, todayStr, todayDayNum, semDates)) {
         const k = `${w.startTime}_${w.endTime}`
         if (!seen.has(k)) seen.set(k, { startTime: w.startTime, endTime: w.endTime })
       }
@@ -184,10 +190,11 @@ function SingleRoomDisplay({
 // ── All-rooms grid view ───────────────────────────────────────────────────────
 
 function AllRoomsDisplay({
-  rooms, slots, bookingMap, displayDate, now, onPrevWeek, onNextWeek, onSelectDay, onSelectRoom,
+  rooms, slots, bookingMap, displayDate, now, semDates, onPrevWeek, onNextWeek, onSelectDay, onSelectRoom,
 }: {
   rooms: RoomDoc[]
   slots: TimeSlot[]
+  semDates: SemDates
   bookingMap: Map<string, RoomBookingDoc>
   displayDate: Date
   now: Date
@@ -320,7 +327,7 @@ function AllRoomsDisplay({
               {/* Room cells */}
               {rooms.map(room => {
                 const booking   = bookingMap.get(bookingKey(slot, displayStr, room.id))
-                const available = roomHasSlot(room, slot, displayStr, displayDayNum)
+                const available = roomHasSlot(room, slot, displayStr, displayDayNum, semDates)
                 const bg = booking
                   ? isCurrent ? 'rgba(136,19,55,0.5)'  : isPast ? 'rgba(136,19,55,0.1)'  : 'rgba(136,19,55,0.2)'
                   : !available ? 'rgba(0,0,0,0)'
@@ -411,14 +418,22 @@ export default function RoomDisplay() {
     displayStr,
   )
 
+  const { data: semester } = useDocument<SemesterSettingsDoc>('settings', 'semester')
+  const semStart = semester?.startDate ?? null
+  const semEnd   = semester?.sem2End ?? semester?.endDate ?? null
+  const semDates = useMemo<SemDates>(
+    () => semStart && semEnd ? { start: semStart, end: semEnd } : undefined,
+    [semStart, semEnd],
+  )
+
   const sortedRooms = useMemo(
     () => [...allRooms].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     [allRooms],
   )
 
   const slots = useMemo(
-    () => deriveSlots(sortedRooms, displayStr, displayDayNum),
-    [sortedRooms, displayStr, displayDayNum],
+    () => deriveSlots(sortedRooms, displayStr, displayDayNum, semDates),
+    [sortedRooms, displayStr, displayDayNum, semDates],
   )
 
   const bookingMap = useMemo(() => {
@@ -468,6 +483,7 @@ export default function RoomDisplay() {
       bookingMap={bookingMap}
       displayDate={displayDate}
       now={now}
+      semDates={semDates}
       onPrevWeek={() => setDayOffset(o => o - 7)}
       onNextWeek={() => setDayOffset(o => o + 7)}
       onSelectDay={d => {

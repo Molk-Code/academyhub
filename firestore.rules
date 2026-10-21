@@ -231,10 +231,11 @@ service cloud.firestore {
     }
 
     // ── Global settings (school day hours, etc.) ──────────────────────────────
-    // settings/booking is publicly readable for the unauthenticated iPad kiosk display.
+    // settings/booking and settings/semester are publicly readable for the
+    // unauthenticated iPad room display (semester dates bound room availability).
 
     match /settings/{docId} {
-      allow read: if isSignedIn() || docId == 'booking';
+      allow read: if isSignedIn() || docId in ['booking', 'semester'];
       allow write: if isAdmin();
     }
 

@@ -127,7 +127,8 @@ export default function SubjectList() {
               className="card-hover group block"
             >
               {/* Cover */}
-              <SubjectCover subject={subject} className="h-32 -mx-6 -mt-6 rounded-t-2xl mb-4">
+              {/* w-auto (not w-full) so the negative margins widen it to the card edges */}
+              <SubjectCover subject={subject} className="w-auto h-32 -mx-6 -mt-6 rounded-t-2xl mb-4">
                 <div className="flex items-end justify-between gap-2">
                   <h3 className="font-bold text-white text-base leading-tight">{subject.title}</h3>
                   <ChevronRight className="w-5 h-5 text-white/70 group-hover:text-white transition-colors flex-shrink-0" />

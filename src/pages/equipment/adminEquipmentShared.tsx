@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { uploadFile, optimizeImageUrl } from '@/lib/cloudinary'
+import { shrinkImageToLimit } from '@/lib/imageCompress'
 import type { EquipmentCategoryDoc, EquipmentDoc } from '@/types'
 
 // ── Types & constants ─────────────────────────────────────────────────────────
@@ -73,7 +74,9 @@ export function formatDate(d: string) {
 }
 
 export async function uploadEquipmentImage(file: File, onProgress: (p: number) => void): Promise<string> {
-  const result = await uploadFile(file, onProgress)
+  // Photos over the 10 MB Cloudinary limit are shrunk in the browser first
+  const ready = await shrinkImageToLimit(file)
+  const result = await uploadFile(ready, onProgress)
   return result.secureUrl
 }
 

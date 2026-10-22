@@ -194,7 +194,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
               ) : (
                 <div style={{ textAlign: 'center', padding: '1rem 0', color: '#4a4a60' }}>
                   {uploading
-                    ? <><Loader2 size={24} style={{ margin: '0 auto 8px', display: 'block', animation: 'spin 1s linear infinite' }} /><p style={{ fontSize: '.8rem' }}>{uploadPct}%</p></>
+                    ? <><Loader2 size={24} style={{ margin: '0 auto 8px', display: 'block', animation: 'spin 1s linear infinite' }} /><p style={{ fontSize: '.8rem' }}>{uploadPct === 0 ? 'Preparing…' : `${uploadPct}%`}</p></>
                     : <><Upload size={24} style={{ margin: '0 auto 8px', display: 'block' }} /><p style={{ fontSize: '.8rem' }}>Drag & drop or click to upload image</p></>
                   }
                 </div>

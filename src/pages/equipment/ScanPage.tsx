@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { NotFoundException } from '@zxing/library'
 import { Scan, Check, X, Wifi, WifiOff, LogIn, AlertTriangle } from 'lucide-react'
+import { parseScanText } from './inventoryShared'
 
 const COOLDOWN_MS = 2500 // ms to block re-scan after a successful scan
 
@@ -109,11 +110,9 @@ export default function ScanPage() {
     const sess = sessionRef.current
     if (!sess || !sess.active || !sessionId) return
 
-    // Individual-unit QRs are encoded as "<equipmentId>::<unit number>" so a
-    // scan can be traced back to a specific physical unit (see qrUnitValue).
-    const m = text.match(/^(.*)::(\d+)$/)
-    const base = m ? m[1] : text
-    const unit = m ? m[2] : null
+    // Individual-unit codes carry a unit number (see parseScanText) so a scan
+    // can be traced back to a specific physical unit.
+    const { base, unit } = parseScanText(text)
     const baseName = equipmentCacheRef.current[base] ?? base
     const equipmentName = unit ? `${baseName} #${unit}` : baseName
     const equipmentId = equipmentCacheRef.current[base] ? base : ''

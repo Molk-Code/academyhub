@@ -4,13 +4,14 @@ import { db } from '@/lib/firebase'
 import { useCollection } from '@/hooks/useFirestore'
 import type { EquipmentDoc, EquipmentCategoryDoc, CohortDoc } from '@/types'
 import {
-  Search, X, Plus, Package, QrCode, Pencil, Trash2, Loader2, AlertTriangle,
+  Search, X, Plus, Package, QrCode, Barcode, Pencil, Trash2, Loader2, AlertTriangle,
   LayoutGrid, Camera, Wrench, Lightbulb, Mic, MapPin, BookOpen, type LucideIcon,
 } from 'lucide-react'
 import { EquipmentImg, catStyle } from './adminEquipmentShared'
 import { InfoModal } from './EquipmentInfoModal'
 import { ItemForm } from './EquipmentItemForm'
 import { QRModal } from './EquipmentQRModal'
+import { BarcodeModal } from './EquipmentBarcodeModal'
 
 // Known categories get a matching icon; anything custom (e.g. a school's own
 // added category) falls back to a generic package icon.
@@ -38,6 +39,7 @@ export function CatalogTab({ categories, pricingEnabled }: { categories: Equipme
   const [editItem, setEditItem] = useState<EquipmentDoc | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [qrItem, setQrItem] = useState<EquipmentDoc | null>(null)
+  const [barcodeItem, setBarcodeItem] = useState<EquipmentDoc | null>(null)
   const [infoItem, setInfoItem] = useState<EquipmentDoc | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -136,6 +138,10 @@ export function CatalogTab({ categories, pricingEnabled }: { categories: Equipme
                     style={{ padding: 8, background: 'rgba(30,30,40,.9)', border: '1px solid #2a2a3a', borderRadius: 8, color: '#c0c0d5', cursor: 'pointer', pointerEvents: 'auto' }}>
                     <QrCode size={16} />
                   </button>
+                  <button onClick={e => { e.stopPropagation(); setBarcodeItem(item) }} title="Barcode"
+                    style={{ padding: 8, background: 'rgba(30,30,40,.9)', border: '1px solid #2a2a3a', borderRadius: 8, color: '#c0c0d5', cursor: 'pointer', pointerEvents: 'auto' }}>
+                    <Barcode size={16} />
+                  </button>
                   <button onClick={e => { e.stopPropagation(); setEditItem(item); setShowForm(true) }} title="Edit"
                     style={{ padding: 8, background: 'rgba(30,30,40,.9)', border: '1px solid #2a2a3a', borderRadius: 8, color: '#c0c0d5', cursor: 'pointer', pointerEvents: 'auto' }}>
                     <Pencil size={16} />
@@ -185,6 +191,7 @@ export function CatalogTab({ categories, pricingEnabled }: { categories: Equipme
 
       {showForm && <ItemForm existing={editItem} onClose={() => { setShowForm(false); setEditItem(null) }} categories={categories} />}
       {qrItem && <QRModal item={qrItem} onClose={() => setQrItem(null)} />}
+      {barcodeItem && <BarcodeModal item={barcodeItem} onClose={() => setBarcodeItem(null)} />}
     </>
   )
 }

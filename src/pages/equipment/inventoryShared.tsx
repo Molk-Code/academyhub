@@ -29,12 +29,17 @@ export function overdueDays(returnDate: string): number {
 }
 
 // Individual-unit QR codes are encoded as "<qrCode or name>::<unit number>"
-// (see qrUnitValue in AdminEquipmentPage) so a scan can be traced back to a
-// specific physical unit rather than just the equipment type.
+// (see qrUnitValue) and barcodes as "<id>.<unit number>" (see barcodeUnitValue)
+// so a scan can be traced back to a specific physical unit rather than just
+// the equipment type. USB barcode scanners type as if on a US keyboard, so on
+// a Swedish layout a scanned QR's "::" arrives as "ÖÖ" — accept that too.
 export function parseScanText(raw: string): { base: string; unit: number | null } {
-  const m = raw.match(/^(.*)::(\d+)$/)
+  const text = raw.trim()
+  // "." only counts as a separator after a Firestore id, so names like
+  // "Canon 24-70 f2.8" (older QRs may encode a name) aren't split.
+  const m = text.match(/^(.*?)(?:::|ÖÖ|öö)(\d+)$/) ?? text.match(/^([A-Za-z0-9]{20})\.(\d+)$/)
   if (m) return { base: m[1], unit: parseInt(m[2], 10) }
-  return { base: raw, unit: null }
+  return { base: text, unit: null }
 }
 
 export function beep(freq: number) {

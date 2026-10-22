@@ -115,3 +115,40 @@ export function printQRLabel(name: string, id: string, category: string, contain
 export function qrUnitValue(item: EquipmentDoc, unit: number): string {
   return `${item.id}::${unit}`
 }
+
+// Barcodes (Code 128) hold the same equipment id as the QR. Individual units
+// use "." instead of "::" because USB scanners type as if on a US keyboard —
+// ":" lands as "Ö" on a Swedish layout, while "." is in the same place.
+export function barcodeUnitValue(item: EquipmentDoc, unit: number): string {
+  return `${item.id}.${unit}`
+}
+
+export function printBarcodeLabel(name: string, category: string, container: HTMLDivElement | null) {
+  if (!container) return
+  const svg = container.querySelector('svg')
+  if (!svg) return
+  const svgData = new XMLSerializer().serializeToString(svg)
+  const win = window.open('', '_blank', 'width=700,height=500')
+  if (!win) return
+  win.document.write(`<html><head><title>Barcode — ${name}</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      @page{size:100mm 50mm;margin:0}
+      html,body{width:100mm;height:50mm;background:#fff}
+      body{font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:3mm 4mm}
+      .wrap svg{width:92mm;height:auto;max-height:30mm;display:block}
+      h1{font-size:12px;font-weight:700;color:#111;text-align:center;line-height:1.2;max-width:92mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .cat{font-size:8px;font-weight:700;color:#6b7280;letter-spacing:.1em;text-transform:uppercase}
+      button{margin-top:10px;padding:8px 20px;background:#111;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer}
+      @media print{button{display:none}}
+    </style></head>
+    <body>
+    <h1>${name}</h1>
+    <p class="cat">${category}</p>
+    <div class="wrap">${svgData}</div>
+    <button onclick="window.print();window.close()">🖨️ Print</button>
+    </body></html>`)
+  win.document.close()
+  win.focus()
+  setTimeout(() => win.print(), 300)
+}

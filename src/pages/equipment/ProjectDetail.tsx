@@ -8,7 +8,7 @@ import { useCollection } from '@/hooks/useFirestore'
 import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc } from '@/types'
 import {
   Package, Calendar, Users, Clock, AlertTriangle, Check, Trash2, Plus,
-  Edit2, CheckCircle2, ArchiveRestore, ZapOff, Scan, Smartphone,
+  Edit2, CheckCircle2, ArchiveRestore, ZapOff, Scan, Smartphone, ScanBarcode,
 } from 'lucide-react'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { NotFoundException } from '@zxing/library'
@@ -33,6 +33,10 @@ export function ProjectDetail({
 
   const [scanMode, setScanMode] = useState<'checkout' | 'checkin'>('checkout')
   const [scanActive, setScanActive] = useState(false)
+  // USB/Bluetooth barcode scanners act as a keyboard: they type the code and press Enter.
+  const [usbActive, setUsbActive] = useState(false)
+  const [usbInput, setUsbInput] = useState('')
+  const usbInputRef = useRef<HTMLInputElement>(null)
   const [scanEntries, setScanEntries] = useState<{ name: string; time: string }[]>([])
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -165,6 +169,14 @@ export function ProjectDetail({
     controlsRef.current?.stop()
     controlsRef.current = null
     setScanActive(false)
+  }
+
+  function submitUsbScan() {
+    const text = usbInput.trim()
+    setUsbInput('')
+    if (!text) return
+    beep(scanMode === 'checkout' ? 880 : 660)
+    handleScan(text)
   }
 
   // Cleanup remote session on unmount
@@ -473,7 +485,7 @@ export function ProjectDetail({
       </div>
 
       {/* Scanner */}
-      <div className={`scan-monitor${(scanActive || !!remoteSessionId) ? ' active' : ''}`}>
+      <div className={`scan-monitor${(scanActive || usbActive || !!remoteSessionId) ? ' active' : ''}`}>
         {/* Mode tabs + action buttons */}
         <div className="scan-monitor-header">
           <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
@@ -481,24 +493,30 @@ export function ProjectDetail({
               className={`category-btn${scanMode === 'checkout' ? ' active' : ''}`}
               style={{ borderRadius: 6 }}
               disabled={scanActive || !!remoteSessionId}
-              onClick={() => setScanMode('checkout')}
+              onClick={() => { setScanMode('checkout'); usbInputRef.current?.focus() }}
             >Checkout</button>
             <button
               className={`category-btn${scanMode === 'checkin' ? ' active' : ''}`}
               style={{ borderRadius: 6 }}
               disabled={scanActive || !!remoteSessionId}
-              onClick={() => setScanMode('checkin')}
+              onClick={() => { setScanMode('checkin'); usbInputRef.current?.focus() }}
             >Check-in</button>
           </div>
           <div className="scan-monitor-actions">
             {/* Local camera */}
-            {!remoteSessionId && (
+            {!remoteSessionId && !usbActive && (
               scanActive
                 ? <button className="scan-stop-btn" onClick={stopScanner}><ZapOff size={14} /> Stop</button>
                 : <button className="manual-add-btn" onClick={startScanner}><Scan size={14} /> This Device</button>
             )}
+            {/* USB / Bluetooth barcode scanner */}
+            {!remoteSessionId && !scanActive && (
+              usbActive
+                ? <button className="scan-stop-btn" onClick={() => { setUsbActive(false); setUsbInput('') }}><ZapOff size={14} /> Stop</button>
+                : <button className="manual-add-btn" onClick={() => setUsbActive(true)}><ScanBarcode size={14} /> USB Scanner</button>
+            )}
             {/* Remote scanner */}
-            {!scanActive && (
+            {!scanActive && !usbActive && (
               remoteSessionId
                 ? <button className="scan-stop-btn" onClick={stopRemoteSession}><ZapOff size={14} /> Stop</button>
                 : <button className="manual-add-btn" style={{ background: 'rgba(76,217,100,.12)', borderColor: 'rgba(76,217,100,.3)', color: '#4cd964' }} onClick={startRemoteSession}>
@@ -516,6 +534,27 @@ export function ProjectDetail({
           </div>
         )}
         <video ref={videoRef} style={{ width: '100%', maxHeight: 240, borderRadius: 8, display: scanActive ? 'block' : 'none', background: '#000' }} />
+
+        {/* USB scanner input — the scanner types here and presses Enter */}
+        {usbActive && (
+          <div style={{ marginBottom: '.75rem' }}>
+            <div className="scan-monitor-status" style={{ marginBottom: '.5rem' }}>
+              <div className="scan-pulse" />
+              Ready for barcode scanner ({scanMode}) — keep this box selected
+            </div>
+            <input
+              ref={usbInputRef}
+              autoFocus
+              value={usbInput}
+              onChange={e => setUsbInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitUsbScan() } }}
+              placeholder="Scan a barcode…"
+              autoComplete="off"
+              spellCheck={false}
+              style={{ width: '100%', padding: '10px 12px', background: '#1a1a25', border: '1px solid #4cd964', borderRadius: 8, color: '#f0f0f5', fontFamily: 'monospace', fontSize: '.9rem', outline: 'none' }}
+            />
+          </div>
+        )}
 
         {/* Remote session: QR code for mobile to scan */}
         {remoteSessionId && (
@@ -542,9 +581,9 @@ export function ProjectDetail({
           </div>
         )}
 
-        {scanEntries.length === 0 && !scanActive && !remoteSessionId && (
+        {scanEntries.length === 0 && !scanActive && !usbActive && !remoteSessionId && (
           <div className="scan-waiting">
-            Use <strong>This Device</strong> to scan with this camera, or <strong>Mobile Scanner</strong> to use a phone as a barcode scanner.
+            Use <strong>This Device</strong> to scan with this camera, <strong>USB Scanner</strong> for a plugged-in or Bluetooth barcode scanner, or <strong>Mobile</strong> to use a phone as a scanner.
           </div>
         )}
 

@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import Avatar from '@/components/common/Avatar'
 import { fullDateTime } from '@/lib/utils'
+import DeleteSubmissionButton from '@/components/assignments/DeleteSubmissionButton'
 
 export default function TestGrader() {
   const { testId } = useParams<{ testId: string }>()
@@ -185,6 +186,20 @@ export default function TestGrader() {
 
         {/* Right: grading / result panel */}
         <div className="lg:col-span-3">
+          {selected && (
+            <div className="mb-3 flex justify-end">
+              <DeleteSubmissionButton
+                key={selected.id}
+                submission={selected}
+                studentName={studentMap[selected.studentId]?.displayName}
+                onDeleted={pts => {
+                  const name = studentMap[selected.studentId]?.displayName ?? 'the student'
+                  setSelected(null)
+                  setMessage(`Submission deleted${pts > 0 ? ` · ${pts} points removed from ${name}` : ''}.`)
+                }}
+              />
+            </div>
+          )}
           {!selected ? (
             <div className="bg-slate-800 rounded-2xl p-8 text-center text-zinc-500">
               Select a submission to review

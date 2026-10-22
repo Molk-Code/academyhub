@@ -467,3 +467,44 @@ export const gradeShortAnswers = functions.https.onCall(async (data, context) =>
 
   return { success: true, percentageScore, passed }
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// deleteSubmission — teacher/admin removes a submission. Any points it awarded
+// (points_log entries referencing it) are reversed and the student's progress
+// is recalculated, so totals stay consistent with the remaining work.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const deleteSubmission = functions.https.onCall(async (data, context) => {
+  requireTeacherOrAdmin(context)
+
+  const { submissionId } = data as { submissionId: string }
+  if (!submissionId || typeof submissionId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'submissionId is required.')
+  }
+
+  const subRef = db.collection('submissions').doc(submissionId)
+  const logsQuery = db.collection('points_log').where('referenceId', '==', submissionId)
+
+  const { studentId, cohortId, pointsReversed } = await db.runTransaction(async (tx) => {
+    const subSnap = await tx.get(subRef)
+    if (!subSnap.exists) throw new functions.https.HttpsError('not-found', 'Submission not found.')
+    const sub = subSnap.data()!
+
+    // Only this student's entries — referenceId alone isn't namespaced by collection
+    const logs = (await tx.get(logsQuery)).docs.filter(d => d.data().studentId === sub.studentId)
+    const points = logs.reduce((sum, d) => sum + ((d.data().points as number) ?? 0), 0)
+
+    for (const d of logs) tx.delete(d.ref)
+    if (points !== 0) {
+      tx.update(db.collection('users').doc(sub.studentId), {
+        totalPoints: admin.firestore.FieldValue.increment(-points),
+      })
+    }
+    tx.delete(subRef)
+    return { studentId: sub.studentId as string, cohortId: sub.cohortId as string, pointsReversed: points }
+  })
+
+  if (cohortId) await updateProgress(studentId, cohortId)
+
+  return { success: true, pointsReversed }
+})

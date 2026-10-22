@@ -9,6 +9,7 @@ import type { SubmissionDoc, UserDoc, AssignmentDoc, CohortDoc } from '@/types'
 import Avatar from '@/components/common/Avatar'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import EmptyState from '@/components/common/EmptyState'
+import DeleteSubmissionButton from '@/components/assignments/DeleteSubmissionButton'
 import { ClipboardCheck, CheckCircle2 } from 'lucide-react'
 
 interface GradePayload {
@@ -26,12 +27,13 @@ export default function GradeBook() {
   const [feedback, setFeedback] = useState('')
   const [grading,  setGrading]  = useState(false)
   const [message,  setMessage]  = useState('')
+  const [tab,      setTab]      = useState<'pending' | 'graded'>('pending')
 
   const { profile } = useAuth()
 
   const { data: allSubmissions, loading } = useCollection<SubmissionDoc>(
     'submissions',
-    [where('status', '==', 'submitted'), orderBy('submittedAt', 'asc')],
+    [where('status', 'in', ['submitted', 'graded']), orderBy('submittedAt', 'asc')],
   )
   const { data: cohorts } = useCollection<CohortDoc>('cohorts')
   const { data: students } = useCollection<UserDoc>('users', [where('role', '==', 'student')])
@@ -44,9 +46,12 @@ export default function GradeBook() {
     return ids.length > 0 ? new Set(ids) : null
   }, [cohorts, profile?.uid])
 
-  const submissions = useMemo(() =>
+  const mine = useMemo(() =>
     myCohortIds ? allSubmissions.filter(s => myCohortIds.has(s.cohortId)) : allSubmissions,
   [allSubmissions, myCohortIds])
+  const pendingSubs = useMemo(() => mine.filter(s => s.status === 'submitted'), [mine])
+  const gradedSubs  = useMemo(() => mine.filter(s => s.status === 'graded').reverse(), [mine])  // newest first
+  const submissions = tab === 'pending' ? pendingSubs : gradedSubs
 
   const studentMap    = Object.fromEntries(students.map(s => [s.uid, s]))
   const assignmentMap = Object.fromEntries(assignments.map(a => [a.id, a]))
@@ -76,8 +81,20 @@ export default function GradeBook() {
       <div>
         <h1 className="page-title">Grade Book</h1>
         <p className="text-zinc-400 text-sm mt-1">
-          {submissions.length} submission{submissions.length !== 1 ? 's' : ''} awaiting grading.
+          {pendingSubs.length} submission{pendingSubs.length !== 1 ? 's' : ''} awaiting grading.
         </p>
+      </div>
+
+      <div className="flex p-1 rounded-xl bg-zinc-900 w-fit">
+        {([['pending', `Awaiting grading (${pendingSubs.length})`], ['graded', `Graded (${gradedSubs.length})`]] as const).map(([t, label]) => (
+          <button
+            key={t}
+            onClick={() => { setTab(t); setSelected(null) }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${tab === t ? 'bg-zinc-800 text-brand-300 shadow-sm' : 'text-zinc-400 hover:text-zinc-100'}`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {message && (
@@ -91,7 +108,9 @@ export default function GradeBook() {
         {/* Submission list */}
         <div className="space-y-2">
           {submissions.length === 0
-            ? <EmptyState icon={ClipboardCheck} title="All graded!" description="No submissions waiting." />
+            ? (tab === 'pending'
+                ? <EmptyState icon={ClipboardCheck} title="All graded!" description="No submissions waiting." />
+                : <EmptyState icon={ClipboardCheck} title="Nothing graded yet" description="Graded submissions will appear here." />)
             : submissions.map(sub => {
                 const student    = studentMap[sub.studentId]
                 const assignment = assignmentMap[sub.assignmentId]
@@ -116,7 +135,9 @@ export default function GradeBook() {
                       <p className="text-xs text-zinc-400 truncate">{assignment?.title ?? 'Assignment'}</p>
                       <p className="text-xs text-zinc-500 mt-0.5">{fullDateTime(sub.submittedAt)}</p>
                     </div>
-                    <span className="badge badge-amber flex-shrink-0">Grade</span>
+                    {sub.status === 'graded'
+                      ? <span className="badge badge-green flex-shrink-0">{sub.score ?? '—'}/{sub.maxScore}</span>
+                      : <span className="badge badge-amber flex-shrink-0">Grade</span>}
                   </button>
                 )
               })
@@ -136,6 +157,16 @@ export default function GradeBook() {
                   <p className="text-sm text-zinc-400">{assignment?.title}</p>
                 </div>
               </div>
+
+              <DeleteSubmissionButton
+                key={selected.id}
+                submission={selected}
+                studentName={student?.displayName}
+                onDeleted={pts => {
+                  setSelected(null)
+                  setMessage(`Submission deleted${pts > 0 ? ` · ${pts} points removed from ${student?.displayName ?? 'the student'}` : ''}.`)
+                }}
+              />
 
               {/* Assignment description */}
               {assignment?.description && (
@@ -168,6 +199,12 @@ export default function GradeBook() {
                 </div>
               )}
 
+              {selected.status === 'graded' ? (
+                <div className="bg-zinc-700/50 rounded-xl p-3 text-sm text-zinc-200">
+                  Graded {fullDateTime(selected.gradedAt)} · <strong>{selected.score ?? '—'}/{selected.maxScore}</strong>
+                  {selected.pointsAwarded ? <> · +{selected.pointsAwarded} pts</> : null}
+                </div>
+              ) : (<>
               <div>
                 <label className="label text-zinc-300">
                   Score (out of {assignment?.pointsValue ?? 100})
@@ -201,6 +238,7 @@ export default function GradeBook() {
               >
                 {grading ? 'Submitting…' : 'Submit grade'}
               </button>
+              </>)}
             </div>
           )
         })()}

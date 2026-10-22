@@ -1,46 +1,55 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, ChevronRight, Search, LayoutGrid, List, AlertTriangle, CalendarClock, CheckCircle2, FileText, X } from 'lucide-react'
+import {
+  ArrowRight, ChevronRight, Search, LayoutGrid, List, AlertTriangle, CalendarClock, CheckCircle2,
+  FileText, X, UserCheck, Check,
+} from 'lucide-react'
 import { collectionGroup, getDocs } from 'firebase/firestore'
 import { format, isPast } from 'date-fns'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where } from '@/hooks/useFirestore'
 import { toDate, cn } from '@/lib/utils'
-import type { SubjectDoc, AssignmentDoc, LessonDoc, SyncedEventDoc, CohortDoc, SubmissionDoc, SubjectTeacherDoc } from '@/types'
+import type { SubjectDoc, AssignmentDoc, LessonDoc, SyncedEventDoc, CohortDoc, SubmissionDoc, SubjectTeacherDoc, SemesterSettingsDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import SubjectCover   from '@/components/subjects/SubjectCover'
 import { SubjectThumb } from '@/components/dashboard/UpcomingCard'
 
 type Status = 'in-progress' | 'completed' | 'not-started'
 type Filter = 'all' | Status
+type Sort = 'order' | 'progress' | 'alpha'
 
-const STATUS_LABEL: Record<Status, string> = {
+const FILTER_LABEL: Record<Filter, string> = {
+  'all':         'All subjects',
   'in-progress': 'In progress',
   'completed':   'Completed',
   'not-started': 'Not started',
 }
-
+// Badge in the card content zone
+const STATUS_BADGE: Record<Status, { label: string; cls: string }> = {
+  'in-progress': { label: 'Active',    cls: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
+  'completed':   { label: 'Completed', cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
+  'not-started': { label: 'Upcoming',  cls: 'bg-zinc-800 text-zinc-400 border-zinc-700' },
+}
 // Progress colours: ember while in progress, emerald when complete, muted when unstarted.
 const STATUS_BAR: Record<Status, string> = {
-  'in-progress': 'bg-brand-500',
+  'in-progress': 'bg-gradient-to-r from-brand-500 to-brand-400',
   'completed':   'bg-emerald-500',
   'not-started': 'bg-zinc-700',
 }
-// Dark backing so the tag stays legible on bright photos
-const STATUS_PILL: Record<Status, string> = {
-  'in-progress': 'bg-black/65 text-brand-300 ring-1 ring-brand-500/40',
-  'completed':   'bg-black/65 text-emerald-300 ring-1 ring-emerald-500/40',
-  'not-started': 'bg-black/55 text-zinc-300',
+const STATUS_TEXT: Record<Status, string> = {
+  'in-progress': 'text-brand-400',
+  'completed':   'text-emerald-400',
+  'not-started': 'text-zinc-400',
 }
 
 interface Chip { tone: 'rose' | 'ember' | 'blue' | 'green' | 'muted'; icon: typeof FileText; text: string }
-const CHIP_TONE: Record<Chip['tone'], string> = {
-  rose:  'bg-rose-500/12 text-rose-300',
-  ember: 'bg-brand-500/12 text-brand-300',
-  blue:  'bg-ember-secondary/12 text-ember-secondary',
-  green: 'bg-emerald-500/12 text-emerald-300',
-  muted: 'bg-zinc-800 text-zinc-400',
+const CHIP_TEXT: Record<Chip['tone'], string> = {
+  rose:  'text-rose-300',
+  ember: 'text-brand-300',
+  blue:  'text-ember-secondary',
+  green: 'text-emerald-300',
+  muted: 'text-zinc-500',
 }
 
 export default function SubjectList() {
@@ -48,6 +57,7 @@ export default function SubjectList() {
   const effectiveCohortId = previewCohortId ?? cohortId
 
   const { data: cohort } = useDocument<CohortDoc>('cohorts', effectiveCohortId ?? undefined)
+  const { data: semester } = useDocument<SemesterSettingsDoc>('settings', 'semester')
   const { data: allSubjects, loading } = useCollection<SubjectDoc>('subjects')
   const subjects = useMemo(() => allSubjects
     .filter(s => !cohort || s.programYear === cohort.programYear)
@@ -87,11 +97,11 @@ export default function SubjectList() {
   useEffect(() => {
     getDocs(collectionGroup(db, 'teachers'))
       .then(snap => {
-        const out: Record<string, (SubjectTeacherDoc & { _sid: string })[]> = {}
+        const out: Record<string, SubjectTeacherDoc[]> = {}
         for (const d of snap.docs) {
-          const sid = d.ref.parent.parent?.id
-          if (!sid || d.ref.parent.parent?.parent.id !== 'subjects') continue
-          ;(out[sid] ??= []).push({ ...(d.data() as SubjectTeacherDoc), id: d.id, _sid: sid })
+          const parent = d.ref.parent.parent
+          if (!parent || parent.parent.id !== 'subjects') continue
+          ;(out[parent.id] ??= []).push({ ...(d.data() as SubjectTeacherDoc), id: d.id })
         }
         setTeachersBySubject(Object.fromEntries(Object.entries(out).map(([sid, list]) =>
           [sid, list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(t => t.name).filter(Boolean)])))
@@ -153,25 +163,42 @@ export default function SubjectList() {
         .sort((a, b) => (a.startTime?.toMillis?.() ?? 0) - (b.startTime?.toMillis?.() ?? 0))[0]
 
       if (overdue.length > 0) {
-        out[subject.id] = { tone: 'rose', icon: AlertTriangle, text: `${overdue.length} overdue · ${overdue[0].title}` }
+        out[subject.id] = { tone: 'rose', icon: AlertTriangle, text: `${overdue.length} overdue` }
       } else if (pending.length > 0) {
         const due = toDate(pending[0].dueDate)
-        out[subject.id] = { tone: 'ember', icon: FileText, text: `${pending.length} assignment${pending.length !== 1 ? 's' : ''} due${due ? ` · ${format(due, 'd MMM')}` : ''}` }
+        out[subject.id] = { tone: 'ember', icon: FileText, text: `${pending.length} due${due ? ` ${format(due, 'd MMM')}` : ''}` }
       } else if (nextLesson) {
         const at = toDate(nextLesson.startTime)
-        out[subject.id] = { tone: 'blue', icon: CalendarClock, text: `Next: ${nextLesson.title}${at ? ` · ${format(at, 'EEE d MMM')}` : ''}` }
+        out[subject.id] = { tone: 'blue', icon: CalendarClock, text: `Next ${at ? format(at, 'EEE d MMM') : 'lesson'}` }
       } else if (published.length > 0) {
         out[subject.id] = { tone: 'green', icon: CheckCircle2, text: 'All caught up' }
       } else {
-        out[subject.id] = { tone: 'muted', icon: CalendarClock, text: 'Nothing scheduled yet' }
+        out[subject.id] = { tone: 'muted', icon: CalendarClock, text: 'Nothing scheduled' }
       }
     }
     return out
   }, [subjects, assignments, submissions, lessons])
 
+  // Current term from the class's own semester dates, falling back to the school's
+  const term = useMemo(() => {
+    const today = format(new Date(), 'yyyy-MM-dd')
+    const s1 = { start: cohort?.semesterStartDate ?? semester?.startDate, end: cohort?.semesterEndDate ?? semester?.endDate }
+    const s2 = { start: cohort?.semesterSem2StartDate ?? semester?.sem2Start, end: cohort?.semesterSem2EndDate ?? semester?.sem2End }
+    const label = (start: string) => {
+      const d = new Date(`${start}T12:00:00`)
+      return `${d.getMonth() >= 6 ? 'Autumn' : 'Spring'} term ${d.getFullYear()}`
+    }
+    for (const t of [s1, s2]) {
+      if (t.start && t.end && today >= t.start && today <= t.end) return { label: label(t.start), active: true }
+    }
+    const next = [s1, s2].find(t => t.start && today < t.start)
+    return next?.start ? { label: label(next.start), active: false } : null
+  }, [cohort, semester])
+
   // ── Controls ──────────────────────────────────────────────────────────────
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery]   = useState('')
+  const [sort, setSort]     = useState<Sort>('order')
   const [layout, setLayout] = useState<'grid' | 'list'>(() => {
     try { return localStorage.getItem('subjectsLayout') === 'list' ? 'list' : 'grid' } catch { return 'grid' }
   })
@@ -179,6 +206,17 @@ export default function SubjectList() {
     setLayout(l)
     try { localStorage.setItem('subjectsLayout', l) } catch {}
   }
+
+  // ⌘K / Ctrl+K focuses search
+  const searchRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); searchRef.current?.focus() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 
   const counts = useMemo(() => {
     const c: Record<Filter, number> = { all: subjects.length, 'in-progress': 0, completed: 0, 'not-started': 0 }
@@ -189,7 +227,8 @@ export default function SubjectList() {
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return subjects.filter(s => {
+    const pctOf = (id: string) => { const cp = curriculumProgressBySubject[id]; return cp ? cp.covered / cp.total : -1 }
+    const list = subjects.filter(s => {
       if (filter !== 'all' && statusOf(s.id) !== filter) return false
       if (!q) return true
       const haystack = [
@@ -199,109 +238,94 @@ export default function SubjectList() {
       ].join(' ').toLowerCase()
       return haystack.includes(q)
     })
+    if (sort === 'alpha') return [...list].sort((a, b) => a.title.localeCompare(b.title, 'sv'))
+    if (sort === 'progress') return [...list].sort((a, b) => pctOf(b.id) - pctOf(a.id) || a.order - b.order)
+    return list
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subjects, filter, query, teachersBySubject, curriculumProgressBySubject])
+  }, [subjects, filter, query, sort, teachersBySubject, curriculumProgressBySubject])
 
   if (loading) return <LoadingSpinner />
 
-  const subtitle = [cohort?.name, cohort?.programYear ? `Year ${cohort.programYear}` : null, `${subjects.length} subject${subjects.length !== 1 ? 's' : ''}`]
-    .filter(Boolean).join(' · ')
-
   return (
     <div className="space-y-6">
-      {/* ── Header ── */}
-      <div>
-        <p className="text-[11px] font-semibold text-brand-300 uppercase tracking-widest">Curriculum</p>
-        <h1 className="page-title">Subjects</h1>
-        <p className="text-zinc-400 text-sm mt-1">{subtitle}</p>
-      </div>
-
-      {/* ── Overall progress meter ── */}
-      {overallProgress && (
-        <div className="rounded-2xl bg-zinc-900 p-5 space-y-3 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-zinc-200">Overall curriculum progress</p>
-            <span className="text-sm font-bold text-brand-300">{overallProgress.pct}%</span>
-          </div>
-
-          {/* One continuous bar — the per-subject segmented version read as scattered blocks */}
-          <div className="h-2.5 rounded-full overflow-hidden bg-zinc-800">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-brand-600 to-brand-400 shadow-[0_0_10px_rgba(255,107,53,0.6)] transition-all duration-700"
-              style={{ width: `${overallProgress.pct}%` }}
-            />
-          </div>
-          <p className="text-xs text-zinc-500">{overallProgress.coveredTopics} of {overallProgress.totalTopics} topics covered</p>
-
-          {/* Subject status breakdown — doubles as quick filters */}
-          <div className="grid grid-cols-3 gap-2 pt-1">
-            {(['completed', 'in-progress', 'not-started'] as const).map(st => (
-              <button
-                key={st}
-                onClick={() => setFilter(filter === st ? 'all' : st)}
-                className={cn(
-                  'flex items-center gap-2 rounded-xl px-3 py-2 text-left transition-colors',
-                  filter === st ? 'bg-zinc-800 ring-1 ring-white/10' : 'bg-zinc-950/40 hover:bg-zinc-800',
-                )}
-              >
-                <span className={cn('w-2 h-2 rounded-full flex-shrink-0', STATUS_BAR[st])} />
-                <span className="min-w-0">
-                  <span className="block font-display text-lg font-bold leading-none text-zinc-100">{counts[st]}</span>
-                  <span className="block text-[10px] uppercase tracking-wider text-zinc-500 mt-1 truncate">{STATUS_LABEL[st]}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Controls: filters, search, layout ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="flex items-center gap-2 overflow-x-auto pb-0.5 -mx-4 px-4 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {(['all', 'in-progress', 'completed', 'not-started'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={cn(
-                'flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap',
-                filter === f
-                  ? 'bg-brand-500 text-white font-semibold shadow-[0_0_12px_rgba(255,107,53,0.4)]'
-                  : 'bg-zinc-900 text-zinc-400 hover:text-zinc-100',
-              )}
-            >
-              {f === 'all' ? 'All' : STATUS_LABEL[f]} ({counts[f]})
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2 sm:ml-auto">
-          <div className="relative flex-1 sm:w-64 sm:flex-none">
-            <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Search subjects, topics, teachers…"
-              className="input pl-9 pr-8 py-2 rounded-xl"
-            />
-            {query && (
-              <button onClick={() => setQuery('')} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-200">
-                <X className="w-3.5 h-3.5" />
-              </button>
+      {/* ── Control header — pinned on desktop while the grid scrolls ── */}
+      <section className="lg:sticky lg:top-0 z-10 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 -mt-5 pt-5 lg:-mt-8 lg:pt-8 pb-5 bg-[rgba(16,20,26,0.92)] backdrop-blur-md border-b border-white/5 space-y-5">
+        <div>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="page-title">Subjects &amp; Film Curriculum</h1>
+            {term?.active && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Term active</span>
             )}
           </div>
-          <div className="flex p-1 rounded-xl bg-zinc-900 flex-shrink-0">
-            {(['grid', 'list'] as const).map(l => (
+          <p className="text-xs text-zinc-400 mt-1 flex items-center gap-2 flex-wrap">
+            {term && <><span>{term.label}</span><span className="text-zinc-600">•</span></>}
+            <span className="text-zinc-300 font-medium">{subjects.length} course module{subjects.length !== 1 ? 's' : ''}</span>
+            {cohort?.name && <><span className="text-zinc-600">•</span><span>{cohort.name}{cohort.programYear ? ` · Year ${cohort.programYear}` : ''}</span></>}
+          </p>
+        </div>
+
+        {/* Wraps instead of overflowing: one line on wide screens, stacks when narrower */}
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
+          <div className="relative w-full sm:w-72 xl:w-80 flex-shrink-0">
+            <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Escape') { setQuery(''); e.currentTarget.blur() } }}
+              placeholder="Search subjects, topics, teachers…"
+              className="input pl-10 pr-14 py-2 rounded-xl bg-zinc-950/60"
+            />
+            {query
+              ? <button onClick={() => setQuery('')} aria-label="Clear search" className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-200"><X className="w-3.5 h-3.5" /></button>
+              : <kbd className="hidden sm:block absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700 pointer-events-none">{isMac ? '⌘K' : 'Ctrl K'}</kbd>}
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 -mx-4 px-4 sm:mx-0 sm:px-0 min-w-0 w-full sm:w-auto sm:flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {(['all', 'in-progress', 'completed', 'not-started'] as const).map(f => (
               <button
-                key={l}
-                onClick={() => chooseLayout(l)}
-                aria-label={l === 'grid' ? 'Grid view' : 'List view'}
-                className={cn('p-1.5 rounded-lg transition-colors', layout === l ? 'bg-zinc-800 text-brand-300' : 'text-zinc-500 hover:text-zinc-200')}
+                key={f}
+                onClick={() => setFilter(f)}
+                className={cn(
+                  'flex-shrink-0 px-3.5 py-1.5 rounded-lg text-xs font-medium border whitespace-nowrap transition-colors',
+                  filter === f
+                    ? 'bg-brand-500/15 text-brand-400 border-brand-500/40 shadow-sm'
+                    : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:bg-zinc-800 hover:text-zinc-200',
+                )}
               >
-                {l === 'grid' ? <LayoutGrid className="w-4 h-4" /> : <List className="w-4 h-4" />}
+                {FILTER_LABEL[f]} ({counts[f]})
               </button>
             ))}
           </div>
+
+          <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+            <label className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-lg pl-2.5 pr-1 py-1">
+              <span className="text-[11px] text-zinc-500">Sort:</span>
+              <select
+                value={sort}
+                onChange={e => setSort(e.target.value as Sort)}
+                className="bg-transparent text-xs text-zinc-300 font-medium border-0 py-0.5 pl-0.5 pr-1 focus:outline-none cursor-pointer sm:!text-xs"
+              >
+                <option value="order">Course order</option>
+                <option value="progress">By progress</option>
+                <option value="alpha">A–Z</option>
+              </select>
+            </label>
+            <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-lg p-1">
+              {(['grid', 'list'] as const).map(l => (
+                <button
+                  key={l}
+                  onClick={() => chooseLayout(l)}
+                  aria-label={l === 'grid' ? 'Grid view' : 'List view'}
+                  className={cn('p-1.5 rounded transition-colors', layout === l ? 'bg-zinc-800 text-brand-400 shadow-sm' : 'text-zinc-500 hover:text-zinc-200')}
+                >
+                  {l === 'grid' ? <LayoutGrid className="w-3.5 h-3.5" /> : <List className="w-3.5 h-3.5" />}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* ── Subjects ── */}
       {visible.length === 0 ? (
@@ -312,61 +336,82 @@ export default function SubjectList() {
           )}
         </div>
       ) : layout === 'grid' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {visible.map(subject => {
             const cp       = curriculumProgressBySubject[subject.id]
             const status   = statusOf(subject.id)
             const pct      = cp ? Math.round((cp.covered / cp.total) * 100) : 0
             const chip     = chipBySubject[subject.id]
             const teachers = teachersBySubject[subject.id] ?? []
-            const cta      = status === 'completed' ? 'Review' : status === 'in-progress' ? 'Continue' : 'Open'
+            const topics   = subject.curriculum ?? []
+            const blurb    = subject.description || (topics.length > 0 ? `Covers ${topics.slice(0, 4).map(t => t.title).join(', ')}${topics.length > 4 ? '…' : '.'}` : '')
+            const badge    = STATUS_BADGE[status]
+            const cta      = status === 'completed'
+              ? { label: 'Review module', cls: 'text-emerald-400 group-hover:text-emerald-300', Icon: ArrowRight }
+              : status === 'in-progress'
+                ? { label: 'Continue module', cls: 'text-brand-400 group-hover:text-brand-300', Icon: ArrowRight }
+                : { label: 'Explore syllabus', cls: 'text-zinc-400 group-hover:text-zinc-200', Icon: ChevronRight }
             return (
               <Link
                 key={subject.id}
                 to={`/subjects/${subject.id}`}
-                className="group flex flex-col h-full rounded-2xl bg-zinc-900 overflow-hidden shadow-sm ring-1 ring-white/5 hover:ring-white/15 hover:-translate-y-0.5 transition-all"
+                className="group flex flex-col justify-between h-full rounded-2xl bg-zinc-900 border border-white/[0.06] overflow-hidden shadow-xl transition-all duration-200 ease-out hover:-translate-y-[3px] hover:border-brand-500/45 hover:shadow-[0_16px_32px_-8px_rgba(0,0,0,0.65),0_0_20px_-6px_rgba(255,107,53,0.15)]"
               >
-                {/* Zone 1: 16:9 thumbnail with status tag */}
-                <div className="relative">
-                  <SubjectCover subject={subject} className="aspect-video" />
-                  <span className={cn('absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full backdrop-blur-md text-[10px] font-semibold uppercase tracking-wider', STATUS_PILL[status])}>
-                    {STATUS_LABEL[status]}
-                  </span>
+                <div>
+                  {/* Zone 1: 16:9 media header */}
+                  <div className="relative overflow-hidden">
+                    <SubjectCover subject={subject} className="aspect-video transition-transform duration-500 group-hover:scale-105" />
+                  </div>
+
+                  {/* Zone 2: content & instructors */}
+                  <div className="p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <span className="text-[11px] font-mono text-zinc-500 font-medium">
+                          Year {subject.programYear} • {topics.length} topic{topics.length !== 1 ? 's' : ''}
+                        </span>
+                        <h2 className="font-display text-base font-bold text-white tracking-tight mt-0.5 group-hover:text-brand-400 transition-colors">
+                          {subject.title}
+                        </h2>
+                      </div>
+                      <span className={cn('px-2 py-0.5 text-[10px] font-semibold rounded border flex-shrink-0', badge.cls)}>{badge.label}</span>
+                    </div>
+                    <p className="text-xs text-zinc-400 mt-2 line-clamp-2 min-h-[2rem]">{blurb}</p>
+                    <div className="flex items-center gap-2 mt-4 text-[11px] text-zinc-400 min-w-0">
+                      <UserCheck className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="truncate">{teachers.length > 0 ? teachers.join(', ') : 'Instructor to be announced'}</span>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Zone 2: title, sub-label, instructors, status chip */}
-                <div className="flex-1 flex flex-col gap-2 px-4 pt-3.5">
-                  <div>
-                    <h3 className="font-display text-base font-semibold text-zinc-100 leading-snug">{subject.title}</h3>
-                    <p className="text-xs text-zinc-400 mt-0.5 line-clamp-1 min-h-[1rem]">
-                      {subject.description || `Year ${subject.programYear}`}
-                    </p>
+                {/* Zone 3: standardized progress & action footer */}
+                <div className="p-5 pt-0">
+                  <div className="bg-zinc-950/50 rounded-xl p-3 border border-white/[0.05]">
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <span className="font-medium text-zinc-300">Curriculum progress</span>
+                      <span className={cn('font-mono font-semibold', STATUS_TEXT[status])}>{cp ? `${pct}%` : '—'}</span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-zinc-800 overflow-hidden mb-2">
+                      {cp && cp.covered > 0
+                        ? <div className={cn('h-full rounded-full', STATUS_BAR[status])} style={{ width: `${pct}%` }} />
+                        : <div className="h-full w-full bg-[repeating-linear-gradient(90deg,#353940_0_6px,transparent_6px_10px)]" />}
+                    </div>
+                    <div className="flex items-center justify-between gap-2 text-[11px] text-zinc-400 pt-1">
+                      {status === 'completed'
+                        ? <span className="text-emerald-400 font-medium flex items-center gap-1 whitespace-nowrap"><Check className="w-3 h-3" /> {cp!.covered} / {cp!.total} topics</span>
+                        : <span className="whitespace-nowrap">{cp ? `${cp.covered} / ${cp.total} topics` : 'No topics yet'}</span>}
+                      {/* Only actionable chips here — "Nothing scheduled" just crowds the footer */}
+                      {chip && chip.tone !== 'muted' && (
+                        <span className={cn('flex items-center gap-1 min-w-0', CHIP_TEXT[chip.tone])}>
+                          <chip.icon className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{chip.text}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-xs text-zinc-500 truncate">
-                    {teachers.length > 0 ? <>with <span className="text-zinc-300">{teachers.join(', ')}</span></> : 'Instructor to be announced'}
-                  </p>
-                  {chip && (
-                    <span className={cn('self-start inline-flex items-center gap-1.5 max-w-full px-2.5 py-1 rounded-lg text-[11px] font-medium', CHIP_TONE[chip.tone])}>
-                      <chip.icon className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span className="truncate">{chip.text}</span>
-                    </span>
-                  )}
-                </div>
-
-                {/* Zone 3: consistent footer — progress + CTA */}
-                <div className="px-4 pt-3 pb-4 mt-3 border-t border-white/5 space-y-2">
-                  <div className="h-1.5 rounded-full overflow-hidden bg-zinc-800">
-                    {cp && cp.covered > 0
-                      ? <div className={cn('h-full rounded-full transition-all', STATUS_BAR[status])} style={{ width: `${pct}%` }} />
-                      : <div className="h-full w-full bg-[repeating-linear-gradient(90deg,#353940_0_6px,transparent_6px_10px)]" />}
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-400">
-                      {cp ? <>{cp.covered} / {cp.total} topics · <span className={status === 'completed' ? 'text-emerald-300' : status === 'in-progress' ? 'text-brand-300' : ''}>{pct}%</span></> : 'No topics yet'}
-                    </span>
-                    <span className="flex items-center gap-1 font-semibold text-brand-300 group-hover:text-brand-200 transition-colors">
-                      {cta} <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-                    </span>
+                  <div className={cn('mt-4 text-xs font-semibold flex items-center gap-1.5 transition-colors', cta.cls)}>
+                    <span>{cta.label}</span>
+                    <cta.Icon className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
                   </div>
                 </div>
               </Link>
@@ -381,37 +426,37 @@ export default function SubjectList() {
             const pct      = cp ? Math.round((cp.covered / cp.total) * 100) : 0
             const chip     = chipBySubject[subject.id]
             const teachers = teachersBySubject[subject.id] ?? []
+            const badge    = STATUS_BADGE[status]
             return (
               <Link
                 key={subject.id}
                 to={`/subjects/${subject.id}`}
-                className="group flex items-center gap-3 p-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 transition-colors"
+                className="group flex items-center gap-3 p-3 rounded-xl bg-zinc-900 border border-white/[0.06] hover:border-brand-500/40 transition-colors"
               >
                 <SubjectThumb subject={subject} className="w-14 h-14 rounded-xl" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 min-w-0">
-                    <p className="font-display text-sm font-semibold text-zinc-100 truncate">{subject.title}</p>
-                    <span className={cn('hidden sm:inline px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider flex-shrink-0', STATUS_PILL[status])}>
-                      {STATUS_LABEL[status]}
-                    </span>
+                    <p className="font-display text-sm font-semibold text-zinc-100 truncate group-hover:text-brand-400 transition-colors">{subject.title}</p>
+                    <span className={cn('hidden sm:inline px-1.5 py-0.5 rounded border text-[9px] font-semibold flex-shrink-0', badge.cls)}>{badge.label}</span>
                   </div>
-                  <p className="text-xs text-zinc-500 truncate">
+                  <p className="text-xs text-zinc-500 truncate flex items-center gap-1.5">
+                    <UserCheck className="w-3 h-3 flex-shrink-0" />
                     {teachers.length > 0 ? teachers.join(', ') : 'Instructor to be announced'}
                   </p>
                   {chip && (
-                    <p className={cn('mt-1 inline-flex items-center gap-1 max-w-full text-[11px] font-medium', CHIP_TONE[chip.tone].split(' ').filter(c => c.startsWith('text-')).join(' '))}>
+                    <p className={cn('mt-1 inline-flex items-center gap-1 max-w-full text-[11px] font-medium', CHIP_TEXT[chip.tone])}>
                       <chip.icon className="w-3 h-3 flex-shrink-0" />
                       <span className="truncate">{chip.text}</span>
                     </p>
                   )}
                 </div>
-                <div className="w-24 sm:w-32 flex-shrink-0 space-y-1">
+                <div className="w-24 sm:w-36 flex-shrink-0 space-y-1">
                   <div className="h-1.5 rounded-full overflow-hidden bg-zinc-800">
                     {cp && cp.covered > 0
                       ? <div className={cn('h-full rounded-full', STATUS_BAR[status])} style={{ width: `${pct}%` }} />
                       : <div className="h-full w-full bg-[repeating-linear-gradient(90deg,#353940_0_6px,transparent_6px_10px)]" />}
                   </div>
-                  <p className="text-[10px] text-zinc-500 text-right">{cp ? `${cp.covered}/${cp.total} topics` : 'No topics yet'}</p>
+                  <p className="text-[10px] text-zinc-500 text-right font-mono">{cp ? `${cp.covered}/${cp.total} · ${pct}%` : 'No topics'}</p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-200 flex-shrink-0" />
               </Link>
@@ -419,6 +464,36 @@ export default function SubjectList() {
           })}
         </div>
       )}
+
+      {/* ── Status strip: course states + total term completion ── */}
+      <footer className="rounded-2xl border border-white/[0.06] bg-zinc-900/60 px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-zinc-400">
+        <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
+          {([
+            ['in-progress', 'bg-brand-500',  `${counts['in-progress']} active`],
+            ['completed',   'bg-emerald-500', `${counts.completed} completed`],
+            ['not-started', 'bg-zinc-600',   `${counts['not-started']} unstarted`],
+          ] as const).map(([f, dot, label]) => (
+            <button
+              key={f}
+              onClick={() => setFilter(filter === f ? 'all' : f)}
+              className={cn('flex items-center gap-2 transition-colors hover:text-zinc-100', filter === f ? 'text-zinc-100 font-semibold' : f === 'not-started' ? '' : 'text-zinc-300 font-medium')}
+            >
+              <span className={cn('w-2 h-2 rounded-full', dot)} />
+              {label}
+            </button>
+          ))}
+        </div>
+        {overallProgress && (
+          <div className="flex items-center gap-3 text-[11px]">
+            <span className="text-zinc-400">Total term completion:</span>
+            <div className="w-28 h-2 rounded-full bg-zinc-800 overflow-hidden">
+              <div className="h-full bg-brand-500 rounded-full" style={{ width: `${overallProgress.pct}%` }} />
+            </div>
+            <span className="font-mono text-zinc-300 font-bold">{overallProgress.pct}%</span>
+            <span className="text-zinc-500">({overallProgress.coveredTopics}/{overallProgress.totalTopics} topics)</span>
+          </div>
+        )}
+      </footer>
     </div>
   )
 }

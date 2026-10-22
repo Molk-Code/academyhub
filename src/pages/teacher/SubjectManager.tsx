@@ -7,6 +7,7 @@ import { useCollection } from '@/hooks/useFirestore'
 import type { SubjectDoc } from '@/types'
 import { Plus, Pencil, Trash2, BookOpen, X, Check, ChevronRight, GripVertical, ImagePlus, Loader2 } from 'lucide-react'
 import { uploadFile } from '@/lib/cloudinary'
+import { shrinkImageToLimit, MAX_IMAGE_BYTES } from '@/lib/imageCompress'
 import SubjectCover   from '@/components/subjects/SubjectCover'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import EmptyState     from '@/components/common/EmptyState'
@@ -43,6 +44,7 @@ export default function SubjectManager() {
   const [saving,   setSaving]   = useState(false)
   const [uploadPct, setUploadPct] = useState<number | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [optimizing, setOptimizing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   // The form renders above the list, so bring it into view when it opens —
   // otherwise editing a subject far down the page looks like nothing happened.
@@ -152,11 +154,16 @@ export default function SubjectManager() {
     setUploadError(null)
     setUploadPct(0)
     try {
-      const { secureUrl } = await uploadFile(file, setUploadPct)
+      // Images over the 10 MB upload limit are shrunk in the browser first
+      if (file.size >= MAX_IMAGE_BYTES) setOptimizing(true)
+      const ready = await shrinkImageToLimit(file)
+      setOptimizing(false)
+      const { secureUrl } = await uploadFile(ready, setUploadPct)
       setForm(f => ({ ...f, imageUrl: secureUrl }))
     } catch (e: any) {
       setUploadError(e.message ?? 'Upload failed.')
     } finally {
+      setOptimizing(false)
       setUploadPct(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
@@ -232,9 +239,11 @@ export default function SubjectManager() {
               {uploadPct !== null && (
                 <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2">
                   <Loader2 className="w-5 h-5 text-white animate-spin" />
-                  <div className="w-1/2 h-1.5 bg-white/20 rounded-full overflow-hidden">
-                    <div className="h-full bg-brand-500 transition-all" style={{ width: `${uploadPct}%` }} />
-                  </div>
+                  {optimizing
+                    ? <p className="text-xs text-white/80">Optimising image…</p>
+                    : <div className="w-1/2 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                        <div className="h-full bg-brand-500 transition-all" style={{ width: `${uploadPct}%` }} />
+                      </div>}
                 </div>
               )}
             </div>

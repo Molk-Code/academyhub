@@ -5,6 +5,7 @@ import { httpsCallable } from 'firebase/functions'
 import { db, functions, auth } from '@/lib/firebase'
 import { updateEmail } from 'firebase/auth'
 import { uploadWithQuota } from '@/lib/uploadWithQuota'
+import { shrinkImageToLimit, MAX_AVATAR_BYTES } from '@/lib/imageCompress'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn, initials, avatarColor, toDate } from '@/lib/utils'
 import { Camera, Loader2, CheckCircle2, Star, CalendarCheck, ClipboardList, ChevronRight, Download, Trash2, Shield, TrendingUp, Lightbulb, Image } from 'lucide-react'
@@ -240,18 +241,14 @@ export default function Profile() {
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file || !profile) return
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('Image is too large. Maximum size is 5 MB.')
-      e.target.value = ''
-      return
-    }
-    const previewUrl = URL.createObjectURL(file)
-    setAvatarPreview(previewUrl)
+    setAvatarPreview(URL.createObjectURL(file))
     setUploading(true)
     setUploadError(null)
     try {
+      // Photos over the 5 MB avatar limit are resized in the browser instead of rejected
+      const ready = await shrinkImageToLimit(file, { maxBytes: MAX_AVATAR_BYTES, maxLongSide: 1024 })
       const path = `avatars/${profile.uid}`
-      const url  = await uploadWithQuota(file, path)
+      const url  = await uploadWithQuota(ready, path)
       await updateDoc(doc(db, 'users', profile.uid), { avatarUrl: url })
       setAvatarPreview(url)
       // Sync avatar to any subject teacher entries for this user

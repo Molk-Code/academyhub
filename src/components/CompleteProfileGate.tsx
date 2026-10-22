@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { uploadWithQuota } from '@/lib/uploadWithQuota'
+import { shrinkImageToLimit, MAX_AVATAR_BYTES } from '@/lib/imageCompress'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn, initials, avatarColor } from '@/lib/utils'
 import { Camera, Loader2, CheckCircle2, User, Phone, Mail } from 'lucide-react'
@@ -33,6 +34,7 @@ function ProfileCompleteOverlay() {
   const [uploading,    setUploading]    = useState(false)
   const [saving,       setSaving]       = useState(false)
   const [photoError,   setPhotoError]   = useState(false)
+  const [saveError,    setSaveError]    = useState<string | null>(null)
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -48,13 +50,16 @@ function ProfileCompleteOverlay() {
     if (!avatarFile && !profile.avatarUrl) { setPhotoError(true); return }
 
     setSaving(true)
+    setSaveError(null)
     try {
       let avatarUrl = profile.avatarUrl ?? null
 
       if (avatarFile) {
         setUploading(true)
-        const path = `avatars/${profile.uid}`
-        avatarUrl  = await uploadWithQuota(avatarFile, path)
+        const path  = `avatars/${profile.uid}`
+        // Photos over the 5 MB avatar limit are resized in the browser instead of rejected
+        const ready = await shrinkImageToLimit(avatarFile, { maxBytes: MAX_AVATAR_BYTES, maxLongSide: 1024 })
+        avatarUrl   = await uploadWithQuota(ready, path)
         setUploading(false)
       }
 
@@ -66,8 +71,9 @@ function ProfileCompleteOverlay() {
       })
 
       await refreshProfile()
-    } catch (err) {
+    } catch (err: any) {
       console.error('Profile save failed', err)
+      setSaveError(err?.message ?? 'Could not save your profile. Please try again.')
     } finally {
       setSaving(false)
       setUploading(false)
@@ -139,7 +145,7 @@ function ProfileCompleteOverlay() {
               >
                 {preview ? 'Change photo' : 'Upload profile photo *'}
               </button>
-              <p className="text-xs text-zinc-400 mt-0.5">JPG, PNG or WebP · max 5 MB</p>
+              <p className="text-xs text-zinc-400 mt-0.5">JPG, PNG or WebP · large photos are resized automatically</p>
             </div>
             {photoError && (
               <p className="text-xs text-rose-600 font-medium">A profile photo is required.</p>
@@ -189,6 +195,10 @@ function ProfileCompleteOverlay() {
               placeholder="firstname.lastname@school.se"
             />
           </div>
+
+          {saveError && (
+            <p className="text-xs text-rose-400 font-medium">{saveError}</p>
+          )}
 
           <button
             type="submit"

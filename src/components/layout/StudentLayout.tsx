@@ -459,7 +459,7 @@ export default function StudentLayout() {
       <OfflineBanner />
 
       {/* ── Mobile top header ──────────────────────────────────────────────── */}
-      <header className="mobile-header lg:hidden fixed top-0 left-0 right-0 z-40 border-b" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+      <header className="mobile-header lg:hidden fixed top-0 left-0 right-0 z-40 backdrop-blur-xl shadow-[0_4px_20px_rgba(0,0,0,0.5)]" style={{ background: 'rgba(16,20,26,0.85)' }}>
         <div className="h-16 flex items-center justify-between px-4">
           <Link to="/dashboard" className="flex items-end gap-2.5 overflow-hidden max-w-[calc(100vw-6rem)]">
             <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain flex-shrink-0" />
@@ -611,83 +611,17 @@ export default function StudentLayout() {
         <div className="h-bottomnav lg:hidden flex-shrink-0" />
       </main>
 
-      {/* ── Mobile bottom tab bar — fixed to viewport bottom ───────────────── */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 border-t" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <div className={cn('flex justify-around', navVisLoading && 'opacity-0 pointer-events-none')}>
-          {/* Home */}
-          {navVis?.student?.['dashboard'] !== false && (
-          <NavLink to="/dashboard" className={({ isActive }) => cn(
-            'flex-1 flex flex-col items-center justify-center gap-0.5 py-3 text-[10px] font-medium transition-colors',
-            isActive ? 'text-brand-400' : 'text-zinc-500',
-          )}>
-            {({ isActive }) => (<>
-              <LayoutDashboard className={cn('w-5 h-5', isActive ? 'text-brand-400' : 'text-zinc-500')} />
-              <span>Home</span>
-            </>)}
-          </NavLink>
-          )}
-          {/* Calendar */}
-          {navVis?.student?.['calendar'] !== false && (
-            <NavLink to="/calendar" className={({ isActive }) => cn(
-              'flex-1 flex flex-col items-center justify-center gap-0.5 py-3 text-[10px] font-medium transition-colors',
-              isActive ? 'text-brand-400' : 'text-zinc-500',
-            )}>
-              {({ isActive }) => (<>
-                <div className="relative">
-                  <Calendar className={cn('w-5 h-5', isActive ? 'text-brand-400' : 'text-zinc-500')} />
-                  {calendarBadge > 0 && (
-                    <span className="absolute -top-1 -right-1.5 min-w-[14px] h-3.5 flex items-center justify-center rounded-full bg-brand-500 text-white text-[8px] font-bold px-0.5 leading-none">
-                      {calendarBadge > 9 ? '9+' : calendarBadge}
-                    </span>
-                  )}
-                </div>
-                <span>Calendar</span>
-              </>)}
-            </NavLink>
-          )}
-          {/* Check In */}
-          {navVis?.student?.['checkin'] !== false && (
-            <NavLink to="/checkin" className={({ isActive }) => cn(
-              'flex-1 flex flex-col items-center justify-center gap-0.5 py-3 text-[10px] font-medium transition-colors',
-              isActive ? 'text-brand-400' : 'text-zinc-500',
-            )}>
-              {({ isActive }) => (<>
-                <QrCode className={cn('w-5 h-5', isActive ? 'text-brand-400' : 'text-zinc-500')} />
-                <span>Check In</span>
-              </>)}
-            </NavLink>
-          )}
-          {/* Chat */}
-          {navVis?.student?.['chat'] !== false && (
-            <NavLink to="/chat" className={({ isActive }) => cn(
-              'flex-1 flex flex-col items-center justify-center gap-0.5 py-3 text-[10px] font-medium transition-colors relative',
-              isActive ? 'text-brand-400' : 'text-zinc-500',
-            )}>
-              {({ isActive }) => (<>
-                <div className="relative">
-                  <MessageSquare className={cn('w-5 h-5', isActive ? 'text-brand-400' : 'text-zinc-500')} />
-                  {chatUnread > 0 && (
-                    <span className="absolute -top-1 -right-1.5 min-w-[14px] h-3.5 flex items-center justify-center rounded-full bg-brand-500 text-white text-[8px] font-bold px-0.5 leading-none">
-                      {chatUnread > 9 ? '9+' : chatUnread}
-                    </span>
-                  )}
-                </div>
-                <span>Chat</span>
-              </>)}
-            </NavLink>
-          )}
-          {/* Profile */}
-          {navVis?.student?.['profile'] !== false && (
-          <NavLink to="/profile" className={({ isActive }) => cn(
-            'flex-1 flex flex-col items-center justify-center gap-0.5 py-3 text-[10px] font-medium transition-colors',
-            isActive ? 'text-brand-400' : 'text-zinc-500',
-          )}>
-            {({ isActive }) => (<>
-              <User className={cn('w-5 h-5', isActive ? 'text-brand-400' : 'text-zinc-500')} />
-              <span>Profile</span>
-            </>)}
-          </NavLink>
-          )}
+      {/* ── Mobile bottom tab bar — frosted, fixed to viewport bottom ──────── */}
+      <nav
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-30 backdrop-blur-xl shadow-[0_-4px_24px_rgba(0,0,0,0.65)]"
+        style={{ background: 'rgba(16,20,26,0.9)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
+        <div className={cn('h-16 flex justify-around items-center px-1', navVisLoading && 'opacity-0 pointer-events-none')}>
+          {navVis?.student?.['dashboard'] !== false && <BottomTab to="/dashboard" icon={LayoutDashboard} label="Home" />}
+          {navVis?.student?.['calendar']  !== false && <BottomTab to="/calendar"  icon={Calendar}        label="Calendar" badge={calendarBadge} />}
+          {navVis?.student?.['checkin']   !== false && <BottomTab to="/checkin"   icon={QrCode}          label="Check In" />}
+          {navVis?.student?.['chat']      !== false && <BottomTab to="/chat"      icon={MessageSquare}   label="Chat" badge={chatUnread} />}
+          {navVis?.student?.['profile']   !== false && <BottomTab to="/profile"   icon={User}            label="Profile" />}
         </div>
       </nav>
       </div>{/* end content column */}
@@ -709,5 +643,32 @@ export default function StudentLayout() {
       <WelcomeModal />
     </>
     </CompleteProfileGate>
+  )
+}
+
+function BottomTab({ to, icon: Icon, label, badge = 0 }: {
+  to: string
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  badge?: number
+}) {
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) => cn(
+        'flex flex-col items-center justify-center gap-0.5 w-16 h-12 rounded-xl text-[10px] transition-all active:scale-95',
+        isActive ? 'text-brand-500 font-semibold' : 'text-zinc-400 font-medium hover:text-zinc-200',
+      )}
+    >
+      <div className="relative">
+        <Icon className="w-[22px] h-[22px]" />
+        {badge > 0 && (
+          <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] flex items-center justify-center rounded-full bg-brand-500 text-white text-[8px] font-bold px-1 leading-none shadow-[0_0_8px_rgba(255,107,53,0.8)]">
+            {badge > 9 ? '9+' : badge}
+          </span>
+        )}
+      </div>
+      <span>{label}</span>
+    </NavLink>
   )
 }

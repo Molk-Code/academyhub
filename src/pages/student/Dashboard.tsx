@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { isPast, differenceInDays, format, startOfDay } from 'date-fns'
-import { BookOpen, ChevronRight, CalendarRange, Clapperboard, Clock, CheckCircle2, XCircle, UtensilsCrossed, Car, ListChecks, Plus, Sparkles, ArrowRight, Package } from 'lucide-react'
+import { isPast, isToday, differenceInDays, format, startOfDay } from 'date-fns'
+import { BookOpen, ChevronRight, CalendarRange, Clapperboard, Clock, CheckCircle2, XCircle, UtensilsCrossed, Car, ListChecks, Plus, Sparkles, ArrowRight, Package, CalendarDays, FilePen, QrCode, DoorOpen, BookMarked, Ticket } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useMyProgress } from '@/hooks/useProgress'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
@@ -15,6 +15,7 @@ import XPBar            from '@/components/dashboard/XPBar'
 import PointsBadge      from '@/components/dashboard/PointsBadge'
 import StreakBadge      from '@/components/dashboard/StreakBadge'
 import { LessonCard, DeadlineCard } from '@/components/dashboard/UpcomingCard'
+import { SectionHeader, SectionLink, ShortcutPill, LessonSlateCard } from '@/components/dashboard/Ember'
 import LoadingSpinner   from '@/components/common/LoadingSpinner'
 import EmptyState       from '@/components/common/EmptyState'
 import Avatar           from '@/components/common/Avatar'
@@ -590,7 +591,7 @@ export default function StudentDashboard() {
     ?? 'there'
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       {/* ── Shooting today banner ───────────────────────────────────────────── */}
       {todayShoot && (
         <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-4 flex items-center justify-between gap-3">
@@ -609,27 +610,40 @@ export default function StudentDashboard() {
       )}
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-zinc-100">
-            Good {timeOfDay()}, {firstName} 👋
-          </h1>
-          <p className="text-zinc-500 mt-1">
-            {(() => {
-              const day = now.getDay()
-              if (day === 1) return 'New week, new scenes to shoot 🎬'
-              if (day === 5) return 'Almost the weekend — great work this week! 🎉'
-              return 'Keep up the great work on your filmmaking journey.'
-            })()}
-          </p>
+      <section className="space-y-3">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-zinc-100 tracking-tight">
+              Good {timeOfDay()}, {firstName} 👋
+            </h1>
+            <p className="text-xs text-zinc-400 mt-1 flex items-center gap-1">
+              <CalendarDays className="w-3.5 h-3.5 text-brand-300 flex-shrink-0" />
+              {format(now, 'EEEE d MMMM')}
+              <span className="text-zinc-600">·</span>
+              <span className="truncate">
+                {(() => {
+                  const day = now.getDay()
+                  if (day === 1) return 'New week, new scenes to shoot 🎬'
+                  if (day === 5) return 'Almost the weekend 🎉'
+                  return 'Keep rolling 🎥'
+                })()}
+              </span>
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <StreakBadge days={progress?.streakDays ?? 0} />
+            {navVis?.student?.['points'] !== false && (
+              <PointsBadge totalPoints={profile?.totalPoints ?? 0} pointsRedeemed={profile?.pointsRedeemed ?? 0} classPoints={classPoints} />
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <StreakBadge days={progress?.streakDays ?? 0} />
-          {navVis?.student?.['points'] !== false && (
-            <PointsBadge totalPoints={profile?.totalPoints ?? 0} pointsRedeemed={profile?.pointsRedeemed ?? 0} classPoints={classPoints} />
-          )}
+        <div className="flex items-center gap-2 overflow-x-auto pb-0.5 -mx-4 px-4 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {navVis?.student?.['checkin']     !== false && <ShortcutPill to="/checkin"     icon={QrCode}     label="Check In" />}
+          {navVis?.student?.['roomBooking'] !== false && <ShortcutPill to="/booking"     icon={DoorOpen}   iconClass="text-ember-secondary" label="Book Room" />}
+          {navVis?.student?.['myBookings']  !== false && <ShortcutPill to="/my-bookings" icon={Ticket}     iconClass="text-ember-tertiary" label="My Bookings" />}
+          {navVis?.student?.['guide']       !== false && <ShortcutPill to="/guide"       icon={BookMarked} iconClass="text-amber-400" label="Guide" />}
         </div>
-      </div>
+      </section>
 
       {/* ── Semester banner ────────────────────────────────────────────────── */}
       {activeSemester && (() => {
@@ -641,7 +655,7 @@ export default function StudentDashboard() {
         const daysLeft = Math.max(differenceInDays(end, now), 0)
         const isOver   = now > end
         return (
-          <div className="bg-zinc-900 rounded-2xl border border-white/10 p-5">
+          <div className="bg-zinc-900 rounded-xl p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3 gap-4">
               <div className="flex items-center gap-2">
                 <CalendarRange className="w-4 h-4 text-brand-500 flex-shrink-0" />
@@ -651,13 +665,13 @@ export default function StudentDashboard() {
                 {isOver ? (
                   <span className="text-xs font-medium text-zinc-400">Semester ended</span>
                 ) : (
-                  <span className="text-xs font-medium text-brand-600">{daysLeft} day{daysLeft !== 1 ? 's' : ''} remaining</span>
+                  <span className="text-xs font-semibold text-brand-300">{daysLeft} day{daysLeft !== 1 ? 's' : ''} remaining</span>
                 )}
               </div>
             </div>
             <div className="relative h-2.5 bg-zinc-800 rounded-full overflow-hidden">
               <div
-                className="absolute inset-y-0 left-0 bg-brand-500 rounded-full transition-all duration-700"
+                className="absolute inset-y-0 left-0 bg-gradient-to-r from-brand-600 to-brand-400 rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(255,107,53,0.6)]"
                 style={{ width: `${pct}%` }}
               />
             </div>
@@ -703,37 +717,35 @@ export default function StudentDashboard() {
       {/* ── Upcoming lessons + pending assignments ─────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Upcoming lessons */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="section-title">Upcoming Lessons</h2>
-            <Link to="/calendar" className="text-sm text-brand-600 hover:text-brand-700 font-medium flex items-center gap-0.5">
-              Calendar <ChevronRight className="w-4 h-4" />
-            </Link>
-          </div>
+        <div>
+          <SectionHeader
+            icon={Clapperboard}
+            iconClass="text-ember-tertiary"
+            title={upcomingLessons[0] && isToday(toDate(upcomingLessons[0].startTime) ?? 0) ? 'Up Next' : 'Upcoming Lessons'}
+            right={<SectionLink to="/calendar">Calendar</SectionLink>}
+          />
           {upcomingLessons.length === 0
             ? <EmptyState icon={BookOpen} title="No upcoming lessons this week 📅" description="Check back when your teacher adds new ones." />
-            : upcomingLessons.map(lesson => (
-                <LessonCard
-                  key={lesson.id}
-                  lesson={lesson}
-                  subjectColor={subjectMap[lesson.subjectId]?.color}
-                  subjectTitle={subjectMap[lesson.subjectId]?.title}
-                />
-              ))
+            : <div className="space-y-2">
+                {upcomingLessons.map((lesson, i) =>
+                  i === 0 && isToday(toDate(lesson.startTime) ?? 0)
+                    ? <LessonSlateCard key={lesson.id} lesson={lesson} subject={subjectMap[lesson.subjectId]} to="/calendar" />
+                    : <LessonCard key={lesson.id} lesson={lesson} subject={subjectMap[lesson.subjectId]} />,
+                )}
+              </div>
           }
         </div>
 
         {/* Pending assignments */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="section-title">Pending Assignments</h2>
-            <Link to="/subjects" className="text-sm text-brand-600 hover:text-brand-700 font-medium flex items-center gap-0.5">
-              All subjects <ChevronRight className="w-4 h-4" />
-            </Link>
-          </div>
+        <div>
+          <SectionHeader
+            icon={FilePen}
+            title="Pending Assignments"
+            right={<SectionLink to="/subjects">All subjects</SectionLink>}
+          />
           {pendingAssignments.length === 0
             ? <EmptyState icon={BookOpen} title="All caught up! 🎉" description="No pending assignments — nice work." />
-            : pendingAssignments.map(a => {
+            : <div className="space-y-2">{pendingAssignments.map(a => {
                 const dueDate = toDate(a.dueDate)
                 const todayStr = now.toISOString().slice(0, 10)
                 const dueTodayStr = dueDate?.toISOString().slice(0, 10)
@@ -741,13 +753,12 @@ export default function StudentDashboard() {
                   <DeadlineCard
                     key={a.id}
                     assignment={a}
-                    subjectColor={subjectMap[a.subjectId]?.color}
-                    subjectTitle={subjectMap[a.subjectId]?.title}
+                    subject={subjectMap[a.subjectId]}
                     isOverdue={isPast(dueDate ?? new Date())}
                     isDueToday={!isPast(dueDate ?? new Date()) && dueTodayStr === todayStr}
                   />
                 )
-              })
+              })}</div>
           }
         </div>
       </div>
@@ -868,39 +879,15 @@ export default function StudentDashboard() {
         )
       })()}
 
-      {/* ── Quick links ───────────────────────────────────────────────────── */}
-      {(() => {
-        const quickLinks = [
-          navVis?.student?.['checkin'] !== false && { to: '/checkin', bg: 'bg-brand-600 hover:bg-brand-700', icon: '📷', label: 'Check In' },
-          navVis?.student?.['roomBooking'] !== false && { to: '/booking', bg: 'bg-sky-500 hover:bg-sky-600', icon: '🚪', label: 'Book Room' },
-          navVis?.student?.['guide']   !== false && { to: '/guide',   bg: 'bg-amber-500 hover:bg-amber-600', icon: '📖', label: 'Guide' },
-        ].filter(Boolean) as { to: string; bg: string; icon: string; label: string }[]
-        if (!quickLinks.length) return null
-        const cols = quickLinks.length === 1 ? 'grid-cols-1' : quickLinks.length === 2 ? 'grid-cols-2' : 'grid-cols-3'
-        return (
-          <div>
-            <h2 className="section-title mb-3">Quick Access</h2>
-            <div className={`grid ${cols} gap-3`}>
-              {quickLinks.map(l => (
-                <Link key={l.to} to={l.to} className={`flex flex-col items-center gap-2 ${l.bg} text-white rounded-2xl p-4 transition-colors text-center`}>
-                  <span className="text-2xl">{l.icon}</span>
-                  <span className="text-sm font-semibold">{l.label}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )
-      })()}
-
       {/* ── Active bookings ────────────────────────────────────────────────── */}
       {activeBookings.length > 0 && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="section-title">Active Bookings</h2>
-            <Link to="/booking" className="text-sm text-brand-600 hover:text-brand-700 font-medium flex items-center gap-0.5">
-              All bookings <ChevronRight className="w-4 h-4" />
-            </Link>
-          </div>
+          <SectionHeader
+            icon={Ticket}
+            iconClass="text-ember-tertiary"
+            title="Active Bookings"
+            right={<SectionLink to="/booking">All bookings</SectionLink>}
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {activeBookings.map(b => {
               const statusColor = b.status === 'pending'
@@ -909,7 +896,7 @@ export default function StudentDashboard() {
               const StatusIcon = b.status === 'pending' ? Clock : CheckCircle2
               const tab = b.type === 'food' ? 'food' : 'minivan'
               return (
-                <Link key={b.id} to="/booking" state={{ tab, openId: b.id }} className="bg-zinc-900 rounded-xl border border-white/10 px-4 py-3 flex items-center gap-3 hover:border-brand-300 transition-colors">
+                <Link key={b.id} to="/booking" state={{ tab, openId: b.id }} className="bg-zinc-900 rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors">
                   <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0">
                     {b.type === 'food'
                       ? <UtensilsCrossed className="w-4 h-4 text-zinc-500" />

@@ -30,7 +30,7 @@ export function usePullToRefresh(onRefresh: () => void) {
       const circle = indicator.querySelector<HTMLElement>('[data-pull-circle]')
       if (arrow)  arrow.style.transform  = `rotate(${progress * 180}deg)`
       if (circle) {
-        circle.style.background  = isTriggered ? '#f26419' : ''
+        circle.style.background  = isTriggered ? '#ff6b35' : ''
         circle.style.borderColor = isTriggered ? '#d44e0a' : ''
       }
     }

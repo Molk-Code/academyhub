@@ -1,6 +1,10 @@
 import { useMemo, useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, ChevronRight, Plus, Clock, AlertTriangle, ClipboardList, Package } from 'lucide-react'
+import {
+  CalendarDays, ChevronRight, Plus, AlertTriangle, ClipboardList, Package, BookOpen, FilePen, UserX,
+  Clapperboard, BellRing, CalendarRange, DoorOpen, Users, Boxes, GraduationCap, FileText, ArrowRight,
+} from 'lucide-react'
+import { SectionHeader, SectionLink, KpiCard, ShortcutPill, LessonSlateCard } from '@/components/dashboard/Ember'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, where, orderBy } from '@/hooks/useFirestore'
 import { toDate, shortDate, timeStr } from '@/lib/utils'
@@ -11,27 +15,6 @@ import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
-function StatCard({ label, value, icon, color, to, alert }: {
-  label: string; value: number; icon: string; color: 'blue' | 'orange' | 'purple' | 'red'; to: string; alert?: boolean
-}) {
-  const colors = {
-    blue:   'bg-blue-500/10 border-blue-500/20 text-blue-400',
-    orange: 'bg-orange-500/10 border-orange-500/20 text-orange-400',
-    purple: 'bg-purple-500/10 border-purple-500/20 text-purple-400',
-    red:    'bg-red-500/10 border-red-500/20 text-red-400',
-  }
-  return (
-    <Link to={to} className={`rounded-2xl border p-4 flex flex-col gap-1 hover:opacity-80 transition-opacity ${colors[color]}`}>
-      <div className="flex items-center justify-between">
-        <span className="text-2xl">{icon}</span>
-        {alert && value > 0 && <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />}
-      </div>
-      <p className="text-3xl font-bold text-white">{value}</p>
-      <p className="text-xs">{label}</p>
-    </Link>
-  )
-}
-
 function AttendanceCount({ lessonId }: { lessonId: string }) {
   const [count, setCount] = useState(0)
   useEffect(() => {
@@ -41,7 +24,7 @@ function AttendanceCount({ lessonId }: { lessonId: string }) {
     )
     return unsub
   }, [lessonId])
-  return <span className="text-sm font-bold text-emerald-600">{count} checked in</span>
+  return <span className="text-xs font-semibold text-ember-tertiary">{count} checked in</span>
 }
 
 function EquipmentWidget() {
@@ -60,11 +43,7 @@ function EquipmentWidget() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
-          <Package className="w-4 h-4 text-brand-400" /> Equipment
-        </h2>
-      </div>
+      <SectionHeader icon={Package} title="Equipment" />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {pendingBookings.length > 0 && (
           <Link
@@ -243,115 +222,118 @@ export default function TeacherDashboard() {
   if (cohortsLoading) return <LoadingSpinner />
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-100">Good {timeOfDay} 👋</h1>
-          <p className="text-zinc-500 mt-1 text-sm">{format(now, 'EEEE d MMMM yyyy')}</p>
-        </div>
-        <div className="flex gap-2">
-          <Link to="/teacher/lessons/new" className="btn-primary py-2.5">
-            <Plus className="w-4 h-4" /> New Lesson
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="font-display text-2xl font-bold text-zinc-100 tracking-tight truncate">Good {timeOfDay} 👋</h1>
+            <p className="text-xs text-zinc-400 mt-1 flex items-center gap-1 truncate">
+              <CalendarDays className="w-3.5 h-3.5 text-brand-300 flex-shrink-0" />
+              {format(now, 'EEEE d MMMM yyyy')}
+            </p>
+          </div>
+          <Link to="/teacher/lessons/new" className="btn-primary py-2 px-3.5 flex-shrink-0 bg-gradient-to-r from-brand-500 to-brand-600">
+            <Plus className="w-4 h-4" /> Lesson
           </Link>
         </div>
-      </div>
+        <div className="flex items-center gap-2 overflow-x-auto pb-0.5 -mx-4 px-4 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <ShortcutPill to="/teacher/lessons"       icon={CalendarDays}  label="Lessons" />
+          <ShortcutPill to="/teacher/assignments"   icon={FileText}      iconClass="text-ember-secondary" label="Assignments" />
+          <ShortcutPill to="/teacher/inventory"     icon={Boxes}         iconClass="text-ember-tertiary"  label="Inventory" />
+          <ShortcutPill to="/teacher/room-bookings" icon={DoorOpen}      iconClass="text-ember-secondary" label="Rooms" />
+          <ShortcutPill to="/teacher/students"      icon={GraduationCap} label="Students" />
+        </div>
+      </section>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Today's lessons"      value={todayLessons.length}        icon="📚" color="blue"   to="/teacher/lessons" />
-        <StatCard label="Pending submissions"  value={pendingSubmissions.length}  icon="📝" color="orange" to="/teacher/assignments"       alert={pendingSubmissions.length > 0} />
-        <StatCard label="Equipment requests"   value={pendingEquipment.length}    icon="📦" color="purple" to="/teacher/equipment-requests" alert={pendingEquipment.length > 0} />
-        <StatCard label="Absence reports"      value={pendingAbsence.length}      icon="⚠️" color="red"    to="/teacher/students"          alert={pendingAbsence.length > 0} />
-      </div>
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+        <KpiCard icon={BookOpen} value={todayLessons.length}       label="Today's lessons" to="/teacher/lessons" />
+        <KpiCard icon={FilePen}  value={pendingSubmissions.length} label="Submissions"     to="/teacher/assignments"        iconClass="text-brand-300"        alert={pendingSubmissions.length > 0} highlight={pendingSubmissions.length > 0} />
+        <KpiCard icon={Package}  value={pendingEquipment.length}   label="Gear requests"   to="/teacher/equipment-requests" iconClass="text-ember-secondary" alert={pendingEquipment.length > 0} />
+        <KpiCard icon={UserX}    value={pendingAbsence.length}     label="Absence reports" to="/teacher/students"          alert={pendingAbsence.length > 0} highlight={pendingAbsence.length > 0} />
+      </section>
 
-      {/* ── Today's lessons ────────────────────────────────────────────── */}
+      {/* ── Today's slate ───────────────────────────────────────────────── */}
       {todayLessons.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold text-zinc-100 mb-3 flex items-center gap-2">
-            <CalendarDays className="w-5 h-5 text-brand-500" /> Today's Lessons
-          </h2>
-          <div className="space-y-2">
+        <section>
+          <SectionHeader
+            icon={Clapperboard}
+            iconClass="text-ember-tertiary"
+            title="Today's Slate"
+            right={<span className="text-ember-tertiary">{todayLessons.length} lesson{todayLessons.length !== 1 ? 's' : ''}</span>}
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {todayLessons.map(lesson => (
-              <div key={lesson.id} className="flex items-center gap-4 p-4 bg-zinc-900 border border-white/10 rounded-xl">
-                <div className="text-center min-w-[52px]">
-                  <p className="text-xs text-zinc-400">{timeStr(lesson.startTime)}</p>
-                  <p className="text-xs text-zinc-400">{timeStr(lesson.endTime)}</p>
-                </div>
-                <div className="w-px h-8 bg-zinc-700 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-zinc-100 truncate">{lesson.title}</p>
-                  {lesson.classroom && (
-                    <p className="text-xs text-zinc-500">{lesson.isOnline ? '🌐' : '📍'} {lesson.classroom}</p>
-                  )}
-                </div>
-                <AttendanceCount lessonId={lesson.id} />
-              </div>
+              <LessonSlateCard
+                key={lesson.id}
+                lesson={lesson}
+                subject={subjectMap[lesson.subjectId]}
+                footer={
+                  <div className="flex items-center justify-between pt-1">
+                    <AttendanceCount lessonId={lesson.id} />
+                    <Link to="/teacher/lessons" className="flex items-center gap-1 px-3 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-medium active:scale-95 transition-all">
+                      Open <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                }
+              />
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Upcoming Reminders */}
+      {/* Upcoming Reminders — swipeable row */}
       {upcomingReminders.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-brand-500" /> Upcoming Reminders
-            </h2>
-            <Link to="/teacher/semester-wheel" className="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-0.5">
-              View all <ChevronRight className="w-4 h-4" />
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {upcomingReminders.map(({ ev, active, days }) => (
-              <Link
-                key={ev.id}
-                to="/teacher/semester-wheel"
-                className="flex items-start gap-3 p-3.5 bg-zinc-900 border border-white/10 rounded-xl hover:border-brand-300 transition-colors"
-              >
-                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: semesterCategories.find(c => c.name === ev.category)?.color ?? ev.color }} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-zinc-100 truncate">{ev.title}</p>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    {ev.startDate.replace(/^(\d{2})-(\d{2})$/, (_, m, d) => {
-                      const mn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-                      return `${mn[parseInt(m)-1]} ${parseInt(d)}`
-                    })} – {ev.endDate.replace(/^(\d{2})-(\d{2})$/, (_, m, d) => {
-                      const mn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-                      return `${mn[parseInt(m)-1]} ${parseInt(d)}`
-                    })}
-                  </p>
-                  <div className="mt-1.5">
+        <section>
+          <SectionHeader
+            icon={BellRing}
+            iconClass="text-ember-secondary"
+            title="Upcoming Reminders"
+            right={<SectionLink to="/teacher/semester-wheel">View all</SectionLink>}
+          />
+          <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3 sm:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {upcomingReminders.map(({ ev, active, days }) => {
+              const dotColor = semesterCategories.find(c => c.name === ev.category)?.color ?? ev.color
+              const fmt = (md: string) => md.replace(/^(\d{2})-(\d{2})$/, (_, m, d) => {
+                const mn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+                return `${mn[parseInt(m)-1]} ${parseInt(d)}`
+              })
+              return (
+                <Link
+                  key={ev.id}
+                  to="/teacher/semester-wheel"
+                  className="flex flex-col justify-between p-3.5 rounded-xl bg-zinc-900 min-w-[210px] max-w-[240px] sm:max-w-none flex-shrink-0 shadow-sm hover:bg-zinc-800 transition-colors"
+                >
+                  <div className="flex items-start justify-between mb-2">
                     {active
-                      ? <span className="animate-pulse text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Active now</span>
-                      : <span className="text-[10px] text-zinc-500">
-                          {days === 0 ? 'Starts today' : days === 1 ? 'Tomorrow' : `In ${days} days`}
-                        </span>
-                    }
+                      ? <span className="px-2 py-0.5 rounded-full bg-ember-tertiary/15 text-ember-tertiary text-[10px] font-semibold animate-pulse">Active now</span>
+                      : <span className="px-2 py-0.5 rounded-full bg-ember-secondary/15 text-ember-secondary text-[10px] font-semibold">
+                          {days === 0 ? 'Starts today' : days === 1 ? 'Tomorrow' : `in ${days} days`}
+                        </span>}
+                    <span className="w-2.5 h-2.5 rounded-full mt-1" style={{ backgroundColor: dotColor, boxShadow: `0 0 8px ${dotColor}` }} />
                   </div>
-                </div>
-              </Link>
-            ))}
+                  <p className="text-sm font-semibold text-zinc-100 truncate mb-3">{ev.title}</p>
+                  <div className="flex items-center gap-1 text-zinc-400 text-[11px] bg-zinc-950/40 rounded px-2 py-1">
+                    <CalendarRange className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="truncate">{fmt(ev.startDate)} – {fmt(ev.endDate)}</span>
+                  </div>
+                </Link>
+              )
+            })}
           </div>
-        </div>
+        </section>
       )}
 
       {/* Today's absences */}
       {todayAbsences.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
-              Absent Today
-              <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                {todayAbsences.length}
-              </span>
-            </h2>
-            <Link to="/teacher/students" className="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-0.5">
-              All reports <ChevronRight className="w-4 h-4" />
-            </Link>
-          </div>
+          <SectionHeader
+            icon={AlertTriangle}
+            iconClass="text-amber-400"
+            title={`Absent Today · ${todayAbsences.length}`}
+            right={<SectionLink to="/teacher/students">All reports</SectionLink>}
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {todayAbsences.map(r => (
               <div key={r.id} className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
@@ -377,12 +359,13 @@ export default function TeacherDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Pending submissions */}
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-zinc-100">Submissions to Grade</h2>
-            <Link to="/teacher/gradebook" className="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-0.5">
-              View all <ChevronRight className="w-4 h-4" />
-            </Link>
-          </div>
+          <SectionHeader
+            icon={FilePen}
+            title="Needs Attention"
+            right={pendingSubmissions.length > 0
+              ? <SectionLink to="/teacher/gradebook">{pendingSubmissions.length} pending</SectionLink>
+              : <SectionLink to="/teacher/gradebook">Gradebook</SectionLink>}
+          />
           <div className="space-y-2">
             {pendingSubmissions.slice(0, 5).map(sub => {
               const student = cohortStudents.find(s => s.uid === sub.studentId)
@@ -390,8 +373,9 @@ export default function TeacherDashboard() {
                 <Link
                   key={sub.id}
                   to={`/teacher/gradebook?submission=${sub.id}`}
-                  className="flex items-center gap-3 p-3 bg-zinc-900 border border-white/10 rounded-xl hover:bg-white/5 transition-colors"
+                  className="relative overflow-hidden flex items-center gap-3 p-3 bg-zinc-800 rounded-xl hover:bg-zinc-700 transition-colors shadow-md"
                 >
+                  <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-brand-500/10 blur-2xl pointer-events-none" />
                   {student && <Avatar uid={student.uid} name={student.displayName} avatarUrl={student.avatarUrl} size="sm" enlargeable />}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-zinc-100 truncate">
@@ -399,7 +383,7 @@ export default function TeacherDashboard() {
                     </p>
                     <p className="text-xs text-zinc-500 truncate">Assignment submission</p>
                   </div>
-                  <span className="badge badge-amber flex-shrink-0">Needs grading</span>
+                  <span className="flex-shrink-0 px-2.5 py-1 rounded-full bg-brand-500/15 text-brand-300 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap">Needs grading</span>
                 </Link>
               )
             })}
@@ -411,15 +395,15 @@ export default function TeacherDashboard() {
 
         {/* Upcoming lessons */}
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-zinc-100">Your Upcoming Lessons</h2>
-            <Link to="/teacher/lessons" className="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-0.5">
-              All lessons <ChevronRight className="w-4 h-4" />
-            </Link>
-          </div>
+          <SectionHeader
+            icon={CalendarDays}
+            iconClass="text-ember-secondary"
+            title="Your Upcoming Lessons"
+            right={<SectionLink to="/teacher/lessons">All lessons</SectionLink>}
+          />
           <div className="space-y-2">
             {upcomingLessons.map(lesson => (
-              <Link key={lesson.id} to="/teacher/lessons" className="flex items-center gap-3 p-3 bg-zinc-900 border border-white/10 rounded-xl hover:bg-white/5 transition-colors">
+              <Link key={lesson.id} to="/teacher/lessons" className="flex items-center gap-3 p-3 bg-zinc-900 rounded-xl hover:bg-zinc-800 transition-colors">
                 <div className="text-center min-w-[48px]">
                   <p className="text-xs text-zinc-500">{shortDate(lesson.startTime).split(' ')[0]}</p>
                   <p className="text-lg font-bold text-zinc-100">{shortDate(lesson.startTime).split(' ')[1]}</p>
@@ -443,17 +427,17 @@ export default function TeacherDashboard() {
 
       {/* Upcoming assignments */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-zinc-100">Upcoming Assignments</h2>
-          <Link to="/teacher/assignments" className="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-0.5">
-            All assignments <ChevronRight className="w-4 h-4" />
-          </Link>
-        </div>
+        <SectionHeader
+          icon={FileText}
+          iconClass="text-ember-secondary"
+          title="Upcoming Assignments"
+          right={<SectionLink to="/teacher/assignments">All assignments</SectionLink>}
+        />
         <div className="space-y-2">
           {upcomingAssignments.map(a => {
             const subject = subjectMap[a.subjectId]
             return (
-              <div key={a.id} className="flex items-center gap-3 p-3 bg-zinc-900 border border-white/10 rounded-xl">
+              <div key={a.id} className="flex items-center gap-3 p-3 bg-zinc-900 rounded-xl">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-zinc-100 truncate">{a.title}</p>
                   <p className="text-xs text-zinc-500">
@@ -479,18 +463,17 @@ export default function TeacherDashboard() {
       {/* Plan activity */}
       {recentPlanActivity.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
-              <ClipboardList className="w-5 h-5 text-brand-500" /> Plan Activity
-            </h2>
-            <span className="text-xs text-zinc-400">Last 7 days</span>
-          </div>
+          <SectionHeader
+            icon={ClipboardList}
+            title="Plan Activity"
+            right={<span className="text-zinc-500 font-medium">Last 7 days</span>}
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {recentPlanActivity.map(({ plan, student }) => student && (
               <Link
                 key={plan.id}
                 to={`/teacher/students/${student.uid}/plan`}
-                className="flex items-center gap-3 p-3 bg-zinc-900 border border-white/10 rounded-xl hover:border-brand-300 transition-colors"
+                className="flex items-center gap-3 p-3 bg-zinc-900 rounded-xl hover:bg-zinc-800 transition-colors"
               >
                 <Avatar uid={student.uid} name={student.displayName} avatarUrl={student.avatarUrl} size="sm" enlargeable />
                 <div className="flex-1 min-w-0">
@@ -511,18 +494,18 @@ export default function TeacherDashboard() {
 
       {/* Student list preview */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-zinc-100">Your Students</h2>
-          <Link to="/teacher/students" className="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-0.5">
-            View all <ChevronRight className="w-4 h-4" />
-          </Link>
-        </div>
+        <SectionHeader
+          icon={Users}
+          iconClass="text-ember-secondary"
+          title="Your Students"
+          right={<SectionLink to="/teacher/students">View all</SectionLink>}
+        />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {cohortStudents.slice(0, 6).map(student => (
             <Link
               key={student.uid}
               to={`/teacher/students/${student.uid}`}
-              className="flex items-center gap-3 p-3 bg-zinc-900 border border-white/10 rounded-xl hover:bg-white/5 transition-colors"
+              className="flex items-center gap-3 p-3 bg-zinc-900 rounded-xl hover:bg-zinc-800 transition-colors"
             >
               <Avatar uid={student.uid} name={student.displayName} avatarUrl={student.avatarUrl} size="sm" enlargeable />
               <div className="flex-1 min-w-0">

@@ -263,7 +263,7 @@ export default function Lessons() {
 
         const el = document.createElement('div')
         el.className = 'x-now-ext'
-        el.style.cssText = `position:absolute;top:${topPx}px;left:${leftPx}px;width:${widthPx}px;height:0;border-top:2px solid #f26419;pointer-events:none;z-index:5;`
+        el.style.cssText = `position:absolute;top:${topPx}px;left:${leftPx}px;width:${widthPx}px;height:0;border-top:2px solid #ff6b35;pointer-events:none;z-index:5;`
         body.appendChild(el)
       } finally {
         obs?.observe(card, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] })

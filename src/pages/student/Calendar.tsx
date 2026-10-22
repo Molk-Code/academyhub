@@ -144,7 +144,7 @@ export default function StudentCalendar() {
 
         const el = document.createElement('div')
         el.className = 'x-now-ext'
-        el.style.cssText = `position:absolute;top:${topPx}px;left:${leftPx}px;width:${widthPx}px;height:0;border-top:2px solid #f26419;pointer-events:none;z-index:5;`
+        el.style.cssText = `position:absolute;top:${topPx}px;left:${leftPx}px;width:${widthPx}px;height:0;border-top:2px solid #ff6b35;pointer-events:none;z-index:5;`
         body.appendChild(el)
       } finally {
         obs?.observe(card, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] })
@@ -958,7 +958,7 @@ export default function StudentCalendar() {
                 isMobileDim
                   ? isLandscape
                     ? 'calc(100dvh - 5.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
-                    : 'calc(100dvh - 13.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
+                    : 'calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
                   : 'calc(100vh - 180px)'
               }
               slotMinTime="00:00:00"

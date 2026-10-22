@@ -211,6 +211,15 @@ export default function Lessons() {
   const [viewingInvitedEvent, setViewingInvitedEvent] = useState<PersonalEventDoc | null>(null)
   const [pdfPickerOpen, setPdfPickerOpen] = useState(false)
   const calendarRef     = useRef<FullCalendar>(null)
+  // Desktop: FullCalendar grid (default — scheduling/ghost blocks live there) or the day timeline
+  const [desktopView, setDesktopView] = useState<'timeline' | 'grid'>(() => {
+    try { return localStorage.getItem('lessonsDesktopView') === 'timeline' ? 'timeline' : 'grid' } catch { return 'grid' }
+  })
+  function chooseDesktopView(v: 'timeline' | 'grid') {
+    setDesktopView(v)
+    try { localStorage.setItem('lessonsDesktopView', v) } catch {}
+    if (v === 'grid') setTimeout(() => calendarRef.current?.getApi().updateSize(), 0)
+  }
   const calendarCardRef = useRef<HTMLDivElement>(null)
 
   const [isLandscape, setIsLandscape] = useState(
@@ -1205,6 +1214,17 @@ export default function Lessons() {
         <>
           {/* Legend */}
           <div className="hidden sm:flex items-center gap-3 flex-wrap">
+            <div className="flex p-1 rounded-xl bg-zinc-900 shadow-inner order-last ml-auto">
+              {(['grid', 'timeline'] as const).map(v => (
+                <button
+                  key={v}
+                  onClick={() => chooseDesktopView(v)}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${desktopView === v ? 'bg-zinc-800 text-brand-300 shadow-sm' : 'text-zinc-400 hover:text-zinc-100'}`}
+                >
+                  {v === 'timeline' ? 'Timeline' : 'Week grid'}
+                </button>
+              ))}
+            </div>
             {cohorts.map((c, idx) => {
               const color = c.color ?? COHORT_FALLBACK_COLORS[idx % COHORT_FALLBACK_COLORS.length]
               return (
@@ -1222,8 +1242,8 @@ export default function Lessons() {
             )}
           </div>
 
-          {/* Mobile: agenda view — replaces FullCalendar on small screens */}
-          <div className="sm:hidden card p-0 overflow-hidden">
+          {/* Mobile: day timeline — replaces FullCalendar on small screens */}
+          <div className="sm:hidden">
             <MobileAgendaView
               key={pendingCalendarDate?.getTime() ?? 0}
               events={allEvents}
@@ -1233,6 +1253,19 @@ export default function Lessons() {
             />
           </div>
 
+          {desktopView === 'timeline' && (
+            <div className="hidden sm:block">
+              <MobileAgendaView
+                variant="desktop"
+                events={allEvents}
+                subjects={subjects}
+                onEventClick={handleMobileEventClick}
+                initialDate={pendingCalendarDate ?? undefined}
+              />
+            </div>
+          )}
+
+        <div className={desktopView === 'grid' ? undefined : 'hidden'}>
         <div ref={calendarCardRef} className="hidden sm:block bg-zinc-900 rounded-2xl border border-white/10 shadow-sm overflow-hidden [&_.fc-toolbar]:flex-wrap [&_.fc-toolbar]:gap-y-2 [&_.fc-toolbar]:px-4 [&_.fc-toolbar]:pt-3 [&_.fc-toolbar-title]:text-base [&_.fc-button]:text-xs [&_.fc-button]:px-2 [&_.fc-button]:py-1 sm:[&_.fc-button]:text-sm sm:[&_.fc-button]:px-3 sm:[&_.fc-button]:py-1.5">
           {isTeacher && blocks.length > 0 && (
             <div className="px-4 pt-3 pb-1 flex items-center gap-2 text-xs text-zinc-400">
@@ -1406,6 +1439,7 @@ export default function Lessons() {
               )
             }}
           />
+        </div>
         </div>
         </>
       )}

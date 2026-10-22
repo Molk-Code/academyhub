@@ -52,6 +52,11 @@
   .pt-header {
     padding-top: calc(4rem + max(env(safe-area-inset-top, 0px), 12px));
   }
+  /* Sticks just below the fixed mobile header (main scrolls under it) */
+  .sticky-below-header {
+    position: sticky;
+    top: calc(4rem + max(env(safe-area-inset-top, 0px), 12px));
+  }
   .pb-bottomnav {
     padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
   }

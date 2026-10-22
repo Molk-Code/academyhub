@@ -17,6 +17,9 @@ export interface MobileAgendaViewProps {
   onAddClick?: (dateStr: string, timeStr: string) => void
   initialDate?: Date
   subjects?: SubjectDoc[]   // enables subject photos on the current session card
+  // 'mobile': sticky week strip above a page-scrolled timeline.
+  // 'desktop': month calendar in a sticky left column, timeline on the right.
+  variant?: 'mobile' | 'desktop'
 }
 
 type Kind = 'lesson' | 'synced' | 'personal' | 'assignment'
@@ -68,7 +71,8 @@ function getMonthWeeks(ms: Date) {
 
 const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
-export default function MobileAgendaView({ events, onEventClick, onAddClick, initialDate, subjects = [] }: MobileAgendaViewProps) {
+export default function MobileAgendaView({ events, onEventClick, onAddClick, initialDate, subjects = [], variant = 'mobile' }: MobileAgendaViewProps) {
+  const isDesktop = variant === 'desktop'
   const [kindFilter, setKindFilter] = useState<Kind | 'all'>('all')
   // Re-render every minute so Completed / In Session / Upcoming stay current
   const [now, setNow] = useState(() => new Date())
@@ -76,7 +80,7 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
   const subjectMap = useMemo(() => Object.fromEntries(subjects.map(s => [s.id, s])), [subjects])
   const [selectedDate, setSelectedDate] = useState(() => initialDate ?? new Date())
   const [weekOffset,   setWeekOffset]   = useState(() => initialDate ? computeWeekOffset(initialDate) : 0)
-  const [isExpanded,   setIsExpanded]   = useState(false)
+  const [isExpanded,   setIsExpanded]   = useState(isDesktop)
   const [monthOffset,  setMonthOffset]  = useState(0)
 
   // Drag pixel offset for 3-panel track (synced ref+state)
@@ -96,7 +100,6 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
   const tPhase  = useRef<'idle' | 'h' | 'v'>('idle')
 
   const stripRef     = useRef<HTMLDivElement>(null)
-  const eventListRef = useRef<HTMLDivElement>(null)
 
   // ── Derived ──────────────────────────────────────────────────────────────
 
@@ -241,27 +244,6 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
     }
   }, [])
 
-  // ── Event list: block page pull-to-refresh on overscroll ─────────────────
-
-  useEffect(() => {
-    const el = eventListRef.current
-    if (!el) return
-    let sy = 0
-    const onStart = (e: TouchEvent) => { sy = e.touches[0].clientY }
-    const onMove  = (e: TouchEvent) => {
-      const dy = e.touches[0].clientY - sy
-      const atTop    = el.scrollTop <= 0
-      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
-      if ((atTop && dy > 0) || (atBottom && dy < 0)) e.preventDefault()
-    }
-    el.addEventListener('touchstart', onStart, { passive: true })
-    el.addEventListener('touchmove',  onMove,  { passive: false })
-    return () => {
-      el.removeEventListener('touchstart', onStart)
-      el.removeEventListener('touchmove',  onMove)
-    }
-  }, [])
-
   // ── Render ───────────────────────────────────────────────────────────────
 
   const trackStyle: React.CSSProperties = {
@@ -325,20 +307,18 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
   }
 
   return (
-    <div
-      className="flex flex-col"
-      style={{ height: 'calc(100dvh - 10rem - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))', overflow: 'hidden' }}
-    >
+    <div className={isDesktop ? 'lg:grid lg:grid-cols-[minmax(280px,340px)_1fr] lg:gap-6 lg:items-start' : 'flex flex-col'}>
 
-      {/* ── Week strip card ─────────────────────────────────────────────── */}
+      {/* ── Week strip / month card — sticks below the header while the page scrolls ── */}
+      <div className={isDesktop ? 'lg:sticky lg:top-4 z-20 mb-4 lg:mb-0' : 'sticky-below-header z-20 -mx-4 px-2 pt-2 pb-1'} style={isDesktop ? undefined : { background: 'var(--bg-primary)' }}>
       <div
         ref={stripRef}
-        className="flex-shrink-0 select-none m-2 mb-0 p-2.5 rounded-2xl bg-zinc-900 shadow-md"
+        className="select-none p-2.5 rounded-2xl bg-zinc-900 shadow-md"
         style={{
           overflow: 'hidden',
-          maxHeight: isExpanded ? '400px' : '140px',
+          maxHeight: isDesktop ? undefined : isExpanded ? '400px' : '140px',
           transition: 'max-height 0.32s ease-out',
-          touchAction: 'none',
+          touchAction: isDesktop ? 'auto' : 'none',
         }}
       >
         {/* Month + week pill + arrows */}
@@ -347,14 +327,14 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
             <span className="font-display text-base font-bold text-zinc-100 capitalize truncate">
               {format(referenceMonth, 'MMMM yyyy', { locale: enGB })}
             </span>
-            {!isExpanded && (
+            {(!isExpanded || isDesktop) && (
               <span className="px-2 py-0.5 rounded-full bg-zinc-700 text-zinc-300 text-[10px] font-medium whitespace-nowrap">
-                Week {format(currentWeekStart, 'w', { locale: enGB, weekStartsOn: 1, firstWeekContainsDate: 4 })}
+                Week {format(isExpanded ? selectedDate : currentWeekStart, 'w', { locale: enGB, weekStartsOn: 1, firstWeekContainsDate: 4 })}
               </span>
             )}
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
-            {!(isToday(selectedDate) && weekOffset === 0 && !isExpanded) && (
+            {!(isToday(selectedDate) && weekOffset === 0 && monthOffset === 0) && (
               <button onClick={goToday} className="px-2 h-7 rounded-lg bg-brand-500/15 text-brand-300 text-[11px] font-semibold">Today</button>
             )}
             <button aria-label="Previous" onClick={() => isExpanded ? prevMonth() : prevWeek()} className="w-7 h-7 flex items-center justify-center rounded-lg bg-zinc-800 text-zinc-400 hover:text-zinc-100">
@@ -389,7 +369,7 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
                           setSelectedDate(day)
                           setWeekOffset(computeWeekOffset(day))
                           setMonthOffset(0)
-                          setIsExpanded(false)
+                          if (!isDesktop) setIsExpanded(false)
                         }, true)}
                       </div>
                     ))}
@@ -407,20 +387,19 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
         </div>
 
         {/* Pull handle */}
-        <div className="flex justify-center pt-1.5">
-          <div className="w-8 h-[3px] rounded-full bg-zinc-700" />
-        </div>
+        {!isDesktop && (
+          <div className="flex justify-center pt-1.5">
+            <div className="w-8 h-[3px] rounded-full bg-zinc-700" />
+          </div>
+        )}
+      </div>
       </div>
 
       {/* ── Event list ──────────────────────────────────────────────────── */}
-      <div
-        ref={eventListRef}
-        className="flex-1 overflow-y-auto px-3 pt-3 pb-4"
-        style={{ overscrollBehavior: 'none' }}
-      >
+      <div className={isDesktop ? 'min-w-0' : 'pt-3 pb-4'}>
         {/* Filter pills — only when the day mixes kinds of events */}
         {kindsToday.length > 1 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-3 -mx-3 px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex items-center gap-2 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {(['all', ...kindsToday] as const).map(k => (
               <button
                 key={k}
@@ -446,10 +425,21 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
               {isToday(selectedDate) ? 'Today' : format(selectedDate, 'EEEE', { locale: enGB })} Timeline
             </span>
           </div>
-          <span className="text-[11px] text-zinc-400 flex-shrink-0">
+          <span className="text-[11px] text-zinc-400 flex-shrink-0 flex items-center gap-2">
+            <span>
             {format(selectedDate, 'd MMM', { locale: enGB })}
             {timed.length > 0 && ` · ${timed.length} ${timed.length === 1 ? 'session' : 'sessions'}`}
             {totalLabel && ` • ${totalLabel}`}
+            </span>
+            {onAddClick && shown.length > 0 && (
+              <button
+                aria-label="Add event"
+                onClick={() => onAddClick(selectedDateStr, '09:00')}
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-brand-500 text-white shadow-[0_0_12px_rgba(255,107,53,0.4)] active:scale-95 transition-transform"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            )}
           </span>
         </div>
 

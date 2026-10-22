@@ -155,7 +155,7 @@ export default function EquipmentBookingPage() {
 
   const { data: equipmentRaw } = useCollection<EquipmentDoc>('equipment')
   const { data: cohort } = useDocument<CohortDoc>('cohorts', cohortId || null)
-  const { data: navVis } = useDocument<{ id: string; student: Record<string, boolean> }>('settings', 'nav_visibility')
+  const { data: navVis, loading: navVisLoading } = useDocument<{ id: string; student: Record<string, boolean> }>('settings', 'nav_visibility')
   const productionNavEnabled = navVis?.student?.['production'] !== false
   const { data: myBookings } = useCollection<EquipmentBookingDoc>(
     'equipment_bookings',
@@ -225,11 +225,13 @@ export default function EquipmentBookingPage() {
   const [cartOpen, setCartOpen] = useState(false)
   const [fromDate, setFromDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [toDate, setToDate] = useState('')
-  const [requireProductionSetting, setRequireProductionSetting] = useState(true)
+  // null until settings/production has loaded — assuming "required" meanwhile made
+  // the production picker flash up for a moment when the setting is off.
+  const [requireProductionSetting, setRequireProductionSetting] = useState<boolean | null>(null)
   useEffect(() => {
-    getDoc(doc(db, 'settings', 'production')).then(snap => {
-      if (snap.exists()) setRequireProductionSetting(snap.data().requireProductionForBooking !== false)
-    })
+    getDoc(doc(db, 'settings', 'production'))
+      .then(snap => setRequireProductionSetting(snap.exists() ? snap.data().requireProductionForBooking !== false : true))
+      .catch(() => setRequireProductionSetting(true))
   }, [])
   const [pricingEnabled, setPricingEnabled] = useState(true)
   useEffect(() => {
@@ -239,7 +241,8 @@ export default function EquipmentBookingPage() {
   }, [])
   // If Production is turned off in Nav Settings entirely, equipment can never
   // require one — there'd be no way to select or create one.
-  const productionRequired = requireProductionSetting && productionNavEnabled
+  const productionSettingsLoaded = requireProductionSetting !== null && !navVisLoading
+  const productionRequired = productionSettingsLoaded && requireProductionSetting === true && productionNavEnabled
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<EquipmentCategory>('ALL')
   const [modalItem, setModalItem] = useState<EquipmentDoc | null>(null)
@@ -880,7 +883,7 @@ export default function EquipmentBookingPage() {
                   const outOfStock = item.available <= 0
                   const locked = isItemLocked(item)
                   const budgetBlocked = !inCart && isOverEquipmentBudget(item)
-                  const needsProduction = productionRequired && item.requiresProduction !== false
+                  const needsProduction = (productionRequired || !productionSettingsLoaded) && item.requiresProduction !== false
                   const disabled = outOfStock || locked || budgetBlocked
                   return (
                     <div className={`product-card${inCart ? ' card-added' : ''}`} key={item.id}

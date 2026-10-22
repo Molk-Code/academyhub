@@ -73,6 +73,16 @@ export default function StudentCalendar() {
   const [selectedEvent, setSelectedEvent] = useState<SelectedEvent | null>(null)
   const [viewingGuestTeacher, setViewingGuestTeacher] = useState<GuestTeacherDoc | null>(null)
   const [mobileView, setMobileView] = useState<ViewId>('timeGridWeek')
+  // Desktop: day timeline (default) or the FullCalendar week grid; remembered per browser
+  const [desktopView, setDesktopView] = useState<'timeline' | 'grid'>(() => {
+    try { return localStorage.getItem('calendarDesktopView') === 'grid' ? 'grid' : 'timeline' } catch { return 'timeline' }
+  })
+  function chooseDesktopView(v: 'timeline' | 'grid') {
+    setDesktopView(v)
+    try { localStorage.setItem('calendarDesktopView', v) } catch {}
+    // FullCalendar measured itself while hidden — re-measure once it's visible
+    if (v === 'grid') setTimeout(() => calendarRef.current?.getApi().updateSize(), 0)
+  }
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false)
   const [addEventModal, setAddEventModal] = useState<{ date: string; start: string; end: string; allDay: boolean } | null>(null)
   const [newEventTitle, setNewEventTitle] = useState('')
@@ -847,6 +857,17 @@ export default function StudentCalendar() {
         <>
           {/* Legend — desktop only */}
           <div className="hidden sm:flex items-center gap-4 flex-wrap">
+            <div className="flex p-1 rounded-xl bg-zinc-900 shadow-inner order-last ml-auto">
+              {(['timeline', 'grid'] as const).map(v => (
+                <button
+                  key={v}
+                  onClick={() => chooseDesktopView(v)}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${desktopView === v ? 'bg-zinc-800 text-brand-300 shadow-sm' : 'text-zinc-400 hover:text-zinc-100'}`}
+                >
+                  {v === 'timeline' ? 'Timeline' : 'Week grid'}
+                </button>
+              ))}
+            </div>
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded-full bg-rose-500 flex-shrink-0" />
               <span className="text-xs text-zinc-400">Deadline</span>
@@ -880,8 +901,8 @@ export default function StudentCalendar() {
             })()}
           </div>
 
-          {/* ── Mobile: agenda view ───────────────────────────────────────── */}
-          <div className="sm:hidden card p-0 overflow-hidden">
+          {/* ── Mobile: day timeline (page-scrolled, sticky week strip) ──── */}
+          <div className="sm:hidden">
             <MobileAgendaView
               events={allEvents}
               subjects={subjects}
@@ -892,7 +913,23 @@ export default function StudentCalendar() {
             />
           </div>
 
-          {/* ── Desktop: FullCalendar ─────────────────────────────────────── */}
+          {/* ── Desktop: day timeline ─────────────────────────────────────── */}
+          {desktopView === 'timeline' && (
+            <div className="hidden sm:block">
+              <MobileAgendaView
+                variant="desktop"
+                events={allEvents}
+                subjects={subjects}
+                onEventClick={handleMobileEventClick}
+                onAddClick={(dateStr, timeStr) => {
+                  setAddEventModal({ date: dateStr, start: timeStr, end: '10:00', allDay: false })
+                }}
+              />
+            </div>
+          )}
+
+          {/* ── Desktop: FullCalendar week grid (stays mounted; hidden in timeline view) ── */}
+          <div className={desktopView === 'grid' ? undefined : 'hidden'}>
           <div
             ref={calendarCardRef}
             style={{ touchAction: 'pan-y' }}
@@ -1070,6 +1107,7 @@ export default function StudentCalendar() {
                 }
               }}
             />
+          </div>
           </div>
         </>
       )}

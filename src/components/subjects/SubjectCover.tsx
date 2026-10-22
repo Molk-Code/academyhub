@@ -9,8 +9,8 @@ type Focus = { x: number; y: number }
 const clamp = (v: number) => Math.min(100, Math.max(0, Math.round(v * 10) / 10))
 
 // Cinematic cover for a subject: its uploaded image (or a gradient in the
-// subject colour when none) faded to black at the bottom, with the emoji on a
-// blurred pill top-left and `children` laid over the bottom edge.
+// subject colour when none) faded to black at the bottom, with `children` laid
+// over the bottom edge.
 // Pass `onReposition` to let the user drag the image to reframe it.
 export default function SubjectCover({
   subject, className, size = 'card', children, onReposition,
@@ -82,9 +82,6 @@ export default function SubjectCover({
         </div>
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent pointer-events-none" />
-      <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-black/45 backdrop-blur-md text-base leading-6 select-none pointer-events-none">
-        {subject.iconEmoji}
-      </span>
       {editable && (
         <span className="absolute top-2.5 right-2.5 flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/55 backdrop-blur-md text-[11px] font-medium text-white/90 pointer-events-none">
           <Move className="w-3 h-3" /> Drag to reposition

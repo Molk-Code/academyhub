@@ -12,6 +12,7 @@ import { useCollection, orderBy, where } from '@/hooks/useFirestore'
 import type { SubjectDoc, CohortDoc, LessonBlockDoc, ClassroomDoc, UserDoc, LessonCategoryDoc, CurriculumItem, GuestTeacherDoc, GuestTeacherBookingDoc } from '@/types'
 import { Link2, Trash2, Video, FileText } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import CurriculumOptions from '@/components/subjects/CurriculumOptions'
 import EmojiPicker    from '@/components/common/EmojiPicker'
 
 // ── Classroom combobox ────────────────────────────────────────────────────────
@@ -343,11 +344,7 @@ export default function LessonBuilder() {
               disabled={!selectedSubjectId}
             >
               <option value="">No course selected…</option>
-              {curriculumItems.map(item => (
-                <option key={item.id} value={item.id}>
-                  Sem {item.semester} · {item.title}
-                </option>
-              ))}
+              <CurriculumOptions items={curriculumItems} />
             </select>
           </div>
           <div>

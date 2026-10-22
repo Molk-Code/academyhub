@@ -10,6 +10,7 @@ import type { LessonDoc, SubjectDoc, CohortDoc, LessonBlockDoc, SemesterSettings
 import { Plus, Pencil, Trash2, CalendarDays, LayoutGrid, X, QrCode, Circle, SlidersHorizontal, ChevronDown, Check, MapPin, Download } from 'lucide-react'
 import { markCalendarInvitesSeen } from '@/hooks/useCalendarInviteBadge'
 import AnnualPlanWheel from '@/components/calendar/AnnualPlanWheel'
+import CurriculumOptions from '@/components/subjects/CurriculumOptions'
 import MobileAgendaView from '@/components/calendar/MobileAgendaView'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import EmptyState     from '@/components/common/EmptyState'
@@ -1668,9 +1669,7 @@ export default function Lessons() {
                         className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-brand-500 disabled:opacity-40"
                       >
                         <option value="">— No course —</option>
-                        {syncedEditCurriculumItems.map(item => (
-                          <option key={item.id} value={item.id}>Sem {item.semester} · {item.title}</option>
-                        ))}
+                        <CurriculumOptions items={syncedEditCurriculumItems} />
                       </select>
                     </div>
                     {/* Title & emoji */}

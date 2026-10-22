@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where } from '@/hooks/useFirestore'
 import type { SubjectDoc, AssignmentDoc, LessonDoc, SyncedEventDoc, CohortDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import SubjectCover   from '@/components/subjects/SubjectCover'
 
 export default function SubjectList() {
   const { cohortId, previewCohortId } = useAuth()
@@ -125,17 +126,17 @@ export default function SubjectList() {
               to={`/subjects/${subject.id}`}
               className="card-hover group block"
             >
-              {/* Header stripe */}
-              <div className={`h-2 -mx-6 -mt-6 rounded-t-2xl mb-5 ${subject.color}`} />
-
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <span className="text-3xl mb-2 block">{subject.iconEmoji}</span>
-                  <h3 className="font-bold text-zinc-100 text-base">{subject.title}</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5 line-clamp-2">{subject.description}</p>
+              {/* Cover */}
+              <SubjectCover subject={subject} className="h-32 -mx-6 -mt-6 rounded-t-2xl mb-4">
+                <div className="flex items-end justify-between gap-2">
+                  <h3 className="font-bold text-white text-base leading-tight">{subject.title}</h3>
+                  <ChevronRight className="w-5 h-5 text-white/70 group-hover:text-white transition-colors flex-shrink-0" />
                 </div>
-                <ChevronRight className="w-5 h-5 text-zinc-300 group-hover:text-brand-500 transition-colors mt-1 flex-shrink-0" />
-              </div>
+              </SubjectCover>
+
+              {subject.description && (
+                <p className="text-xs text-zinc-400 line-clamp-2">{subject.description}</p>
+              )}
 
               <div className="mt-4 space-y-3">
                 {cp && (

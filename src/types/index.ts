@@ -172,6 +172,7 @@ export interface SubjectDoc {
   description: string
   color: string        // Tailwind bg class, e.g. 'bg-indigo-500'
   iconEmoji: string
+  imageUrl?: string    // Cloudinary cover image; falls back to a `color` gradient
   programYear: 1 | 2
   order: number
   createdBy: string

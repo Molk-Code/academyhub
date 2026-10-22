@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import SharePointBrowser from '@/components/sharepoint/SharePointBrowser'
+import SubjectCover from '@/components/subjects/SubjectCover'
 import { nanoid } from 'nanoid'
 import { cn, initials, avatarColor } from '@/lib/utils'
 
@@ -484,23 +485,20 @@ export default function SubjectDetail() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start gap-4">
-        <Link to="/teacher/subjects" className="mt-1 p-2 text-zinc-500 hover:text-zinc-100 hover:bg-zinc-700 rounded-xl transition-colors">
+      <div className="flex items-center justify-between gap-3">
+        <Link to="/teacher/subjects" className="p-2 -ml-2 text-zinc-500 hover:text-zinc-100 hover:bg-zinc-700 rounded-xl transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">{subject.iconEmoji}</span>
-            <div>
-              <h1 className="page-title">{subject.title}</h1>
-              <p className="text-zinc-500 text-sm mt-0.5">{subject.description}</p>
-            </div>
-          </div>
-        </div>
         <button onClick={addSemester} className="btn-primary py-2.5 flex-shrink-0">
           <Plus className="w-4 h-4" /> Add semester
         </button>
       </div>
+      <SubjectCover subject={subject} size="hero" className="h-40 sm:h-52 rounded-2xl">
+        <div className="sm:p-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{subject.title}</h1>
+          {subject.description && <p className="text-white/75 text-sm mt-1 line-clamp-2">{subject.description}</p>}
+        </div>
+      </SubjectCover>
 
       {/* ── Curriculum ─────────────────────────────────────────────────────── */}
       {curriculum.length > 0 && (

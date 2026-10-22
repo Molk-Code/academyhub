@@ -8,6 +8,7 @@ import { Link2, FileText, ExternalLink, UserRound, CheckCircle2, XCircle, Globe,
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import SharePointBrowser from '@/components/sharepoint/SharePointBrowser'
 import Breadcrumb from '@/components/common/Breadcrumb'
+import SubjectCover from '@/components/subjects/SubjectCover'
 
 export default function StudentSubjectDetail() {
   const { id } = useParams<{ id: string }>()
@@ -133,13 +134,12 @@ export default function StudentSubjectDetail() {
       ]} />
 
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <span className="text-3xl">{subject.iconEmoji}</span>
-        <div>
-          <h1 className="page-title">{subject.title}</h1>
-          <p className="text-zinc-500 text-sm mt-0.5">{subject.description}</p>
+      <SubjectCover subject={subject} size="hero" className="h-40 sm:h-52 rounded-2xl">
+        <div className="sm:p-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{subject.title}</h1>
+          {subject.description && <p className="text-white/75 text-sm mt-1 line-clamp-2">{subject.description}</p>}
         </div>
-      </div>
+      </SubjectCover>
 
       {/* Curriculum */}
       {semesters.length > 0 && (

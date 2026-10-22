@@ -23,6 +23,14 @@ export function optimizeImageUrl(url: string | null | undefined): string {
   return url.replace('/upload/', '/upload/f_auto,q_auto/')
 }
 
+// Banner-sized crop for cover images (subject cards/headers): fills w×h, keeping
+// the most interesting part of the photo (g_auto), in the best format.
+export function coverImageUrl(url: string | null | undefined, w: number, h: number): string {
+  if (!url) return ''
+  if (!url.includes('res.cloudinary.com') || !url.includes('/upload/')) return url
+  return url.replace('/upload/', `/upload/c_fill,g_auto,w_${w},h_${h},f_auto,q_auto/`)
+}
+
 export async function uploadVideo(
   file: File,
   onProgress: (pct: number) => void,

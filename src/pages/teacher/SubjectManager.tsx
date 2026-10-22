@@ -5,7 +5,9 @@ import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection } from '@/hooks/useFirestore'
 import type { SubjectDoc } from '@/types'
-import { Plus, Pencil, Trash2, BookOpen, X, Check, ChevronRight, GripVertical } from 'lucide-react'
+import { Plus, Pencil, Trash2, BookOpen, X, Check, ChevronRight, GripVertical, ImagePlus, Loader2 } from 'lucide-react'
+import { uploadFile } from '@/lib/cloudinary'
+import SubjectCover   from '@/components/subjects/SubjectCover'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import EmptyState     from '@/components/common/EmptyState'
 import EmojiPicker    from '@/components/common/EmojiPicker'
@@ -26,6 +28,7 @@ const EMPTY_FORM = {
   description: '',
   iconEmoji: '🎬',
   color: 'bg-indigo-500',
+  imageUrl: '',
   programYear: 1 as 1 | 2,
   order: 0,
 }
@@ -38,6 +41,9 @@ export default function SubjectManager() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [form,     setForm]     = useState<FormState>(EMPTY_FORM)
   const [saving,   setSaving]   = useState(false)
+  const [uploadPct, setUploadPct] = useState<number | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // ── Drag-to-reorder state ──────────────────────────────────────────────────
   const [dragId,     setDragId]     = useState<string | null>(null)
@@ -120,11 +126,27 @@ export default function SubjectManager() {
   function openEdit(e: React.MouseEvent, s: SubjectDoc) {
     e.preventDefault()
     setEditing(s.id)
-    setForm({ title: s.title, description: s.description, iconEmoji: s.iconEmoji, color: s.color, programYear: s.programYear, order: s.order })
+    setForm({ title: s.title, description: s.description, iconEmoji: s.iconEmoji, color: s.color, imageUrl: s.imageUrl ?? '', programYear: s.programYear, order: s.order })
     setShowForm(true)
   }
 
-  function cancel() { setShowForm(false); setEditing(null) }
+  function cancel() { setShowForm(false); setEditing(null); setUploadPct(null); setUploadError(null) }
+
+  async function handleImagePick(file: File | undefined) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setUploadError('Please choose an image file.'); return }
+    setUploadError(null)
+    setUploadPct(0)
+    try {
+      const { secureUrl } = await uploadFile(file, setUploadPct)
+      setForm(f => ({ ...f, imageUrl: secureUrl }))
+    } catch (e: any) {
+      setUploadError(e.message ?? 'Upload failed.')
+    } finally {
+      setUploadPct(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   async function handleSave() {
     if (!form.title.trim()) return
@@ -187,6 +209,36 @@ export default function SubjectManager() {
             <textarea className="input resize-none" rows={2} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Short description shown to students" />
           </div>
 
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-1">Cover image</label>
+            <div className="relative rounded-xl overflow-hidden">
+              <SubjectCover subject={{ ...form, title: form.title || 'Subject' }} className="h-36">
+                <p className="text-white font-semibold text-sm truncate">{form.title || 'Subject title'}</p>
+              </SubjectCover>
+              {uploadPct !== null && (
+                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2">
+                  <Loader2 className="w-5 h-5 text-white animate-spin" />
+                  <div className="w-1/2 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                    <div className="h-full bg-brand-500 transition-all" style={{ width: `${uploadPct}%` }} />
+                  </div>
+                </div>
+              )}
+            </div>
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => handleImagePick(e.target.files?.[0])} />
+            <div className="flex flex-wrap gap-2 mt-2">
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadPct !== null} className="btn-ghost py-1.5 text-sm">
+                <ImagePlus className="w-4 h-4" /> {form.imageUrl ? 'Replace image' : 'Upload image'}
+              </button>
+              {form.imageUrl && (
+                <button type="button" onClick={() => setForm(f => ({ ...f, imageUrl: '' }))} disabled={uploadPct !== null} className="btn-ghost py-1.5 text-sm text-zinc-400">
+                  <X className="w-4 h-4" /> Remove
+                </button>
+              )}
+            </div>
+            {uploadError && <p className="text-xs text-rose-400 mt-1">{uploadError}</p>}
+            {!form.imageUrl && <p className="text-xs text-zinc-500 mt-1">Without an image, the cover uses the subject colour.</p>}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-zinc-400 mb-1">Programme year</label>
@@ -208,7 +260,7 @@ export default function SubjectManager() {
           </div>
 
           <div className="flex gap-3 pt-2">
-            <button onClick={handleSave} disabled={saving || !form.title.trim()} className="btn-primary py-2">
+            <button onClick={handleSave} disabled={saving || uploadPct !== null || !form.title.trim()} className="btn-primary py-2">
               <Check className="w-4 h-4" /> {saving ? 'Saving…' : 'Save'}
             </button>
             <button onClick={cancel} className="btn-ghost py-2">
@@ -250,24 +302,22 @@ export default function SubjectManager() {
                         : 'hover:ring-2 hover:ring-brand-500/40'
                     }`}
                   >
-                    <div className={`h-1.5 ${s.color}`} />
-                    <div className="p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <GripVertical className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 flex-shrink-0 cursor-grab active:cursor-grabbing touch-none select-none" />
-                          <span className="text-2xl flex-shrink-0">{s.iconEmoji}</span>
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-white leading-tight truncate">{s.title}</p>
-                            <p className="text-xs text-zinc-400 mt-0.5 line-clamp-1">{s.description || '—'}</p>
-                          </div>
-                        </div>
+                    <SubjectCover subject={s} className="h-28">
+                      <div className="flex items-end justify-between gap-2">
+                        <p className="text-sm font-semibold text-white leading-tight truncate">{s.title}</p>
                         <Link
                           to={`/teacher/subjects/${s.id}`}
                           onClick={e => e.stopPropagation()}
-                          className="flex-shrink-0 p-1 text-zinc-400 hover:text-brand-400 transition-colors"
+                          className="flex-shrink-0 p-1 rounded-lg bg-black/40 backdrop-blur text-white/80 hover:text-white transition-colors"
                         >
                           <ChevronRight className="w-4 h-4" />
                         </Link>
+                      </div>
+                    </SubjectCover>
+                    <div className="p-4">
+                      <div className="flex items-start gap-2">
+                        <GripVertical className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 flex-shrink-0 cursor-grab active:cursor-grabbing touch-none select-none" />
+                        <p className="text-xs text-zinc-400 line-clamp-2 min-w-0">{s.description || '—'}</p>
                       </div>
                       <div className="flex items-center justify-between mt-3">
                         <span className="text-xs text-zinc-500">

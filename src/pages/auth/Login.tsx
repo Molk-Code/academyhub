@@ -223,16 +223,11 @@ export default function Login() {
             </div>
           )}
 
+          {/* "Setting up a new school? Register here" (/signup) hidden until the multi-school launch */}
           {!showForgotPw && (
-            <>
-              <p className="text-center text-xs text-zinc-400 mt-6">
-                No account yet? Your teacher will send you an invite link.
-              </p>
-              <p className="text-center text-xs text-zinc-500 mt-2">
-                Setting up a new school?{' '}
-                <a href="/signup" className="text-brand-400 hover:underline">Register here</a>
-              </p>
-            </>
+            <p className="text-center text-xs text-zinc-400 mt-6">
+              No account yet? Your teacher will send you an invite link.
+            </p>
           )}
           <p className="text-center text-xs text-zinc-600 mt-3">
             <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-400 transition-colors">

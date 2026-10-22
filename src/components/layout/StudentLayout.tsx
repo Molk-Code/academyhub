@@ -535,11 +535,15 @@ export default function StudentLayout() {
       <div className="flex-1 flex flex-col min-h-0">
       <main
         ref={mainRef}
+        style={{ '--header-h': '4rem' } as React.CSSProperties}
         className={cn(
-          'flex-1 overflow-y-auto min-h-0 pt-header lg:pt-0',
+          'flex-1 overflow-y-auto min-h-0',
           (isChatPage || isVideoPage) && 'overflow-hidden flex flex-col',
         )}
       >
+        {/* Header spacer — a real element rather than main padding-top, because
+            WebKit adds a scroller's padding to position:sticky offsets */}
+        <div className="pt-header lg:hidden flex-shrink-0" aria-hidden />
         <NotificationPermissionBanner />
         <InstallPrompt />
 

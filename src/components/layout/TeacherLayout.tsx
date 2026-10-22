@@ -367,11 +367,15 @@ export default function TeacherLayout() {
       {/* ── Main content ───────────────────────────────────────────────────── */}
       <main
         ref={mainRef}
+        style={{ '--header-h': '3.5rem' } as React.CSSProperties}
         className={cn(
-          'flex-1 pt-header lg:pt-0',
+          'flex-1',
           (isChatPage || isVideoPage) ? 'overflow-hidden flex flex-col' : 'overflow-y-auto',
         )}
       >
+        {/* Header spacer — a real element rather than main padding-top, because
+            WebKit adds a scroller's padding to position:sticky offsets */}
+        <div className="pt-header lg:hidden flex-shrink-0" aria-hidden />
         <NotificationPermissionBanner />
         <Suspense fallback={
           <div className="p-8">

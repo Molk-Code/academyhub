@@ -8,14 +8,21 @@ import type { LessonDoc, AssignmentDoc, SubjectDoc } from '@/types'
 
 // Small square tile: the subject's cover image, or its colour with the emoji.
 export function SubjectThumb({ subject, fallbackEmoji = '🎬', className }: {
-  subject?: Pick<SubjectDoc, 'imageUrl' | 'color' | 'iconEmoji'>
+  subject?: Pick<SubjectDoc, 'imageUrl' | 'imageFocus' | 'color' | 'iconEmoji'>
   fallbackEmoji?: string
   className?: string
 }) {
+  const focus = subject?.imageFocus
   return (
     <div className={cn('w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center', !subject?.imageUrl && (subject?.color ?? 'bg-zinc-800'), className)}>
       {subject?.imageUrl
-        ? <img src={coverImageUrl(subject.imageUrl, 120, 120)} alt="" loading="lazy" className="w-full h-full object-cover" />
+        ? <img
+            src={coverImageUrl(subject.imageUrl, 120, 120, !!focus)}
+            alt=""
+            loading="lazy"
+            className="w-full h-full object-cover"
+            style={focus ? { objectPosition: `${focus.x}% ${focus.y}%` } : undefined}
+          />
         : <span className="text-lg leading-none">{subject?.iconEmoji ?? fallbackEmoji}</span>}
     </div>
   )

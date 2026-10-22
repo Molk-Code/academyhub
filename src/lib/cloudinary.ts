@@ -23,12 +23,16 @@ export function optimizeImageUrl(url: string | null | undefined): string {
   return url.replace('/upload/', '/upload/f_auto,q_auto/')
 }
 
-// Banner-sized crop for cover images (subject cards/headers): fills w×h, keeping
-// the most interesting part of the photo (g_auto), in the best format.
-export function coverImageUrl(url: string | null | undefined, w: number, h: number): string {
+// Banner-sized image for covers (subject cards/headers), in the best format.
+// Auto mode crops server-side to w×h around the most interesting part (g_auto).
+// With `uncropped` (a hand-set framing point), it's only scaled down — large
+// enough to cover w×h at any aspect ratio — and CSS object-position frames it.
+export function coverImageUrl(url: string | null | undefined, w: number, h: number, uncropped = false): string {
   if (!url) return ''
   if (!url.includes('res.cloudinary.com') || !url.includes('/upload/')) return url
-  return url.replace('/upload/', `/upload/c_fill,g_auto,w_${w},h_${h},f_auto,q_auto/`)
+  return uncropped
+    ? url.replace('/upload/', `/upload/c_limit,w_${w * 2},h_${w * 2},f_auto,q_auto/`)
+    : url.replace('/upload/', `/upload/c_fill,g_auto,w_${w},h_${h},f_auto,q_auto/`)
 }
 
 export async function uploadVideo(

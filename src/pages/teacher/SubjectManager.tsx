@@ -5,7 +5,7 @@ import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection } from '@/hooks/useFirestore'
 import type { SubjectDoc } from '@/types'
-import { Plus, Pencil, Trash2, BookOpen, X, Check, ChevronRight, GripVertical, ImagePlus, Loader2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, BookOpen, X, Check, ChevronRight, GripVertical, ImagePlus, Loader2, RotateCcw } from 'lucide-react'
 import { uploadFile } from '@/lib/cloudinary'
 import { shrinkImageToLimit, MAX_IMAGE_BYTES } from '@/lib/imageCompress'
 import SubjectCover   from '@/components/subjects/SubjectCover'
@@ -30,6 +30,7 @@ const EMPTY_FORM = {
   iconEmoji: '🎬',
   color: 'bg-indigo-500',
   imageUrl: '',
+  imageFocus: null as { x: number; y: number } | null,  // null = auto crop
   programYear: 1 as 1 | 2,
   order: 0,
 }
@@ -142,7 +143,7 @@ export default function SubjectManager() {
   function openEdit(e: React.MouseEvent, s: SubjectDoc) {
     e.preventDefault()
     setEditing(s.id)
-    setForm({ title: s.title, description: s.description, iconEmoji: s.iconEmoji, color: s.color, imageUrl: s.imageUrl ?? '', programYear: s.programYear, order: s.order })
+    setForm({ title: s.title, description: s.description, iconEmoji: s.iconEmoji, color: s.color, imageUrl: s.imageUrl ?? '', imageFocus: s.imageFocus ?? null, programYear: s.programYear, order: s.order })
     setShowForm(true)
   }
 
@@ -159,7 +160,7 @@ export default function SubjectManager() {
       const ready = await shrinkImageToLimit(file)
       setOptimizing(false)
       const { secureUrl } = await uploadFile(ready, setUploadPct)
-      setForm(f => ({ ...f, imageUrl: secureUrl }))
+      setForm(f => ({ ...f, imageUrl: secureUrl, imageFocus: null }))
     } catch (e: any) {
       setUploadError(e.message ?? 'Upload failed.')
     } finally {
@@ -233,7 +234,11 @@ export default function SubjectManager() {
           <div>
             <label className="block text-xs font-medium text-zinc-400 mb-1">Cover image</label>
             <div className="relative rounded-xl overflow-hidden">
-              <SubjectCover subject={{ ...form, title: form.title || 'Subject' }} className="h-36">
+              <SubjectCover
+                subject={{ ...form, title: form.title || 'Subject' }}
+                className="h-36"
+                onReposition={form.imageUrl && uploadPct === null ? focus => setForm(f => ({ ...f, imageFocus: focus })) : undefined}
+              >
                 <p className="text-white font-semibold text-sm truncate">{form.title || 'Subject title'}</p>
               </SubjectCover>
               {uploadPct !== null && (
@@ -252,8 +257,13 @@ export default function SubjectManager() {
               <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadPct !== null} className="btn-ghost py-1.5 text-sm">
                 <ImagePlus className="w-4 h-4" /> {form.imageUrl ? 'Replace image' : 'Upload image'}
               </button>
+              {form.imageUrl && form.imageFocus && (
+                <button type="button" onClick={() => setForm(f => ({ ...f, imageFocus: null }))} disabled={uploadPct !== null} className="btn-ghost py-1.5 text-sm text-zinc-400">
+                  <RotateCcw className="w-4 h-4" /> Reset framing
+                </button>
+              )}
               {form.imageUrl && (
-                <button type="button" onClick={() => setForm(f => ({ ...f, imageUrl: '' }))} disabled={uploadPct !== null} className="btn-ghost py-1.5 text-sm text-zinc-400">
+                <button type="button" onClick={() => setForm(f => ({ ...f, imageUrl: '', imageFocus: null }))} disabled={uploadPct !== null} className="btn-ghost py-1.5 text-sm text-zinc-400">
                   <X className="w-4 h-4" /> Remove
                 </button>
               )}

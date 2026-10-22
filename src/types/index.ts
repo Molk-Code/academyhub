@@ -173,6 +173,7 @@ export interface SubjectDoc {
   color: string        // Tailwind bg class, e.g. 'bg-indigo-500'
   iconEmoji: string
   imageUrl?: string    // Cloudinary cover image; falls back to a `color` gradient
+  imageFocus?: { x: number; y: number } | null  // framing point in % (object-position); null/absent = auto crop
   programYear: 1 | 2
   order: number
   createdBy: string

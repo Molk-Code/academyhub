@@ -7,10 +7,12 @@ import { thumbnailUrl } from '@/lib/cloudinary'
 import { Link2, FileText, ExternalLink, UserRound, CheckCircle2, XCircle, Globe, Play, Clock } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import SharePointBrowser from '@/components/sharepoint/SharePointBrowser'
+import { useMicrosoftAuth } from '@/contexts/MicrosoftAuthContext'
 import Breadcrumb from '@/components/common/Breadcrumb'
 import SubjectCover from '@/components/subjects/SubjectCover'
 
 export default function StudentSubjectDetail() {
+  const { isConfigured: sharePointConfigured } = useMicrosoftAuth()
   const { id } = useParams<{ id: string }>()
   const { cohortId, previewCohortId, profile } = useAuth()
   const effectiveCohortId = previewCohortId ?? cohortId
@@ -280,16 +282,18 @@ export default function StudentSubjectDetail() {
         </div>
       )}
 
-      {/* SharePoint Resources */}
-      <div className="space-y-2">
-        <h2 className="text-base font-semibold text-zinc-100">Shared Files</h2>
-        <SharePointBrowser
-          subPath={`Resources/${id}`}
-          canDelete={false}
-          canUpload={false}
-          title="Subject Files"
-        />
-      </div>
+      {/* SharePoint Resources — hidden until a SharePoint connection is configured */}
+      {sharePointConfigured && (
+        <div className="space-y-2">
+          <h2 className="text-base font-semibold text-zinc-100">Shared Files</h2>
+          <SharePointBrowser
+            subPath={`Resources/${id}`}
+            canDelete={false}
+            canUpload={false}
+            title="Subject Files"
+          />
+        </div>
+      )}
 
       {/* Teachers */}
       {teachers.length > 0 && (

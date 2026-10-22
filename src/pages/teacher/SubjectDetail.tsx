@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import SharePointBrowser from '@/components/sharepoint/SharePointBrowser'
+import { useMicrosoftAuth } from '@/contexts/MicrosoftAuthContext'
 import SubjectCover from '@/components/subjects/SubjectCover'
 import { nanoid } from 'nanoid'
 import { cn, initials, avatarColor } from '@/lib/utils'
@@ -25,6 +26,7 @@ const EMPTY_ITEM: Omit<CurriculumItem, 'id' | 'order'> = {
 const EMPTY_TEACHER_FORM = { name: '', title: '', description: '', portfolioUrl: '', expertise: '' }
 
 export default function SubjectDetail() {
+  const { isConfigured: sharePointConfigured } = useMicrosoftAuth()
   const { id } = useParams<{ id: string }>()
   const { data: subject, loading } = useDocument<SubjectDoc>('subjects', id)
   const { data: teachers } = useCollection<SubjectTeacherDoc>(
@@ -1009,17 +1011,19 @@ export default function SubjectDetail() {
         </div>
       )}
 
-      {/* SharePoint shared files */}
-      <div className="space-y-2">
-        <h2 className="text-base font-semibold text-zinc-100">Shared Files (SharePoint)</h2>
-        <p className="text-xs text-zinc-400">Files uploaded here are visible to all students in this subject.</p>
-        <SharePointBrowser
-          subPath={`Resources/${id}`}
-          canDelete={true}
-          canUpload={true}
-          title="Subject Files"
-        />
-      </div>
+      {/* SharePoint shared files — hidden until a SharePoint connection is configured */}
+      {sharePointConfigured && (
+        <div className="space-y-2">
+          <h2 className="text-base font-semibold text-zinc-100">Shared Files (SharePoint)</h2>
+          <p className="text-xs text-zinc-400">Files uploaded here are visible to all students in this subject.</p>
+          <SharePointBrowser
+            subPath={`Resources/${id}`}
+            canDelete={true}
+            canUpload={true}
+            title="Subject Files"
+          />
+        </div>
+      )}
 
 
 

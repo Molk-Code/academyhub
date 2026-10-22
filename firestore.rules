@@ -534,6 +534,13 @@ service cloud.firestore {
       allow read: if isSignedIn();
     }
 
+    // Collection-group reads of subject teachers (subject list instructors,
+    // avatar sync in Profile, guest-teacher lookups). Mirrors the read rule on
+    // subjects/{subjectId}/teachers; writes still go through that rule.
+    match /{path=**}/teachers/{teacherId} {
+      allow read: if isSignedIn();
+    }
+
     match /inventory_presets/{presetId} {
       allow read: if isSignedIn() && (isAdmin() || tierHasFeature('inventory'));
       allow write: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('inventory'));

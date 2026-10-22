@@ -1,7 +1,9 @@
-<title>Mobile Agenda View</title>
 import { useState, useMemo, useEffect, useRef } from 'react'
 import type { EventInput } from '@fullcalendar/core'
-import { MapPin } from 'lucide-react'
+import { MapPin, CheckCircle2, Clock, ChevronLeft, ChevronRight, Plus, CalendarClock } from 'lucide-react'
+import type { SubjectDoc } from '@/types'
+import SubjectCover from '@/components/subjects/SubjectCover'
+import { cn } from '@/lib/utils'
 import {
   format, startOfWeek, addDays, addWeeks, subWeeks,
   isSameDay, isToday, parseISO,
@@ -14,6 +16,22 @@ export interface MobileAgendaViewProps {
   onEventClick: (ev: EventInput) => void
   onAddClick?: (dateStr: string, timeStr: string) => void
   initialDate?: Date
+  subjects?: SubjectDoc[]   // enables subject photos on the current session card
+}
+
+type Kind = 'lesson' | 'synced' | 'personal' | 'assignment'
+const KIND_LABEL: Record<Kind, string> = { lesson: 'Lessons', synced: 'Outlook', personal: 'Personal', assignment: 'Deadlines' }
+
+function kindOf(ev: EventInput): Kind {
+  const ep = ev.extendedProps ?? {}
+  if (ep.type === 'assignment') return 'assignment'
+  if (ep.isPersonal) return 'personal'
+  if (ep.isSynced) return 'synced'
+  return 'lesson'
+}
+
+function cleanTitle(ev: EventInput) {
+  return String(ev.title).replace(/^📅 |^📋 Due: /g, '')
 }
 
 function toDate(val: EventInput['start'] | EventInput['end']): Date | null {
@@ -50,7 +68,12 @@ function getMonthWeeks(ms: Date) {
 
 const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
-export default function MobileAgendaView({ events, onEventClick, onAddClick, initialDate }: MobileAgendaViewProps) {
+export default function MobileAgendaView({ events, onEventClick, onAddClick, initialDate, subjects = [] }: MobileAgendaViewProps) {
+  const [kindFilter, setKindFilter] = useState<Kind | 'all'>('all')
+  // Re-render every minute so Completed / In Session / Upcoming stay current
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 60_000); return () => clearInterval(t) }, [])
+  const subjectMap = useMemo(() => Object.fromEntries(subjects.map(s => [s.id, s])), [subjects])
   const [selectedDate, setSelectedDate] = useState(() => initialDate ?? new Date())
   const [weekOffset,   setWeekOffset]   = useState(() => initialDate ? computeWeekOffset(initialDate) : 0)
   const [isExpanded,   setIsExpanded]   = useState(false)
@@ -114,6 +137,7 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
   }, [events])
 
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd')
+  useEffect(() => { setKindFilter('all') }, [selectedDateStr])
 
   const dayEvents = useMemo(() => {
     const out: EventInput[] = []
@@ -248,8 +272,57 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
     willChange: 'transform',
   }
 
-  const allDay = dayEvents.filter(e => e.allDay)
-  const timed  = dayEvents.filter(e => !e.allDay)
+  const kindsToday = Array.from(new Set(dayEvents.map(kindOf)))
+  const shown  = kindFilter === 'all' ? dayEvents : dayEvents.filter(e => kindOf(e) === kindFilter)
+  const allDay = shown.filter(e => e.allDay)
+  const timed  = shown.filter(e => !e.allDay)
+
+  const totalMinutes = timed.reduce((sum, ev) => {
+    const a = toDate(ev.start), b = toDate(ev.end)
+    return a && b ? sum + Math.max(0, Math.round((b.getTime() - a.getTime()) / 60000)) : sum
+  }, 0)
+  const totalLabel = totalMinutes === 0 ? '' : totalMinutes < 60 ? `${totalMinutes}m` : `${Math.floor(totalMinutes / 60)}h${totalMinutes % 60 ? ` ${totalMinutes % 60}m` : ''}`
+
+  function statusOf(ev: EventInput): 'past' | 'current' | 'upcoming' {
+    const a = toDate(ev.start), b = toDate(ev.end) ?? a
+    if (!a || !b) return 'upcoming'
+    if (b <= now) return 'past'
+    if (a <= now) return 'current'
+    return 'upcoming'
+  }
+
+  function dayTile(day: Date, onClick: () => void, compact = false) {
+    const sel     = isSameDay(day, selectedDate)
+    const tod     = isToday(day)
+    const hasDot  = dotDays.has(format(day, 'yyyy-MM-dd'))
+    const weekend = day.getDay() === 0 || day.getDay() === 6
+    return (
+      <button
+        onClick={onClick}
+        className={cn(
+          'flex-1 flex flex-col items-center rounded-xl transition-all mx-0.5',
+          compact ? 'py-1' : 'py-1.5',
+          sel
+            ? 'bg-brand-500 text-white shadow-[0_0_18px_rgba(255,107,53,0.65)] scale-105 z-10'
+            : weekend ? 'bg-zinc-950/40 hover:bg-zinc-800' : 'bg-zinc-950/70 hover:bg-zinc-800',
+        )}
+      >
+        {!compact && (
+          <span className={cn('text-[10px] font-medium', sel ? 'text-brand-900 font-semibold uppercase tracking-wider' : weekend ? 'text-zinc-600' : 'text-zinc-400')}>
+            {format(day, 'EEE', { locale: enGB })}
+          </span>
+        )}
+        <span className={cn(
+          'font-semibold leading-tight',
+          compact ? 'text-[13px]' : 'text-[15px] mt-0.5',
+          sel ? 'text-white font-bold' : tod ? 'text-brand-400' : weekend ? 'text-zinc-500' : 'text-zinc-100',
+        )}>
+          {format(day, 'd')}
+        </span>
+        <span className={cn('w-1.5 h-1.5 mt-0.5 rounded-full', sel ? 'bg-white' : hasDot ? (tod ? 'bg-brand-500' : 'bg-zinc-500') : 'bg-transparent')} />
+      </button>
+    )
+  }
 
   return (
     <div
@@ -257,202 +330,251 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
       style={{ height: 'calc(100dvh - 10rem - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))', overflow: 'hidden' }}
     >
 
-      {/* ── Strip section ──────────────────────────────────────────────── */}
+      {/* ── Week strip card ─────────────────────────────────────────────── */}
       <div
         ref={stripRef}
-        className="flex-shrink-0 border-b select-none"
+        className="flex-shrink-0 select-none m-2 mb-0 p-2.5 rounded-2xl bg-zinc-900 shadow-md"
         style={{
           overflow: 'hidden',
-          maxHeight: isExpanded ? '360px' : '118px',
+          maxHeight: isExpanded ? '400px' : '140px',
           transition: 'max-height 0.32s ease-out',
-          background: 'var(--bg-surface)',
-          borderColor: 'var(--border)',
           touchAction: 'none',
         }}
       >
-        {/* Top bar: month/year + Today + arrows */}
-        <div className="flex items-center justify-between px-3 pt-2 pb-1">
-          <span className="text-sm font-bold capitalize" style={{ color: 'var(--text-primary)' }}>
-            {format(referenceMonth, 'MMMM yyyy', { locale: enGB })}
-          </span>
-          <div className="flex items-center gap-0.5">
-            <button onClick={goToday} className="text-xs font-semibold px-2 py-1 rounded-lg transition-colors" style={{ color: 'var(--brand)' }}>
-              Today
+        {/* Month + week pill + arrows */}
+        <div className="flex items-center justify-between px-1 pb-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-display text-base font-bold text-zinc-100 capitalize truncate">
+              {format(referenceMonth, 'MMMM yyyy', { locale: enGB })}
+            </span>
+            {!isExpanded && (
+              <span className="px-2 py-0.5 rounded-full bg-zinc-700 text-zinc-300 text-[10px] font-medium whitespace-nowrap">
+                Week {format(currentWeekStart, 'w', { locale: enGB, weekStartsOn: 1, firstWeekContainsDate: 4 })}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {!(isToday(selectedDate) && weekOffset === 0 && !isExpanded) && (
+              <button onClick={goToday} className="px-2 h-7 rounded-lg bg-brand-500/15 text-brand-300 text-[11px] font-semibold">Today</button>
+            )}
+            <button aria-label="Previous" onClick={() => isExpanded ? prevMonth() : prevWeek()} className="w-7 h-7 flex items-center justify-center rounded-lg bg-zinc-800 text-zinc-400 hover:text-zinc-100">
+              <ChevronLeft className="w-4 h-4" />
             </button>
-            <button onClick={() => isExpanded ? prevMonth() : prevWeek()} className="px-2 py-1 text-zinc-400 hover:bg-white/8 rounded-lg transition-colors text-sm leading-none">‹</button>
-            <button onClick={() => isExpanded ? nextMonth() : nextWeek()} className="px-2 py-1 text-zinc-400 hover:bg-white/8 rounded-lg transition-colors text-sm leading-none">›</button>
+            <button aria-label="Next" onClick={() => isExpanded ? nextMonth() : nextWeek()} className="w-7 h-7 flex items-center justify-center rounded-lg bg-zinc-800 text-zinc-400 hover:text-zinc-100">
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
-        {/* Fixed day-letter header */}
-        <div className="flex items-center" style={{ paddingLeft: 32 }}>
-          {DAY_LETTERS.map((l, i) => (
-            <div key={i} className="flex-1 text-center text-[10px] font-semibold text-zinc-500 pb-1">{l}</div>
-          ))}
-        </div>
+        {/* Expanded month: weekday letters header */}
+        {isExpanded && (
+          <div className="flex items-center">
+            {DAY_LETTERS.map((l, i) => (
+              <div key={i} className="flex-1 text-center text-[10px] font-semibold text-zinc-500 pb-1">{l}</div>
+            ))}
+          </div>
+        )}
 
-        {/* 3-panel sliding track */}
+        {/* 3-panel sliding track — clipped so neighbouring weeks don't peek into the card padding */}
+        <div className="overflow-hidden py-1">
         <div style={trackStyle}>
           {isExpanded
             ? monthPanels.map(({ month, weeks }, pi) => (
-              <div key={pi} style={{ width: '33.333%' }} className="pb-1">
+              <div key={pi} style={{ width: '33.333%' }} className="space-y-1 pb-1">
                 {weeks.map((days, wi) => (
                   <div key={wi} className="flex items-center">
-                    <span className="w-8 text-center text-[9px] font-medium text-zinc-600 flex-shrink-0">
-                      w{format(days[0], 'w')}
-                    </span>
-                    {days.map((day, di) => {
-                      const sel     = isSameDay(day, selectedDate)
-                      const tod     = isToday(day)
-                      const hasDot  = dotDays.has(format(day, 'yyyy-MM-dd'))
-                      const inMonth = isSameMonth(day, month)
-                      return (
-                        <button
-                          key={di}
-                          onClick={() => {
-                            setSelectedDate(day)
-                            setWeekOffset(computeWeekOffset(day))
-                            setMonthOffset(0)
-                            setIsExpanded(false)
-                          }}
-                          className="flex-1 flex flex-col items-center py-0.5"
-                        >
-                          <span className={`w-7 h-7 flex items-center justify-center rounded-full text-[13px] font-semibold
-                            ${sel ? 'bg-brand-500 text-white'
-                              : tod ? 'ring-1 ring-brand-500 text-brand-400'
-                              : inMonth ? 'text-zinc-200'
-                              : 'text-zinc-600'}`}
-                          >
-                            {format(day, 'd')}
-                          </span>
-                          <span className={`w-1 h-1 rounded-full ${hasDot && !sel ? 'bg-zinc-500' : 'bg-transparent'}`} />
-                        </button>
-                      )
-                    })}
+                    {days.map((day, di) => (
+                      <div key={di} className={cn('flex-1 flex', !isSameMonth(day, month) && 'opacity-35')}>
+                        {dayTile(day, () => {
+                          setSelectedDate(day)
+                          setWeekOffset(computeWeekOffset(day))
+                          setMonthOffset(0)
+                          setIsExpanded(false)
+                        }, true)}
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
             ))
-            : weekPanels.map(({ weekStart, days }, pi) => (
-              <div key={pi} style={{ width: '33.333%' }} className="flex items-center pb-2">
-                <span className="w-8 text-center text-[9px] font-medium text-zinc-600 flex-shrink-0">
-                  w{format(weekStart, 'w')}
-                </span>
-                {days.map((day, di) => {
-                  const sel    = isSameDay(day, selectedDate)
-                  const tod    = isToday(day)
-                  const hasDot = dotDays.has(format(day, 'yyyy-MM-dd'))
-                  return (
-                    <button
-                      key={di}
-                      onClick={() => setSelectedDate(day)}
-                      className="flex-1 flex flex-col items-center gap-0.5 py-0.5"
-                    >
-                      <span className={`w-7 h-7 flex items-center justify-center rounded-full text-[13px] font-semibold transition-colors
-                        ${sel ? 'bg-brand-500 text-white'
-                          : tod ? 'ring-1 ring-brand-500 text-brand-400'
-                          : 'text-zinc-200'}`}
-                      >
-                        {format(day, 'd')}
-                      </span>
-                      <span className={`w-1 h-1 rounded-full ${hasDot && !sel ? 'bg-zinc-500' : 'bg-transparent'}`} />
-                    </button>
-                  )
-                })}
+            : weekPanels.map(({ days }, pi) => (
+              <div key={pi} style={{ width: '33.333%' }} className="flex items-center py-1">
+                {days.map((day, di) => <div key={di} className="flex-1 flex">{dayTile(day, () => setSelectedDate(day))}</div>)}
               </div>
             ))
           }
         </div>
+        </div>
 
         {/* Pull handle */}
-        <div className="flex justify-center pb-1.5 pt-0.5">
+        <div className="flex justify-center pt-1.5">
           <div className="w-8 h-[3px] rounded-full bg-zinc-700" />
         </div>
-      </div>
-
-      {/* ── Day header ──────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 px-4 py-2 border-b" style={{ borderColor: 'var(--border)', background: 'var(--bg-surface)' }}>
-        <p className="text-xs font-semibold text-zinc-400 capitalize">
-          {format(selectedDate, 'EEEE d MMMM', { locale: enGB })}
-        </p>
       </div>
 
       {/* ── Event list ──────────────────────────────────────────────────── */}
       <div
         ref={eventListRef}
-        className="flex-1 overflow-y-auto"
-        style={{ background: 'var(--bg-primary)', overscrollBehavior: 'none' }}
+        className="flex-1 overflow-y-auto px-3 pt-3 pb-4"
+        style={{ overscrollBehavior: 'none' }}
       >
-        {dayEvents.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-14 gap-2">
-            <p className="text-zinc-500 text-sm">No events</p>
+        {/* Filter pills — only when the day mixes kinds of events */}
+        {kindsToday.length > 1 && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-3 -mx-3 px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {(['all', ...kindsToday] as const).map(k => (
+              <button
+                key={k}
+                onClick={() => setKindFilter(k)}
+                className={cn(
+                  'flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all',
+                  kindFilter === k
+                    ? 'bg-brand-500 text-white font-semibold shadow-[0_0_12px_rgba(255,107,53,0.4)]'
+                    : 'bg-zinc-800 text-zinc-400 hover:text-zinc-100',
+                )}
+              >
+                {k === 'all' ? `All (${dayEvents.length})` : KIND_LABEL[k]}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Day header */}
+        <div className="flex items-center justify-between pb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-brand-500 shadow-[0_0_8px_#ff6b35] flex-shrink-0" />
+            <span className="text-xs font-bold text-zinc-100 uppercase tracking-wider truncate">
+              {isToday(selectedDate) ? 'Today' : format(selectedDate, 'EEEE', { locale: enGB })} Timeline
+            </span>
+          </div>
+          <span className="text-[11px] text-zinc-400 flex-shrink-0">
+            {format(selectedDate, 'd MMM', { locale: enGB })}
+            {timed.length > 0 && ` · ${timed.length} ${timed.length === 1 ? 'session' : 'sessions'}`}
+            {totalLabel && ` • ${totalLabel}`}
+          </span>
+        </div>
+
+        {shown.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-3 rounded-2xl bg-zinc-900/60">
+            <CalendarClock className="w-8 h-8 text-zinc-600" />
+            <p className="text-zinc-400 text-sm">Nothing scheduled</p>
             {onAddClick && (
-              <button onClick={() => onAddClick(selectedDateStr, '09:00')} className="text-sm font-medium" style={{ color: 'var(--brand)' }}>
-                + Add event
+              <button onClick={() => onAddClick(selectedDateStr, '09:00')} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-brand-500 text-white text-xs font-semibold shadow-[0_0_12px_rgba(255,107,53,0.4)] active:scale-95 transition-transform">
+                <Plus className="w-3.5 h-3.5" /> Add event
               </button>
             )}
           </div>
         ) : (
-          <div>
+          <>
+            {/* All-day chips */}
             {allDay.length > 0 && (
-              <div className="px-4 py-2 space-y-1.5 border-b" style={{ borderColor: 'var(--border)' }}>
-                {allDay.map(ev => (
-                  <button
-                    key={String(ev.id)}
-                    onClick={() => onEventClick(ev)}
-                    className="w-full flex items-center gap-3 text-left rounded-xl px-3 py-2.5 hover:bg-white/5 transition-colors"
-                    style={{ background: `${String(ev.backgroundColor ?? '#6366f1')}22` }}
-                  >
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: String(ev.backgroundColor ?? '#6366f1') }} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                        {String(ev.title).replace(/^📅 |^📋 Due: /g, '')}
-                      </p>
-                    </div>
-                    <span className="text-[10px] text-zinc-500 flex-shrink-0">All day</span>
-                  </button>
-                ))}
+              <div className="space-y-1.5 mb-4">
+                {allDay.map(ev => {
+                  const color = String(ev.backgroundColor ?? '#ff6b35')
+                  return (
+                    <button
+                      key={String(ev.id)}
+                      onClick={() => onEventClick(ev)}
+                      className="w-full flex items-center gap-3 text-left rounded-xl px-3 py-2.5 bg-zinc-900 hover:bg-zinc-800 transition-colors"
+                    >
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}` }} />
+                      <p className="flex-1 min-w-0 text-sm font-semibold text-zinc-100 truncate">{cleanTitle(ev)}</p>
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-500 flex-shrink-0">
+                        {kindOf(ev) === 'assignment' ? 'Due' : 'All day'}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             )}
 
-            {timed.map((ev, idx) => {
-              const start    = toDate(ev.start)
-              const end      = toDate(ev.end)
-              const color    = String(ev.backgroundColor ?? '#6366f1')
-              const loc      = ev.extendedProps?.classroom || ev.extendedProps?.location || ''
-              const subj     = ev.extendedProps?.subjectTitle || ev.extendedProps?.className || ''
-              const rawTitle = String(ev.title).replace(/^📅 /g, '')
-              return (
-                <button
-                  key={String(ev.id)}
-                  onClick={() => onEventClick(ev)}
-                  className={`w-full flex items-start gap-3 px-4 py-3.5 text-left hover:bg-white/[0.03] active:bg-white/[0.06] transition-colors ${idx < timed.length - 1 ? 'border-b' : ''}`}
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  <div className="flex-shrink-0 w-14 text-right pt-0.5">
-                    {start && <p className="text-[13px] font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{fmt(start)}</p>}
-                    {start && end && (
-                      <>
-                        <p className="text-[10px] text-zinc-400 mt-0.5 leading-tight">{fmt(end)}</p>
-                        <p className="text-[9px] text-zinc-600 mt-0.5 leading-tight">{duration(start, end)}</p>
-                      </>
-                    )}
-                  </div>
-                  <div className="w-[3px] self-stretch rounded-full flex-shrink-0 mt-0.5" style={{ backgroundColor: color, minHeight: '2.5rem' }} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>{rawTitle}</p>
-                    {subj && <p className="text-[11px] text-zinc-400 mt-0.5">{subj}</p>}
-                    {loc && (
-                      <div className="flex items-center gap-1 mt-1">
-                        <MapPin className="w-3 h-3 text-zinc-500 flex-shrink-0" />
-                        <span className="text-[11px] text-zinc-400 truncate">{loc}</span>
+            {/* Timeline */}
+            {timed.length > 0 && (
+              <div className="relative flex flex-col gap-4 pl-5">
+                <div className="absolute left-[7px] top-3 bottom-3 w-0.5 bg-zinc-700" />
+                {timed.map(ev => {
+                  const start   = toDate(ev.start)
+                  const end     = toDate(ev.end)
+                  const status  = statusOf(ev)
+                  const ep      = ev.extendedProps ?? {}
+                  const loc     = ep.isOnline ? 'Online' : (ep.classroom || ep.location || '')
+                  const subjTitle = ep.subjectTitle || ep.className || ''
+                  const subject = ep.subjectId ? subjectMap[ep.subjectId] : undefined
+                  const color   = String(ev.backgroundColor ?? '#ff6b35')
+                  const range   = start ? `${fmt(start)} – ${end ? fmt(end) : ''}` : ''
+                  const kind    = kindOf(ev)
+
+                  return (
+                    <div key={String(ev.id)} className="relative flex flex-col gap-1">
+                      {/* Dot on the line */}
+                      {status === 'current'
+                        ? <span className="absolute -left-[19px] top-1 w-3.5 h-3.5 rounded-full bg-brand-500 shadow-[0_0_12px_rgba(255,107,53,0.9)] animate-pulse z-10" />
+                        : status === 'past'
+                          ? <span className="absolute -left-[18px] top-1 w-3 h-3 rounded-full bg-ember-tertiary shadow-[0_0_8px_rgba(78,222,163,0.8)] z-10" />
+                          : <span className="absolute -left-[18px] top-1 w-3 h-3 rounded-full bg-zinc-700 ring-2 ring-zinc-950 z-10" />}
+
+                      {/* Time + status line */}
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className={cn('font-mono tabular-nums', status === 'current' ? 'text-brand-300 font-bold' : status === 'past' ? 'text-ember-tertiary font-semibold' : 'text-zinc-400')}>
+                          {range}{start && end && <span className="font-sans text-zinc-500 font-normal"> · {duration(start, end)}</span>}
+                        </span>
+                        {status === 'current'
+                          ? <span className="px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300 font-semibold">In Session</span>
+                          : status === 'past'
+                            ? <span className="flex items-center gap-1 text-ember-tertiary"><CheckCircle2 className="w-3.5 h-3.5" /> Completed</span>
+                            : <span className="flex items-center gap-1 text-zinc-500"><Clock className="w-3.5 h-3.5" /> Upcoming</span>}
                       </div>
-                    )}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
+
+                      {/* Card */}
+                      <button
+                        onClick={() => onEventClick(ev)}
+                        className={cn(
+                          'relative w-full text-left rounded-2xl overflow-hidden transition-colors active:scale-[0.99]',
+                          status === 'current' ? 'bg-zinc-900 shadow-xl ring-1 ring-brand-500/30' : 'bg-zinc-900/80 shadow-sm hover:bg-zinc-900',
+                          status === 'past' && 'opacity-80',
+                        )}
+                      >
+                        {status === 'current' && (
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-brand-500/10 rounded-full blur-2xl pointer-events-none" />
+                        )}
+                        {status === 'current' && subject && (
+                          <SubjectCover subject={subject} className="h-28">
+                            {loc && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/50 backdrop-blur text-brand-300 text-[10px] font-semibold uppercase tracking-wider">
+                                <MapPin className="w-3 h-3" /> {loc}
+                              </span>
+                            )}
+                          </SubjectCover>
+                        )}
+                        <div className="relative p-3.5 flex items-start gap-3">
+                          <span className="w-1 self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                          <div className="flex-1 min-w-0">
+                            <p className={cn('font-display font-semibold text-zinc-100 leading-snug', status === 'current' ? 'text-base' : 'text-[15px]')}>
+                              {cleanTitle(ev)}
+                            </p>
+                            {(subjTitle || (loc && !(status === 'current' && subject))) && (
+                              <div className="flex items-center gap-1.5 text-xs text-zinc-400 mt-1 min-w-0">
+                                {loc && !(status === 'current' && subject) && (
+                                  <>
+                                    <MapPin className="w-3.5 h-3.5 text-brand-400 flex-shrink-0" />
+                                    <span className="truncate">{loc}</span>
+                                  </>
+                                )}
+                                {subjTitle && loc && !(status === 'current' && subject) && <span className="text-zinc-600">•</span>}
+                                {subjTitle && <span className="truncate">{subjTitle}</span>}
+                              </div>
+                            )}
+                          </div>
+                          {kind !== 'lesson' && (
+                            <span className="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 text-[10px] font-medium flex-shrink-0">{KIND_LABEL[kind].replace(/s$/, '')}</span>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

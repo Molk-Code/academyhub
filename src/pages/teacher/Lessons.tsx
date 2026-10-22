@@ -419,6 +419,7 @@ export default function Lessons() {
       borderColor:     color,
       extendedProps: {
         isBlock:      false,
+        subjectId:    l.subjectId,
         subjectTitle: subjectMap[l.subjectId]?.title,
         className:    cohortObj?.name,
         cohortId:     l.cohortId,
@@ -1226,6 +1227,7 @@ export default function Lessons() {
             <MobileAgendaView
               key={pendingCalendarDate?.getTime() ?? 0}
               events={allEvents}
+              subjects={subjects}
               onEventClick={handleMobileEventClick}
               initialDate={pendingCalendarDate ?? undefined}
             />

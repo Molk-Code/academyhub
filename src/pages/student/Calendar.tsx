@@ -450,7 +450,7 @@ export default function StudentCalendar() {
         end:   endDate   ?? undefined,
         backgroundColor: color,
         borderColor:     color,
-        extendedProps: { type: 'lesson', classroom: l.classroom, isOnline: l.isOnline },
+        extendedProps: { type: 'lesson', classroom: l.classroom, isOnline: l.isOnline, subjectId: l.subjectId, subjectTitle: subjectMap[l.subjectId]?.title },
       }
     })
 
@@ -884,6 +884,7 @@ export default function StudentCalendar() {
           <div className="sm:hidden card p-0 overflow-hidden">
             <MobileAgendaView
               events={allEvents}
+              subjects={subjects}
               onEventClick={handleMobileEventClick}
               onAddClick={(dateStr, timeStr) => {
                 setAddEventModal({ date: dateStr, start: timeStr, end: '10:00', allDay: false })

@@ -9,13 +9,18 @@ import { thumbnailUrl } from '@/lib/cloudinary'
 import {
   ArrowLeft, Plus, Pencil, Trash2, Check, X,
   Link2, FileUp, ExternalLink, FileText, UserRound, CheckCircle2, Play, Clock, Users,
+  BookOpen, CalendarClock, ClipboardList,
 } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import SharePointBrowser from '@/components/sharepoint/SharePointBrowser'
 import { useMicrosoftAuth } from '@/contexts/MicrosoftAuthContext'
 import SubjectCover from '@/components/subjects/SubjectCover'
+import { format } from 'date-fns'
 import { nanoid } from 'nanoid'
-import { cn, initials, avatarColor } from '@/lib/utils'
+import { cn, initials, avatarColor, toDate } from '@/lib/utils'
+
+// Shared surface for tiles and panels, matching the subject overview cards
+const PANEL = 'rounded-2xl bg-zinc-900 border border-white/[0.06] shadow-xl'
 
 const METHOD_OPTIONS = ['Lesson', 'Workshop', 'Assignment'] as const
 
@@ -488,50 +493,103 @@ export default function SubjectDetail() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
-        <Link to="/teacher/subjects" className="p-2 -ml-2 text-zinc-500 hover:text-zinc-100 hover:bg-zinc-700 rounded-xl transition-colors">
-          <ArrowLeft className="w-5 h-5" />
+        <Link to="/teacher/subjects" className="flex items-center gap-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-100 transition-colors">
+          <ArrowLeft className="w-4 h-4" /> All subjects
         </Link>
-        <button onClick={addSemester} className="btn-primary py-2.5 flex-shrink-0">
+        <button onClick={addSemester} className="btn-primary py-2 px-4 text-xs flex-shrink-0">
           <Plus className="w-4 h-4" /> Add semester
         </button>
       </div>
-      <SubjectCover subject={subject} size="hero" className="h-40 sm:h-52 rounded-2xl">
-        <div className="sm:p-2">
-          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{subject.title}</h1>
-          {subject.description && <p className="text-white/75 text-sm mt-1 line-clamp-2">{subject.description}</p>}
-        </div>
-      </SubjectCover>
+
+      {(() => {
+        const status = coveredIds.size === 0 ? 'not-started' : coveredIds.size >= curriculum.length ? 'completed' : 'in-progress'
+        const badge = status === 'completed'
+          ? { label: 'Completed', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' }
+          : status === 'in-progress'
+            ? { label: 'Active', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' }
+            : { label: 'Upcoming', cls: 'bg-black/50 text-zinc-300 border-white/15' }
+        const bar  = status === 'completed' ? 'bg-emerald-500' : 'bg-gradient-to-r from-brand-500 to-brand-400'
+        const txt  = status === 'completed' ? 'text-emerald-400' : status === 'in-progress' ? 'text-brand-400' : 'text-zinc-400'
+        const now  = new Date()
+        const next = [...lessons]
+          .filter(l => (toDate(l.startTime) ?? now) > now)
+          .sort((a, b) => (a.startTime?.toMillis?.() ?? 0) - (b.startTime?.toMillis?.() ?? 0))[0]
+        const nextAt = next ? toDate(next.startTime) : null
+        const published = subjectAssignments.filter(a => a.isPublished).length
+        const pastLessons = lessons.filter(l => (toDate(l.startTime) ?? now) <= now).length
+        return (
+          <>
+            <div className={cn(PANEL, 'overflow-hidden')}>
+              <SubjectCover subject={subject} size="hero" className="h-44 sm:h-60">
+                <div className="sm:p-2 space-y-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-mono text-white/70 font-medium">
+                      Year {subject.programYear} • {curriculum.length} topic{curriculum.length !== 1 ? 's' : ''} • {lessons.length} lesson{lessons.length !== 1 ? 's' : ''}
+                    </span>
+                    <span className={cn('px-2 py-0.5 text-[10px] font-semibold rounded border backdrop-blur-md', badge.cls)}>{badge.label}</span>
+                  </div>
+                  <h1 className="font-display text-2xl sm:text-3xl font-bold text-white tracking-tight">{subject.title}</h1>
+                  {subject.description && <p className="text-white/75 text-sm line-clamp-2 max-w-2xl">{subject.description}</p>}
+                </div>
+              </SubjectCover>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className={cn(PANEL, 'p-4')}>
+                <div className="flex items-center justify-between text-xs mb-2">
+                  <span className="font-medium text-zinc-300 flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5 text-zinc-500" /> Curriculum taught</span>
+                  <span className={cn('font-mono font-semibold', txt)}>{curriculum.length ? `${currProgress}%` : '—'}</span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-zinc-800 overflow-hidden mb-2">
+                  {coveredIds.size > 0
+                    ? <div className={cn('h-full rounded-full transition-all duration-500', bar)} style={{ width: `${currProgress}%` }} />
+                    : <div className="h-full w-full bg-[repeating-linear-gradient(90deg,#353940_0_6px,transparent_6px_10px)]" />}
+                </div>
+                <p className="text-[11px] text-zinc-400">{curriculum.length ? `${coveredIds.size} / ${curriculum.length} topics covered` : 'No topics yet'}</p>
+              </div>
+              <div className={cn(PANEL, 'p-4 min-w-0')}>
+                <p className="text-xs font-medium text-zinc-300 flex items-center gap-1.5 mb-2"><CalendarClock className="w-3.5 h-3.5 text-ember-secondary" /> Next lesson</p>
+                {next && nextAt ? (
+                  <>
+                    <p className="font-display text-sm font-semibold text-zinc-100 truncate">{next.title}</p>
+                    <p className="text-[11px] text-zinc-400 mt-1 truncate">
+                      <span className="font-mono text-ember-secondary">{format(nextAt, 'EEE d MMM · HH:mm')}</span>
+                      {(next.isOnline || next.classroom) && <> • {next.isOnline ? 'Online' : next.classroom}</>}
+                    </p>
+                  </>
+                ) : <p className="text-[11px] text-zinc-500">Nothing scheduled · {pastLessons} held so far</p>}
+              </div>
+              <div className={cn(PANEL, 'p-4 min-w-0')}>
+                <p className="text-xs font-medium text-zinc-300 flex items-center gap-1.5 mb-2"><ClipboardList className="w-3.5 h-3.5 text-brand-400" /> Assignments</p>
+                <p className="font-display text-sm font-semibold text-zinc-100">
+                  {published} published{subjectAssignments.length - published > 0 && <span className="text-zinc-500 font-sans font-normal"> · {subjectAssignments.length - published} draft</span>}
+                </p>
+                <Link to="/teacher/assignments" className="text-[11px] font-semibold text-brand-400 hover:text-brand-300 mt-1 inline-block">Manage assignments →</Link>
+              </div>
+            </div>
+          </>
+        )
+      })()}
 
       {/* ── Curriculum ─────────────────────────────────────────────────────── */}
-      {curriculum.length > 0 && (
-        <div className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm px-5 py-4">
-          <div className="flex justify-between text-sm mb-2">
-            <span className="font-semibold text-zinc-300">Curriculum progress</span>
-            <span className="text-zinc-500">{coveredIds.size} / {curriculum.length} topics covered · <span className="font-medium text-zinc-300">{currProgress}%</span></span>
-          </div>
-          <div className="h-3 bg-zinc-800 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${subject.color}`}
-              style={{ width: `${currProgress}%` }}
-            />
-          </div>
-        </div>
-      )}
 
       {semesters.map(sem => {
         const items = curriculum.filter(i => i.semester === sem).sort((a, b) => a.order - b.order)
         return (
-          <div key={sem} className="bg-zinc-900 rounded-2xl overflow-hidden border border-white/10 shadow-sm">
-            <div className={`flex items-center justify-between px-5 py-3 ${subject.color}`}>
-              <h2 className="text-sm font-bold text-white tracking-wide">Semester {sem}</h2>
-              <button onClick={() => startAdd(sem)} className="flex items-center gap-1 text-xs text-white/80 hover:text-white transition-colors">
-                <Plus className="w-3.5 h-3.5" /> Add item
+          <div key={sem} className={cn(PANEL, 'overflow-hidden')}>
+            <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-white/[0.05]">
+              <div className="flex items-center gap-3 min-w-0">
+                <h2 className="section-title flex items-center gap-2"><BookOpen /> Semester {sem}</h2>
+                <span className="text-[11px] font-mono text-zinc-500">{items.filter(i => coveredIds.has(i.id)).length}/{items.length} covered</span>
+              </div>
+              <button onClick={() => startAdd(sem)} className="flex items-center gap-1 text-xs font-semibold text-brand-400 hover:text-brand-300 transition-colors">
+                <Plus className="w-3.5 h-3.5" /> Add topic
               </button>
             </div>
             <div className="overflow-x-auto">
             <table className="w-full min-w-[640px]">
               <thead>
-                <tr className="border-b border-white/8">
+                <tr className="border-b border-white/[0.05]">
                   <th className="w-8 px-4 py-2.5" />
                   <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5 w-1/4">Course / Topic</th>
                   <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5">Content</th>
@@ -539,13 +597,13 @@ export default function SubjectDetail() {
                   <th className="w-16 px-4 py-2.5" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-white/[0.05]">
                 {items.map(item => {
                   const status = itemLessonMap[item.id]
                   const completed = status?.completed ?? false
                   const plannedDate = (!completed && status?.plannedDate) ? status.plannedDate : null
                   return editingId === item.id ? (
-                    <tr key={item.id} className="bg-brand-50">
+                    <tr key={item.id} className="bg-brand-500/[0.06]">
                       <td className="px-4 py-2" />
                       <td className="px-4 py-2"><input autoFocus className="input py-1.5 text-sm" value={itemForm.title} onChange={e => setItemForm(f => ({ ...f, title: e.target.value }))} placeholder="Topic name" /></td>
                       <td className="px-4 py-2"><input className="input py-1.5 text-sm" value={itemForm.content} onChange={e => setItemForm(f => ({ ...f, content: e.target.value }))} placeholder="What is covered" /></td>
@@ -566,7 +624,7 @@ export default function SubjectDetail() {
                       </div></td>
                     </tr>
                   ) : (
-                    <tr key={item.id} className={`group hover:bg-white/5 transition-colors ${completed ? 'bg-emerald-50/40' : ''}`}>
+                    <tr key={item.id} className={`group hover:bg-white/5 transition-colors ${completed ? 'bg-emerald-500/[0.04]' : ''}`}>
                       <td className="px-4 py-3 text-center">
                         {completed
                           ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
@@ -578,7 +636,7 @@ export default function SubjectDetail() {
                       <td className="px-4 py-3">
                         <span className={`text-sm font-medium ${completed ? 'text-emerald-300' : 'text-zinc-100'}`}>{item.title}</span>
                         {plannedDate && (
-                          <p className="text-xs text-amber-600 mt-0.5">
+                          <p className="text-[11px] font-mono text-amber-400 mt-0.5">
                             Planned: {plannedDate.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
                           </p>
                         )}
@@ -586,11 +644,11 @@ export default function SubjectDetail() {
                       <td className="px-4 py-3 text-sm text-zinc-400">{item.content}</td>
                       <td className="px-4 py-3">
                         {item.method === 'Assignment' && item.assignmentId ? (
-                          <Link to={`/teacher/assignments`} className="text-xs bg-violet-900/40 text-violet-300 border border-violet-700/40 px-2 py-0.5 rounded-full hover:bg-violet-800/40 transition-colors">
-                            📋 {subjectAssignments.find(a => a.id === item.assignmentId)?.title ?? 'Assignment'}
+                          <Link to={`/teacher/assignments`} className="inline-flex items-center gap-1 text-[11px] font-medium bg-brand-500/15 text-brand-300 border border-brand-500/30 px-2 py-0.5 rounded-md hover:bg-brand-500/25 transition-colors">
+                            <FileText className="w-3 h-3" /> {subjectAssignments.find(a => a.id === item.assignmentId)?.title ?? 'Assignment'}
                           </Link>
                         ) : (
-                          <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">{item.method}</span>
+                          <span className="text-[11px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-md">{item.method}</span>
                         )}
                       </td>
                       <td className="px-4 py-3"><div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -611,7 +669,7 @@ export default function SubjectDetail() {
                 })}
 
                 {addingSem === sem && (
-                  <tr className="bg-brand-50">
+                  <tr className="bg-brand-500/[0.06]">
                     <td className="px-4 py-2" />
                     <td className="px-4 py-2"><input autoFocus className="input py-1.5 text-sm" value={itemForm.title} onChange={e => setItemForm(f => ({ ...f, title: e.target.value }))} placeholder="Topic name" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
                     <td className="px-4 py-2"><input className="input py-1.5 text-sm" value={itemForm.content} onChange={e => setItemForm(f => ({ ...f, content: e.target.value }))} placeholder="What is covered" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
@@ -644,13 +702,13 @@ export default function SubjectDetail() {
       })}
 
       {addingSem !== null && !semesters.includes(addingSem) && (
-        <div className="bg-zinc-900 rounded-2xl overflow-hidden border border-white/10 shadow-sm">
-          <div className={`flex items-center justify-between px-5 py-3 ${subject.color}`}>
-            <h2 className="text-sm font-bold text-white tracking-wide">Semester {addingSem}</h2>
+        <div className={cn(PANEL, 'overflow-hidden')}>
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.05]">
+            <h2 className="section-title flex items-center gap-2"><BookOpen /> Semester {addingSem}</h2>
           </div>
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/8">
+              <tr className="border-b border-white/[0.05]">
                 <th className="w-8 px-4 py-2.5" />
                 <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5 w-1/4">Course / Topic</th>
                 <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5">Content</th>
@@ -659,7 +717,7 @@ export default function SubjectDetail() {
               </tr>
             </thead>
             <tbody>
-              <tr className="bg-brand-50">
+              <tr className="bg-brand-500/[0.06]">
                 <td className="px-4 py-2" />
                 <td className="px-4 py-2"><input autoFocus className="input py-1.5 text-sm" value={itemForm.title} onChange={e => setItemForm(f => ({ ...f, title: e.target.value }))} placeholder="Topic name" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
                 <td className="px-4 py-2"><input className="input py-1.5 text-sm" value={itemForm.content} onChange={e => setItemForm(f => ({ ...f, content: e.target.value }))} placeholder="What is covered" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
@@ -685,16 +743,16 @@ export default function SubjectDetail() {
       )}
 
       {semesters.length === 0 && addingSem === null && (
-        <div className="text-center py-16 text-zinc-400">
+        <div className={cn(PANEL, 'text-center py-14 text-zinc-400')}>
           <p className="text-sm">No curriculum yet.</p>
           <button onClick={() => startAdd(1)} className="mt-3 btn-primary py-2"><Plus className="w-4 h-4" /> Add first semester</button>
         </div>
       )}
 
       {/* ── Resources ──────────────────────────────────────────────────────── */}
-      <div className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
-          <h2 className="text-base font-semibold text-zinc-100">Resources</h2>
+      <div className={cn(PANEL, 'overflow-hidden')}>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.05]">
+          <h2 className="section-title flex items-center gap-2"><Link2 /> Resources</h2>
           <div className="flex gap-2">
             <button onClick={openAddLink} className="btn-secondary py-1.5 text-xs gap-1.5">
               <Link2 className="w-3.5 h-3.5" /> Add link
@@ -745,7 +803,7 @@ export default function SubjectDetail() {
         {resources.length === 0 && addingRes === null ? (
           <p className="px-5 py-6 text-sm text-zinc-400 text-center">No resources yet. Add a link or upload a file above.</p>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-white/[0.05]">
             {resources.map(res => (
               <li key={res.id} className="flex items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors group">
                 {res.type === 'link'
@@ -770,9 +828,9 @@ export default function SubjectDetail() {
       </div>
 
       {/* ── Teachers ───────────────────────────────────────────────────────── */}
-      <div className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
-          <h2 className="text-base font-semibold text-zinc-100">Teachers</h2>
+      <div className={cn(PANEL, 'overflow-hidden')}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.05]">
+          <h2 className="section-title flex items-center gap-2"><Users /> Teachers</h2>
           {!teacherPanel && (
             <button onClick={openAddTeacher} className="btn-secondary py-1.5 text-xs gap-1.5">
               <Plus className="w-3.5 h-3.5" /> Add teacher
@@ -980,13 +1038,13 @@ export default function SubjectDetail() {
       {/* Subject Videos */}
       {subjectVideos.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-base font-semibold text-zinc-100">Videos</h2>
+          <h2 className="section-title flex items-center gap-2"><Play /> Videos</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {subjectVideos.map(video => (
               <Link
                 key={video.id}
                 to={`/teacher/video-lab/${video.id}`}
-                className="group bg-zinc-900 rounded-2xl border border-white/10 overflow-hidden shadow-sm hover:shadow-card-hover hover:-translate-y-0.5 transition-all"
+                className="group rounded-2xl bg-zinc-900 border border-white/[0.06] overflow-hidden shadow-xl transition-all duration-200 hover:-translate-y-[3px] hover:border-brand-500/45"
               >
                 <div className="relative aspect-video bg-slate-900 overflow-hidden">
                   <img src={thumbnailUrl(video.cloudinaryPublicId)} alt={video.title} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" loading="lazy" />
@@ -1014,7 +1072,7 @@ export default function SubjectDetail() {
       {/* SharePoint shared files — hidden until a SharePoint connection is configured */}
       {sharePointConfigured && (
         <div className="space-y-2">
-          <h2 className="text-base font-semibold text-zinc-100">Shared Files (SharePoint)</h2>
+          <h2 className="section-title">Shared files (SharePoint)</h2>
           <p className="text-xs text-zinc-400">Files uploaded here are visible to all students in this subject.</p>
           <SharePointBrowser
             subPath={`Resources/${id}`}
@@ -1032,7 +1090,7 @@ export default function SubjectDetail() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
           onClick={e => { if (e.target === e.currentTarget) setAbsentModal(null) }}>
           <div className="bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-sm">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.05]">
               <div>
                 <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Absent during</p>
                 <p className="text-sm font-bold text-zinc-100 mt-0.5">{absentModal.itemTitle}</p>

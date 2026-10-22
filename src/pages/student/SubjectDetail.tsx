@@ -1,15 +1,40 @@
 import { useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { format, isPast } from 'date-fns'
 import { useDocument, useCollection, orderBy, where } from '@/hooks/useFirestore'
 import { useAuth } from '@/contexts/AuthContext'
-import type { SubjectDoc, SubjectTeacherDoc, LessonDoc, SyncedEventDoc, VideoLabDoc, AbsenceReportDoc, AssignmentDoc } from '@/types'
+import type { SubjectDoc, SubjectTeacherDoc, LessonDoc, SyncedEventDoc, VideoLabDoc, AbsenceReportDoc, AssignmentDoc, SubmissionDoc } from '@/types'
 import { thumbnailUrl } from '@/lib/cloudinary'
-import { Link2, FileText, ExternalLink, UserRound, CheckCircle2, XCircle, Globe, Play, Clock } from 'lucide-react'
+import { toDate, cn } from '@/lib/utils'
+import {
+  Link2, FileText, ExternalLink, UserRound, Check, X, Globe, Play, Clock, CalendarClock, ClipboardList,
+  BookOpen, MapPin, Video, AlertTriangle, CheckCircle2,
+} from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import SharePointBrowser from '@/components/sharepoint/SharePointBrowser'
 import { useMicrosoftAuth } from '@/contexts/MicrosoftAuthContext'
 import Breadcrumb from '@/components/common/Breadcrumb'
 import SubjectCover from '@/components/subjects/SubjectCover'
+
+type Status = 'in-progress' | 'completed' | 'not-started'
+const STATUS_BADGE: Record<Status, { label: string; cls: string }> = {
+  'in-progress': { label: 'Active',    cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+  'completed':   { label: 'Completed', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  'not-started': { label: 'Upcoming',  cls: 'bg-black/50 text-zinc-300 border-white/15' },
+}
+const STATUS_BAR: Record<Status, string> = {
+  'in-progress': 'bg-gradient-to-r from-brand-500 to-brand-400',
+  'completed':   'bg-emerald-500',
+  'not-started': 'bg-zinc-700',
+}
+const STATUS_TEXT: Record<Status, string> = {
+  'in-progress': 'text-brand-400',
+  'completed':   'text-emerald-400',
+  'not-started': 'text-zinc-400',
+}
+
+// Shared surface for tiles and panels, matching the subject overview cards
+const PANEL = 'rounded-2xl bg-zinc-900 border border-white/[0.06] shadow-xl'
 
 export default function StudentSubjectDetail() {
   const { isConfigured: sharePointConfigured } = useMicrosoftAuth()
@@ -57,6 +82,13 @@ export default function StudentSubjectDetail() {
   const assignmentMap = useMemo(
     () => Object.fromEntries(subjectAssignments.map(a => [a.id, a])),
     [subjectAssignments],
+  )
+
+  const { data: mySubmissions } = useCollection<SubmissionDoc>(
+    'submissions',
+    profile ? [where('studentId', '==', profile.uid)] : [],
+    !!profile,
+    profile?.uid ?? '',
   )
 
   // Student's absence reports for lessons in this subject
@@ -119,6 +151,23 @@ export default function StudentSubjectDetail() {
   const curriculumProgress = curriculum.length > 0
     ? Math.round((coveredIds.size / curriculum.length) * 100)
     : 0
+  const status: Status = coveredIds.size === 0 ? 'not-started'
+    : coveredIds.size >= curriculum.length ? 'completed' : 'in-progress'
+
+  const nextLesson = useMemo(() => {
+    const now = new Date()
+    return [...lessons]
+      .filter(l => (toDate(l.startTime) ?? now) > now)
+      .sort((a, b) => (a.startTime?.toMillis?.() ?? 0) - (b.startTime?.toMillis?.() ?? 0))[0] ?? null
+  }, [lessons])
+
+  const pendingAssignments = useMemo(() => {
+    const submitted = new Set(mySubmissions.filter(s => s.status !== 'draft').map(s => s.assignmentId))
+    return subjectAssignments
+      .filter(a => !submitted.has(a.id))
+      .sort((a, b) => (a.dueDate?.toMillis?.() ?? 0) - (b.dueDate?.toMillis?.() ?? 0))
+  }, [subjectAssignments, mySubmissions])
+  const overdueCount = pendingAssignments.filter(a => { const d = toDate(a.dueDate); return d ? isPast(d) : false }).length
 
   if (loading) return <LoadingSpinner />
   if (!subject) return (
@@ -126,6 +175,11 @@ export default function StudentSubjectDetail() {
       Subject not found. <Link to="/subjects" className="text-brand-500 underline">Go back</Link>
     </div>
   )
+
+  const badge = STATUS_BADGE[status]
+  const hasSidebar = teachers.length > 0 || resources.length > 0
+  const nextAt = nextLesson ? toDate(nextLesson.startTime) : null
+  const nextDue = pendingAssignments[0] ? toDate(pendingAssignments[0].dueDate) : null
 
   return (
     <div className="space-y-6">
@@ -135,206 +189,254 @@ export default function StudentSubjectDetail() {
         { label: subject.title },
       ]} />
 
-      {/* Header */}
-      <SubjectCover subject={subject} size="hero" className="h-40 sm:h-52 rounded-2xl">
-        <div className="sm:p-2">
-          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{subject.title}</h1>
-          {subject.description && <p className="text-white/75 text-sm mt-1 line-clamp-2">{subject.description}</p>}
-        </div>
-      </SubjectCover>
-
-      {/* Curriculum */}
-      {semesters.length > 0 && (
-        <div className="space-y-4">
-          {curriculum.length > 0 && (
-            <div className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm px-5 py-4">
-              <div className="flex justify-between text-sm mb-2">
-                <span className="font-semibold text-zinc-300">Curriculum progress</span>
-                <span className="text-zinc-500">{coveredIds.size} / {curriculum.length} topics covered · <span className="font-medium text-zinc-300">{curriculumProgress}%</span></span>
-              </div>
-              <div className="h-3 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${subject.color}`}
-                  style={{ width: `${curriculumProgress}%` }}
-                />
-              </div>
+      {/* ── Hero ── */}
+      <div className={cn(PANEL, 'overflow-hidden')}>
+        <SubjectCover subject={subject} size="hero" className="h-44 sm:h-60">
+          <div className="sm:p-2 space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] font-mono text-white/70 font-medium">
+                Year {subject.programYear} • {curriculum.length} topic{curriculum.length !== 1 ? 's' : ''} • {subjectAssignments.length} assignment{subjectAssignments.length !== 1 ? 's' : ''}
+              </span>
+              <span className={cn('px-2 py-0.5 text-[10px] font-semibold rounded border backdrop-blur-md', badge.cls)}>{badge.label}</span>
             </div>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-white tracking-tight">{subject.title}</h1>
+            {subject.description && <p className="text-white/75 text-sm line-clamp-2 max-w-2xl">{subject.description}</p>}
+          </div>
+        </SubjectCover>
+      </div>
+
+      {/* ── Stat tiles ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className={cn(PANEL, 'p-4')}>
+          <div className="flex items-center justify-between text-xs mb-2">
+            <span className="font-medium text-zinc-300 flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5 text-zinc-500" /> Curriculum progress</span>
+            <span className={cn('font-mono font-semibold', STATUS_TEXT[status])}>{curriculum.length ? `${curriculumProgress}%` : '—'}</span>
+          </div>
+          <div className="w-full h-1.5 rounded-full bg-zinc-800 overflow-hidden mb-2">
+            {coveredIds.size > 0
+              ? <div className={cn('h-full rounded-full transition-all duration-500', STATUS_BAR[status])} style={{ width: `${curriculumProgress}%` }} />
+              : <div className="h-full w-full bg-[repeating-linear-gradient(90deg,#353940_0_6px,transparent_6px_10px)]" />}
+          </div>
+          <p className="text-[11px] text-zinc-400">
+            {curriculum.length ? `${coveredIds.size} / ${curriculum.length} topics covered` : 'No topics yet'}
+            {absentCoveredIds.size > 0 && <span className="text-rose-300"> · missed {absentCoveredIds.size}</span>}
+          </p>
+        </div>
+
+        <div className={cn(PANEL, 'p-4 min-w-0')}>
+          <p className="text-xs font-medium text-zinc-300 flex items-center gap-1.5 mb-2"><CalendarClock className="w-3.5 h-3.5 text-ember-secondary" /> Next lesson</p>
+          {nextLesson && nextAt ? (
+            <>
+              <p className="font-display text-sm font-semibold text-zinc-100 truncate">{nextLesson.title}</p>
+              <p className="text-[11px] text-zinc-400 mt-1 flex items-center gap-1.5 min-w-0">
+                <span className="font-mono text-ember-secondary whitespace-nowrap">{format(nextAt, 'EEE d MMM · HH:mm')}</span>
+                <span className="text-zinc-600">•</span>
+                {nextLesson.isOnline ? <Video className="w-3 h-3 flex-shrink-0" /> : <MapPin className="w-3 h-3 flex-shrink-0" />}
+                <span className="truncate">{nextLesson.isOnline ? 'Online' : nextLesson.classroom}</span>
+              </p>
+            </>
+          ) : <p className="text-[11px] text-zinc-500">Nothing scheduled yet</p>}
+        </div>
+
+        <div className={cn(PANEL, 'p-4 min-w-0')}>
+          <p className="text-xs font-medium text-zinc-300 flex items-center gap-1.5 mb-2"><ClipboardList className="w-3.5 h-3.5 text-brand-400" /> Assignments</p>
+          {subjectAssignments.length === 0 ? (
+            <p className="text-[11px] text-zinc-500">No assignments yet</p>
+          ) : pendingAssignments.length === 0 ? (
+            <p className="text-sm font-semibold text-emerald-300 flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> All caught up</p>
+          ) : (
+            <Link to={`/assignments/${pendingAssignments[0].id}`} className="block group">
+              <p className="font-display text-sm font-semibold text-zinc-100 group-hover:text-brand-400 transition-colors">
+                {pendingAssignments.length} to hand in
+                {overdueCount > 0 && <span className="ml-2 text-[10px] font-sans font-semibold uppercase tracking-wider text-rose-300 bg-rose-500/15 px-1.5 py-0.5 rounded"><AlertTriangle className="inline w-3 h-3 -mt-0.5" /> {overdueCount} overdue</span>}
+              </p>
+              <p className="text-[11px] text-zinc-400 mt-1 truncate">
+                Next: {pendingAssignments[0].title}{nextDue && <span className="font-mono text-brand-300"> · {format(nextDue, 'd MMM')}</span>}
+              </p>
+            </Link>
           )}
+        </div>
+      </div>
+
+      <div className={cn(hasSidebar && 'lg:grid lg:grid-cols-[1fr_320px] lg:gap-6 lg:items-start', 'space-y-6 lg:space-y-0')}>
+        {/* ── Main column ── */}
+        <div className="space-y-6 min-w-0">
+          {/* Curriculum timeline per semester */}
           {semesters.map(sem => {
             const items = curriculum.filter(i => i.semester === sem).sort((a, b) => a.order - b.order)
+            const done = items.filter(i => coveredIds.has(i.id)).length
             return (
-              <div key={sem} className="bg-zinc-900 rounded-2xl overflow-hidden border border-white/10 shadow-sm">
-                <div className={`px-5 py-3 ${subject.color}`}>
-                  <h2 className="text-sm font-bold text-white tracking-wide">Semester {sem}</h2>
+              <section key={sem} className={cn(PANEL, 'p-5')}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="section-title flex items-center gap-2"><BookOpen /> Semester {sem}</h2>
+                  <span className="text-[11px] font-mono text-zinc-400">{done}/{items.length} covered</span>
                 </div>
-                <div className="overflow-x-auto">
-                <table className="w-full min-w-[560px]">
-                  <thead>
-                    <tr className="border-b border-white/8">
-                      <th className="w-8 px-4 py-2.5" />
-                      <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5 w-1/3">Topic</th>
-                      <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5">Content</th>
-                      <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5 w-32">How</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
+                {items.length === 0 ? (
+                  <p className="text-sm text-zinc-500">No topics yet.</p>
+                ) : (
+                  <ol className="relative space-y-3 pl-7">
+                    <span className="absolute left-[9px] top-2 bottom-2 w-0.5 bg-zinc-800" aria-hidden />
                     {items.map(item => {
                       const covered = coveredIds.has(item.id)
                       const wasAbsent = absentCoveredIds.has(item.id)
+                      const assignment = item.method === 'Assignment' && item.assignmentId ? assignmentMap[item.assignmentId] : undefined
                       return (
-                        <tr key={item.id} className={`hover:bg-white/5 transition-colors ${wasAbsent ? 'bg-rose-50/30' : covered ? 'bg-emerald-50/40' : ''}`}>
-                          <td className="px-4 py-3 text-center">
-                            {wasAbsent
-                              ? <span title="You were absent during this lesson"><XCircle className="w-4 h-4 text-rose-500 mx-auto" /></span>
-                              : covered
-                                ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
-                                : null
-                            }
-                          </td>
-                          <td className={`px-4 py-3 text-sm font-medium ${wasAbsent ? 'text-rose-300' : covered ? 'text-emerald-300' : 'text-zinc-100'}`}>{item.title}</td>
-                          <td className="px-4 py-3 text-sm text-zinc-400">{item.content}</td>
-                          <td className="px-4 py-3">
-                            {item.method === 'Assignment' && item.assignmentId && assignmentMap[item.assignmentId] ? (
-                              <Link
-                                to={`/assignments/${item.assignmentId}`}
-                                className="text-xs bg-violet-900/40 text-violet-300 border border-violet-700/40 px-2 py-0.5 rounded-full hover:bg-violet-800/40 transition-colors"
-                              >
-                                📋 {assignmentMap[item.assignmentId].title}
-                              </Link>
-                            ) : (
-                              <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">{item.method}</span>
-                            )}
-                          </td>
-                        </tr>
+                        <li key={item.id} className="relative">
+                          {/* Timeline marker */}
+                          <span className={cn(
+                            'absolute -left-7 top-3 w-5 h-5 rounded-full flex items-center justify-center ring-4 ring-zinc-900',
+                            wasAbsent ? 'bg-rose-500/20 text-rose-300'
+                              : covered ? 'bg-emerald-500 text-white shadow-[0_0_8px_rgba(16,185,129,0.6)]'
+                              : 'bg-zinc-800 text-zinc-500',
+                          )} title={wasAbsent ? 'You were absent during this lesson' : covered ? 'Covered' : 'Upcoming'}>
+                            {wasAbsent ? <X className="w-3 h-3" /> : covered ? <Check className="w-3 h-3" /> : <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />}
+                          </span>
+                          <div className={cn(
+                            'rounded-xl p-3.5 border transition-colors',
+                            wasAbsent ? 'bg-rose-950/25 border-rose-800/40'
+                              : covered ? 'bg-zinc-950/40 border-emerald-500/15'
+                              : 'bg-zinc-950/40 border-white/[0.05]',
+                          )}>
+                            <div className="flex items-start justify-between gap-3">
+                              <p className={cn('text-sm font-semibold', wasAbsent ? 'text-rose-200' : covered ? 'text-emerald-200' : 'text-zinc-100')}>{item.title}</p>
+                              {assignment ? (
+                                <Link
+                                  to={`/assignments/${item.assignmentId}`}
+                                  className="flex-shrink-0 max-w-[55%] inline-flex items-center gap-1 text-[11px] font-medium bg-brand-500/15 text-brand-300 border border-brand-500/30 px-2 py-0.5 rounded-md hover:bg-brand-500/25 transition-colors"
+                                >
+                                  <FileText className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{assignment.title}</span>
+                                </Link>
+                              ) : item.method ? (
+                                <span className="flex-shrink-0 text-[11px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-md">{item.method}</span>
+                              ) : null}
+                            </div>
+                            {item.content && <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">{item.content}</p>}
+                            {wasAbsent && <p className="text-[11px] text-rose-300 mt-1.5">You were absent when this was covered</p>}
+                          </div>
+                        </li>
                       )
                     })}
-                    {items.length === 0 && (
-                      <tr><td colSpan={4} className="px-5 py-4 text-sm text-zinc-400 text-center">No items yet.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-                </div>
-              </div>
+                  </ol>
+                )}
+              </section>
             )
           })}
-        </div>
-      )}
 
-      {/* Resources */}
-      {resources.length > 0 && (
-        <div className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-white/8">
-            <h2 className="text-base font-semibold text-zinc-100">Resources</h2>
-          </div>
-          <ul className="divide-y divide-slate-100">
-            {resources.map(res => (
-              <li key={res.id} className="flex items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors">
-                {res.type === 'link'
-                  ? <Link2 className="w-4 h-4 text-brand-500 flex-shrink-0" />
-                  : <FileText className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                }
-                <a
-                  href={res.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 text-sm font-medium text-zinc-200 hover:text-brand-600 transition-colors flex items-center gap-1.5 min-w-0"
-                >
-                  <span className="truncate">{res.title}</span>
-                  <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 opacity-40" />
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Subject Videos */}
-      {subjectVideos.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-base font-semibold text-zinc-100">Videos</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {subjectVideos.map(video => (
-              <Link
-                key={video.id}
-                to={`/video-lab/${video.id}`}
-                className="group bg-zinc-900 rounded-2xl border border-white/10 overflow-hidden shadow-sm hover:shadow-card-hover hover:-translate-y-0.5 transition-all"
-              >
-                <div className="relative aspect-video bg-slate-900 overflow-hidden">
-                  <img src={thumbnailUrl(video.cloudinaryPublicId)} alt={video.title} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" loading="lazy" />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                      <Play className="w-4 h-4 text-zinc-100 ml-0.5" />
+          {/* Subject videos */}
+          {subjectVideos.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="section-title flex items-center gap-2"><Play /> Videos</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {subjectVideos.map(video => (
+                  <Link
+                    key={video.id}
+                    to={`/video-lab/${video.id}`}
+                    className="group rounded-2xl bg-zinc-900 border border-white/[0.06] overflow-hidden shadow-xl transition-all duration-200 hover:-translate-y-[3px] hover:border-brand-500/45"
+                  >
+                    <div className="relative aspect-video bg-zinc-950 overflow-hidden">
+                      <img src={thumbnailUrl(video.cloudinaryPublicId)} alt={video.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="w-10 h-10 rounded-full bg-brand-500 flex items-center justify-center shadow-ember">
+                          <Play className="w-4 h-4 text-white ml-0.5" />
+                        </div>
+                      </div>
+                      {video.duration > 0 && (
+                        <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] font-mono px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                          <Clock className="w-2.5 h-2.5" />{Math.floor(video.duration / 60)}:{String(video.duration % 60).padStart(2, '0')}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  {video.duration > 0 && (
-                    <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] font-mono px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                      <Clock className="w-2.5 h-2.5" />{Math.floor(video.duration/60)}:{String(video.duration%60).padStart(2,'0')}
+                    <div className="px-4 py-3">
+                      <p className="text-sm font-semibold text-zinc-100 line-clamp-1 group-hover:text-brand-400 transition-colors">{video.title}</p>
+                      <p className="text-[11px] text-zinc-500 mt-0.5">{video.uploaderName}</p>
                     </div>
-                  )}
-                </div>
-                <div className="px-3 py-2.5">
-                  <p className="text-sm font-medium text-zinc-100 line-clamp-1">{video.title}</p>
-                  <p className="text-xs text-zinc-400 mt-0.5">{video.uploaderName}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* SharePoint Resources — hidden until a SharePoint connection is configured */}
-      {sharePointConfigured && (
-        <div className="space-y-2">
-          <h2 className="text-base font-semibold text-zinc-100">Shared Files</h2>
-          <SharePointBrowser
-            subPath={`Resources/${id}`}
-            canDelete={false}
-            canUpload={false}
-            title="Subject Files"
-          />
-        </div>
-      )}
-
-      {/* Teachers */}
-      {teachers.length > 0 && (
-        <div className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-white/8">
-            <h2 className="text-base font-semibold text-zinc-100">Teachers</h2>
-          </div>
-          <div className="p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-            {teachers.map(t => (
-              <div key={t.id} className="flex flex-col items-center text-center gap-3">
-                {t.imageUrl ? (
-                  <img src={t.imageUrl} alt={t.name} className="w-32 h-32 rounded-full object-cover ring-4 ring-white shadow-md" />
-                ) : (
-                  <div className="w-32 h-32 rounded-full bg-zinc-800 flex items-center justify-center ring-4 ring-white shadow-md">
-                    <UserRound className="w-14 h-14 text-zinc-300" />
-                  </div>
-                )}
-                <div>
-                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                    <span className="font-semibold text-sm text-zinc-100">{t.name}</span>
-                    {t.isGuest && <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Guest</span>}
-                  </div>
-                  {t.title && <p className="text-xs text-brand-600 font-medium mt-0.5">{t.title}</p>}
-                  {t.description && <p className="text-xs text-zinc-500 mt-1 leading-relaxed">{t.description}</p>}
-                  {t.portfolioUrl && (
-                    <a href={t.portfolioUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-brand-500 hover:underline mt-1.5">
-                      <Globe className="w-3 h-3" /> Portfolio
-                    </a>
-                  )}
-                </div>
+                  </Link>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </section>
+          )}
 
-      {semesters.length === 0 && resources.length === 0 && teachers.length === 0 && (
-        <div className="text-center py-16 text-zinc-400">
-          <p className="text-sm">No content has been added to this subject yet.</p>
+          {/* SharePoint Resources — hidden until a SharePoint connection is configured */}
+          {sharePointConfigured && (
+            <section className="space-y-2">
+              <h2 className="section-title">Shared files</h2>
+              <SharePointBrowser
+                subPath={`Resources/${id}`}
+                canDelete={false}
+                canUpload={false}
+                title="Subject Files"
+              />
+            </section>
+          )}
+
+          {semesters.length === 0 && resources.length === 0 && teachers.length === 0 && subjectVideos.length === 0 && (
+            <div className={cn(PANEL, 'text-center py-14 text-zinc-400')}>
+              <p className="text-sm">No content has been added to this subject yet.</p>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* ── Sidebar ── */}
+        {hasSidebar && (
+          <aside className="space-y-6 lg:sticky lg:top-6">
+            {teachers.length > 0 && (
+              <section className={cn(PANEL, 'p-5')}>
+                <h2 className="section-title flex items-center gap-2 mb-4"><UserRound /> Teachers</h2>
+                <div className="space-y-4">
+                  {teachers.map(t => (
+                    <div key={t.id} className="flex items-start gap-3">
+                      {t.imageUrl ? (
+                        <img src={t.imageUrl} alt={t.name} className="w-12 h-12 rounded-full object-cover ring-2 ring-white/10 flex-shrink-0" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center ring-2 ring-white/10 flex-shrink-0">
+                          <UserRound className="w-6 h-6 text-zinc-500" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-semibold text-sm text-zinc-100">{t.name}</span>
+                          {t.isGuest && <span className="text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/25 px-1.5 py-0.5 rounded">Guest</span>}
+                        </div>
+                        {t.title && <p className="text-xs text-brand-300 font-medium mt-0.5">{t.title}</p>}
+                        {t.description && <p className="text-xs text-zinc-500 mt-1 leading-relaxed line-clamp-3">{t.description}</p>}
+                        {t.portfolioUrl && (
+                          <a href={t.portfolioUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-400 hover:text-brand-300 mt-1.5">
+                            <Globe className="w-3 h-3" /> Portfolio
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {resources.length > 0 && (
+              <section className={cn(PANEL, 'p-5')}>
+                <h2 className="section-title flex items-center gap-2 mb-3"><Link2 /> Resources</h2>
+                <ul className="space-y-1.5">
+                  {resources.map(res => (
+                    <li key={res.id}>
+                      <a
+                        href={res.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 bg-zinc-950/40 border border-white/[0.05] hover:border-brand-500/40 transition-colors group"
+                      >
+                        {res.type === 'link'
+                          ? <Link2 className="w-4 h-4 text-ember-secondary flex-shrink-0" />
+                          : <FileText className="w-4 h-4 text-amber-400 flex-shrink-0" />}
+                        <span className="flex-1 min-w-0 text-sm text-zinc-200 truncate group-hover:text-brand-300 transition-colors">{res.title}</span>
+                        <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 text-zinc-500" />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </aside>
+        )}
+      </div>
     </div>
   )
 }

@@ -44,6 +44,12 @@ export default function SubjectManager() {
   const [uploadPct, setUploadPct] = useState<number | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // The form renders above the list, so bring it into view when it opens —
+  // otherwise editing a subject far down the page looks like nothing happened.
+  const formRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (showForm) formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [showForm, editing])
 
   // ── Drag-to-reorder state ──────────────────────────────────────────────────
   const [dragId,     setDragId]     = useState<string | null>(null)
@@ -196,7 +202,7 @@ export default function SubjectManager() {
 
       {/* Create / edit form */}
       {showForm && (
-        <div className="bg-slate-800 rounded-2xl p-6 space-y-4">
+        <div ref={formRef} className="bg-slate-800 rounded-2xl p-6 space-y-4 scroll-mt-24">
           <h2 className="text-base font-semibold text-white">{editing ? 'Edit Subject' : 'New Subject'}</h2>
 
           <div>

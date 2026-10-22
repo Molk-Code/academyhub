@@ -48,6 +48,7 @@ export default function SubjectManager() {
   // ── Drag-to-reorder state ──────────────────────────────────────────────────
   const [dragId,     setDragId]     = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [armedId,    setArmedId]    = useState<string | null>(null)  // card whose grip is held
 
   const subjectsRef  = useRef<SubjectDoc[]>([])
   const dragIdRef    = useRef<string | null>(null)
@@ -108,6 +109,13 @@ export default function SubjectManager() {
       document.removeEventListener('touchmove', onTouchMove)
       document.removeEventListener('touchend',  onTouchEnd)
     }
+  }, [])
+
+  // Disarm if the grip is pressed and released without a drag starting
+  useEffect(() => {
+    const disarm = () => setArmedId(null)
+    window.addEventListener('mouseup', disarm)
+    return () => window.removeEventListener('mouseup', disarm)
   }, [])
 
   async function handleDrop(targetId: string) {
@@ -282,18 +290,15 @@ export default function SubjectManager() {
                   <div
                     key={s.id}
                     data-subject-id={s.id}
-                    draggable
-                    onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; setDragId(s.id) }}
+                    // Only draggable while the grip handle is held — avoids accidental reorders
+                    draggable={armedId === s.id}
+                    onDragStart={e => {
+                      if (armedId !== s.id) { e.preventDefault(); return }
+                      e.dataTransfer.effectAllowed = 'move'; setDragId(s.id)
+                    }}
                     onDragOver={e => { e.preventDefault(); if (dragOverId !== s.id) setDragOverId(s.id) }}
                     onDrop={e => { e.preventDefault(); handleDrop(s.id) }}
-                    onDragEnd={() => { setDragId(null); setDragOverId(null) }}
-                    onTouchStart={e => {
-                      e.preventDefault()
-                      touchActive.current = true
-                      dragIdRef.current   = s.id
-                      dragOverRef.current = null
-                      setDragId(s.id); setDragOverId(null)
-                    }}
+                    onDragEnd={() => { setDragId(null); setDragOverId(null); setArmedId(null) }}
                     className={`group bg-slate-800 rounded-2xl overflow-hidden transition-all ${
                       dragId === s.id ? 'opacity-40' : ''
                     } ${
@@ -316,7 +321,22 @@ export default function SubjectManager() {
                     </SubjectCover>
                     <div className="p-4">
                       <div className="flex items-start gap-2">
-                        <GripVertical className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 flex-shrink-0 cursor-grab active:cursor-grabbing touch-none select-none" />
+                        <span
+                          title="Drag to reorder"
+                          aria-label="Drag to reorder"
+                          onMouseDown={() => setArmedId(s.id)}
+                          onMouseUp={() => setArmedId(null)}
+                          onTouchStart={e => {
+                            e.preventDefault()
+                            touchActive.current = true
+                            dragIdRef.current   = s.id
+                            dragOverRef.current = null
+                            setDragId(s.id); setDragOverId(null)
+                          }}
+                          className="-m-1.5 p-1.5 rounded-lg flex-shrink-0 cursor-grab active:cursor-grabbing touch-none select-none text-zinc-600 group-hover:text-zinc-400 hover:bg-zinc-700/60 hover:text-zinc-200 transition-colors"
+                        >
+                          <GripVertical className="w-4 h-4" />
+                        </span>
                         <p className="text-xs text-zinc-400 line-clamp-2 min-w-0">{s.description || '—'}</p>
                       </div>
                       <div className="flex items-center justify-between mt-3">

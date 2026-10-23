@@ -84,22 +84,3 @@ export function useBookingBadgeDetail(): { food: number; van: number; equipment:
     return { food: pendingFood.length, van: pendingVan.length, equipment: pendingEquipment.length }
   }, [uid, isAdmin, pendingFood, pendingVan, pendingEquipment, seenRev])
 }
-
-/** For student Booking tabs: per-tab unseen counts */
-export function useStudentBookingTabBadges(): { food: number; van: number } {
-  const { uid, isStaff, seenRev, myFood, myVan } = useBookingData()
-
-  return useMemo(() => {
-    if (!uid || isStaff) return { food: 0, van: 0 }
-    const foodSeenAt = parseInt(localStorage.getItem(FOOD_SEEN_KEY(uid)) ?? '0', 10)
-    const vanSeenAt  = parseInt(localStorage.getItem(VAN_SEEN_KEY(uid))  ?? '0', 10)
-    const latestTs = (o: any) => Math.max(
-      (o.updatedAt as any)?.toMillis?.() ?? 0,
-      (o.createdAt as any)?.toMillis?.() ?? 0,
-    )
-    return {
-      food: myFood.filter(o => o.status !== 'cancelled' && latestTs(o) > foodSeenAt).length,
-      van:  myVan.filter(b  => b.status !== 'rejected'  && latestTs(b) > vanSeenAt).length,
-    }
-  }, [uid, isStaff, myFood, myVan, seenRev])
-}

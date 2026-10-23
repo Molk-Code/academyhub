@@ -886,7 +886,7 @@ export default function StudentDashboard() {
             icon={Ticket}
             iconClass="text-ember-tertiary"
             title="Active Bookings"
-            right={<SectionLink to="/booking">All bookings</SectionLink>}
+            right={<SectionLink to="/my-bookings">All bookings</SectionLink>}
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {activeBookings.map(b => {
@@ -894,9 +894,8 @@ export default function StudentDashboard() {
                 ? 'bg-amber-950/40 text-amber-300 border-amber-800/50'
                 : 'bg-emerald-950/40 text-emerald-300 border-emerald-800/50'
               const StatusIcon = b.status === 'pending' ? Clock : CheckCircle2
-              const tab = b.type === 'food' ? 'food' : 'minivan'
               return (
-                <Link key={b.id} to="/booking" state={{ tab, openId: b.id }} className="bg-zinc-900 rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors">
+                <Link key={b.id} to="/my-bookings" className="bg-zinc-900 rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors">
                   <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0">
                     {b.type === 'food'
                       ? <UtensilsCrossed className="w-4 h-4 text-zinc-500" />

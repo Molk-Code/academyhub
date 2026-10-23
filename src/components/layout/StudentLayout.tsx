@@ -288,7 +288,7 @@ export default function StudentLayout() {
     const vis = navVis?.student
     return (
       <>
-        {primaryNav.map(item => <NavItem key={item.to} {...item} onNavigate={onNavigate} />)}
+        {primaryNav.filter(item => item.to !== '/bug-reports').map(item => <NavItem key={item.to} {...item} onNavigate={onNavigate} />)}
 
         {/* Subjects — standalone, always visible */}
         {vis?.['subjects'] !== false && <NavItem to="/subjects" icon={BookOpen} label="Subjects" onNavigate={onNavigate} />}
@@ -333,6 +333,9 @@ export default function StudentLayout() {
 
         {/* Prizes */}
         {canPrizes && vis?.['prizes'] !== false && <NavItem to="/prizes" icon={Trophy} label="Prizes" onNavigate={onNavigate} />}
+
+        {/* Bug Reports — last of the app's own pages, above any external links */}
+        {primaryNav.filter(item => item.to === '/bug-reports').map(item => <NavItem key={item.to} {...item} onNavigate={onNavigate} />)}
 
         {/* Custom external links */}
         {(navVis?.customLinks ?? []).filter(l => l.roles.includes('student')).map(link => (

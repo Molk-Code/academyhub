@@ -30,6 +30,23 @@ function formatDate(d: string) {
   return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+// Compact checkout → return range: "13 Oct – 5 Nov", with years only where
+// needed ("13 Oct – 5 Nov 2025", "20 Dec 2026 – 8 Jan 2027").
+function formatRange(start: string, end: string) {
+  if (!start) return '—'
+  const a = new Date(start + 'T12:00:00')
+  const b = end ? new Date(end + 'T12:00:00') : null
+  // Fixed 3-letter months — en-GB locale data writes September as "Sept"
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const dm = (d: Date) => `${d.getDate()} ${MONTHS[d.getMonth()]}`
+  const dmy = (d: Date) => `${dm(d)} ${d.getFullYear()}`
+  if (!b) return dmy(a)
+  if (a.getFullYear() !== b.getFullYear()) return `${dmy(a)} – ${dmy(b)}`
+  const sameDay = start === end
+  if (a.getFullYear() === new Date().getFullYear()) return sameDay ? dm(a) : `${dm(a)} – ${dm(b)}`
+  return sameDay ? dmy(a) : `${dm(a)} – ${dmy(b)}`
+}
+
 function CohortBadge({ cohortId, cohorts }: { cohortId: string; cohorts: Record<string, string> }) {
   const name = cohorts[cohortId] ?? cohortId
   if (!name) return null
@@ -285,7 +302,7 @@ function ProjectsTab({
       <tr style={{ borderBottom: '1px solid #1a1a25', cursor: 'pointer' }} onClick={() => onOpenProject(p.id)}>
         <td style={{ padding: '.5rem .75rem', color: '#f97316', fontWeight: 600 }}>{p.name}</td>
         <td style={{ padding: '.5rem .75rem', color: '#6a6a80', fontSize: '.78rem' }}>{(p.borrowers ?? []).slice(0, 3).join(', ')}{(p.borrowers?.length ?? 0) > 3 ? ` +${p.borrowers!.length - 3}` : ''}</td>
-        <td style={{ padding: '.5rem .75rem', color: '#4a4a60', fontSize: '.75rem' }}>{p.checkoutDate ? `${p.checkoutDate} → ${p.returnDate}` : '—'}</td>
+        <td style={{ padding: '.5rem .75rem', color: '#6a6a80', fontSize: '.75rem', whiteSpace: 'nowrap' }}>{formatRange(p.checkoutDate, p.returnDate)}</td>
         <td style={{ padding: '.5rem .75rem' }}>
           <span style={{ fontSize: '.65rem', fontWeight: 700, color: statusColor, background: statusColor + '18', border: `1px solid ${statusColor}40`, borderRadius: 10, padding: '2px 7px' }}>
             {p.status}
@@ -379,11 +396,11 @@ function ProjectBudgetTab({
               <tr key={r.project.id} style={{ borderBottom: '1px solid #1a1a25' }}>
                 <td style={{ padding: '.5rem .75rem', color: '#4a4a60', fontFamily: 'monospace' }}>#{i + 1}</td>
                 <td style={{ padding: '.5rem .75rem' }}>
-                  <button onClick={() => onOpenProject(r.project.id)} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600, fontSize: 'inherit' }}>
+                  <button onClick={() => onOpenProject(r.project.id)} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600, fontSize: 'inherit', textAlign: 'left' }}>
                     {r.project.name}
                   </button>
                 </td>
-                <td style={{ padding: '.5rem .75rem', color: '#4a4a60', fontSize: '.75rem' }}>{r.project.checkoutDate ? `${r.project.checkoutDate} → ${r.project.returnDate}` : '—'}</td>
+                <td style={{ padding: '.5rem .75rem', color: '#6a6a80', fontSize: '.75rem', whiteSpace: 'nowrap' }}>{formatRange(r.project.checkoutDate, r.project.returnDate)}</td>
                 <td style={{ padding: '.5rem .75rem', color: '#6a6a80', textAlign: 'right' }}>{r.itemCount}</td>
                 <td style={{ padding: '.5rem .75rem', color: '#f0f0f5', fontWeight: 700, textAlign: 'right' }}>{r.cost > 0 ? `${r.cost.toLocaleString('sv-SE')} kr` : '—'}</td>
               </tr>

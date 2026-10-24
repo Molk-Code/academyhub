@@ -147,10 +147,14 @@ export default function ChatPage() {
     )
   }
 
-  // Mark read when switching channels OR when new messages arrive on the active channel
+  // Mark read when switching channels, when new messages arrive on the active
+  // channel, or when the server stamps its lastMessageAt (which can land a
+  // moment after the message itself) — so the channel you're viewing never
+  // flips to unread.
+  const activeLastMessageAt = channels.find(c => c.id === activeChannelId)?.lastMessageAt?.toMillis() ?? 0
   useEffect(() => {
     if (profile && activeChannelId) markChannelRead(profile.uid, activeChannelId)
-  }, [activeChannelId, messages.length, profile?.uid]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeChannelId, messages.length, activeLastMessageAt, profile?.uid]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setIsSearching(false)
@@ -198,9 +202,14 @@ export default function ChatPage() {
       setPendingFiles([])
       if (textareaRef.current) textareaRef.current.style.height = 'auto'
       textareaRef.current?.focus()
-      await updateDoc(doc(db, 'chat_channels', activeChannelId), {
-        lastMessageAt: serverTimestamp(),
-      })
+      // onChatMessage (server) stamps lastMessageAt for every message — students
+      // can't write channel docs. Staff still stamp it here so their own posts
+      // show up instantly, as before.
+      if (roles.includes('teacher') || roles.includes('admin')) {
+        await updateDoc(doc(db, 'chat_channels', activeChannelId), {
+          lastMessageAt: serverTimestamp(),
+        }).catch(() => { /* the server stamps it anyway */ })
+      }
     } finally {
       setSending(false)
     }

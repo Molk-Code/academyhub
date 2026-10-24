@@ -126,7 +126,15 @@ export const onChatMessage = functions.firestore
     const msg = snap.data()
 
     // Booking system posts set skipPush to avoid double notifications
+    // (postToBookingsChannel stamps lastMessageAt itself)
     if (msg.skipPush === true) return null
+
+    // Drives the unread dots. Done here because students can't write channel
+    // docs, so their messages never marked a channel unread. Best effort — a
+    // deleted channel mustn't stop the push.
+    await db.collection('chat_channels').doc(context.params.channelId)
+      .update({ lastMessageAt: admin.firestore.FieldValue.serverTimestamp() })
+      .catch(err => console.warn('onChatMessage: lastMessageAt update failed', err))
 
     // Atomic idempotency guard — prevents race between concurrent function instances
     const msgRef = snap.ref

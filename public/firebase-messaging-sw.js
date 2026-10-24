@@ -30,6 +30,10 @@ firebase.initializeApp({
 const messaging = firebase.messaging()
 
 messaging.onBackgroundMessage((payload) => {
+  // Pushes that carry a `notification` block are already shown by the browser /
+  // FCM SDK. Showing our own copy too is what produced duplicates on iOS, which
+  // doesn't collapse notifications by tag. Only display data-only pushes here.
+  if (payload.notification) return
   const { title, body, icon } = payload.data || {}
   if (!title) return
   return self.registration.showNotification(title, {

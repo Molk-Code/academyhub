@@ -172,6 +172,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signOut() {
+    // Unregister this device's push token first (needs the signed-in user), so
+    // the account we're leaving stops sending notifications here. Capped so a
+    // slow network never blocks signing out.
+    const uid = auth.currentUser?.uid
+    if (uid) {
+      try {
+        const { unregisterDevice } = await import('@/lib/fcm')
+        await Promise.race([unregisterDevice(uid), new Promise(r => setTimeout(r, 3000))])
+      } catch { /* best effort */ }
+    }
     await firebaseSignOut(auth)
   }
 

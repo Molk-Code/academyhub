@@ -1,4 +1,4 @@
-import { admin, db } from './lib'
+import { admin, db, functions } from './lib'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Push notification helpers
@@ -221,3 +221,30 @@ export async function pushToUser(uid: string, title: string, body: string, url: 
     saveNotifications([uid], { title, body, url }),
   ])
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// claimFcmToken — a device's push token belongs to whoever is signed in on it.
+// Adds the token to the caller and removes it from every other account, so a
+// phone used for two accounts (e.g. staff + admin) doesn't receive the other
+// account's notifications, or the same notification twice.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const claimFcmToken = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  const { token } = data as { token: string }
+  if (!token || typeof token !== 'string' || token.length > 4096) {
+    throw new functions.https.HttpsError('invalid-argument', 'token is required.')
+  }
+  const uid = context.auth.uid
+  const holders = await db.collection('users').where('fcmTokens', 'array-contains', token).get()
+  const batch = db.batch()
+  let removed = 0
+  for (const d of holders.docs) {
+    if (d.id === uid) continue
+    batch.update(d.ref, { fcmTokens: admin.firestore.FieldValue.arrayRemove(token) })
+    removed++
+  }
+  batch.update(db.collection('users').doc(uid), { fcmTokens: admin.firestore.FieldValue.arrayUnion(token) })
+  await batch.commit()
+  return { removedFromOtherAccounts: removed }
+})

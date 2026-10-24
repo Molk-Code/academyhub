@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import ErrorBoundary from './components/common/ErrorBoundary'
-import { reloadOnceForStaleChunk } from '@/lib/staleChunk'
+import { reloadForStaleChunk } from '@/lib/staleChunk'
 import { reportClientError } from '@/lib/clientErrorReport'
 import './index.css'
 import '@vidstack/react/player/styles/base.css'
@@ -12,7 +12,11 @@ import '@vidstack/react/player/styles/base.css'
 // Auto-reload on stale chunk / MIME errors; report everything else.
 window.addEventListener('unhandledrejection', (event) => {
   const msg = event.reason?.message ?? String(event.reason ?? '')
-  if (reloadOnceForStaleChunk(msg)) return
+  if (reloadForStaleChunk(msg)) return
+  // Safari drops its IndexedDB connection when the app is backgrounded; the
+  // Firebase SDKs reconnect on their own. It was ~99% of _client_errors and
+  // buried the real crashes, so don't report it.
+  if (msg.includes('Connection to Indexed Database server lost')) return
   if (msg) reportClientError(msg, event.reason?.stack, 'unhandledrejection')
 })
 

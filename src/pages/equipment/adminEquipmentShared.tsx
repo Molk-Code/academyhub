@@ -128,8 +128,16 @@ export function barcodeUnitValue(item: EquipmentDoc, unit: number): string {
 
 export function printBarcodeLabel(name: string, category: string, container: HTMLDivElement | null) {
   if (!container) return
-  const svg = container.querySelector('svg')
-  if (!svg) return
+  const source = container.querySelector('svg')
+  if (!source) return
+  // JsBarcode puts a CSS transform on the <svg>; Safari prints transformed
+  // elements as a screen-resolution bitmap, which made labels blurry. Print a
+  // clean copy: no inline style or pixel size (the viewBox + CSS size it), and
+  // crisp bar edges.
+  const svg = source.cloneNode(true) as SVGSVGElement
+  for (const attr of ['style', 'width', 'height', 'x', 'y']) svg.removeAttribute(attr)
+  svg.setAttribute('shape-rendering', 'crispEdges')
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet')
   const svgData = new XMLSerializer().serializeToString(svg)
   const win = window.open('', '_blank', 'width=700,height=500')
   if (!win) return

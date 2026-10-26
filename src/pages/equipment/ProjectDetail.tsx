@@ -37,7 +37,11 @@ export function ProjectDetail({
   const [usbActive, setUsbActive] = useState(false)
   const [usbInput, setUsbInput] = useState('')
   const usbInputRef = useRef<HTMLInputElement>(null)
-  const [scanEntries, setScanEntries] = useState<{ name: string; time: string }[]>([])
+  // Scanners type far faster than a person; used to submit a scan that ends
+  // without Enter (scanner configured with no suffix) once typing pauses.
+  const usbTimingRef = useRef<{ first: number; last: number }>({ first: 0, last: 0 })
+  const usbIdleRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [scanEntries, setScanEntries] = useState<{ name: string; time: string; note?: string; warn?: boolean }[]>([])
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [actionState, setActionState] = useState<'idle' | 'complete' | 'archive' | 'unarchive'>('idle')
@@ -171,13 +175,43 @@ export function ProjectDetail({
     setScanActive(false)
   }
 
-  function submitUsbScan() {
-    const text = usbInput.trim()
+  function submitUsbScan(raw = usbInput) {
+    if (usbIdleRef.current) { clearTimeout(usbIdleRef.current); usbIdleRef.current = null }
+    const text = raw.trim()
     setUsbInput('')
     if (!text) return
     beep(scanMode === 'checkout' ? 880 : 660)
     handleScan(text)
   }
+
+  function onUsbInputChange(value: string) {
+    const now = Date.now()
+    const t = usbTimingRef.current
+    if (!usbInput) t.first = now
+    t.last = now
+    setUsbInput(value)
+    if (usbIdleRef.current) clearTimeout(usbIdleRef.current)
+    // No Enter after a burst of scanner-speed typing → treat the pause as the end.
+    usbIdleRef.current = setTimeout(() => {
+      const perChar = (t.last - t.first) / Math.max(1, value.length - 1)
+      if (value.trim().length >= 4 && perChar < 35) submitUsbScan(value)
+    }, 250)
+  }
+
+  // While USB mode is on, send keystrokes to the scan box even if it lost focus
+  // (clicked elsewhere on the page) — otherwise scans silently go nowhere.
+  useEffect(() => {
+    if (!usbActive) return
+    function onKey(e: KeyboardEvent) {
+      const el = document.activeElement as HTMLElement | null
+      if (el === usbInputRef.current) return
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return
+      if (e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1) return
+      usbInputRef.current?.focus()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [usbActive])
 
   // Cleanup remote session on unmount
   useEffect(() => {
@@ -194,13 +228,20 @@ export function ProjectDetail({
   }
 
   async function handleScan(text: string) {
-    setScanEntries(prev => [{ name: text, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 19)])
+    const time = new Date().toLocaleTimeString()
+    const log = (name: string, note: string, warn = false) =>
+      setScanEntries(prev => [{ name, time, note, warn }, ...prev.slice(0, 19)])
     const { base, unit } = parseScanText(text)
+    const lower = base.toLowerCase()
     const matchedEquip = equipmentAll.find(e => e.id === base || e.qrCode === base || e.name === base)
+      // Caps Lock flips the case of everything a scanner types
+      ?? equipmentAll.find(e => e.id.toLowerCase() === lower || (e.qrCode ?? '').toLowerCase() === lower)
     const displayName = matchedEquip
       ? (unit ? `${matchedEquip.name} #${unit}` : matchedEquip.name)
       : text
     if (scanMode === 'checkout') {
+      log(displayName, matchedEquip ? 'Checked out' : 'Not in the equipment list — added by its code', !matchedEquip)
+      if (!matchedEquip) beep(220)
       await addDoc(collection(db, `inventory_projects/${project.id}/items`), {
         equipmentId: matchedEquip?.id ?? '',
         equipmentName: displayName,
@@ -212,7 +253,14 @@ export function ProjectDetail({
       })
       if (matchedEquip) await adjustEquipmentAvailable(matchedEquip.id, -1)
     } else {
-      const match = items.find(i => i.status === 'checked-out' && i.equipmentName === displayName)
+      const checkedOut = items.filter(i => i.status === 'checked-out')
+      const match = checkedOut.find(i => i.equipmentName === displayName)
+        // Items imported from a booking carry no unit number in their name
+        ?? (matchedEquip ? checkedOut.find(i => i.equipmentId === matchedEquip.id) : undefined)
+      log(match?.equipmentName ?? displayName,
+        match ? 'Returned' : matchedEquip ? 'Not checked out in this project' : 'Not in the equipment list',
+        !match)
+      if (!match) beep(220)
       if (match) {
         await updateDoc(doc(db, `inventory_projects/${project.id}/items`, match.id), {
           status: 'returned',
@@ -540,14 +588,14 @@ export function ProjectDetail({
           <div style={{ marginBottom: '.75rem' }}>
             <div className="scan-monitor-status" style={{ marginBottom: '.5rem' }}>
               <div className="scan-pulse" />
-              Ready for barcode scanner ({scanMode}) — keep this box selected
+              Ready for barcode scanner ({scanMode}) — just scan, anywhere on this page
             </div>
             <input
               ref={usbInputRef}
               autoFocus
               value={usbInput}
-              onChange={e => setUsbInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitUsbScan() } }}
+              onChange={e => onUsbInputChange(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); submitUsbScan() } }}
               placeholder="Scan a barcode…"
               autoComplete="off"
               spellCheck={false}
@@ -592,7 +640,10 @@ export function ProjectDetail({
             <div className="scan-list">
               {scanEntries.map((e, i) => (
                 <div className="scan-entry" key={i}>
-                  <span className="scan-entry-name">{e.name}</span>
+                  <span className="scan-entry-name">
+                    {e.name}
+                    {e.note && <span style={{ marginLeft: 8, fontSize: '.72rem', color: e.warn ? '#f5a623' : '#4cd964' }}>{e.note}</span>}
+                  </span>
                   <span className="scan-entry-time">{e.time}</span>
                 </div>
               ))}

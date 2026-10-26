@@ -34,7 +34,11 @@ export function ProjectDetail({
   const [scanMode, setScanMode] = useState<'checkout' | 'checkin'>('checkout')
   const [scanActive, setScanActive] = useState(false)
   // USB/Bluetooth barcode scanners act as a keyboard: they type the code and press Enter.
-  const [usbActive, setUsbActive] = useState(false)
+  // On by default on computers, so a plugged-in scanner just works when a
+  // project is open. Not on touch devices: there the scan box would pop up the
+  // on-screen keyboard. Paused while the camera or a phone is scanning.
+  const usbByDefault = typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches
+  const [usbActive, setUsbActive] = useState(usbByDefault)
   const [usbInput, setUsbInput] = useState('')
   const usbInputRef = useRef<HTMLInputElement>(null)
   // Scanners type far faster than a person; used to submit a scan that ends
@@ -127,6 +131,7 @@ export function ProjectDetail({
         active: true,
         createdAt: serverTimestamp(),
       })
+      setUsbActive(false)
       setRemoteSessionId(ref.id)
       setRemoteScanCount(0)
       setScanEntries([])
@@ -139,9 +144,11 @@ export function ProjectDetail({
     if (!remoteSessionId) return
     await updateDoc(doc(db, 'scan_sessions', remoteSessionId), { active: false }).catch(() => {})
     setRemoteSessionId(null)
+    setUsbActive(usbByDefault)
   }
 
   async function startScanner() {
+    setUsbActive(false)
     setScanActive(true)
     const reader = new BrowserMultiFormatReader()
     try {
@@ -173,6 +180,7 @@ export function ProjectDetail({
     controlsRef.current?.stop()
     controlsRef.current = null
     setScanActive(false)
+    setUsbActive(usbByDefault)
   }
 
   function submitUsbScan(raw = usbInput) {
@@ -552,7 +560,7 @@ export function ProjectDetail({
           </div>
           <div className="scan-monitor-actions">
             {/* Local camera */}
-            {!remoteSessionId && !usbActive && (
+            {!remoteSessionId && (
               scanActive
                 ? <button className="scan-stop-btn" onClick={stopScanner}><ZapOff size={14} /> Stop</button>
                 : <button className="manual-add-btn" onClick={startScanner}><Scan size={14} /> This Device</button>
@@ -561,10 +569,10 @@ export function ProjectDetail({
             {!remoteSessionId && !scanActive && (
               usbActive
                 ? <button className="scan-stop-btn" onClick={() => { setUsbActive(false); setUsbInput('') }}><ZapOff size={14} /> Stop</button>
-                : <button className="manual-add-btn" onClick={() => setUsbActive(true)}><ScanBarcode size={14} /> USB Scanner</button>
+                : <button className="manual-add-btn" onClick={() => { setUsbActive(true); setTimeout(() => usbInputRef.current?.focus(), 0) }}><ScanBarcode size={14} /> USB Scanner</button>
             )}
             {/* Remote scanner */}
-            {!scanActive && !usbActive && (
+            {!scanActive && (
               remoteSessionId
                 ? <button className="scan-stop-btn" onClick={stopRemoteSession}><ZapOff size={14} /> Stop</button>
                 : <button className="manual-add-btn" style={{ background: 'rgba(76,217,100,.12)', borderColor: 'rgba(76,217,100,.3)', color: '#4cd964' }} onClick={startRemoteSession}>
@@ -592,7 +600,6 @@ export function ProjectDetail({
             </div>
             <input
               ref={usbInputRef}
-              autoFocus
               value={usbInput}
               onChange={e => onUsbInputChange(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); submitUsbScan() } }}

@@ -405,6 +405,7 @@ export function ProjectDetail({
     win.document.write(buildEquipmentContractHtml({
       projectName: project.name,
       borrowerName: project.borrowers?.join(', ') ?? '',
+      signers: project.borrowers ?? [],
       dateFrom: formatDate(project.checkoutDate),
       dateTo: formatDate(project.returnDate),
       items: items.map(i => ({

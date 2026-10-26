@@ -331,6 +331,7 @@ export default function InventoryProject() {
     win.document.write(buildEquipmentContractHtml({
       projectName: project.name,
       borrowerName: project.borrowers.join(', '),
+      signers: project.borrowers,
       dateFrom: project.checkoutDate,
       dateTo: project.returnDate,
       items: items.map(i => ({

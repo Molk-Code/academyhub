@@ -461,8 +461,31 @@ export interface InventoryProjectDoc {
   returnDate: string
   status: InventoryProjectStatus
   bookingId?: string   // set when created via "Set Up in Inventory" from an equipment booking
+  // Set by the requestEquipmentSignatures function when staff ask borrowers to sign
+  signatureRequest?: { requestedAt?: Timestamp; requestedBy: string; requestedByName: string }
   createdAt?: Timestamp
   updatedAt?: Timestamp
+}
+
+// inventory_projects/{id}/signatures — server-written by signEquipmentContract
+export interface EquipmentSignatureDoc {
+  id: string
+  uid: string
+  typedName: string
+  accountName: string
+  email: string
+  signedAt?: Timestamp
+  contractHash: string
+  snapshot: {
+    legalText: string
+    projectName: string
+    dateFrom: string
+    dateTo: string
+    items: { id: string; name: string }[]
+  }
+  ip: string
+  userAgent: string
+  method: string
 }
 
 export interface InventoryItemDoc {

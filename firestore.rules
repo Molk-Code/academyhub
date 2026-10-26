@@ -527,6 +527,13 @@ service cloud.firestore {
         allow read: if isSignedIn() && (isAdmin() || tierHasFeature('inventory'));
         allow write: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('inventory'));
       }
+
+      // Contract e-signatures — written only by the signEquipmentContract
+      // function (server-captured evidence), never edited. Borrowers see their own.
+      match /signatures/{sigId} {
+        allow read: if isTeacherOrAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+        allow write: if false;
+      }
     }
 
     // Collection group rule required for collectionGroup('items') queries

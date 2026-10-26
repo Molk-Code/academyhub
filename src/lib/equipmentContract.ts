@@ -14,9 +14,21 @@ export interface EquipmentContractOptions {
   dateFrom: string
   dateTo: string
   items: EquipmentContractItem[]
+  // Terms as signed (defaults to the current LEGAL_TEXT)
+  legalText?: string
+  // Electronic signature, printed in the "Sign" box instead of leaving it blank
+  signature?: {
+    typedName: string
+    accountName: string
+    email: string
+    signedAt: string
+    ip: string
+    contractHash: string
+  }
 }
 
-const LEGAL_TEXT =
+// Keep in sync with LEGAL_TEXT in functions/src/equipment-signing.ts
+export const LEGAL_TEXT =
   "The following items are loaned to the above-mentioned borrower. The borrowers are aware that by signing this " +
   "agreement, they are responsible for handling, storing, and transporting the equipment in such a way that no " +
   "damage or abnormal wear and tear occurs. If any damage occurs, it must be reported immediately to the school's " +
@@ -67,6 +79,10 @@ export function buildEquipmentContractHtml(opts: EquipmentContractOptions): stri
   .ec-time { width: 160px; }
   .ec-sign-label { text-align: center; font-weight: 700; }
   .ec-sign-box { height: 110px; }
+  .ec-esign { font-size: 12px; line-height: 1.55; padding: 10px 14px; }
+  .ec-esign-name { font-size: 18px; font-weight: 700; font-style: italic; margin-bottom: 4px; }
+  .ec-esign-meta { color: #555; font-size: 11px; }
+  .ec-esign-hash { font-family: monospace; font-size: 10px; color: #777; word-break: break-all; }
   .ec-footer { max-width: 800px; margin: 12px auto 0; font-size: 11px; color: #888; text-align: right; }
   @media print { body { padding: 0; } }
 </style>
@@ -92,7 +108,7 @@ export function buildEquipmentContractHtml(opts: EquipmentContractOptions): stri
     </tr>
     <tr>
       <td style="border:none"></td>
-      <td class="ec-legal">${esc(LEGAL_TEXT)}</td>
+      <td class="ec-legal">${esc(opts.legalText ?? LEGAL_TEXT)}</td>
     </tr>
     <tr class="ec-highlight">
       <td class="ec-label">Date from</td>
@@ -109,10 +125,27 @@ export function buildEquipmentContractHtml(opts: EquipmentContractOptions): stri
     ${itemRows}
     <tr>
       <td class="ec-sign-label">Sign</td>
-      <td class="ec-sign-box"></td>
+      ${opts.signature ? `<td class="ec-esign">
+        <div class="ec-esign-name">${esc(opts.signature.typedName)}</div>
+        <div class="ec-esign-meta">Signed electronically in CineForge by ${esc(opts.signature.accountName)} (${esc(opts.signature.email)})<br/>
+        ${esc(opts.signature.signedAt)}${opts.signature.ip ? ` · IP ${esc(opts.signature.ip)}` : ''}</div>
+        <div class="ec-esign-hash">Contract fingerprint (SHA-256): ${esc(opts.signature.contractHash)}</div>
+      </td>` : '<td class="ec-sign-box"></td>'}
     </tr>
   </table>
   <div class="ec-footer">Generated ${new Date().toLocaleString()}</div>
 </body>
 </html>`
+}
+
+// Open the contract in a new window and print it (same flow as "Download Contract PDF")
+export function printEquipmentContract(opts: EquipmentContractOptions) {
+  const win = window.open('', '_blank')
+  if (!win) return
+  win.document.write(buildEquipmentContractHtml(opts))
+  win.document.close()
+  let printed = false
+  const doPrint = () => { if (printed) return; printed = true; win.print() }
+  win.addEventListener('load', doPrint)
+  setTimeout(doPrint, 500)
 }

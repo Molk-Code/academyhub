@@ -16,6 +16,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { buildEquipmentContractHtml } from '@/lib/equipmentContract'
 import { isOverdue, formatDate, overdueDays, parseScanText, beep } from './inventoryShared'
 import { EquipmentPicker } from './EquipmentPicker'
+import { ContractSignatures } from './ContractSignatures'
 
 export function ProjectDetail({
   project,
@@ -539,6 +540,8 @@ export function ProjectDetail({
           </button>
         )}
       </div>
+
+      <ContractSignatures project={project} items={items} />
 
       {/* Scanner */}
       {/* On computers the USB scanner listens silently (hidden input below) —

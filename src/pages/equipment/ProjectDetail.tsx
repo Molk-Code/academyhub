@@ -215,7 +215,7 @@ export function ProjectDetail({
       if (el === usbInputRef.current) return
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return
       if (e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1) return
-      usbInputRef.current?.focus()
+      usbInputRef.current?.focus({ preventScroll: true })
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
@@ -541,7 +541,9 @@ export function ProjectDetail({
       </div>
 
       {/* Scanner */}
-      <div className={`scan-monitor${(scanActive || usbActive || !!remoteSessionId) ? ' active' : ''}`}>
+      {/* On computers the USB scanner listens silently (hidden input below) —
+          only the camera / phone sessions light up the scan panel. */}
+      <div className={`scan-monitor${(scanActive || (usbActive && !usbByDefault) || !!remoteSessionId) ? ' active' : ''}`}>
         {/* Mode tabs + action buttons */}
         <div className="scan-monitor-header">
           <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
@@ -549,13 +551,13 @@ export function ProjectDetail({
               className={`category-btn${scanMode === 'checkout' ? ' active' : ''}`}
               style={{ borderRadius: 6 }}
               disabled={scanActive || !!remoteSessionId}
-              onClick={() => { setScanMode('checkout'); usbInputRef.current?.focus() }}
+              onClick={() => { setScanMode('checkout'); usbInputRef.current?.focus({ preventScroll: true }) }}
             >Checkout</button>
             <button
               className={`category-btn${scanMode === 'checkin' ? ' active' : ''}`}
               style={{ borderRadius: 6 }}
               disabled={scanActive || !!remoteSessionId}
-              onClick={() => { setScanMode('checkin'); usbInputRef.current?.focus() }}
+              onClick={() => { setScanMode('checkin'); usbInputRef.current?.focus({ preventScroll: true }) }}
             >Check-in</button>
           </div>
           <div className="scan-monitor-actions">
@@ -566,10 +568,10 @@ export function ProjectDetail({
                 : <button className="manual-add-btn" onClick={startScanner}><Scan size={14} /> This Device</button>
             )}
             {/* USB / Bluetooth barcode scanner */}
-            {!remoteSessionId && !scanActive && (
+            {!remoteSessionId && !scanActive && !usbByDefault && (
               usbActive
                 ? <button className="scan-stop-btn" onClick={() => { setUsbActive(false); setUsbInput('') }}><ZapOff size={14} /> Stop</button>
-                : <button className="manual-add-btn" onClick={() => { setUsbActive(true); setTimeout(() => usbInputRef.current?.focus(), 0) }}><ScanBarcode size={14} /> USB Scanner</button>
+                : <button className="manual-add-btn" onClick={() => { setUsbActive(true); setTimeout(() => usbInputRef.current?.focus({ preventScroll: true }), 0) }}><ScanBarcode size={14} /> USB Scanner</button>
             )}
             {/* Remote scanner */}
             {!scanActive && (
@@ -593,11 +595,13 @@ export function ProjectDetail({
 
         {/* USB scanner input — the scanner types here and presses Enter */}
         {usbActive && (
-          <div style={{ marginBottom: '.75rem' }}>
-            <div className="scan-monitor-status" style={{ marginBottom: '.5rem' }}>
-              <div className="scan-pulse" />
-              Ready for barcode scanner ({scanMode}) — just scan, anywhere on this page
-            </div>
+          <div style={usbByDefault ? { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0, pointerEvents: 'none' } : { marginBottom: '.75rem' }}>
+            {!usbByDefault && (
+              <div className="scan-monitor-status" style={{ marginBottom: '.5rem' }}>
+                <div className="scan-pulse" />
+                Ready for barcode scanner ({scanMode}) — just scan, anywhere on this page
+              </div>
+            )}
             <input
               ref={usbInputRef}
               value={usbInput}
@@ -606,6 +610,8 @@ export function ProjectDetail({
               placeholder="Scan a barcode…"
               autoComplete="off"
               spellCheck={false}
+              tabIndex={usbByDefault ? -1 : undefined}
+              aria-hidden={usbByDefault || undefined}
               style={{ width: '100%', padding: '10px 12px', background: '#1a1a25', border: '1px solid #4cd964', borderRadius: 8, color: '#f0f0f5', fontFamily: 'monospace', fontSize: '.9rem', outline: 'none' }}
             />
           </div>
@@ -636,9 +642,11 @@ export function ProjectDetail({
           </div>
         )}
 
-        {scanEntries.length === 0 && !scanActive && !usbActive && !remoteSessionId && (
+        {scanEntries.length === 0 && !scanActive && (!usbActive || usbByDefault) && !remoteSessionId && (
           <div className="scan-waiting">
-            Use <strong>This Device</strong> to scan with this camera, <strong>USB Scanner</strong> for a plugged-in or Bluetooth barcode scanner, or <strong>Mobile</strong> to use a phone as a scanner.
+            {usbByDefault
+              ? <>A plugged-in barcode scanner works automatically on this page. Or use <strong>This Device</strong> to scan with this camera, or <strong>Mobile</strong> to use a phone as a scanner.</>
+              : <>Use <strong>This Device</strong> to scan with this camera, <strong>USB Scanner</strong> for a plugged-in or Bluetooth barcode scanner, or <strong>Mobile</strong> to use a phone as a scanner.</>}
           </div>
         )}
 

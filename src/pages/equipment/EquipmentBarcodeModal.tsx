@@ -1,8 +1,114 @@
 import { useEffect, useRef, useState } from 'react'
 import JsBarcode from 'jsbarcode'
 import type { EquipmentDoc } from '@/types'
-import { Barcode, X, Printer } from 'lucide-react'
+import { Barcode, X, Printer, Download, Copy, Check } from 'lucide-react'
 import { printBarcodeLabel, barcodeUnitValue } from './adminEquipmentShared'
+
+// ── High-resolution PNG label (for P-touch Editor & other label software) ────
+// Label software rasterises imported PDFs at low resolution, so offer a PNG
+// rendered at print resolution instead: 100 × 50 mm at 600 dpi, with bars on
+// whole-pixel module widths (no anti-aliased edges) and the DPI written into
+// the file so the label lands at its real size.
+const DPI = 600
+const mm = (v: number) => Math.round((v / 25.4) * DPI)
+
+function crc32(bytes: Uint8Array): number {
+  let c = ~0
+  for (const b of bytes) {
+    c ^= b
+    for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1))
+  }
+  return ~c >>> 0
+}
+
+// Insert a pHYs chunk (pixels per metre) right after IHDR.
+function withDpi(png: Uint8Array, dpi: number): Uint8Array {
+  const ppm = Math.round(dpi / 0.0254)
+  const chunk = new Uint8Array(21)
+  const dv = new DataView(chunk.buffer)
+  dv.setUint32(0, 9)
+  chunk.set([0x70, 0x48, 0x59, 0x73], 4) // "pHYs"
+  dv.setUint32(8, ppm)
+  dv.setUint32(12, ppm)
+  chunk[16] = 1 // unit: metre
+  dv.setUint32(17, crc32(chunk.subarray(4, 17)))
+  const at = 8 + 25 // signature + IHDR chunk
+  const out = new Uint8Array(png.length + chunk.length)
+  out.set(png.subarray(0, at))
+  out.set(chunk, at)
+  out.set(png.subarray(at), at + chunk.length)
+  return out
+}
+
+async function downloadBarcodePng(value: string, name: string, category: string) {
+  const W = mm(100), H = mm(50)
+  const canvas = document.createElement('canvas')
+  canvas.width = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, W, H)
+  ctx.fillStyle = '#111'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+
+  // Barcode: count modules first, then pick the widest whole-pixel module that fits 92 mm
+  const probe = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  JsBarcode(probe, value, { format: 'CODE128', width: 1, margin: 0, displayValue: false })
+  const modules = parseFloat(probe.getAttribute('width') ?? '0') || 1
+  const moduleW = Math.max(1, Math.floor(mm(92) / modules))
+  const bc = document.createElement('canvas')
+  JsBarcode(bc, value, {
+    format: 'CODE128',
+    width: moduleW,
+    height: mm(16),
+    margin: 0,
+    // Drawn below ourselves — JsBarcode's canvas text clips descenders (g, p)
+    displayValue: false,
+    background: '#ffffff',
+    lineColor: '#000000',
+  })
+
+  // Name + category, same proportions as the printed label
+  let nameSize = mm(3.6)
+  ctx.font = `bold ${nameSize}px Arial, sans-serif`
+  while (ctx.measureText(name).width > mm(92) && nameSize > mm(2)) {
+    nameSize -= 4
+    ctx.font = `bold ${nameSize}px Arial, sans-serif`
+  }
+  const catSize = mm(2.4)
+  const gap = mm(1.5)
+  const codeSize = mm(3)
+  const blockH = nameSize + (category ? gap + catSize : 0) + gap * 1.5 + bc.height + mm(1) + codeSize
+  let y = Math.round((H - blockH) / 2)
+
+  ctx.fillText(name, W / 2, y)
+  y += nameSize + gap
+  if (category) {
+    ctx.fillStyle = '#6b7280'
+    ctx.font = `bold ${catSize}px Arial, sans-serif`
+    ctx.fillText(category.toUpperCase(), W / 2, y)
+    y += catSize + gap
+  }
+  y += gap * 0.5
+  ctx.imageSmoothingEnabled = false
+  ctx.drawImage(bc, Math.round((W - bc.width) / 2), Math.round(y))
+  y += bc.height + mm(1)
+  ctx.fillStyle = '#000'
+  ctx.font = `${codeSize}px Menlo, Consolas, monospace`
+  ctx.fillText(value, W / 2, y)
+
+  const blob: Blob = await new Promise(res => canvas.toBlob(b => res(b!), 'image/png'))
+  const png = withDpi(new Uint8Array(await blob.arrayBuffer()), DPI)
+  const url = URL.createObjectURL(new Blob([png as Uint8Array<ArrayBuffer>], { type: 'image/png' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `barcode-${name.replace(/[^\w\-#åäöÅÄÖ ]+/g, '').trim().replace(/\s+/g, '-') || 'label'}.png`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 2000)
+}
 
 export function BarcodeModal({ item, onClose }: { item: EquipmentDoc; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -10,6 +116,7 @@ export function BarcodeModal({ item, onClose }: { item: EquipmentDoc; onClose: (
   const hasMultiple = item.totalQuantity > 1
   const [mode, setMode] = useState<'shared' | 'individual'>('shared')
   const [unit, setUnit] = useState(1)
+  const [copied, setCopied] = useState(false)
 
   const value = mode === 'individual' ? barcodeUnitValue(item, unit) : item.id
   const label = mode === 'individual' ? `${item.name} #${unit}` : item.name
@@ -84,6 +191,22 @@ export function BarcodeModal({ item, onClose }: { item: EquipmentDoc; onClose: (
         >
           <Printer size={14} /> Print Barcode Label
         </button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <button
+            onClick={() => downloadBarcodePng(value, label, item.category)}
+            title="High-resolution PNG (600 dpi, 100 × 50 mm) — import into P-touch Editor or other label software"
+            style={{ flex: 1, padding: '10px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 10, color: '#f0f0f5', fontSize: '.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          >
+            <Download size={14} /> Download PNG
+          </button>
+          <button
+            onClick={() => { navigator.clipboard?.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }}
+            title="Copy the code — paste into P-touch Editor's own Code 128 barcode for the sharpest print"
+            style={{ flex: 1, padding: '10px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 10, color: copied ? '#4cd964' : '#f0f0f5', fontSize: '.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          >
+            {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copied' : 'Copy code'}
+          </button>
+        </div>
       </div>
     </div>
   )

@@ -169,8 +169,15 @@ function CreateProjectForm({
           .map(d => ({ id: d.id, ...d.data() } as UserDoc))
           .sort((a, b) => (a.displayName ?? '').localeCompare(b.displayName ?? '')),
       )
-      const tq = await getDocs(query(collection(db, 'users'), where('role', 'in', ['teacher', 'admin'])))
-      setTeachers(tq.docs.map(d => ({ id: d.id, ...d.data() } as UserDoc)))
+      // Active role OR any switchable role — multi-role staff may currently be
+      // switched to another role, so 'role' alone misses them.
+      const [tq, trq] = await Promise.all([
+        getDocs(query(collection(db, 'users'), where('role', 'in', ['teacher', 'admin']))),
+        getDocs(query(collection(db, 'users'), where('roles', 'array-contains-any', ['teacher', 'admin']))),
+      ])
+      const staff = new Map<string, UserDoc>()
+      for (const d of [...tq.docs, ...trq.docs]) staff.set(d.id, { id: d.id, ...d.data() } as UserDoc)
+      setTeachers([...staff.values()].sort((a, b) => (a.displayName ?? '').localeCompare(b.displayName ?? '')))
     }
     load()
   }, [])
@@ -211,7 +218,8 @@ function CreateProjectForm({
       const ref = await addDoc(collection(db, 'inventory_projects'), {
         name,
         borrowers,
-        borrowerIds: students.filter(s => borrowers.includes(s.displayName)).map(s => s.id),
+        // Students and teachers can both borrow; ids let them see the project in My Bookings
+        borrowerIds: [...new Set([...students, ...teachers].filter(s => borrowers.includes(s.displayName)).map(s => s.id))],
         equipmentManagerId: managerId,
         equipmentManagerName: manager,
         cohortId: profile?.cohortId ?? '',
@@ -319,15 +327,26 @@ function CreateProjectForm({
               </span>
             ))}
           </div>
-          {students.length > 0 && (
+          {(students.length > 0 || teachers.length > 0) && (
             <select
               className="form-select borrower-dropdown"
               onChange={e => { if (e.target.value) addBorrower(e.target.value); e.target.value = '' }}
             >
-              <option value="">Select student...</option>
-              {students.map(s => (
-                <option key={s.id} value={s.displayName}>{s.displayName}</option>
-              ))}
+              <option value="">Select student or teacher...</option>
+              {students.length > 0 && (
+                <optgroup label="Students">
+                  {students.map(s => (
+                    <option key={s.id} value={s.displayName}>{s.displayName}</option>
+                  ))}
+                </optgroup>
+              )}
+              {teachers.length > 0 && (
+                <optgroup label="Teachers">
+                  {teachers.map(t => (
+                    <option key={t.id} value={t.displayName}>{t.displayName}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           )}
           <div className="borrower-manual-row">

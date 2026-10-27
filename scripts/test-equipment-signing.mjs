@@ -10,6 +10,7 @@ const FN = 'https://us-central1-academy-hub-c252f.cloudfunctions.net'
 const NAME = 'ZZ Signing test (temporary)'
 const student = (await admin.auth().getUserByEmail('test-student@cineforge.app')).uid
 const teacher = (await admin.auth().getUserByEmail('test-teacher@cineforge.app')).uid
+const admin2 = (await admin.auth().getUserByEmail('test-admin@cineforge.app')).uid // requests when the teacher is a borrower
 
 async function idToken(uid) {
   const custom = await admin.auth().createCustomToken(uid)
@@ -30,7 +31,7 @@ if (process.argv[2] === 'cleanup') {
   for (const d of (await db.collection('inventory_projects').where('name', '==', NAME).get()).docs) {
     await db.recursiveDelete(d.ref); console.log('deleted project', d.id)
   }
-  const notes = await db.collection('notifications').where('uid', '==', student).where('title', '==', 'Sign equipment contract').get()
+  const notes = await db.collection('notifications').where('uid', 'in', [student, teacher]).where('title', '==', 'Sign equipment contract').get()
   for (const d of notes.docs) await d.ref.delete()
   console.log('deleted', notes.size, 'test notifications')
   process.exit(0)
@@ -64,5 +65,12 @@ const q = await fetch(`https://firestore.googleapis.com/v1/projects/academy-hub-
 })
 console.log('student reads own signatures:', q.status, (await q.json()).filter(x => x.document).length, 'doc(s)')
 const notes = await db.collection('notifications').where('uid', '==', student).where('title', '==', 'Sign equipment contract').get()
-console.log('notifications saved for Test Student:', notes.size)
+console.log('notifications saved for Test Student:', notes.size, notes.docs.map(d => d.data().url))
+
+// Teacher as borrower: notified with the teacher My Bookings link, can sign
+await ref.update({ borrowers: ['Test Student', 'Test Teacher'], borrowerIds: [student, teacher] })
+console.log('admin request with teacher borrower:', JSON.stringify((await call('requestEquipmentSignatures', admin2, { projectId: ref.id })).body))
+const tNotes = await db.collection('notifications').where('uid', '==', teacher).where('title', '==', 'Sign equipment contract').get()
+console.log('teacher notification urls:', tNotes.docs.map(d => d.data().url))
+console.log('teacher signs:', (await call('signEquipmentContract', teacher, { projectId: ref.id, typedName: 'Test Teacher', accepted: true })).status)
 process.exit(0)

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { addDoc, collection, collectionGroup, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -498,17 +499,23 @@ function MinivanSection({ bookings }: { bookings: MinivanBookingDoc[] }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+// Shared by students (/my-bookings) and teachers (/teacher/my-bookings) — both
+// can be borrowers on an equipment project.
 export default function MyBookings() {
   const { profile } = useAuth()
+  const navRole = useLocation().pathname.startsWith('/teacher') ? 'teacher' : 'student'
   const uid = profile?.uid ?? ''
   const canEquipment = useFeature('equipment')
   const canFoodBox   = useFeature('food_box')
   const canVehicles  = useFeature('vehicles')
-  const { data: navVis } = useDocument<{ id: string; student: Record<string, boolean> }>('settings', 'nav_visibility')
+  const { data: navVis } = useDocument<{ id: string; student?: Record<string, boolean>; teacher?: Record<string, boolean> }>('settings', 'nav_visibility')
 
-  const showEquipment = canEquipment && navVis?.student?.['equipment'] !== false
-  const showFoodBox   = canFoodBox   && navVis?.student?.['foodBox']   !== false
-  const showVehicles  = canVehicles  && navVis?.student?.['vehicle']   !== false
+  // Teachers book equipment / food boxes / vans from staff pages, so only the
+  // student nav toggles hide these sections.
+  const vis = navRole === 'student' ? navVis?.student : undefined
+  const showEquipment = canEquipment && vis?.['equipment'] !== false
+  const showFoodBox   = canFoodBox   && vis?.['foodBox']   !== false
+  const showVehicles  = canVehicles  && vis?.['vehicle']   !== false
 
   const { projects, items } = useEquipmentProjects(uid, !!uid && showEquipment)
   const bookingRequests     = useEquipmentBookingRequests(uid, !!uid && showEquipment)

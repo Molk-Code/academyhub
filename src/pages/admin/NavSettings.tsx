@@ -54,7 +54,7 @@ const FEATURES: Feature[] = [
   { id: 'roomBooking',      label: 'Booking – Room',      icon: DoorOpen,        student: true,  teacher: true  },
   { id: 'foodBox',          label: 'Booking – Food Box',  icon: UtensilsCrossed, student: true,  teacher: false },
   { id: 'vehicle',          label: 'Booking – Vehicle',   icon: Car,             student: true,  teacher: false },
-  { id: 'myBookings',       label: 'My Bookings',         icon: ClipboardCheck, student: true,  teacher: false },
+  { id: 'myBookings',       label: 'My Bookings',         icon: ClipboardCheck, student: true,  teacher: true  },
 ]
 
 // ── Toggle ─────────────────────────────────────────────────────────────────────

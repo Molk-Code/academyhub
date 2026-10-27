@@ -212,6 +212,7 @@ export default function App() {
             <Route path="/teacher/notebook"                   element={<Notebook />} />
             <Route path="/teacher/guest-teachers"            element={<GuestTeacherBank />} />
             <Route path="/teacher/bug-reports"               element={<MyBugReports />} />
+            <Route path="/teacher/my-bookings"               element={<MyBookings />} />
           </Route>
 
           {/* ── Admin ───────────────────────────────────────────────────── */}

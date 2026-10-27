@@ -92,16 +92,28 @@ export const requestEquipmentSignatures = functions.https.onCall(async (data, co
 
   if (toAsk.length > 0) {
     const users = await Promise.all(toAsk.map(uid => db.collection('users').doc(uid).get()))
-    const tokens = users.flatMap(u => (u.data()?.fcmTokens as string[]) ?? [])
-    const msg = {
-      title: 'Sign equipment contract',
-      body:  `${project.name ?? 'Your equipment loan'} — please review and sign in My Bookings.`,
-      url:   '/my-bookings',
+    // Teachers can be borrowers too — their My Bookings lives under /teacher
+    const isStaff = (u: FirebaseFirestore.DocumentSnapshot) => {
+      const d = u.data() ?? {}
+      const roles: string[] = (d.roles as string[])?.length ? d.roles : [d.role]
+      return !roles.includes('student') && roles.some(r => r === 'teacher' || r === 'admin')
     }
-    await Promise.all([
-      sendPush([...new Set(tokens)], { ...msg, tag: `sign-${projectId}` }),
-      saveNotifications(toAsk, msg),
-    ])
+    const groups = [
+      { url: '/my-bookings',         users: users.filter(u => !isStaff(u)) },
+      { url: '/teacher/my-bookings', users: users.filter(isStaff) },
+    ]
+    await Promise.all(groups.filter(g => g.users.length > 0).flatMap(g => {
+      const msg = {
+        title: 'Sign equipment contract',
+        body:  `${project.name ?? 'Your equipment loan'} — please review and sign in My Bookings.`,
+        url:   g.url,
+      }
+      const tokens = g.users.flatMap(u => (u.data()?.fcmTokens as string[]) ?? [])
+      return [
+        sendPush([...new Set(tokens)], { ...msg, tag: `sign-${projectId}` }),
+        saveNotifications(g.users.map(u => u.id), msg),
+      ]
+    }))
   }
 
   return { notified: toAsk.length, alreadySigned: borrowerIds.length - toAsk.length }

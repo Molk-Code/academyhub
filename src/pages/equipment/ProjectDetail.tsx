@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   collection, addDoc, updateDoc, deleteDoc, doc,
-  serverTimestamp, onSnapshot, increment,
+  serverTimestamp, onSnapshot, increment, writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { useCollection } from '@/hooks/useFirestore'
+import { useCollection, where } from '@/hooks/useFirestore'
 import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc } from '@/types'
 import {
   Package, Calendar, Users, Clock, AlertTriangle, Check, Trash2, Plus,
-  Edit2, CheckCircle2, ArchiveRestore, ZapOff, Scan, Smartphone, ScanBarcode,
+  Edit2, CheckCircle2, ArchiveRestore, ZapOff, Scan, Smartphone, ScanBarcode, ArrowRightLeft,
 } from 'lucide-react'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { NotFoundException } from '@zxing/library'
@@ -31,6 +31,17 @@ export function ProjectDetail({
 }) {
   const { data: items } = useCollection<InventoryItemDoc>(`inventory_projects/${project.id}/items`)
   const { data: equipmentAll } = useCollection<EquipmentDoc>('equipment')
+  // Other active projects an item can be moved to
+  const { data: activeProjects } = useCollection<InventoryProjectDoc>(
+    'inventory_projects',
+    [where('status', 'in', ['active', 'checked-out'])],
+  )
+  const moveTargets = useMemo(
+    () => activeProjects.filter(p => p.id !== project.id).sort((a, b) => a.name.localeCompare(b.name, 'sv')),
+    [activeProjects, project.id],
+  )
+  const [moveOpen, setMoveOpen] = useState<Record<string, string>>({}) // itemId → chosen target project id
+  const [moving, setMoving] = useState<string | null>(null)
 
   const [scanMode, setScanMode] = useState<'checkout' | 'checkin'>('checkout')
   const [scanActive, setScanActive] = useState(false)
@@ -360,6 +371,28 @@ export function ProjectDetail({
       checkinTimestamp: new Date().toISOString(),
     })
     if (item.equipmentId) await adjustEquipmentAvailable(item.equipmentId, 1)
+  }
+
+  // Move an item to another active project as-is (status, times, notes kept).
+  // It stays in the same availability state, so the equipment count is untouched.
+  async function moveItem(item: InventoryItemDoc, targetId: string) {
+    const target = moveTargets.find(p => p.id === targetId)
+    if (!target) return
+    setMoving(item.id)
+    try {
+      const { id: _id, ...data } = item
+      const batch = writeBatch(db)
+      batch.set(doc(collection(db, `inventory_projects/${targetId}/items`)), {
+        ...data,
+        assignedTo: target.borrowers?.[0] ?? '',
+        movedFrom: { projectId: project.id, projectName: project.name, at: new Date().toISOString() },
+      })
+      batch.delete(doc(db, `inventory_projects/${project.id}/items`, item.id))
+      await batch.commit()
+      setMoveOpen(prev => { const n = { ...prev }; delete n[item.id]; return n })
+    } finally {
+      setMoving(null)
+    }
   }
 
   async function removeItem(item: InventoryItemDoc) {
@@ -770,6 +803,17 @@ export function ProjectDetail({
                       <Check size={16} />
                     </button>
                   )}
+                  <button
+                    className="item-missing-btn"
+                    title="Move to another project"
+                    onClick={() => setMoveOpen(prev => {
+                      const n = { ...prev }
+                      if (item.id in n) delete n[item.id]; else n[item.id] = ''
+                      return n
+                    })}
+                  >
+                    <ArrowRightLeft size={14} />
+                  </button>
                   <button className="item-remove-btn" title="Remove" onClick={() => removeItem(item)}>
                     <Trash2 size={14} />
                   </button>
@@ -778,6 +822,35 @@ export function ProjectDetail({
               {item.status === 'damaged' && item.damageNotes && (
                 <div className="checkin-inline-damage">
                   <span style={{ fontSize: '.8rem', color: '#ffa502' }}>{item.damageNotes}</span>
+                </div>
+              )}
+              {moveOpen[item.id] !== undefined && (
+                <div className="checkin-inline-damage">
+                  {moveTargets.length > 0 ? (
+                    <>
+                      <select
+                        className="checkin-damage-input"
+                        value={moveOpen[item.id]}
+                        onChange={e => setMoveOpen(prev => ({ ...prev, [item.id]: e.target.value }))}
+                      >
+                        <option value="">Move to project…</option>
+                        {moveTargets.map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}{p.borrowers?.length ? ` — ${p.borrowers.join(', ')}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="checkin-damage-save-btn"
+                        disabled={!moveOpen[item.id] || moving === item.id}
+                        onClick={() => moveItem(item, moveOpen[item.id])}
+                      >
+                        <ArrowRightLeft size={13} /> {moving === item.id ? 'Moving…' : 'Move'}
+                      </button>
+                    </>
+                  ) : (
+                    <span style={{ fontSize: '.8rem', color: '#6a6a80' }}>No other active projects to move to.</span>
+                  )}
                 </div>
               )}
               {inlineDamage[item.id] !== undefined && (

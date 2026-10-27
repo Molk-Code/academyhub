@@ -12,12 +12,12 @@ import './molkom.css'
 type Item = InventoryItemDoc & { projectId: string }
 
 const TABS = [
-  { id: 'most-borrowed',    label: 'Most Borrowed' },
   { id: 'equipment-status', label: 'Equipment Status' },
   { id: 'overdue',          label: 'Overdue' },
   { id: 'damaged',          label: 'Damaged' },
   { id: 'missing',          label: 'Missing' },
   { id: 'manual',           label: 'Manual Checkouts' },
+  { id: 'most-borrowed',    label: 'Most Borrowed' },
   { id: 'borrowers',        label: 'Borrowers' },
   { id: 'projects',         label: 'Projects' },
   { id: 'budget',           label: 'Budget' },

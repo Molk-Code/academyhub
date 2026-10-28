@@ -402,6 +402,7 @@ export interface EquipmentDoc {
   totalQuantity: number
   imageUrl: string
   qrCode: string
+  gtinNo?: number               // equipment number inside its EAN-14 code (assigned on first EAN-14 label)
   included: string[]
   filmYear2Only: boolean
   allowedCohortIds?: string[]   // empty / absent = available to all

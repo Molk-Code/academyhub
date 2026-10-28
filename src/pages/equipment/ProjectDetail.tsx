@@ -251,9 +251,10 @@ export function ProjectDetail({
     const time = new Date().toLocaleTimeString()
     const log = (name: string, note: string, warn = false) =>
       setScanEntries(prev => [{ name, time, note, warn }, ...prev.slice(0, 19)])
-    const { base, unit } = parseScanText(text)
+    const { base, unit, gtinNo } = parseScanText(text)
     const lower = base.toLowerCase()
-    const matchedEquip = equipmentAll.find(e => e.id === base || e.qrCode === base || e.name === base)
+    const matchedEquip = (gtinNo ? equipmentAll.find(e => e.gtinNo === gtinNo) : undefined)
+      ?? equipmentAll.find(e => e.id === base || e.qrCode === base || e.name === base)
       // Caps Lock flips the case of everything a scanner types
       ?? equipmentAll.find(e => e.id.toLowerCase() === lower || (e.qrCode ?? '').toLowerCase() === lower)
     const displayName = matchedEquip

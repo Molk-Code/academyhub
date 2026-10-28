@@ -244,6 +244,12 @@ service cloud.firestore {
       allow write: if isTeacherOrAdmin();
     }
 
+    // Counter for EAN-14 equipment numbers, bumped when staff print a label
+    match /settings/equipment_gtin {
+      allow read: if isSignedIn();
+      allow write: if isTeacherOrAdmin();
+    }
+
     match /settings/inventory_stats_resets {
       allow read: if isSignedIn();
       allow write: if isTeacherOrAdmin();

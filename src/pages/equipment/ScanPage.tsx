@@ -58,6 +58,7 @@ export default function ScanPage() {
   const cooldownRef = useRef(false)          // fast ref to block scans during cooldown
   const sessionRef = useRef<ScanSession | null>(null)
   const equipmentCacheRef = useRef<Record<string, string>>({})
+  const gtinCacheRef = useRef<Record<number, string>>({})   // EAN-14 equipment number → id
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Listen to session doc
@@ -76,7 +77,11 @@ export default function ScanPage() {
   // Pre-load equipment name cache
   useEffect(() => {
     getDocs(collection(db, 'equipment')).then(snap => {
-      snap.docs.forEach(d => { equipmentCacheRef.current[d.id] = (d.data() as any).name ?? d.id })
+      snap.docs.forEach(d => {
+        equipmentCacheRef.current[d.id] = (d.data() as any).name ?? d.id
+        const gtinNo = (d.data() as any).gtinNo
+        if (gtinNo) gtinCacheRef.current[gtinNo] = d.id
+      })
     }).catch(() => {})
   }, [])
 
@@ -112,7 +117,9 @@ export default function ScanPage() {
 
     // Individual-unit codes carry a unit number (see parseScanText) so a scan
     // can be traced back to a specific physical unit.
-    const { base, unit } = parseScanText(text)
+    const parsed = parseScanText(text)
+    const unit = parsed.unit
+    const base = (parsed.gtinNo && gtinCacheRef.current[parsed.gtinNo]) || parsed.base
     const baseName = equipmentCacheRef.current[base] ?? base
     const equipmentName = unit ? `${baseName} #${unit}` : baseName
     const equipmentId = equipmentCacheRef.current[base] ? base : ''

@@ -152,7 +152,18 @@ export default function LessonBuilder() {
   const { data: lcategories } = useCollection<LessonCategoryDoc>('lessonCategories', [orderBy('order', 'asc')])
   const { data: blocks     } = useCollection<LessonBlockDoc>('lessonBlocks', [orderBy('order', 'asc')])
   const { data: classrooms } = useCollection<ClassroomDoc>('classrooms', [orderBy('order', 'asc')])
-  const { data: teachers      } = useCollection<UserDoc>('users', [where('role', '==', 'teacher')])
+  // Anyone who teaches — including admins with teacher in their roles array
+  // (their primary `role` is 'admin'), plus legacy docs without a roles array
+  const { data: roleTeachers  } = useCollection<UserDoc>('users', [where('role', '==', 'teacher')])
+  const { data: rolesTeachers } = useCollection<UserDoc>('users', [where('roles', 'array-contains', 'teacher')], true, 'roles-teacher')
+  const teachers = useMemo(() => {
+    const byId = new Map<string, UserDoc>()
+    for (const t of [...roleTeachers, ...rolesTeachers]) {
+      if (t.isActive === false) continue
+      byId.set(t.uid ?? t.id, { ...t, uid: t.uid ?? t.id })
+    }
+    return [...byId.values()].sort((a, b) => (a.displayName ?? '').localeCompare(b.displayName ?? '', 'sv'))
+  }, [roleTeachers, rolesTeachers])
   const { data: guestTeachers } = useCollection<GuestTeacherDoc>('guest_teachers')
   const { data: guestTeacherBookings } = useCollection<GuestTeacherBookingDoc>('guest_teacher_bookings', [where('type', '==', 'subject')])
 

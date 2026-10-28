@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot,
-  serverTimestamp, orderBy, query,
+  serverTimestamp, orderBy, query, runTransaction,
 } from 'firebase/firestore'
 import { format, formatDistanceToNow } from 'date-fns'
 import { Plus, Trash2, BookOpen, Search } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
+import { merge3, mapCaret } from '@/lib/textMerge'
 
 interface NoteDoc {
   id: string
@@ -40,6 +41,15 @@ export default function Notebook() {
   const [search, setSearch]     = useState('')
   const [creating, setCreating] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const bodyRef   = useRef<HTMLTextAreaElement>(null)
+
+  // Live co-editing: `base` is the last server version the editor agreed
+  // with; `live` mirrors the editor so async saves see current text; `edits`
+  // counts keystrokes so a save can tell whether the user typed meanwhile.
+  const base   = useRef({ title: '', body: '' })
+  const live   = useRef({ title: '', body: '' })
+  const edits  = useRef(0)
+  const synced = useRef(0)   // value of `edits` the server has caught up with
 
   // Real-time notes list
   useEffect(() => {
@@ -50,40 +60,111 @@ export default function Notebook() {
     })
   }, [])
 
-  // Load note into editor only when the selected note changes — not on every snapshot update
+  // Put text into the editor without making the caret jump
+  const applyToEditor = useCallback((next: { title: string; body: string }) => {
+    const el = bodyRef.current
+    const focused = el && document.activeElement === el
+    const before = live.current.body
+    const selStart = el?.selectionStart ?? 0
+    const selEnd = el?.selectionEnd ?? 0
+    live.current = next
+    setTitle(next.title)
+    setBody(next.body)
+    if (focused && before !== next.body) {
+      requestAnimationFrame(() => {
+        el.setSelectionRange(mapCaret(before, next.body, selStart), mapCaret(before, next.body, selEnd))
+      })
+    }
+  }, [])
+
+  // Load the note when it's opened, then follow other teachers' edits live.
+  // While this user has unsaved typing, remote changes wait for the save,
+  // which merges both.
   const loadedNoteId = useRef<string | null>(null)
   useEffect(() => {
-    if (!selected) { setTitle(''); setBody(''); loadedNoteId.current = null; return }
-    if (loadedNoteId.current === selected) return  // already loaded, user may be editing
+    if (!selected) {
+      setTitle(''); setBody(''); loadedNoteId.current = null
+      base.current = live.current = { title: '', body: '' }
+      return
+    }
     const note = notes.find(n => n.id === selected)
     if (!note) return
-    loadedNoteId.current = selected
-    setTitle(note.title)
-    setBody(note.body)
-  }, [selected, notes])
+    const remote = { title: note.title ?? '', body: note.body ?? '' }
+    if (loadedNoteId.current !== selected) {
+      loadedNoteId.current = selected
+      edits.current = synced.current = 0
+      base.current = remote
+      applyToEditor(remote)
+      return
+    }
+    if (edits.current !== synced.current) return
+    if (remote.title === live.current.title && remote.body === live.current.body) {
+      base.current = remote
+      return
+    }
+    base.current = remote
+    applyToEditor(remote)
+  }, [selected, notes, applyToEditor])
 
-  const scheduleSave = useCallback((newTitle: string, newBody: string) => {
+  const scheduleSave = useCallback(() => {
     if (!selected || !profile) return
+    const noteId = selected
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
-      await updateDoc(doc(db, 'teacher_notes', selected), {
-        title:           newTitle,   // save exactly what the user typed, even empty
-        body:            newBody,
-        updatedBy:       profile.uid,
-        updatedByName:   profile.displayName ?? 'Teacher',
-        updatedAt:       serverTimestamp(),
-      })
+      const sentAt = edits.current
+      const mine = live.current
+      const from = base.current
+      const meta = {
+        updatedBy:     profile.uid,
+        updatedByName: profile.displayName ?? 'Teacher',
+        updatedAt:     serverTimestamp(),
+      }
+      let saved = mine
+      try {
+        // Merge onto whatever is on the server now, so simultaneous edits
+        // by another teacher aren't overwritten
+        saved = await runTransaction(db, async tx => {
+          const ref = doc(db, 'teacher_notes', noteId)
+          const snap = await tx.get(ref)
+          const server = { title: snap.data()?.title ?? '', body: snap.data()?.body ?? '' }
+          const merged = {
+            title: merge3(from.title, mine.title, server.title),
+            body:  merge3(from.body,  mine.body,  server.body),
+          }
+          tx.update(ref, { ...merged, ...meta })
+          return merged
+        })
+      } catch {
+        // Offline (transactions need the server) — plain save, last write wins
+        await updateDoc(doc(db, 'teacher_notes', noteId), { ...mine, ...meta })
+      }
+      if (loadedNoteId.current !== noteId) return
+      base.current = saved
+      if (edits.current === sentAt) {
+        synced.current = sentAt
+        applyToEditor(saved)
+      } else {
+        // Typed during the save — carry those keystrokes onto the merged text
+        applyToEditor({
+          title: merge3(mine.title, live.current.title, saved.title),
+          body:  merge3(mine.body,  live.current.body,  saved.body),
+        })
+      }
     }, 800)
-  }, [selected, profile])
+  }, [selected, profile, applyToEditor])
 
   function handleTitleChange(val: string) {
     setTitle(val)
-    scheduleSave(val, body)
+    live.current = { ...live.current, title: val }
+    edits.current++
+    scheduleSave()
   }
 
   function handleBodyChange(val: string) {
     setBody(val)
-    scheduleSave(title, val)
+    live.current = { ...live.current, body: val }
+    edits.current++
+    scheduleSave()
   }
 
   async function createNote() {
@@ -101,6 +182,8 @@ export default function Notebook() {
     })
     setCreating(false)
     loadedNoteId.current = ref.id
+    edits.current = synced.current = 0
+    base.current = live.current = { title: '', body: '' }
     setSelected(ref.id)
     setTitle('')
     setBody('')
@@ -237,6 +320,7 @@ export default function Notebook() {
             {/* Body */}
             <div className="flex-1 px-6 pb-6 overflow-y-auto">
               <textarea
+                ref={bodyRef}
                 value={body}
                 onChange={e => handleBodyChange(e.target.value)}
                 placeholder="Start writing…"

@@ -35,6 +35,7 @@ const ChatPage      = lazy(() => import('@/pages/chat/ChatPage'))
 const StudentDashboard      = lazy(() => import('@/pages/student/Dashboard'))
 const StudentCalendar       = lazy(() => import('@/pages/student/Calendar'))
 const SubjectList           = lazy(() => import('@/pages/student/SubjectList'))
+const StudentGuestTeachers  = lazy(() => import('@/pages/student/GuestTeachers'))
 const StudentSubjectDetail  = lazy(() => import('@/pages/student/SubjectDetail'))
 const Prizes                = lazy(() => import('@/pages/student/Prizes'))
 const CheckIn               = lazy(() => import('@/pages/student/CheckIn'))
@@ -142,6 +143,7 @@ export default function App() {
             <Route path="/calendar"  element={<StudentCalendar />} />
             <Route path="/subjects"     element={<SubjectList />} />
             <Route path="/subjects/:id" element={<StudentSubjectDetail />} />
+            <Route path="/guest-teachers" element={<StudentGuestTeachers />} />
             <Route path="/prizes"    element={<FeatureGate feature="prizes"><Prizes /></FeatureGate>} />
             <Route path="/checkin"              element={<CheckIn />} />
             <Route path="/assignments"           element={<StudentAssignments />} />

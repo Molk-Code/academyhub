@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Calendar, BookOpen,
   Trophy, LogOut, ArrowLeft, QrCode, ClipboardList, DoorOpen,
   MessageSquare, Clapperboard, Film, FolderOpen, Menu, X, ListChecks, User, ChevronDown, CalendarRange, Package,
-  Car, UtensilsCrossed, RefreshCw, ArrowDown, ClipboardCheck, Bug,
+  Car, UtensilsCrossed, RefreshCw, ArrowDown, ClipboardCheck, Bug, UserRound,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
@@ -292,6 +292,7 @@ export default function StudentLayout() {
 
         {/* Subjects — standalone, always visible */}
         {vis?.['subjects'] !== false && <NavItem to="/subjects" icon={BookOpen} label="Subjects" onNavigate={onNavigate} />}
+        {vis?.['guestTeacherList'] !== false && <NavItem to="/guest-teachers" icon={UserRound} label="Guest Teachers" onNavigate={onNavigate} />}
 
         {/* Create group — only render if at least one item is visible */}
         {(canProduction && vis?.['production'] !== false) || (canVideoLab && videoLabEnabled) ? (

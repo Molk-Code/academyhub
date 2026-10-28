@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { addDoc, collection, collectionGroup, onSnapshot, serverTimestamp } from 'firebase/firestore'
+import { addDoc, collection, collectionGroup, deleteDoc, doc, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useFeature } from '@/hooks/useFeature'
@@ -8,10 +8,10 @@ import { useCollection, useDocument, orderBy, where } from '@/hooks/useFirestore
 import { markFoodBoxSeen, markMinivanSeen } from '@/hooks/useBookingBadge'
 import { LEGAL_TEXT } from '@/lib/equipmentContract'
 import { latestByUid, signatureState, signEquipmentContract, printSignedContract } from '@/lib/equipmentSigning'
-import type { EquipmentSignatureDoc, InventoryProjectDoc, InventoryItemDoc, FoodBoxOrderDoc, MinivanBookingDoc, EquipmentBookingDoc, EquipmentBookingMessageDoc } from '@/types'
+import type { RoomBookingDoc, RoomDoc, EquipmentSignatureDoc, InventoryProjectDoc, InventoryItemDoc, FoodBoxOrderDoc, MinivanBookingDoc, EquipmentBookingDoc, EquipmentBookingMessageDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import {
-  ClipboardList, Package, UtensilsCrossed, Car,
+  ClipboardList, Package, UtensilsCrossed, Car, DoorOpen, X,
   AlertTriangle, CheckCircle2, XCircle, Clock, RotateCcw, Send, FileSignature,
 } from 'lucide-react'
 
@@ -142,6 +142,24 @@ function useMinivanBookings(uid: string, enabled: boolean) {
     () => [...bookings].sort((a, b) => ((b.createdAt as any)?.toMillis?.() ?? 0) - ((a.createdAt as any)?.toMillis?.() ?? 0)),
     [bookings],
   )
+}
+
+// Upcoming room bookings (today onwards), soonest first
+function useRoomBookings(uid: string, enabled: boolean) {
+  const { data: bookings } = useCollection<RoomBookingDoc>(
+    'room_bookings',
+    enabled ? [where('studentId', '==', uid)] : [],
+    enabled,
+    `rooms-${uid}`,
+  )
+  return useMemo(() => {
+    const now = new Date()
+    const todayStr = today()
+    const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    return bookings
+      .filter(b => b.date > todayStr || (b.date === todayStr && b.endTime > nowTime))
+      .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
+  }, [bookings])
 }
 
 // ── Equipment projects section ───────────────────────────────────────────────
@@ -466,6 +484,46 @@ function FoodBoxSection({ orders }: { orders: FoodBoxOrderDoc[] }) {
   )
 }
 
+// ── Room bookings section ────────────────────────────────────────────────────
+
+function RoomBookingsSection({ bookings }: { bookings: RoomBookingDoc[] }) {
+  const { data: rooms } = useCollection<RoomDoc>('rooms', [], bookings.length > 0)
+  const [cancelling, setCancelling] = useState<string | null>(null)
+  if (bookings.length === 0) return null
+
+  async function cancel(id: string) {
+    if (!confirm('Cancel this room booking?')) return
+    setCancelling(id)
+    try { await deleteDoc(doc(db, 'room_bookings', id)) }
+    finally { setCancelling(null) }
+  }
+
+  return (
+    <div className="space-y-3">
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
+        <DoorOpen className="w-4 h-4" /> Room Bookings
+      </h2>
+      <div className="space-y-2">
+        {bookings.map(b => (
+          <div key={b.id} className="bg-zinc-900 rounded-xl border border-white/10 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-zinc-200">{rooms.find(r => r.id === b.roomId)?.name ?? 'Room'}</p>
+              <p className="text-xs text-zinc-400 mt-0.5">{fmtDate(b.date)} · {b.startTime}–{b.endTime}</p>
+            </div>
+            <button
+              onClick={() => cancel(b.id)}
+              disabled={cancelling === b.id}
+              className="inline-flex items-center gap-1 text-xs font-medium text-zinc-400 hover:text-rose-400 disabled:opacity-50 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" /> {cancelling === b.id ? 'Cancelling…' : 'Cancel'}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Minivan section ──────────────────────────────────────────────────────────
 
 function MinivanSection({ bookings }: { bookings: MinivanBookingDoc[] }) {
@@ -506,6 +564,7 @@ export default function MyBookings() {
   const navRole = useLocation().pathname.startsWith('/teacher') ? 'teacher' : 'student'
   const uid = profile?.uid ?? ''
   const canEquipment = useFeature('equipment')
+  const canRooms     = useFeature('booking')
   const canFoodBox   = useFeature('food_box')
   const canVehicles  = useFeature('vehicles')
   const { data: navVis } = useDocument<{ id: string; student?: Record<string, boolean>; teacher?: Record<string, boolean> }>('settings', 'nav_visibility')
@@ -514,11 +573,13 @@ export default function MyBookings() {
   // student nav toggles hide these sections.
   const vis = navRole === 'student' ? navVis?.student : undefined
   const showEquipment = canEquipment && vis?.['equipment'] !== false
+  const showRooms     = canRooms     && vis?.['roomBooking'] !== false
   const showFoodBox   = canFoodBox   && vis?.['foodBox']   !== false
   const showVehicles  = canVehicles  && vis?.['vehicle']   !== false
 
   const { projects, items } = useEquipmentProjects(uid, !!uid && showEquipment)
   const bookingRequests     = useEquipmentBookingRequests(uid, !!uid && showEquipment)
+  const roomBookings        = useRoomBookings(uid, !!uid && showRooms)
   const foodOrders          = useFoodBoxOrders(uid, !!uid && showFoodBox)
   const vanBookings         = useMinivanBookings(uid, !!uid && showVehicles)
 
@@ -531,7 +592,7 @@ export default function MyBookings() {
 
   if (!profile) return null
 
-  const nothingToShow = projects.length === 0 && bookingRequests.length === 0 && foodOrders.length === 0 && vanBookings.length === 0
+  const nothingToShow = projects.length === 0 && roomBookings.length === 0 && bookingRequests.length === 0 && foodOrders.length === 0 && vanBookings.length === 0
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -551,6 +612,7 @@ export default function MyBookings() {
         <>
           {showEquipment && <BookingRequestsSection bookings={bookingRequests} />}
           {showEquipment && <EquipmentProjectsSection projects={projects} items={items} uid={uid} accountName={profile.displayName ?? ''} />}
+          {showRooms     && <RoomBookingsSection bookings={roomBookings} />}
           {showFoodBox   && <FoodBoxSection orders={foodOrders} />}
           {showVehicles  && <MinivanSection bookings={vanBookings} />}
         </>

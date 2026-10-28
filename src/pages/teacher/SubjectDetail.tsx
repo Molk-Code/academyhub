@@ -9,7 +9,7 @@ import { thumbnailUrl } from '@/lib/cloudinary'
 import {
   ArrowLeft, Plus, Pencil, Trash2, Check, X,
   Link2, FileUp, ExternalLink, FileText, UserRound, CheckCircle2, Play, Clock, Users,
-  BookOpen, CalendarClock, ClipboardList,
+  BookOpen, CalendarClock, ClipboardList, ChevronUp, ChevronDown,
 } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import SharePointBrowser from '@/components/sharepoint/SharePointBrowser'
@@ -235,6 +235,20 @@ export default function SubjectDetail() {
       return updated
     }))
     setEditingId(null)
+  }
+
+  // Move a topic one step up/down within its semester; renumbers that
+  // semester's topics so the order is explicit (students sort by it too)
+  async function moveItem(itemId: string, dir: -1 | 1) {
+    const item = curriculum.find(i => i.id === itemId)
+    if (!item || saving) return
+    const sem = curriculum.filter(i => i.semester === item.semester).sort((a, b) => a.order - b.order)
+    const from = sem.findIndex(i => i.id === itemId)
+    const to = from + dir
+    if (to < 0 || to >= sem.length) return
+    ;[sem[from], sem[to]] = [sem[to], sem[from]]
+    const newOrder = new Map(sem.map((i, idx) => [i.id, idx]))
+    await saveCurriculum(curriculum.map(i => newOrder.has(i.id) ? { ...i, order: newOrder.get(i.id)! } : i))
   }
 
   async function deleteItem(itemId: string) {
@@ -590,7 +604,7 @@ export default function SubjectDetail() {
             <table className="w-full min-w-[640px]">
               <thead>
                 <tr className="border-b border-white/[0.05]">
-                  <th className="w-8 px-4 py-2.5" />
+                  <th className="w-14 px-2 py-2.5" />
                   <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5 w-1/4">Course / Topic</th>
                   <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5">Content</th>
                   <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5 w-36">How</th>
@@ -598,7 +612,7 @@ export default function SubjectDetail() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.05]">
-                {items.map(item => {
+                {items.map((item, idx) => {
                   const status = itemLessonMap[item.id]
                   const completed = status?.completed ?? false
                   const plannedDate = (!completed && status?.plannedDate) ? status.plannedDate : null
@@ -625,13 +639,21 @@ export default function SubjectDetail() {
                     </tr>
                   ) : (
                     <tr key={item.id} className={`group hover:bg-white/5 transition-colors ${completed ? 'bg-emerald-500/[0.04]' : ''}`}>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-2 py-3 text-center">
+                        <div className="flex items-center gap-1">
+                          <div className="flex flex-col">
+                            <button onClick={() => moveItem(item.id, -1)} disabled={idx === 0 || saving} title="Move up" className="p-0.5 text-zinc-500 hover:text-zinc-200 disabled:opacity-20 disabled:hover:text-zinc-500 transition-colors"><ChevronUp className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => moveItem(item.id, 1)} disabled={idx === items.length - 1 || saving} title="Move down" className="p-0.5 text-zinc-500 hover:text-zinc-200 disabled:opacity-20 disabled:hover:text-zinc-500 transition-colors"><ChevronDown className="w-3.5 h-3.5" /></button>
+                          </div>
+                          <span className="w-4 flex justify-center">
                         {completed
                           ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
                           : plannedDate
                             ? <span className="inline-block w-2 h-2 rounded-full bg-amber-400 mx-auto" title="Planned" />
                             : null
                         }
+                          </span>
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-sm font-medium ${completed ? 'text-emerald-300' : 'text-zinc-100'}`}>{item.title}</span>
@@ -709,7 +731,7 @@ export default function SubjectDetail() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-white/[0.05]">
-                <th className="w-8 px-4 py-2.5" />
+                <th className="w-14 px-2 py-2.5" />
                 <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5 w-1/4">Course / Topic</th>
                 <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5">Content</th>
                 <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5 w-36">How</th>

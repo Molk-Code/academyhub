@@ -14,6 +14,7 @@ import type { SubjectDoc, AssignmentDoc, LessonDoc, SyncedEventDoc, CohortDoc, S
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import SubjectCover   from '@/components/subjects/SubjectCover'
 import { SubjectThumb } from '@/components/dashboard/UpcomingCard'
+import { nextSubjectSession } from '@/lib/nextSession'
 
 type Status = 'in-progress' | 'completed' | 'not-started'
 type Filter = 'all' | Status
@@ -158,9 +159,11 @@ export default function SubjectList() {
         .filter(a => !submitted.has(a.id))
         .sort((a, b) => (a.dueDate?.toMillis?.() ?? 0) - (b.dueDate?.toMillis?.() ?? 0))
       const overdue = pending.filter(a => { const d = toDate(a.dueDate); return d ? isPast(d) : false })
-      const nextLesson = lessons
-        .filter(l => l.subjectId === subject.id && (toDate(l.startTime) ?? now) > now)
-        .sort((a, b) => (a.startTime?.toMillis?.() ?? 0) - (b.startTime?.toMillis?.() ?? 0))[0]
+      const nextLesson = nextSubjectSession(
+        lessons.filter(l => l.subjectId === subject.id),
+        syncedEvents.filter(e => e.subjectId === subject.id),
+        now,
+      )
 
       if (overdue.length > 0) {
         out[subject.id] = { tone: 'rose', icon: AlertTriangle, text: `${overdue.length} overdue` }
@@ -168,8 +171,7 @@ export default function SubjectList() {
         const due = toDate(pending[0].dueDate)
         out[subject.id] = { tone: 'ember', icon: FileText, text: `${pending.length} due${due ? ` ${format(due, 'd MMM')}` : ''}` }
       } else if (nextLesson) {
-        const at = toDate(nextLesson.startTime)
-        out[subject.id] = { tone: 'blue', icon: CalendarClock, text: `Next ${at ? format(at, 'EEE d MMM') : 'lesson'}` }
+        out[subject.id] = { tone: 'blue', icon: CalendarClock, text: `Next ${format(nextLesson.start, 'EEE d MMM')}` }
       } else if (published.length > 0) {
         out[subject.id] = { tone: 'green', icon: CheckCircle2, text: 'All caught up' }
       } else {
@@ -177,7 +179,7 @@ export default function SubjectList() {
       }
     }
     return out
-  }, [subjects, assignments, submissions, lessons])
+  }, [subjects, assignments, submissions, lessons, syncedEvents])
 
   // Current term from the class's own semester dates, falling back to the school's
   const term = useMemo(() => {

@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { SubjectDoc, SubjectTeacherDoc, LessonDoc, SyncedEventDoc, VideoLabDoc, AbsenceReportDoc, AssignmentDoc, SubmissionDoc } from '@/types'
 import { thumbnailUrl } from '@/lib/cloudinary'
 import { toDate, cn } from '@/lib/utils'
+import { nextSubjectSession } from '@/lib/nextSession'
 import {
   Link2, FileText, ExternalLink, UserRound, Check, X, Globe, Play, Clock, CalendarClock, ClipboardList,
   BookOpen, MapPin, Video, AlertTriangle, CheckCircle2,
@@ -154,12 +155,8 @@ export default function StudentSubjectDetail() {
   const status: Status = coveredIds.size === 0 ? 'not-started'
     : coveredIds.size >= curriculum.length ? 'completed' : 'in-progress'
 
-  const nextLesson = useMemo(() => {
-    const now = new Date()
-    return [...lessons]
-      .filter(l => (toDate(l.startTime) ?? now) > now)
-      .sort((a, b) => (a.startTime?.toMillis?.() ?? 0) - (b.startTime?.toMillis?.() ?? 0))[0] ?? null
-  }, [lessons])
+  // Native lessons and synced Outlook sessions both count as "next lesson"
+  const nextLesson = useMemo(() => nextSubjectSession(lessons, syncedEvents), [lessons, syncedEvents])
 
   const pendingAssignments = useMemo(() => {
     const submitted = new Set(mySubmissions.filter(s => s.status !== 'draft').map(s => s.assignmentId))
@@ -178,7 +175,7 @@ export default function StudentSubjectDetail() {
 
   const badge = STATUS_BADGE[status]
   const hasSidebar = teachers.length > 0 || resources.length > 0
-  const nextAt = nextLesson ? toDate(nextLesson.startTime) : null
+  const nextAt = nextLesson?.start ?? null
   const nextDue = pendingAssignments[0] ? toDate(pendingAssignments[0].dueDate) : null
 
   return (
@@ -230,9 +227,13 @@ export default function StudentSubjectDetail() {
               <p className="font-display text-sm font-semibold text-zinc-100 truncate">{nextLesson.title}</p>
               <p className="text-[11px] text-zinc-400 mt-1 flex items-center gap-1.5 min-w-0">
                 <span className="font-mono text-ember-secondary whitespace-nowrap">{format(nextAt, 'EEE d MMM · HH:mm')}</span>
-                <span className="text-zinc-600">•</span>
-                {nextLesson.isOnline ? <Video className="w-3 h-3 flex-shrink-0" /> : <MapPin className="w-3 h-3 flex-shrink-0" />}
-                <span className="truncate">{nextLesson.isOnline ? 'Online' : nextLesson.classroom}</span>
+                {nextLesson.place && (
+                  <>
+                    <span className="text-zinc-600">•</span>
+                    {nextLesson.place === 'Online' ? <Video className="w-3 h-3 flex-shrink-0" /> : <MapPin className="w-3 h-3 flex-shrink-0" />}
+                    <span className="truncate">{nextLesson.place}</span>
+                  </>
+                )}
               </p>
             </>
           ) : <p className="text-[11px] text-zinc-500">Nothing scheduled yet</p>}

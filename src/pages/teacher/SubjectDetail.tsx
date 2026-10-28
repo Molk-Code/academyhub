@@ -15,6 +15,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner'
 import SharePointBrowser from '@/components/sharepoint/SharePointBrowser'
 import { useMicrosoftAuth } from '@/contexts/MicrosoftAuthContext'
 import SubjectCover from '@/components/subjects/SubjectCover'
+import { subjectSessions } from '@/lib/nextSession'
 import { format } from 'date-fns'
 import { nanoid } from 'nanoid'
 import { cn, initials, avatarColor, toDate } from '@/lib/utils'
@@ -525,12 +526,12 @@ export default function SubjectDetail() {
         const bar  = status === 'completed' ? 'bg-emerald-500' : 'bg-gradient-to-r from-brand-500 to-brand-400'
         const txt  = status === 'completed' ? 'text-emerald-400' : status === 'in-progress' ? 'text-brand-400' : 'text-zinc-400'
         const now  = new Date()
-        const next = [...lessons]
-          .filter(l => (toDate(l.startTime) ?? now) > now)
-          .sort((a, b) => (a.startTime?.toMillis?.() ?? 0) - (b.startTime?.toMillis?.() ?? 0))[0]
-        const nextAt = next ? toDate(next.startTime) : null
+        // Native lessons and synced Outlook sessions both count
+        const sessions = subjectSessions(lessons, syncedEvents)
+        const next = sessions.find(s => s.start > now)
+        const nextAt = next?.start ?? null
         const published = subjectAssignments.filter(a => a.isPublished).length
-        const pastLessons = lessons.filter(l => (toDate(l.startTime) ?? now) <= now).length
+        const pastLessons = sessions.filter(s => s.start <= now).length
         return (
           <>
             <div className={cn(PANEL, 'overflow-hidden')}>
@@ -568,7 +569,7 @@ export default function SubjectDetail() {
                     <p className="font-display text-sm font-semibold text-zinc-100 truncate">{next.title}</p>
                     <p className="text-[11px] text-zinc-400 mt-1 truncate">
                       <span className="font-mono text-ember-secondary">{format(nextAt, 'EEE d MMM · HH:mm')}</span>
-                      {(next.isOnline || next.classroom) && <> • {next.isOnline ? 'Online' : next.classroom}</>}
+                      {next.place && <> • {next.place}</>}
                     </p>
                   </>
                 ) : <p className="text-[11px] text-zinc-500">Nothing scheduled · {pastLessons} held so far</p>}

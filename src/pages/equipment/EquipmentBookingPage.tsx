@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument } from '@/hooks/useFirestore'
 import type { EquipmentDoc, EquipmentBookingDoc, EquipmentBookingMessageDoc, CohortDoc, ProductionDoc, ProductionSceneDoc, ProductionCrewAssignmentDoc, ProductionCastDoc, ProductionLocationDoc, ProductionShootingDayDoc, CrewRoleDoc } from '@/types'
 import { calcRentalDays, billableDays, salaryCost as calcSalaryCost, equipmentCostForProduction } from '@/lib/productionBudget'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import {
   ShoppingCart, X, Search, Package, Calendar, Check,
   AlertTriangle, ChevronDown, ChevronRight, CheckCircle2, Clock, Truck, RotateCcw, XCircle, Lock, Trash2, Send,
@@ -152,6 +152,9 @@ function BookingMessageThread({ bookingId }: { bookingId: string }) {
 export default function EquipmentBookingPage() {
   const { profile, loading: authLoading, cohortId: ctxCohortId, previewCohortId } = useAuth()
   const cohortId = ctxCohortId ?? previewCohortId ?? profile?.cohortId ?? ''
+  // Teachers book from /teacher/booking/equipment: no class restrictions and
+  // no production required
+  const isStaffBooker = useLocation().pathname.startsWith('/teacher')
 
   const { data: equipmentRaw } = useCollection<EquipmentDoc>('equipment')
   const { data: cohort } = useDocument<CohortDoc>('cohorts', cohortId || null)
@@ -242,7 +245,7 @@ export default function EquipmentBookingPage() {
   // If Production is turned off in Nav Settings entirely, equipment can never
   // require one — there'd be no way to select or create one.
   const productionSettingsLoaded = requireProductionSetting !== null && !navVisLoading
-  const productionRequired = productionSettingsLoaded && requireProductionSetting === true && productionNavEnabled
+  const productionRequired = !isStaffBooker && productionSettingsLoaded && requireProductionSetting === true && productionNavEnabled
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<EquipmentCategory>('ALL')
   const [modalItem, setModalItem] = useState<EquipmentDoc | null>(null)
@@ -337,6 +340,7 @@ export default function EquipmentBookingPage() {
   }
 
   function isItemLocked(item: EquipmentDoc): boolean {
+    if (isStaffBooker) return false
     if (item.allowedCohortIds && item.allowedCohortIds.length > 0) {
       return !cohortId || !item.allowedCohortIds.includes(cohortId)
     }
@@ -411,7 +415,7 @@ export default function EquipmentBookingPage() {
         checkoutDate: fromDate,
         returnDate: toDate,
         status: 'pending',
-        teacherNotes: `Cohort: ${cohort?.name ?? cohortId}`,
+        teacherNotes: isStaffBooker ? 'Staff booking (teacher)' : `Cohort: ${cohort?.name ?? cohortId}`,
         createdAt: serverTimestamp() as any,
       }
       await addDoc(collection(db, 'equipment_bookings'), bookingData)

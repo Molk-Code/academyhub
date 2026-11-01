@@ -50,6 +50,7 @@ const NAV: NavItem[] = [
   { to: '/teacher/subjects',      icon: BookOpen,        label: 'Subjects',       featureId: 'subjects'                                      },
   { to: '/teacher/prizes',        icon: Gift,            label: 'Prizes',         featureId: 'prizes',                                tierFeature: 'prizes'    },
   { to: '/teacher/room-bookings', icon: DoorOpen,        label: 'Room Bookings',  featureId: 'roomBooking',  showBooking: true,       tierFeature: 'booking'   },
+  { to: '/teacher/booking/equipment', icon: Package,     label: 'Equipment',      featureId: 'equipment',                             tierFeature: 'equipment' },
   { to: '/teacher/my-bookings',   icon: ClipboardCheck,  label: 'My Bookings',    featureId: 'myBookings'                                    },
   { to: '/teacher/chat',          icon: MessageSquare,   label: 'Chat',           featureId: 'chat',         showUnread: true,        tierFeature: 'chat'      },
   { to: '/teacher/production',    icon: Clapperboard,    label: 'Production',     featureId: 'production',                            tierFeature: 'production' },

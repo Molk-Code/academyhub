@@ -215,6 +215,7 @@ export default function App() {
             <Route path="/teacher/guest-teachers"            element={<GuestTeacherBank />} />
             <Route path="/teacher/bug-reports"               element={<MyBugReports />} />
             <Route path="/teacher/my-bookings"               element={<MyBookings />} />
+            <Route path="/teacher/booking/equipment"         element={<FeatureGate feature="equipment" redirectTo="/teacher"><EquipmentBookingPage /></FeatureGate>} />
           </Route>
 
           {/* ── Admin ───────────────────────────────────────────────────── */}

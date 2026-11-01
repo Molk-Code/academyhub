@@ -326,7 +326,7 @@ export default function StudentLayout() {
           <SidebarGroup label="Booking" icon="📦" defaultOpen={false}>
             {vis?.['myBookings'] !== false && <NavItem to="/my-bookings"       icon={ClipboardCheck} label="My Bookings"  showBooking onNavigate={onNavigate} />}
             {canBooking   && vis?.['roomBooking'] !== false && <NavItem to="/booking"           icon={DoorOpen}       label="Room Booking" end onNavigate={onNavigate} />}
-            {canEquipment && vis?.['equipment'] !== false && <NavItem to="/booking/equipment" icon={Package}         label="Equipment"    onNavigate={onNavigate} />}
+            {canEquipment && vis?.['equipment'] !== false && <NavItem to="/booking/equipment" icon={Package}         label="Rental House" onNavigate={onNavigate} />}
             {canVehicles  && vis?.['vehicle']   !== false && <NavItem to="/vehicles"          icon={Car}             label="Vehicles"     onNavigate={onNavigate} />}
             {canFoodBox   && vis?.['foodBox']   !== false && <NavItem to="/food-boxes"        icon={UtensilsCrossed} label="Food Boxes"   onNavigate={onNavigate} />}
           </SidebarGroup>

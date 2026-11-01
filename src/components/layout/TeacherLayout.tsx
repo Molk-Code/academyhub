@@ -50,7 +50,7 @@ const NAV: NavItem[] = [
   { to: '/teacher/subjects',      icon: BookOpen,        label: 'Subjects',       featureId: 'subjects'                                      },
   { to: '/teacher/prizes',        icon: Gift,            label: 'Prizes',         featureId: 'prizes',                                tierFeature: 'prizes'    },
   { to: '/teacher/room-bookings', icon: DoorOpen,        label: 'Room Bookings',  featureId: 'roomBooking',  showBooking: true,       tierFeature: 'booking'   },
-  { to: '/teacher/booking/equipment', icon: Package,     label: 'Equipment',      featureId: 'equipment',                             tierFeature: 'equipment' },
+  { to: '/teacher/booking/equipment', icon: Package,     label: 'Rental House',   featureId: 'equipment',                             tierFeature: 'equipment' },
   { to: '/teacher/my-bookings',   icon: ClipboardCheck,  label: 'My Bookings',    featureId: 'myBookings'                                    },
   { to: '/teacher/chat',          icon: MessageSquare,   label: 'Chat',           featureId: 'chat',         showUnread: true,        tierFeature: 'chat'      },
   { to: '/teacher/production',    icon: Clapperboard,    label: 'Production',     featureId: 'production',                            tierFeature: 'production' },
@@ -144,6 +144,8 @@ export default function TeacherLayout() {
   const isChatPage  = pathname.endsWith('/chat')
   const isVideoPage = /\/videos\/[^/]+$/.test(pathname)
   const isGuidePage = pathname.endsWith('/guide')
+  // Rental House brings its own full-width layout, same as for students
+  const isFullPage  = pathname === '/teacher/booking/equipment'
 
   const chatUnread      = useChatUnreadCount()
   const bookingBadge    = useBookingBadge()
@@ -389,6 +391,8 @@ export default function TeacherLayout() {
           </div>
         }>
           {(isChatPage || isVideoPage) ? (
+            <Outlet key={pathname} />
+          ) : isFullPage ? (
             <Outlet key={pathname} />
           ) : (
             <motion.div

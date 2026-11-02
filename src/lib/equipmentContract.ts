@@ -20,14 +20,21 @@ export interface EquipmentContractOptions {
   // Terms as signed (defaults to the current LEGAL_TEXT)
   legalText?: string
   // Electronic signature, printed in the "Sign" box instead of leaving it blank
-  signature?: {
-    typedName: string
-    accountName: string
-    email: string
-    signedAt: string
-    ip: string
-    contractHash: string
-  }
+  signature?: ContractESignature
+  // Several borrowers' e-signatures on one contract; `unsigned` lists the
+  // borrowers who haven't signed this version yet
+  signatures?: ContractESignature[]
+  unsigned?: string[]
+}
+
+export interface ContractESignature {
+  typedName: string
+  accountName: string
+  email: string
+  signedAt: string
+  ip: string
+  contractHash: string
+  note?: string   // e.g. "Signed an earlier version of this contract"
 }
 
 // Keep in sync with LEGAL_TEXT in functions/src/equipment-signing.ts
@@ -59,16 +66,24 @@ export function buildEquipmentContractHtml(opts: EquipmentContractOptions): stri
        <tr><td class="num">2</td><td class="blank"></td>${hasTimes ? '<td></td>' : ''}</tr>
        <tr><td class="num">3</td><td class="blank"></td>${hasTimes ? '<td></td>' : ''}</tr>`
 
-  const sig = opts.signature
-  const signBlock = sig
-    ? `<div class="esign">
+  const esigns = opts.signatures ?? (opts.signature ? [opts.signature] : [])
+  const esignHtml = (sig: ContractESignature) => `<div class="esign">
         <div class="esign-name">${esc(sig.typedName)}</div>
         <div class="esign-meta">
           Signed electronically in CineForge by ${esc(sig.accountName)} (${esc(sig.email)})<br/>
           ${esc(sig.signedAt)}${sig.ip ? ` &middot; IP ${esc(sig.ip)}` : ''}
         </div>
+        ${sig.note ? `<div class="esign-note">${esc(sig.note)}</div>` : ''}
         <div class="esign-hash">Contract fingerprint (SHA-256)<br/>${esc(sig.contractHash)}</div>
       </div>`
+  const signBlock = esigns.length || opts.unsigned?.length
+    ? [
+        ...esigns.map(esignHtml),
+        ...(opts.unsigned ?? []).map(name => `<div class="esign unsigned">
+            <div class="esign-name">${esc(name)}</div>
+            <div class="esign-meta">Not signed yet</div>
+          </div>`),
+      ].join('')
     : (opts.signers?.length ? opts.signers : ['']).map(name => `<div class="paper-sign">
         <div><div class="line"></div><span>Signature</span></div>
         <div>${name ? `<div class="pre">${esc(name)}</div>` : '<div class="line"></div>'}<span>Name${name ? '' : ' in block letters'}</span></div>
@@ -108,6 +123,9 @@ export function buildEquipmentContractHtml(opts: EquipmentContractOptions): stri
   .sign { border: 1px solid #ccc; border-radius: 6px; padding: 14px 16px; }
   .esign-name { font-size: 20px; font-weight: 700; font-style: italic; margin-bottom: 4px; }
   .esign-meta { font-size: 11px; color: #555; }
+  .esign + .esign { margin-top: 12px; padding-top: 12px; border-top: 1px solid #e3e3e3; }
+  .esign.unsigned .esign-name { color: #999; font-style: normal; font-size: 15px; }
+  .esign-note { font-size: 11px; color: #b45309; margin-top: 4px; }
   .esign-hash { font-family: Menlo, Consolas, monospace; font-size: 9.5px; color: #777; margin-top: 8px; word-break: break-all; }
   .paper-sign { display: grid; grid-template-columns: 2fr 2fr 1fr; gap: 20px; padding-top: 28px; }
   .paper-sign .line { border-bottom: 1px solid #1a1a1a; height: 1px; }

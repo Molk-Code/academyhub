@@ -4,7 +4,7 @@ import { useCollection, where } from '@/hooks/useFirestore'
 import type { EquipmentSignatureDoc, InventoryItemDoc, InventoryProjectDoc, UserDoc } from '@/types'
 import { PenLine, Send, Check, Clock, AlertTriangle, FileSignature } from 'lucide-react'
 import {
-  latestByUid, signatureState, requestEquipmentSignatures, printSignedContract, type SignatureState,
+  latestByUid, signatureState, requestEquipmentSignatures, printSignedContract, printAllSignatures, type SignatureState,
 } from '@/lib/equipmentSigning'
 
 const STATE_STYLE: Record<SignatureState, { label: string; color: string; bg: string }> = {
@@ -48,8 +48,11 @@ export function ContractSignatures({ project, items }: { project: InventoryProje
     setResult('')
     try {
       const { data } = await requestEquipmentSignatures(project.id)
+      const noPush = data.withoutPush ?? []
       setResult(data.notified > 0
-        ? `Sent to ${data.notified} borrower${data.notified === 1 ? '' : 's'}.`
+        ? `Sent to ${data.notified} borrower${data.notified === 1 ? '' : 's'}.` + (noPush.length
+            ? ` ${noPush.join(', ')} ${noPush.length === 1 ? "hasn't" : "haven't"} turned on push notifications, so will only see it in CineForge.`
+            : '')
         : 'Everyone has already signed.')
     } catch (e: any) {
       setResult(e?.message ?? 'Could not send.')
@@ -69,11 +72,22 @@ export function ContractSignatures({ project, items }: { project: InventoryProje
             {rows.length - unsigned}/{rows.length} signed
           </span>
         </span>
+        <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {rows.some(r => r.sig) && (
+          <button
+            className="secondary-btn"
+            onClick={() => printAllSignatures(project, items, sigs, rows.map(r => ({ uid: r.uid, name: r.name })))}
+            style={{ padding: '.4rem .8rem', fontSize: '.8rem' }}
+          >
+            <FileSignature size={14} /> Contract with all signatures
+          </button>
+        )}
         {rows.length > 0 && unsigned > 0 && (
           <button className="secondary-btn" disabled={sending} onClick={send} style={{ padding: '.4rem .8rem', fontSize: '.8rem' }}>
             <Send size={14} /> {sending ? 'Sending…' : project.signatureRequest ? 'Send reminder' : 'Send for signing'}
           </button>
         )}
+        </span>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

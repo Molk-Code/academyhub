@@ -125,6 +125,9 @@ export const onEquipmentBookingUpdated = functions.firestore
     const before = change.before.data()
     const after  = change.after.data()
     if (before.status === after.status) return null
+    // Closed because its inventory project was archived — the project's own
+    // notifications already covered it
+    if (after.closedByProject && !before.closedByProject) return null
     const studentId = after.studentId as string
     const studentSnap = await db.collection('users').doc(studentId).get()
     const tokens: string[] = studentSnap.data()?.fcmTokens ?? []
@@ -199,7 +202,8 @@ export const onInventoryProjectCreated = functions.firestore
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// onInventoryProjectUpdated — notify borrowers when project status changes
+// onInventoryProjectUpdated — keep the student's original booking request in
+// step with the project, and notify borrowers of returns and new dates
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const onInventoryProjectUpdated = functions.firestore
@@ -207,17 +211,43 @@ export const onInventoryProjectUpdated = functions.firestore
   .onUpdate(async (change) => {
     const before = change.before.data()
     const after  = change.after.data()
-    if (before.status === after.status) return null
-    if (after.status !== 'returned') return null
+
+    // The booking request feeds the dashboard and Rental House "My bookings":
+    // mirror date changes, and close it once the project is archived/returned
+    const bookingId = after.bookingId as string | undefined
+    if (bookingId) {
+      const update: Record<string, unknown> = {}
+      if (before.checkoutDate !== after.checkoutDate) update.checkoutDate = after.checkoutDate ?? ''
+      if (before.returnDate   !== after.returnDate)   update.returnDate   = after.returnDate ?? ''
+      if (before.status !== after.status && (after.status === 'archived' || after.status === 'returned')) {
+        update.status = 'returned'
+        update.closedByProject = true
+      }
+      if (Object.keys(update).length > 0) {
+        try { await db.collection('equipment_bookings').doc(bookingId).update(update) }
+        catch (err) { console.warn('[inventory] could not sync booking', bookingId, err) }
+      }
+    }
+
     const borrowerIds: string[] = after.borrowerIds ?? []
     if (borrowerIds.length === 0) return null
+    let opts: { title: string; body: string; url: string } | null = null
+    if (before.status !== after.status && after.status === 'returned') {
+      opts = {
+        title: '✅ Equipment returned',
+        body:  `Project "${after.name}" has been marked as returned`,
+        url:   '/my-bookings',
+      }
+    } else if (before.returnDate !== after.returnDate && after.returnDate && after.status !== 'archived') {
+      opts = {
+        title: '📅 Return date changed',
+        body:  `"${after.name}" — now return by ${after.returnDate}`,
+        url:   '/my-bookings',
+      }
+    }
+    if (!opts) return null
     const usersSnaps = await Promise.all(borrowerIds.map(uid => db.collection('users').doc(uid).get()))
     const tokens = usersSnaps.flatMap(s => (s.data()?.fcmTokens ?? []) as string[])
-    const opts = {
-      title: '✅ Equipment returned',
-      body:  `Project "${after.name}" has been marked as returned`,
-      url:   '/my-bookings',
-    }
     await Promise.all([
       sendPush(tokens, { ...opts, tag: 'inventory' }),
       saveNotifications(borrowerIds, opts),

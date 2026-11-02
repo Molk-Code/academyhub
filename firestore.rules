@@ -638,8 +638,9 @@ service cloud.firestore {
 
     match /synced_events/{eventId} {
       allow read: if isSignedIn();
-      // Cloud Function creates/deletes; teachers may update override fields only
-      allow update: if isTeacherOrAdmin();
+      // Cloud Function creates/deletes; teachers may update override fields,
+      // and delete occurrences Outlook removed without telling the flow
+      allow update, delete: if isTeacherOrAdmin();
     }
 
     // ── Team Resources ────────────────────────────────────────────────────────

@@ -97,7 +97,10 @@ function useEquipmentProjects(uid: string, enabled: boolean) {
     enabled,
   )
   const sorted = useMemo(
-    () => [...projects].sort((a, b) => ((b.createdAt as any)?.seconds ?? 0) - ((a.createdAt as any)?.seconds ?? 0)),
+    // Archived projects are finished business — drop them from My Bookings
+    () => projects
+      .filter(p => p.status !== 'archived')
+      .sort((a, b) => ((b.createdAt as any)?.seconds ?? 0) - ((a.createdAt as any)?.seconds ?? 0)),
     [projects],
   )
   const items = useProjectItems(sorted.map(p => p.id))
@@ -255,7 +258,8 @@ function ContractSignPanel({ project, items, uid, accountName }: {
             <input
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder={accountName}
+              // Not the student's name: a greyed-out name read as already signed
+              placeholder="Sign with your name"
               autoComplete="name"
               className="w-full bg-zinc-950 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500/60"
             />

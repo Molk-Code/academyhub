@@ -181,6 +181,7 @@ export default function Lessons() {
   const [syncedEditClassroom,          setSyncedEditClassroom]          = useState('')
   const [savingSyncedEdit,             setSavingSyncedEdit]             = useState(false)
   const [syncedEditExpanded,      setSyncedEditExpanded]      = useState(false)
+  const [confirmDeleteSynced,     setConfirmDeleteSynced]     = useState(false)
   const [view,                  setView]                  = useState<'calendar' | 'month' | 'wheel'>('calendar')
   const [pendingCalendarDate,   setPendingCalendarDate]   = useState<Date | null>(null)
   const [deleting,         setDeleting]         = useState<string | null>(null)
@@ -922,6 +923,26 @@ export default function Lessons() {
     setSyncedEditRequireAttendance(e.requireAttendance !== false)
     setSyncedEditClassroom(e.classroom ?? '')
     setSyncedEditExpanded(false)
+    setConfirmDeleteSynced(false)
+  }
+
+  // Remove a synced Outlook event from CineForge only — for occurrences that
+  // were deleted in Outlook but never reported (recurring-series deletions
+  // don't reach the Power Automate flow). If it still exists in Outlook it
+  // comes back the next time Outlook sends it.
+  async function deleteSyncedEvent() {
+    if (!editingSyncedEvent) return
+    setSavingSyncedEdit(true)
+    try {
+      await deleteDoc(doc(db, 'synced_events', editingSyncedEvent.id))
+      setEditingSyncedEvent(null)
+    } catch (err) {
+      console.error('Failed to delete synced event:', err)
+      alert('Delete failed — check console for details.')
+    } finally {
+      setSavingSyncedEdit(false)
+      setConfirmDeleteSynced(false)
+    }
   }
 
   async function saveSyncedEventEdit() {
@@ -1839,6 +1860,35 @@ export default function Lessons() {
                     >
                       {savingSyncedEdit ? 'Saving…' : 'Save changes'}
                     </button>
+                    {confirmDeleteSynced ? (
+                      <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 space-y-2">
+                        <p className="text-xs text-rose-200">
+                          Remove this event from the CineForge calendar? Outlook isn't changed — if the event still exists there, it comes back the next time Outlook updates it.
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={deleteSyncedEvent}
+                            disabled={savingSyncedEdit}
+                            className="flex-1 text-sm py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold disabled:opacity-50"
+                          >
+                            Remove from CineForge
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteSynced(false)}
+                            className="flex-1 text-sm py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200"
+                          >
+                            Keep
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDeleteSynced(true)}
+                        className="w-full text-sm py-2 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
+                      >
+                        Delete from CineForge calendar
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

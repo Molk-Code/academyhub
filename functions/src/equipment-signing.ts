@@ -90,8 +90,12 @@ export const requestEquipmentSignatures = functions.https.onCall(async (data, co
     },
   })
 
+  const withoutPush: string[] = []
   if (toAsk.length > 0) {
     const users = await Promise.all(toAsk.map(uid => db.collection('users').doc(uid).get()))
+    for (const u of users) {
+      if (!((u.data()?.fcmTokens as string[]) ?? []).length) withoutPush.push((u.data()?.displayName as string) ?? 'A borrower')
+    }
     // Teachers can be borrowers too — their My Bookings lives under /teacher
     const isStaff = (u: FirebaseFirestore.DocumentSnapshot) => {
       const d = u.data() ?? {}
@@ -116,7 +120,7 @@ export const requestEquipmentSignatures = functions.https.onCall(async (data, co
     }))
   }
 
-  return { notified: toAsk.length, alreadySigned: borrowerIds.length - toAsk.length }
+  return { notified: toAsk.length, alreadySigned: borrowerIds.length - toAsk.length, withoutPush }
 })
 
 export const signEquipmentContract = functions.https.onCall(async (data, context) => {

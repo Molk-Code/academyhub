@@ -431,6 +431,7 @@ export interface EquipmentBookingDoc {
   status: EquipmentBookingStatus
   teacherNotes: string
   linkedProjectId?: string   // set once "Set Up in Inventory" has created the inventory_projects doc
+  closedByProject?: boolean  // closed automatically when its inventory project was archived/returned
   productionId?: string
   productionTitle?: string
   productionReadiness?: { score: number; hasBreakdown: boolean; hasCrew: boolean; hasCast: boolean; hasLocations: boolean; hasSchedule: boolean }

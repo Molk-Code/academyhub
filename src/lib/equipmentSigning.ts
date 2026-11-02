@@ -6,7 +6,7 @@ import { printEquipmentContract } from '@/lib/equipmentContract'
 export type SignatureState = 'signed' | 'changed' | 'requested' | 'not-requested'
 
 export const requestEquipmentSignatures = (projectId: string) =>
-  httpsCallable<{ projectId: string }, { notified: number; alreadySigned: number }>(functions, 'requestEquipmentSignatures')({ projectId })
+  httpsCallable<{ projectId: string }, { notified: number; alreadySigned: number; withoutPush?: string[] }>(functions, 'requestEquipmentSignatures')({ projectId })
 
 export const signEquipmentContract = (projectId: string, typedName: string) =>
   httpsCallable<{ projectId: string; typedName: string; accepted: boolean }, { signatureId: string }>(functions, 'signEquipmentContract')({ projectId, typedName, accepted: true })
@@ -60,5 +60,41 @@ export function printSignedContract(sig: EquipmentSignatureDoc) {
       ip: sig.ip,
       contractHash: sig.contractHash,
     },
+  })
+}
+
+// One contract as it stands now, with every borrower's latest e-signature
+// (flagged when they signed an earlier version) and who hasn't signed yet
+export function printAllSignatures(
+  project: InventoryProjectDoc,
+  items: InventoryItemDoc[],
+  sigs: EquipmentSignatureDoc[],
+  borrowers: { uid: string; name: string }[],
+) {
+  const latest = latestByUid(sigs)
+  const signed = borrowers.flatMap(b => {
+    const sig = latest.get(b.uid)
+    if (!sig) return []
+    return [{
+      typedName: sig.typedName,
+      accountName: sig.accountName,
+      email: sig.email,
+      signedAt: sig.signedAt?.toDate().toLocaleString('sv-SE') ?? '',
+      ip: sig.ip,
+      contractHash: sig.contractHash,
+      ...(stillMatches(sig, project, items) ? {} : {
+        note: `Signed an earlier version (${sig.snapshot.items.length} items, ${fmt(sig.snapshot.dateFrom)} – ${fmt(sig.snapshot.dateTo)}) — needs re-signing`,
+      }),
+    }]
+  })
+  const items_ = [...items].sort((a, b) => a.id.localeCompare(b.id))
+  printEquipmentContract({
+    projectName: project.name,
+    borrowerName: borrowers.map(b => b.name).join(', '),
+    dateFrom: fmt(project.checkoutDate),
+    dateTo: fmt(project.returnDate),
+    items: items_.map(i => ({ product: i.equipmentName })),
+    signatures: signed,
+    unsigned: borrowers.filter(b => !latest.has(b.uid)).map(b => b.name),
   })
 }

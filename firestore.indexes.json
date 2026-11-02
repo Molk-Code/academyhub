@@ -146,6 +146,14 @@
         { "fieldPath": "subjectId", "order": "ASCENDING" },
         { "fieldPath": "cohortId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "synced_events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "syncId", "order": "ASCENDING" },
+        { "fieldPath": "startTime", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

@@ -12,6 +12,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { format } from 'date-fns'
 
 const WEBHOOK_BASE = 'https://us-central1-academy-hub-c252f.cloudfunctions.net/receiveOfficeCalendarEvent'
+const RECONCILE_BASE = 'https://us-central1-academy-hub-c252f.cloudfunctions.net/reconcileOfficeCalendar'
 
 function genSecret(): string {
   // 32 bytes of randomness, URL-safe
@@ -68,6 +69,7 @@ function SyncCard({ sync, cohorts }: { sync: OfficeCalendarSyncDoc; cohorts: Coh
   const [expanded, setExpanded] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
   const webhookUrl = `${WEBHOOK_BASE}?syncId=${sync.id}`
+  const reconcileUrl = `${RECONCILE_BASE}?syncId=${sync.id}`
 
   async function toggleEnabled() {
     await updateDoc(doc(db, 'office_calendar_syncs', sync.id), {
@@ -163,6 +165,26 @@ function SyncCard({ sync, cohorts }: { sync: OfficeCalendarSyncDoc; cohorts: Coh
               <li>Body (map from trigger outputs): <code className="bg-blue-500/10 px-1 rounded">{`{"externalId": Id, "subject": Subject, "start": Start, "end": End, "location": Location, "isAllDay": IsAllDay, "changeType": "created"}`}</code> — set changeType to "deleted" in the flow's delete/cancel branch</li>
               <li>Save. Test by editing an event on the source Outlook calendar.</li>
             </ol>
+          </div>
+
+          <CopyField label="Daily check-up URL" value={reconcileUrl} />
+
+          <div className="bg-blue-950/30 border border-blue-500/20 rounded-xl p-4 space-y-1.5">
+            <p className="text-xs font-semibold text-blue-300">Daily check-up flow (catches removed series occurrences)</p>
+            <p className="text-[11px] text-blue-200/60">
+              Deleting one date from a recurring series never reaches the flow above. This second flow compares the whole calendar once a day: anything Outlook no longer lists is removed, anything missing is added.
+              {sync.lastReconciledAt && <> Last check-up: {sync.lastReconciledAt.toDate().toLocaleString('sv-SE')}{sync.lastReconcile && ` — ${sync.lastReconcile.deleted} removed, ${sync.lastReconcile.added} added, ${sync.lastReconcile.updated} updated`}.</>}
+            </p>
+            <ol className="text-xs text-blue-200/80 space-y-1 list-decimal list-inside">
+              <li>New <b>Scheduled cloud flow</b> → repeat every 1 day (e.g. 05:00)</li>
+              <li>Add "<b>Get calendar view of events (V3)</b>" (Office 365 Outlook) → same calendar · Start time <code className="bg-blue-500/10 px-1 rounded">{'addDays(utcNow(),-7)'}</code> · End time <code className="bg-blue-500/10 px-1 rounded">{'addDays(utcNow(),120)'}</code> (as expressions)</li>
+              <li>On that step: <b>… → Settings → Pagination: On, threshold 5000</b> — without it Outlook returns only the first 256 events</li>
+              <li>Add "<b>Select</b>" (Data Operation) → From = <code className="bg-blue-500/10 px-1 rounded">value</code> · Map (text mode): <code className="bg-blue-500/10 px-1 rounded">{`{"externalId": Id, "subject": Subject, "start": Start, "end": End, "location": Location, "isAllDay": IsAllDay}`}</code></li>
+              <li>Add "<b>HTTP</b>" → POST, URI = check-up URL above with <code className="bg-blue-500/10 px-1 rounded">&amp;dryRun=1</code> on the end for the first run · same two headers as above</li>
+              <li>Body: <code className="bg-blue-500/10 px-1 rounded">{`{"windowStart": "@{addDays(utcNow(),-6)}", "windowEnd": "@{addDays(utcNow(),119)}", "events": @{body('Select')}}`}</code> (one day inside the Outlook window on each side, on purpose)</li>
+              <li>Run it once (Test → Manually). The HTTP output shows what it <i>would</i> remove/add. If that looks right, remove <code className="bg-blue-500/10 px-1 rounded">&amp;dryRun=1</code> and save.</li>
+            </ol>
+            <p className="text-[11px] text-blue-200/60">Safety: an empty list from Outlook changes nothing, and a run that would remove most of the calendar is refused (status 409) — usually a sign Pagination is off.</p>
           </div>
 
           <div className="flex items-center justify-between pt-1">

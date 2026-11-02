@@ -336,6 +336,182 @@ export const receiveOfficeCalendarEvent = functions.https.onRequest(async (req, 
   }
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// reconcileOfficeCalendar — scheduled Power Automate "check-up" for a sync.
+// The event trigger never reports a single occurrence deleted from a
+// recurring series (Outlook only edits the series' exception list), so once a
+// day the flow sends the full Outlook calendar view for a window and we:
+//   • remove synced events in that window that Outlook no longer lists
+//     (or marks cancelled),
+//   • add/refresh events that are missing or out of date (also backfills
+//     anything the event trigger never sent).
+// Override fields (subject link, custom title, teachers …) are never touched.
+//
+// Body: { windowStart, windowEnd, events: [{ externalId, subject, start, end,
+//         location, isAllDay, isCancelled? }] }
+// Query: ?syncId=…  [&dryRun=1 to only report]  [&force=1 to skip the
+//        mass-delete guard]
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ReconcileEvent {
+  externalId?: string
+  id?: string
+  Id?: string
+  subject?: string
+  start?: string
+  end?: string
+  location?: string
+  isAllDay?: boolean | string
+  isCancelled?: boolean | string
+}
+
+// Outlook's calendar view gives UTC times without a zone ("…T09:20:00.0000000")
+function parseUtc(v: string | undefined): Date | null {
+  if (!v) return null
+  const s = String(v).trim()
+  const d = new Date(/(Z|[+-]\d\d:?\d\d)$/i.test(s) ? s : `${s}Z`)
+  return isNaN(d.getTime()) ? null : d
+}
+
+export const reconcileOfficeCalendar = functions
+  .runWith({ timeoutSeconds: 300, memory: '512MB' })
+  .https.onRequest(async (req, res) => {
+    try {
+      await reconcile(req, res)
+    } catch (err: any) {
+      console.error('reconcileOfficeCalendar failed', err)
+      res.status(500).json({ error: err?.message ?? 'Unknown error' })
+    }
+  })
+
+async function reconcile(req: functions.https.Request, res: functions.Response) {
+    if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed. Use POST.' }); return }
+
+    const syncId = String(req.query.syncId ?? '')
+    const dryRun = ['1', 'true'].includes(String(req.query.dryRun ?? '').toLowerCase())
+    const force  = ['1', 'true'].includes(String(req.query.force ?? '').toLowerCase())
+    if (!syncId) { res.status(400).json({ error: 'Missing ?syncId=... in the URL.' }); return }
+
+    const syncSnap = await db.collection('office_calendar_syncs').doc(syncId).get()
+    if (!syncSnap.exists) { res.status(404).json({ error: 'Unknown syncId.' }); return }
+    const sync = syncSnap.data()!
+    if (!sync.webhookSecret || (req.get('x-webhook-secret') ?? '') !== sync.webhookSecret) {
+      res.status(401).json({ error: 'Invalid or missing x-webhook-secret header.' }); return
+    }
+    if (sync.enabled === false) { res.status(200).json({ ok: true, skipped: true, reason: 'sync is disabled' }); return }
+
+    let body = req.body ?? {}
+    if (typeof body === 'string') { try { body = JSON.parse(body) } catch { body = {} } }
+    const windowStart = parseUtc(body.windowStart)
+    const windowEnd   = parseUtc(body.windowEnd)
+    let rawEvents: unknown = body.events
+    if (typeof rawEvents === 'string') { try { rawEvents = JSON.parse(rawEvents) } catch { rawEvents = null } }
+    if (!windowStart || !windowEnd || windowEnd <= windowStart) {
+      res.status(400).json({ error: 'windowStart and windowEnd must be valid datetimes, start before end.' }); return
+    }
+    if (!Array.isArray(rawEvents)) { res.status(400).json({ error: 'events must be an array.' }); return }
+    // An empty list almost always means the Outlook step failed — never wipe on it
+    if (rawEvents.length === 0) {
+      res.status(200).json({ ok: true, skipped: true, reason: 'Outlook returned no events — nothing changed.' }); return
+    }
+
+    const outlook = new Map<string, { title: string; start: Date; end: Date | null; allDay: boolean; location: string | null }>()
+    let cancelled = 0
+    for (const e of rawEvents as ReconcileEvent[]) {
+      const externalId = e?.externalId ?? e?.id ?? e?.Id
+      const start = parseUtc(e?.start)
+      if (!externalId || !start) continue
+      if (toBool(e.isCancelled)) { cancelled++; continue }
+      outlook.set(String(externalId), {
+        title:    e.subject ?? '',
+        start,
+        end:      parseUtc(e.end),
+        allDay:   toBool(e.isAllDay),
+        location: e.location || null,
+      })
+    }
+
+    const storedSnap = await db.collection('synced_events')
+      .where('syncId', '==', syncId)
+      .where('startTime', '>=', admin.firestore.Timestamp.fromDate(windowStart))
+      .where('startTime', '<',  admin.firestore.Timestamp.fromDate(windowEnd))
+      .get()
+    const stored = new Map(storedSnap.docs.map(d => [d.data().externalId as string, d]))
+
+    const toDelete = storedSnap.docs.filter(d => !outlook.has(d.data().externalId as string))
+    const matched  = storedSnap.size - toDelete.length
+    const toWrite: { id: string; data: Record<string, unknown>; isNew: boolean }[] = []
+    for (const [externalId, ev] of outlook) {
+      if (ev.start < windowStart || ev.start >= windowEnd) continue
+      const existing = stored.get(externalId)?.data()
+      const startTs = admin.firestore.Timestamp.fromDate(ev.start)
+      const endTs   = ev.end ? admin.firestore.Timestamp.fromDate(ev.end) : null
+      const same = existing
+        && existing.title === ev.title
+        && existing.startTime?.toMillis?.() === startTs.toMillis()
+        && (existing.endTime?.toMillis?.() ?? null) === (endTs?.toMillis() ?? null)
+        && !!existing.allDay === ev.allDay
+        && (existing.location ?? null) === ev.location
+      if (same) continue
+      toWrite.push({
+        id: stored.get(externalId)?.id ?? `${syncId}_${externalId}`,
+        isNew: !existing,
+        data: {
+          syncId,
+          cohortId:   sync.cohortId ?? 'all',
+          externalId,
+          title:      ev.title,
+          startTime:  startTs,
+          endTime:    endTs,
+          allDay:     ev.allDay,
+          location:   ev.location,
+          source:     'office365',
+          updatedAt:  admin.firestore.FieldValue.serverTimestamp(),
+        },
+      })
+    }
+
+    const summary = {
+      window: { start: windowStart.toISOString(), end: windowEnd.toISOString() },
+      outlookEvents: outlook.size,
+      outlookCancelled: cancelled,
+      storedInWindow: storedSnap.size,
+      matched,
+      toDelete: toDelete.length,
+      toAdd: toWrite.filter(w => w.isNew).length,
+      toUpdate: toWrite.filter(w => !w.isNew).length,
+      deleting: toDelete.slice(0, 50).map(d => `${d.data().startTime?.toDate?.().toISOString()} ${d.data().title}`),
+    }
+
+    // Guard against a partial Outlook list (e.g. pagination off) or a change
+    // of Outlook ids wiping the calendar: refuse big deletions unless forced
+    const suspicious = storedSnap.size > 0 && (
+      matched === 0 || (toDelete.length > 10 && toDelete.length > storedSnap.size / 2)
+    )
+    console.log('[officeReconcile]', syncId, dryRun ? 'DRY RUN' : '', JSON.stringify(summary))
+    if (suspicious && !force) {
+      res.status(409).json({ ok: false, refused: true, reason: 'Would remove most of the calendar — check that Pagination is on in the Outlook step. Nothing was changed.', ...summary })
+      return
+    }
+    if (dryRun) { res.status(200).json({ ok: true, dryRun: true, ...summary }); return }
+
+    const ops = [
+      ...toDelete.map(d => (b: FirebaseFirestore.WriteBatch) => b.delete(d.ref)),
+      ...toWrite.map(w => (b: FirebaseFirestore.WriteBatch) =>
+        b.set(db.collection('synced_events').doc(w.id), w.data, { merge: true })),
+    ]
+    for (let i = 0; i < ops.length; i += 400) {
+      const batch = db.batch()
+      ops.slice(i, i + 400).forEach(op => op(batch))
+      await batch.commit()
+    }
+    await syncSnap.ref.update({
+      lastReconciledAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastReconcile: { deleted: toDelete.length, added: summary.toAdd, updated: summary.toUpdate },
+    })
+    res.status(200).json({ ok: true, ...summary })
+}
+
 // ── sendGuestTeacherBookingEmail ──────────────────────────────────────────────
 export const sendGuestTeacherBookingEmail = functions.runWith({ secrets: ['RESEND_API_KEY'] }).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')

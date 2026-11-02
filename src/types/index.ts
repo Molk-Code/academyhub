@@ -1032,6 +1032,8 @@ export interface OfficeCalendarSyncDoc {
   webhookSecret: string        // shared secret Power Automate sends as x-webhook-secret
   eventCount?: number
   lastReceivedAt?: Timestamp | null
+  lastReconciledAt?: Timestamp | null   // last daily check-up run (reconcileOfficeCalendar)
+  lastReconcile?: { deleted: number; added: number; updated: number }
   createdAt: Timestamp
   createdBy: string
   updatedAt?: Timestamp

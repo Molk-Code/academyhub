@@ -44,7 +44,8 @@ function isRoomAvailableForSlot(
 }
 
 export default function RoomBooking({ standalone = false }: { standalone?: boolean }) {
-  const { profile } = useAuth()
+  const { profile, cohortId, previewCohortId } = useAuth()
+  const effectiveCohortId = previewCohortId ?? cohortId
 
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedDayIdx, setSelectedDayIdx] = useState<number>(() => {
@@ -129,8 +130,10 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
   }, [bookings])
 
   // The limit counts either the selected day's or the whole week's bookings
-  const maxBookings  = bookingSettings?.maxBookingsPerWeek ?? null
-  const limitPerDay  = bookingSettings?.maxBookingsPeriod === 'day'
+  // and the student's class may have its own rule instead of the default
+  const classLimit   = effectiveCohortId ? bookingSettings?.roomLimitsByCohort?.[effectiveCohortId] : undefined
+  const maxBookings  = classLimit ? classLimit.max : bookingSettings?.maxBookingsPerWeek ?? null
+  const limitPerDay  = (classLimit ? classLimit.period : bookingSettings?.maxBookingsPeriod) === 'day'
   const myBookingCount = useMemo(
     () => bookings.filter(b => b.studentId === profile?.uid && (!limitPerDay || b.date === selectedDateStr)).length,
     [bookings, profile?.uid, limitPerDay, selectedDateStr],

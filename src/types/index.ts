@@ -602,10 +602,16 @@ export interface AuthClaims {
   cohortId: string | null
 }
 
+export interface RoomBookingLimit {
+  max: number | null          // null = unlimited
+  period: 'day' | 'week'
+}
+
 export interface BookingSettingsDoc {
   id: string
   maxBookingsPerWeek: number | null  // room bookings per student per period; null = unlimited
   maxBookingsPeriod?: 'day' | 'week' // period the limit above applies to (default 'week')
+  roomLimitsByCohort?: Record<string, RoomBookingLimit>  // per-class overrides of the rule above
   foodBoxLeadDays?: number           // working days in advance required for food box orders (default 5)
 }
 

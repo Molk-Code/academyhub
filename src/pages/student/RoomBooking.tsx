@@ -128,12 +128,14 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
     return m
   }, [bookings])
 
-  const maxBookingsPerWeek = bookingSettings?.maxBookingsPerWeek ?? null
-  const myWeeklyBookings = useMemo(
-    () => bookings.filter(b => b.studentId === profile?.uid).length,
-    [bookings, profile?.uid],
+  // The limit counts either the selected day's or the whole week's bookings
+  const maxBookings  = bookingSettings?.maxBookingsPerWeek ?? null
+  const limitPerDay  = bookingSettings?.maxBookingsPeriod === 'day'
+  const myBookingCount = useMemo(
+    () => bookings.filter(b => b.studentId === profile?.uid && (!limitPerDay || b.date === selectedDateStr)).length,
+    [bookings, profile?.uid, limitPerDay, selectedDateStr],
   )
-  const weeklyLimitReached = maxBookingsPerWeek !== null && myWeeklyBookings >= maxBookingsPerWeek
+  const limitReached = maxBookings !== null && myBookingCount >= maxBookings
 
   const todayStr   = format(new Date(), 'yyyy-MM-dd')
   const nowTimeStr = format(new Date(), 'HH:mm')
@@ -158,7 +160,7 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
       return
     }
 
-    if (weeklyLimitReached) return
+    if (limitReached) return
 
     setActing(true)
     try {
@@ -200,15 +202,15 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
             <p className="text-zinc-400 text-sm mt-1">Book an editing room for a time slot. One booking per slot per day.</p>
           </div>
         )}
-        {maxBookingsPerWeek !== null && (
+        {maxBookings !== null && (
           <div
             className="flex-shrink-0 text-sm font-medium px-4 py-2 rounded-xl border"
-            style={weeklyLimitReached
+            style={limitReached
               ? { background: 'rgba(239,68,68,0.10)', borderColor: 'rgba(239,68,68,0.30)', color: '#fca5a5' }
               : { background: 'var(--bg-elevated)', borderColor: 'var(--border)', color: 'var(--text-primary)' }
             }
           >
-            {myWeeklyBookings} / {maxBookingsPerWeek} bookings this week
+            {myBookingCount} / {maxBookings} bookings {limitPerDay ? `on ${format(selectedDay, 'EEE d MMM')}` : 'this week'}
           </div>
         )}
       </div>
@@ -306,7 +308,7 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
                     const isMine        = booking?.studentId === profile?.uid
                     const isUnavailable = !isRoomAvailableForSlot(room, selectedDateStr, selectedDayNum, slot, semDates)
                     const isPast        = isSlotExpired(slot)
-                    const isLimitHit    = !isBooked && !isMine && weeklyLimitReached
+                    const isLimitHit    = !isBooked && !isMine && limitReached
 
                     return (
                       <td key={room.id} className="px-2 py-2 text-center">

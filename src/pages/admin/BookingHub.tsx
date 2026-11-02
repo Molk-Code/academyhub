@@ -200,10 +200,13 @@ export default function BookingHub() {
   const [maxWeeklyInput, setMaxWeeklyInput] = useState<string>('')
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [settingsEditing, setSettingsEditing] = useState(false)
+  const [periodInput, setPeriodInput] = useState<'day' | 'week'>('week')
   const currentMax = bookingSettings?.maxBookingsPerWeek ?? null
+  const currentPeriod = bookingSettings?.maxBookingsPeriod ?? 'week'
 
   function startEditSettings() {
     setMaxWeeklyInput(currentMax !== null ? String(currentMax) : '')
+    setPeriodInput(currentPeriod)
     setSettingsEditing(true)
   }
 
@@ -211,7 +214,7 @@ export default function BookingHub() {
     setSettingsSaving(true)
     try {
       const val = maxWeeklyInput.trim() === '' ? null : Math.max(1, parseInt(maxWeeklyInput, 10) || 1)
-      await setDoc(doc(db, 'settings', 'booking'), { maxBookingsPerWeek: val }, { merge: true })
+      await setDoc(doc(db, 'settings', 'booking'), { maxBookingsPerWeek: val, maxBookingsPeriod: periodInput }, { merge: true })
       setSettingsEditing(false)
     } finally {
       setSettingsSaving(false)
@@ -551,18 +554,18 @@ export default function BookingHub() {
           <h2 className="text-base font-semibold text-zinc-200">Booking settings</h2>
         </div>
         <div className="bg-zinc-900 rounded-2xl border border-white/10 p-5">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
                 <Settings2 className="w-4.5 h-4.5 text-brand-600" />
               </div>
               <div>
-                <p className="text-sm font-medium text-zinc-200">Max bookings per student per week</p>
-                <p className="text-xs text-zinc-400 mt-0.5">Limits how many room slots a student can book in a single calendar week.</p>
+                <p className="text-sm font-medium text-zinc-200">Max room bookings per student</p>
+                <p className="text-xs text-zinc-400 mt-0.5">Limits how many room slots a student can book per day or per calendar week.</p>
               </div>
             </div>
             {settingsEditing ? (
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
                 <input
                   type="number"
                   min={1}
@@ -571,6 +574,21 @@ export default function BookingHub() {
                   onChange={e => setMaxWeeklyInput(e.target.value)}
                   className="input w-28 text-sm py-1.5 text-center"
                 />
+                <div className="flex rounded-lg border border-white/10 overflow-hidden">
+                  {(['day', 'week'] as const).map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPeriodInput(p)}
+                      className={cn(
+                        'px-3 py-1.5 text-sm font-medium transition-colors',
+                        periodInput === p ? 'bg-brand-600 text-white' : 'text-zinc-400 hover:bg-zinc-800',
+                      )}
+                    >
+                      per {p}
+                    </button>
+                  ))}
+                </div>
                 <button onClick={saveSettings} disabled={settingsSaving}
                   className="btn-primary py-1.5 px-3 text-sm flex items-center gap-1.5">
                   <Check className="w-3.5 h-3.5" />{settingsSaving ? 'Saving…' : 'Save'}
@@ -585,7 +603,7 @@ export default function BookingHub() {
                   'text-sm font-semibold px-3 py-1 rounded-full',
                   currentMax !== null ? 'bg-brand-50 text-brand-700' : 'bg-zinc-800 text-zinc-500',
                 )}>
-                  {currentMax !== null ? `${currentMax} / week` : 'Unlimited'}
+                  {currentMax !== null ? `${currentMax} / ${currentPeriod}` : 'Unlimited'}
                 </span>
                 <button onClick={startEditSettings}
                   className="p-1.5 text-zinc-400 hover:text-zinc-300 rounded-lg hover:bg-zinc-800 transition-colors">

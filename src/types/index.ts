@@ -604,7 +604,8 @@ export interface AuthClaims {
 
 export interface BookingSettingsDoc {
   id: string
-  maxBookingsPerWeek: number | null  // null = unlimited
+  maxBookingsPerWeek: number | null  // room bookings per student per period; null = unlimited
+  maxBookingsPeriod?: 'day' | 'week' // period the limit above applies to (default 'week')
   foodBoxLeadDays?: number           // working days in advance required for food box orders (default 5)
 }
 

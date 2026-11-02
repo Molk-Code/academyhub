@@ -431,6 +431,17 @@ async function reconcile(req: functions.https.Request, res: functions.Response) 
       })
     }
 
+    // Outlook's calendar view can cap how many events it returns (the action
+    // has no pagination setting in every tenant). A capped list ends early, so
+    // when it's that long only trust it up to its last event: nothing after
+    // that point is treated as removed.
+    const POSSIBLY_CAPPED = 200
+    let checkedEnd = windowEnd
+    if (rawEvents.length >= POSSIBLY_CAPPED && outlook.size > 0) {
+      const lastStart = Math.max(...[...outlook.values()].map(e => e.start.getTime()))
+      if (lastStart < windowEnd.getTime()) checkedEnd = new Date(lastStart)
+    }
+
     const storedSnap = await db.collection('synced_events')
       .where('syncId', '==', syncId)
       .where('startTime', '>=', admin.firestore.Timestamp.fromDate(windowStart))
@@ -438,8 +449,10 @@ async function reconcile(req: functions.https.Request, res: functions.Response) 
       .get()
     const stored = new Map(storedSnap.docs.map(d => [d.data().externalId as string, d]))
 
-    const toDelete = storedSnap.docs.filter(d => !outlook.has(d.data().externalId as string))
-    const matched  = storedSnap.size - toDelete.length
+    const toDelete = storedSnap.docs.filter(d =>
+      !outlook.has(d.data().externalId as string)
+      && (d.data().startTime?.toMillis?.() ?? 0) <= checkedEnd.getTime())
+    const matched  = storedSnap.docs.filter(d => outlook.has(d.data().externalId as string)).length
     const toWrite: { id: string; data: Record<string, unknown>; isNew: boolean }[] = []
     for (const [externalId, ev] of outlook) {
       if (ev.start < windowStart || ev.start >= windowEnd) continue
@@ -473,6 +486,7 @@ async function reconcile(req: functions.https.Request, res: functions.Response) 
 
     const summary = {
       window: { start: windowStart.toISOString(), end: windowEnd.toISOString() },
+      ...(checkedEnd < windowEnd ? { removalsCheckedUntil: checkedEnd.toISOString(), note: `Outlook sent ${rawEvents.length} events — possibly capped, so removals were only checked up to the last one. Shorten the window if this persists.` } : {}),
       outlookEvents: outlook.size,
       outlookCancelled: cancelled,
       storedInWindow: storedSnap.size,
@@ -486,7 +500,7 @@ async function reconcile(req: functions.https.Request, res: functions.Response) 
     // Guard against a partial Outlook list (e.g. pagination off) or a change
     // of Outlook ids wiping the calendar: refuse big deletions unless forced
     const suspicious = storedSnap.size > 0 && (
-      matched === 0 || (toDelete.length > 10 && toDelete.length > storedSnap.size / 2)
+      matched === 0 || (toDelete.length > 10 && toDelete.length > matched)
     )
     console.log('[officeReconcile]', syncId, dryRun ? 'DRY RUN' : '', JSON.stringify(summary))
     if (suspicious && !force) {

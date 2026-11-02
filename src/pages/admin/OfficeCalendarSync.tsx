@@ -178,7 +178,7 @@ function SyncCard({ sync, cohorts }: { sync: OfficeCalendarSyncDoc; cohorts: Coh
             <ol className="text-xs text-blue-200/80 space-y-1 list-decimal list-inside">
               <li>New <b>Scheduled cloud flow</b> → repeat every 1 day (e.g. 05:00)</li>
               <li>Add "<b>Get calendar view of events (V3)</b>" (Office 365 Outlook) → same calendar · Start time <code className="bg-blue-500/10 px-1 rounded">{'addDays(utcNow(),-7)'}</code> · End time <code className="bg-blue-500/10 px-1 rounded">{'addDays(utcNow(),120)'}</code> (as expressions)</li>
-              <li>On that step: <b>… → Settings → Pagination: On, threshold 5000</b> — without it Outlook returns only the first 256 events</li>
+              <li>If that step has <b>Settings → Pagination</b>, turn it on (threshold 5000). Many tenants don't show it — that's fine: CineForge notices a capped list and only checks removals up to its last event</li>
               <li>Add "<b>Select</b>" (Data Operation) → From = <code className="bg-blue-500/10 px-1 rounded">value</code> · Map (text mode): <code className="bg-blue-500/10 px-1 rounded">{`{"externalId": Id, "subject": Subject, "start": Start, "end": End, "location": Location, "isAllDay": IsAllDay}`}</code></li>
               <li>Add "<b>HTTP</b>" → POST, URI = check-up URL above with <code className="bg-blue-500/10 px-1 rounded">&amp;dryRun=1</code> on the end for the first run · same two headers as above</li>
               <li>Body: <code className="bg-blue-500/10 px-1 rounded">{`{"windowStart": "@{addDays(utcNow(),-6)}", "windowEnd": "@{addDays(utcNow(),119)}", "events": @{body('Select')}}`}</code> (one day inside the Outlook window on each side, on purpose)</li>

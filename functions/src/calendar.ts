@@ -353,16 +353,17 @@ export const receiveOfficeCalendarEvent = functions.https.onRequest(async (req, 
 //        mass-delete guard]
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Either our own mapped shape or Outlook's calendar view items passed through
+// as-is (camelCase or PascalCase, depending on the connector version)
 interface ReconcileEvent {
   externalId?: string
-  id?: string
-  Id?: string
-  subject?: string
-  start?: string
-  end?: string
-  location?: string
-  isAllDay?: boolean | string
-  isCancelled?: boolean | string
+  id?: string; Id?: string
+  subject?: string; Subject?: string
+  start?: string; Start?: string
+  end?: string; End?: string
+  location?: string | { displayName?: string }; Location?: string
+  isAllDay?: boolean | string; IsAllDay?: boolean | string
+  isCancelled?: boolean | string; IsCancelled?: boolean | string
 }
 
 // Outlook's calendar view gives UTC times without a zone ("…T09:20:00.0000000")
@@ -419,15 +420,16 @@ async function reconcile(req: functions.https.Request, res: functions.Response) 
     let cancelled = 0
     for (const e of rawEvents as ReconcileEvent[]) {
       const externalId = e?.externalId ?? e?.id ?? e?.Id
-      const start = parseUtc(e?.start)
+      const start = parseUtc(e?.start ?? e?.Start)
       if (!externalId || !start) continue
-      if (toBool(e.isCancelled)) { cancelled++; continue }
+      if (toBool(e.isCancelled ?? e.IsCancelled)) { cancelled++; continue }
+      const loc = e.location ?? e.Location
       outlook.set(String(externalId), {
-        title:    e.subject ?? '',
+        title:    e.subject ?? e.Subject ?? '',
         start,
-        end:      parseUtc(e.end),
-        allDay:   toBool(e.isAllDay),
-        location: e.location || null,
+        end:      parseUtc(e.end ?? e.End),
+        allDay:   toBool(e.isAllDay ?? e.IsAllDay),
+        location: (typeof loc === 'object' ? loc?.displayName : loc) || null,
       })
     }
 

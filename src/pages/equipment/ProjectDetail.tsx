@@ -29,7 +29,13 @@ export function ProjectDetail({
   onUpdate: (data: Partial<InventoryProjectDoc>) => Promise<void>
   onDelete: () => Promise<void>
 }) {
-  const { data: items } = useCollection<InventoryItemDoc>(`inventory_projects/${project.id}/items`)
+  const { data: unsortedItems } = useCollection<InventoryItemDoc>(`inventory_projects/${project.id}/items`)
+  // Alphabetical, with numbers in names compared naturally ("Battery 2" before "Battery 10")
+  const items = useMemo(
+    () => [...unsortedItems].sort((a, b) =>
+      a.equipmentName.localeCompare(b.equipmentName, 'sv', { numeric: true, sensitivity: 'base' })),
+    [unsortedItems],
+  )
   const { data: equipmentAll } = useCollection<EquipmentDoc>('equipment')
   // Other active projects an item can be moved to
   const { data: activeProjects } = useCollection<InventoryProjectDoc>(

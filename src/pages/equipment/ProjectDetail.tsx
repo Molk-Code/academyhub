@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   collection, addDoc, updateDoc, deleteDoc, doc,
-  serverTimestamp, onSnapshot, increment, writeBatch, getDocs, query,
+  serverTimestamp, onSnapshot, writeBatch, getDocs, query,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, where } from '@/hooks/useFirestore'
@@ -149,7 +149,6 @@ export function ProjectDetail({
             await updateDoc(doc(db, `inventory_projects/${project.id}/items`, match.id), {
               status: 'returned', checkinTimestamp: new Date().toISOString(),
             })
-            if (match.equipmentId) await adjustEquipmentAvailable(match.equipmentId, 1)
           }
           beep(660)
           setScanEntries(prev => [{ name: equipmentName, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 19)])
@@ -289,14 +288,8 @@ export function ProjectDetail({
     return () => { if (remoteSessionId) updateDoc(doc(db, 'scan_sessions', remoteSessionId), { active: false }).catch(() => {}) }
   }, [remoteSessionId])
 
-  // Equipment catalog "available" count reflects real-time checkout status
-  // across every project — decrement when a unit leaves availability
-  // (checked out or missing), increment when it comes back (returned).
-  // Items not matched to a catalog entry (equipmentId blank) have nothing to adjust.
-  async function adjustEquipmentAvailable(equipmentId: string, delta: number) {
-    if (!equipmentId) return
-    await updateDoc(doc(db, 'equipment', equipmentId), { available: increment(delta) })
-  }
+  // The catalog's "available" count is recomputed from project items by the
+  // onInventoryItemWritten Cloud Function — no counting needed here.
 
   async function handleScan(text: string) {
     const time = new Date().toLocaleTimeString()
@@ -324,7 +317,6 @@ export function ProjectDetail({
         damageNotes: '',
         assignedTo: project.borrowers?.[0] ?? '',
       })
-      if (matchedEquip) await adjustEquipmentAvailable(matchedEquip.id, -1)
     } else {
       const checkedOut = items.filter(i => i.status === 'checked-out')
       const match = checkedOut.find(i => i.equipmentName === displayName)
@@ -340,7 +332,6 @@ export function ProjectDetail({
           status: 'returned',
           checkinTimestamp: new Date().toISOString(),
         })
-        if (match.equipmentId) await adjustEquipmentAvailable(match.equipmentId, 1)
       }
     }
   }
@@ -358,7 +349,6 @@ export function ProjectDetail({
       // Typed by name, not chosen from the catalog picker — tracked separately in Statistics
       ...(equipmentId ? {} : { isManualEntry: true }),
     })
-    if (equipmentId) await adjustEquipmentAvailable(equipmentId, -1)
     setManualInput('')
   }
 
@@ -377,7 +367,6 @@ export function ProjectDetail({
       status: 'checked-out',
       checkoutTimestamp: new Date().toISOString(),
     })
-    if (item.equipmentId) await adjustEquipmentAvailable(item.equipmentId, -1)
   }
 
   async function returnItem(item: InventoryItemDoc) {
@@ -388,7 +377,6 @@ export function ProjectDetail({
     })
     // Covers both checked-out → returned and missing → returned ("Found") — both
     // are non-available states beforehand, so this is always a +1.
-    if (item.equipmentId) await adjustEquipmentAvailable(item.equipmentId, 1)
   }
 
   // Undo an accidental return — checkoutTimestamp is left untouched, so the
@@ -399,7 +387,6 @@ export function ProjectDetail({
       status: 'checked-out',
       checkinTimestamp: '',
     })
-    if (item.equipmentId) await adjustEquipmentAvailable(item.equipmentId, -1)
   }
 
   async function markMissing(item: InventoryItemDoc) {
@@ -424,7 +411,6 @@ export function ProjectDetail({
       damageNotes: '',
       checkinTimestamp: new Date().toISOString(),
     })
-    if (item.equipmentId) await adjustEquipmentAvailable(item.equipmentId, 1)
   }
 
   // Move an item to another active project as-is (status, times, notes kept).
@@ -454,7 +440,6 @@ export function ProjectDetail({
     // Deleting a not-yet-returned item would otherwise permanently understate
     // availability — give the unit back unless it was already returned, or
     // was still pending (never decremented in the first place).
-    if (item.equipmentId && item.status !== 'returned' && item.status !== 'pending') await adjustEquipmentAvailable(item.equipmentId, 1)
   }
 
   async function markAllReturned() {

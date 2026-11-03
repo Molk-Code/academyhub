@@ -99,21 +99,39 @@ function EquipmentStatusTab({
     status === 'damaged' || status === 'missing' ? 0 : status === 'pending' ? 1 : status === 'checked-out' ? 2 : 3
 
   const rows = useMemo(() => {
-    return filtered
-      .map(e => {
-        const matching = allItems.filter(i => (i.equipmentId === e.id || i.equipmentName === e.name) && i.status !== 'returned')
-        const activeItem = matching[0]
-        const proj = activeItem ? projectMap[activeItem.projectId] : undefined
-        const status: 'damaged' | 'missing' | 'pending' | 'checked-out' | 'available' =
-          activeItem?.status === 'damaged' ? 'damaged' :
-          activeItem?.status === 'missing' ? 'missing' :
-          activeItem?.status === 'pending' ? 'pending' :
-          activeItem?.status === 'checked-out' ? 'checked-out' : 'available'
-        const checkedOutCount = matching.filter(i => i.status === 'checked-out').length
-        return { equipment: e, activeItem, proj, status, checkedOutCount }
-      })
-      .sort((a, b) => statusPriority(a.status) - statusPriority(b.status) || a.equipment.name.localeCompare(b.equipment.name))
-  }, [filtered, allItems, projectMap])
+    const toStatus = (item?: Item): 'damaged' | 'missing' | 'pending' | 'checked-out' | 'available' =>
+      item?.status === 'damaged' ? 'damaged' :
+      item?.status === 'missing' ? 'missing' :
+      item?.status === 'pending' ? 'pending' :
+      item?.status === 'checked-out' ? 'checked-out' : 'available'
+    const open = allItems.filter(i => i.status !== 'returned')
+    // Old items saved without an id still match the catalog by name; items
+    // typed by hand never do, so they don't count against a catalog item
+    const catalogNames = new Set(equipment.map(e => e.name))
+    const linksTo = (i: Item, e: EquipmentDoc) =>
+      i.equipmentId ? i.equipmentId === e.id : !i.isManualEntry && i.equipmentName === e.name
+    const catalogRows = filtered.map(e => {
+      const matching = open.filter(i => linksTo(i, e))
+      const activeItem = matching[0]
+      return {
+        key: e.id, name: e.name, category: e.category, manual: false,
+        activeItem, proj: activeItem ? projectMap[activeItem.projectId] : undefined,
+        status: toStatus(activeItem),
+        checkedOutCount: matching.filter(i => i.status === 'checked-out').length,
+      }
+    })
+    // Hand-typed items show only while they're out, then drop off the list
+    const q = search.toLowerCase()
+    const manualRows = open
+      .filter(i => !i.equipmentId && (i.isManualEntry || !catalogNames.has(i.equipmentName)))
+      .filter(i => i.equipmentName.toLowerCase().includes(q))
+      .map(i => ({
+        key: `manual-${i.projectId}-${i.id}`, name: i.equipmentName, category: '', manual: true,
+        activeItem: i, proj: projectMap[i.projectId], status: toStatus(i), checkedOutCount: 0,
+      }))
+    return [...catalogRows, ...manualRows]
+      .sort((a, b) => statusPriority(a.status) - statusPriority(b.status) || a.name.localeCompare(b.name))
+  }, [filtered, equipment, allItems, projectMap, search])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -134,14 +152,19 @@ function EquipmentStatusTab({
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ equipment: e, activeItem, proj, checkedOutCount }) => {
+            {rows.map(({ key, name, category, manual, activeItem, proj, checkedOutCount }) => {
               const { dot, label, color } = getStatusDisplay(activeItem, proj)
               return (
-                <tr key={e.id} style={{ borderBottom: '1px solid #1a1a25' }}>
+                <tr key={key} style={{ borderBottom: '1px solid #1a1a25' }}>
                   <td style={{ padding: '.5rem .75rem', color: '#f0f0f5', fontWeight: 600 }}>
-                    {e.name}{checkedOutCount > 1 ? <span style={{ color: '#6a6a80', fontWeight: 700 }}> ×{checkedOutCount}</span> : ''}
+                    {name}{checkedOutCount > 1 ? <span style={{ color: '#6a6a80', fontWeight: 700 }}> ×{checkedOutCount}</span> : ''}
+                    {manual && (
+                      <span style={{ marginLeft: 8, fontSize: '.62rem', fontWeight: 700, color: '#a1a1aa', border: '1px solid #3a3a4a', borderRadius: 8, padding: '1px 6px', verticalAlign: 'middle' }}>
+                        MANUAL
+                      </span>
+                    )}
                   </td>
-                  <td style={{ padding: '.5rem .75rem', color: '#f97316', fontSize: '.7rem', fontWeight: 700 }}>{e.category}</td>
+                  <td style={{ padding: '.5rem .75rem', color: '#f97316', fontSize: '.7rem', fontWeight: 700 }}>{category || '—'}</td>
                   <td style={{ padding: '.5rem .75rem' }}><span style={{ color }}>{dot} {label}</span></td>
                   <td style={{ padding: '.5rem .75rem', color: '#6a6a80' }}>
                     {proj

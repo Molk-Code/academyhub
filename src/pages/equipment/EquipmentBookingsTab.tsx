@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  collection, addDoc, deleteDoc, doc, serverTimestamp, increment, writeBatch,
+  collection, addDoc, deleteDoc, doc, serverTimestamp, writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -108,29 +108,13 @@ export function BookingsTab() {
   async function setStatus(id: string, newStatus: string, teacherNotes?: string) {
     setSavingId(id)
     try {
-      const booking = bookings.find(b => b.id === id)
       const batch = writeBatch(db)
       batch.update(doc(db, 'equipment_bookings', id), {
         status: newStatus,
         ...(teacherNotes !== undefined ? { teacherNotes } : {}),
       })
 
-      // Adjust available count when equipment physically moves
-      if (booking?.items?.length) {
-        const prevStatus = booking.status
-        const delta =
-          newStatus === 'checked-out' && prevStatus !== 'checked-out' ? -1 :
-          prevStatus === 'checked-out' && (newStatus === 'returned' || newStatus === 'cancelled') ? 1 :
-          0
-        if (delta !== 0) {
-          for (const item of booking.items) {
-            batch.update(doc(db, 'equipment', item.equipmentId), {
-              available: increment(delta * item.quantity),
-            })
-          }
-        }
-      }
-
+      // Availability follows the linked project's items (onInventoryItemWritten)
       await batch.commit()
     } finally {
       setSavingId(null)

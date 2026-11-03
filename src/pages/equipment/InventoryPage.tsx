@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { StatsContent } from './InventoryStats'
 import {
   collection, collectionGroup, addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs,
-  serverTimestamp, query, where, onSnapshot, increment, writeBatch,
+  serverTimestamp, query, where, onSnapshot, writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -248,9 +248,6 @@ function CreateProjectForm({
             damageNotes: '',
             assignedTo,
           })
-        }
-        if (!fromBooking && item.equipmentId && item.quantity > 0) {
-          await updateDoc(doc(db, 'equipment', item.equipmentId), { available: increment(-item.quantity) })
         }
       }
       if (fromBooking) {

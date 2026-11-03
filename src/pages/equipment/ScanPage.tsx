@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { doc, addDoc, updateDoc, collection, serverTimestamp, onSnapshot, getDocs, increment } from 'firebase/firestore'
+import { doc, addDoc, updateDoc, collection, serverTimestamp, onSnapshot, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { BrowserMultiFormatReader } from '@zxing/browser'
@@ -155,7 +155,6 @@ export default function ScanPage() {
           assignedTo: '',
           scannedViaSession: sessionId,
         })
-        if (equipmentId) await updateDoc(doc(db, 'equipment', equipmentId), { available: increment(-1) })
       } else {
         // Unknown until the item list loads; then refuse items not out in this project
         const out = checkedOutRef.current

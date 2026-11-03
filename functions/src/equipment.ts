@@ -254,3 +254,40 @@ export const onInventoryProjectUpdated = functions.firestore
     ])
     return null
   })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// onInventoryItemWritten — keep each catalog item's "available" count equal to
+// its total minus the units out in projects (checked out, damaged or missing).
+// Recomputed from the items rather than incremented, so the count can't drift.
+// Items with no equipmentId (typed by hand or unknown codes) never count.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const OUT_STATUSES = ['checked-out', 'damaged', 'missing']
+
+export async function recomputeEquipmentAvailable(equipmentId: string): Promise<void> {
+  const equipRef = db.collection('equipment').doc(equipmentId)
+  const [equipSnap, itemsSnap] = await Promise.all([
+    equipRef.get(),
+    db.collectionGroup('items').where('equipmentId', '==', equipmentId).get(),
+  ])
+  if (!equipSnap.exists) return
+  const out = itemsSnap.docs.filter(d =>
+    d.ref.parent.parent?.parent.id === 'inventory_projects' && OUT_STATUSES.includes(d.data().status),
+  ).length
+  const total = Number(equipSnap.data()?.totalQuantity ?? 0)
+  const available = Math.max(0, total - out)
+  if (equipSnap.data()?.available !== available) await equipRef.update({ available })
+}
+
+export const onInventoryItemWritten = functions.firestore
+  .document('inventory_projects/{projectId}/items/{itemId}')
+  .onWrite(async (change) => {
+    const before = change.before.exists ? change.before.data() : undefined
+    const after  = change.after.exists ? change.after.data() : undefined
+    const wasOut = !!before && OUT_STATUSES.includes(before.status)
+    const isOut  = !!after && OUT_STATUSES.includes(after.status)
+    if (wasOut === isOut && before?.equipmentId === after?.equipmentId) return null
+    const ids = new Set([before?.equipmentId, after?.equipmentId].filter((id): id is string => !!id))
+    await Promise.all([...ids].map(recomputeEquipmentAvailable))
+    return null
+  })

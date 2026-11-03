@@ -1093,6 +1093,17 @@ export default function EquipmentBookingPage() {
                         }
                         {item.notes && <div className="product-notes"><LinkifiedText text={item.notes} /></div>}
                         {item.description && <div className="product-description">{item.description}</div>}
+                        {item.linkUrl && (
+                          <a
+                            href={externalHref(item.linkUrl)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, fontSize: '.75rem', fontWeight: 700, color: '#f26419', textDecoration: 'none' }}
+                          >
+                            <ExternalLink size={12} /> Product page
+                          </a>
+                        )}
                         {pricingEnabled && (
                           <div className="product-pricing">
                             {item.priceInclVat > 0

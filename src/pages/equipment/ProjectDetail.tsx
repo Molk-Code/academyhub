@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   collection, addDoc, updateDoc, deleteDoc, doc,
-  serverTimestamp, onSnapshot, increment, writeBatch,
+  serverTimestamp, onSnapshot, increment, writeBatch, getDocs, query,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, where } from '@/hooks/useFirestore'
@@ -17,6 +17,7 @@ import { buildEquipmentContractHtml } from '@/lib/equipmentContract'
 import { isOverdue, formatDate, overdueDays, parseScanText, beep } from './inventoryShared'
 import { EquipmentPicker } from './EquipmentPicker'
 import { ContractSignatures } from './ContractSignatures'
+import { ScanFlash, useScanFlash, NotInProjectModal, type NotInProjectData } from './ScanFeedback'
 
 export function ProjectDetail({
   project,
@@ -46,6 +47,41 @@ export function ProjectDetail({
     () => activeProjects.filter(p => p.id !== project.id).sort((a, b) => a.name.localeCompare(b.name, 'sv')),
     [activeProjects, project.id],
   )
+  // Remote-scan listeners outlive renders; read the latest lists through refs
+  const equipmentRef = useRef(equipmentAll)
+  equipmentRef.current = equipmentAll
+  const moveTargetsRef = useRef(moveTargets)
+  moveTargetsRef.current = moveTargets
+
+  // Scan feedback: the scanned item flashes on screen; a check-in of an item
+  // not out in this project opens a popup naming where it is checked out
+  const { flash, show: showFlash } = useScanFlash()
+  const [notInProject, setNotInProject] = useState<NotInProjectData | null>(null)
+
+  function flashItem(name: string, equipmentId: string | undefined, label: string, warn = false) {
+    const equip = equipmentId ? equipmentRef.current.find(e => e.id === equipmentId) : undefined
+    setNotInProject(null)
+    showFlash({ name, imageUrl: equip?.imageUrl || null, label, warn })
+  }
+
+  async function reportNotInProject(name: string, equipmentId: string | undefined) {
+    const equip = equipmentId ? equipmentRef.current.find(e => e.id === equipmentId) : undefined
+    const opened = { name, imageUrl: equip?.imageUrl || null, known: !!equip, otherProjects: equip ? null : [] }
+    setNotInProject(opened)
+    if (!equip) return
+    const found: string[] = []
+    await Promise.all(moveTargetsRef.current.map(async p => {
+      const snap = await getDocs(query(
+        collection(db, `inventory_projects/${p.id}/items`),
+        where('equipmentId', '==', equip.id),
+      )).catch(() => null)
+      if (snap?.docs.some(d => d.data().status === 'checked-out')) found.push(p.name)
+    }))
+    found.sort((a, b) => a.localeCompare(b, 'sv'))
+    // Only fill in the popup if it still shows this scan
+    setNotInProject(cur => (cur === opened ? { ...opened, otherProjects: found } : cur))
+  }
+
   const [moveOpen, setMoveOpen] = useState<Record<string, string>>({}) // itemId → chosen target project id
   const [moving, setMoving] = useState<string | null>(null)
 
@@ -93,6 +129,7 @@ export function ProjectDetail({
   const pendingCount = items.filter(i => i.status === 'pending').length
 
   // Listen to remote check-in signals from mobile
+  const handledCheckinsRef = useRef(new Set<string>())
   useEffect(() => {
     if (!remoteSessionId || scanMode !== 'checkin') return
     const unsub = onSnapshot(
@@ -100,8 +137,14 @@ export function ProjectDetail({
       async snap => {
         for (const change of snap.docChanges()) {
           if (change.type !== 'added') continue
-          const { equipmentName } = change.doc.data()
+          // Re-subscribing (items changed) replays every earlier check-in as "added"
+          if (handledCheckinsRef.current.has(change.doc.id)) continue
+          handledCheckinsRef.current.add(change.doc.id)
+          const { equipmentName, equipmentId } = change.doc.data()
           const match = items.find(i => i.status === 'checked-out' && i.equipmentName === equipmentName)
+            ?? (equipmentId ? items.find(i => i.status === 'checked-out' && i.equipmentId === equipmentId) : undefined)
+          if (match) flashItem(match.equipmentName, match.equipmentId || equipmentId, 'Returned')
+          else { beep(220); reportNotInProject(equipmentName, equipmentId) }
           if (match) {
             await updateDoc(doc(db, `inventory_projects/${project.id}/items`, match.id), {
               status: 'returned', checkinTimestamp: new Date().toISOString(),
@@ -126,8 +169,10 @@ export function ProjectDetail({
         snap.docChanges().forEach(change => {
           if (change.type !== 'added') return
           const data = change.doc.data()
-          if (data.scannedViaSession === remoteSessionId) {
+          if (data.scannedViaSession === remoteSessionId && !handledCheckinsRef.current.has(change.doc.id)) {
+            handledCheckinsRef.current.add(change.doc.id)
             beep(880)
+            flashItem(data.equipmentName, data.equipmentId, 'Checked out')
             setScanEntries(prev => [{ name: data.equipmentName, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 19)])
             setRemoteScanCount(c => c + 1)
           }
@@ -268,6 +313,7 @@ export function ProjectDetail({
       : text
     if (scanMode === 'checkout') {
       log(displayName, matchedEquip ? 'Checked out' : 'Not in the equipment list — added by its code', !matchedEquip)
+      flashItem(displayName, matchedEquip?.id, matchedEquip ? 'Checked out' : 'Added by its code — not in the equipment list', !matchedEquip)
       if (!matchedEquip) beep(220)
       await addDoc(collection(db, `inventory_projects/${project.id}/items`), {
         equipmentId: matchedEquip?.id ?? '',
@@ -287,8 +333,9 @@ export function ProjectDetail({
       log(match?.equipmentName ?? displayName,
         match ? 'Returned' : matchedEquip ? 'Not checked out in this project' : 'Not in the equipment list',
         !match)
-      if (!match) beep(220)
+      if (!match) { beep(220); reportNotInProject(displayName, matchedEquip?.id) }
       if (match) {
+        flashItem(match.equipmentName, match.equipmentId || matchedEquip?.id, 'Returned')
         await updateDoc(doc(db, `inventory_projects/${project.id}/items`, match.id), {
           status: 'returned',
           checkinTimestamp: new Date().toISOString(),
@@ -470,6 +517,8 @@ export function ProjectDetail({
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
+      <ScanFlash flash={flash} />
+      {notInProject && <NotInProjectModal data={notInProject} onClose={() => setNotInProject(null)} />}
       {showPicker && (
         <EquipmentPicker
           onClose={() => setShowPicker(false)}

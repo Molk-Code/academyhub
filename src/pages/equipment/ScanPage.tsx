@@ -7,6 +7,7 @@ import { BrowserMultiFormatReader } from '@zxing/browser'
 import { NotFoundException } from '@zxing/library'
 import { Scan, Check, X, Wifi, WifiOff, LogIn, AlertTriangle } from 'lucide-react'
 import { parseScanText } from './inventoryShared'
+import { ScanFlash, useScanFlash } from './ScanFeedback'
 
 const COOLDOWN_MS = 2500 // ms to block re-scan after a successful scan
 
@@ -18,7 +19,7 @@ interface ScanSession {
 }
 
 interface ScanEntry { name: string; time: string; ok: boolean }
-type CooldownState = { active: false } | { active: true; name: string; ok: boolean; progress: number }
+type CooldownState = { active: false } | { active: true; name: string; ok: boolean; progress: number; message?: string }
 
 function beep(ok: boolean) {
   try {
@@ -59,6 +60,10 @@ export default function ScanPage() {
   const sessionRef = useRef<ScanSession | null>(null)
   const equipmentCacheRef = useRef<Record<string, string>>({})
   const gtinCacheRef = useRef<Record<number, string>>({})   // EAN-14 equipment number → id
+  const imageCacheRef = useRef<Record<string, string>>({})  // equipment id → image
+  // The project's checked-out items, so a check-in can be refused right here
+  const checkedOutRef = useRef<{ equipmentId: string; equipmentName: string }[] | null>(null)
+  const { flash, show: showFlash } = useScanFlash()
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Listen to session doc
@@ -74,6 +79,16 @@ export default function ScanPage() {
     return unsub
   }, [sessionId])
 
+  useEffect(() => {
+    if (!session?.projectId) return
+    return onSnapshot(collection(db, `inventory_projects/${session.projectId}/items`), snap => {
+      checkedOutRef.current = snap.docs
+        .map(d => d.data() as { equipmentId?: string; equipmentName?: string; status?: string })
+        .filter(i => i.status === 'checked-out')
+        .map(i => ({ equipmentId: i.equipmentId ?? '', equipmentName: i.equipmentName ?? '' }))
+    }, () => { checkedOutRef.current = null })
+  }, [session?.projectId])
+
   // Pre-load equipment name cache
   useEffect(() => {
     getDocs(collection(db, 'equipment')).then(snap => {
@@ -81,16 +96,18 @@ export default function ScanPage() {
         equipmentCacheRef.current[d.id] = (d.data() as any).name ?? d.id
         const gtinNo = (d.data() as any).gtinNo
         if (gtinNo) gtinCacheRef.current[gtinNo] = d.id
+        const imageUrl = (d.data() as any).imageUrl
+        if (imageUrl) imageCacheRef.current[d.id] = imageUrl
       })
     }).catch(() => {})
   }, [])
 
   // Cooldown: countdown progress from 100 → 0, then unlock
-  function startCooldown(name: string, ok: boolean) {
+  function startCooldown(name: string, ok: boolean, message?: string) {
     if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current)
     cooldownRef.current = true
     const start = Date.now()
-    setCooldown({ active: true, name, ok, progress: 100 })
+    setCooldown({ active: true, name, ok, progress: 100, message })
 
     cooldownTimerRef.current = setInterval(() => {
       const elapsed = Date.now() - start
@@ -101,7 +118,7 @@ export default function ScanPage() {
         cooldownRef.current = false
         setCooldown({ active: false })
       } else {
-        setCooldown({ active: true, name, ok, progress: remaining })
+        setCooldown({ active: true, name, ok, progress: remaining, message })
       }
     }, 30)
   }
@@ -124,6 +141,7 @@ export default function ScanPage() {
     const equipmentName = unit ? `${baseName} #${unit}` : baseName
     const equipmentId = equipmentCacheRef.current[base] ? base : ''
     let ok = false
+    let message: string | undefined
 
     try {
       if (sess.mode === 'checkout') {
@@ -139,6 +157,12 @@ export default function ScanPage() {
         })
         if (equipmentId) await updateDoc(doc(db, 'equipment', equipmentId), { available: increment(-1) })
       } else {
+        // Unknown until the item list loads; then refuse items not out in this project
+        const out = checkedOutRef.current
+        if (out && !out.some(i => i.equipmentName === equipmentName || (equipmentId && i.equipmentId === equipmentId))) {
+          message = 'Not checked out in this project — check other projects'
+          throw new Error(message)
+        }
         await addDoc(collection(db, `scan_sessions/${sessionId}/checkins`), {
           equipmentName,
           equipmentId,
@@ -149,7 +173,14 @@ export default function ScanPage() {
     } catch {}
 
     beep(ok)
-    startCooldown(equipmentName, ok)
+    if (ok) {
+      showFlash({
+        name: equipmentName,
+        imageUrl: equipmentId ? imageCacheRef.current[equipmentId] : null,
+        label: sess.mode === 'checkout' ? 'Checked out' : 'Checked in',
+      })
+    }
+    startCooldown(equipmentName, ok, message)
     setScanEntries(prev => [{ name: equipmentName, time: new Date().toLocaleTimeString(), ok }, ...prev.slice(0, 29)])
   }, [sessionId])
 
@@ -226,6 +257,7 @@ export default function ScanPage() {
 
   return (
     <div style={base}>
+      <ScanFlash flash={flash} />
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
@@ -297,7 +329,7 @@ export default function ScanPage() {
                 {cooldown.name}
               </p>
               <p style={{ fontSize: '.75rem', color: cooldown.ok ? '#4cd964' : '#f87171', fontWeight: 600 }}>
-                {cooldown.ok ? (session.mode === 'checkout' ? 'Checked out' : 'Checked in') : 'Failed — try again'}
+                {cooldown.ok ? (session.mode === 'checkout' ? 'Checked out' : 'Checked in') : cooldown.message ?? 'Failed — try again'}
               </p>
 
               {/* Progress bar: drains left-to-right over COOLDOWN_MS */}

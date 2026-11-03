@@ -405,6 +405,7 @@ export interface EquipmentDoc {
   gtinNo?: number               // equipment number inside its EAN-14 code (assigned on first EAN-14 label)
   included: string[]
   linkUrl?: string              // product page elsewhere on the web, opened in a new tab
+  accessoryIds?: string[]       // catalog items suggested when this one is added to the cart
   filmYear2Only: boolean
   allowedCohortIds?: string[]   // empty / absent = available to all
   requiresProduction?: boolean  // default true; false = bookable without a production

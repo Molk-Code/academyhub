@@ -13,14 +13,14 @@ interface FormState {
   name: string; category: EquipmentCategory; description: string; notes: string
   location: string; totalQuantity: string; linkUrl: string
   priceExclVat: string; priceInclVat: string; imageUrl: string
-  included: string[]; allowedCohortIds: string[]; requiresProduction: boolean; isActive: boolean
+  included: string[]; accessoryIds: string[]; allowedCohortIds: string[]; requiresProduction: boolean; isActive: boolean
 }
 
 const EMPTY_FORM: FormState = {
   name: '', category: 'CAMERA', description: '', notes: '',
   location: '', totalQuantity: '1', linkUrl: '',
   priceExclVat: '', priceInclVat: '', imageUrl: '',
-  included: [], allowedCohortIds: [], requiresProduction: true, isActive: true,
+  included: [], accessoryIds: [], allowedCohortIds: [], requiresProduction: true, isActive: true,
 }
 
 const lbl: React.CSSProperties = { fontSize: '.75rem', color: '#8a8aab', fontWeight: 600, display: 'block', marginBottom: 4 }
@@ -28,6 +28,9 @@ const lbl: React.CSSProperties = { fontSize: '.75rem', color: '#8a8aab', fontWei
 export function ItemForm({ existing, onClose, categories }: { existing: EquipmentDoc | null; onClose: () => void; categories: EquipmentCategoryDoc[] }) {
   const { data: cohorts } = useCollection<CohortDoc>('cohorts')
   const sortedCohorts = useMemo(() => [...cohorts].sort((a, b) => a.name.localeCompare(b.name)), [cohorts])
+  const { data: catalog } = useCollection<EquipmentDoc>('equipment')
+  const catalogById = useMemo(() => new Map(catalog.map(e => [e.id, e])), [catalog])
+  const [accessorySearch, setAccessorySearch] = useState('')
 
   const [form, setForm] = useState<FormState>(() => existing ? {
     name: existing.name, category: existing.category,
@@ -37,6 +40,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
     priceExclVat: existing.priceExclVat ? String(existing.priceExclVat) : '',
     priceInclVat: existing.priceInclVat ? String(existing.priceInclVat) : '',
     imageUrl: existing.imageUrl ?? '', included: existing.included ?? [],
+    accessoryIds: existing.accessoryIds ?? [],
     allowedCohortIds: existing.allowedCohortIds ?? (existing.filmYear2Only
       ? cohorts.filter(c => c.programYear === 2).map(c => c.id)
       : []),
@@ -89,6 +93,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
       priceInclVat: parseFloat(form.priceInclVat) || 0,
       imageUrl: form.imageUrl, qrCode: form.name.trim(),
       included: form.included,
+      accessoryIds: form.accessoryIds,
       allowedCohortIds: form.allowedCohortIds,
       requiresProduction: form.requiresProduction,
       filmYear2Only: false,
@@ -233,6 +238,55 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Suggested accessories — offered in a popup when this item is added to the cart */}
+          <div>
+            <label style={lbl}>Suggested Accessories</label>
+            <p style={{ fontSize: '.7rem', color: '#4a4a60', marginBottom: 8 }}>
+              Other catalog items to suggest when this is added to the cart (e.g. a DMX controller for a light set).
+            </p>
+            {form.accessoryIds.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {form.accessoryIds.map(id => (
+                  <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '.75rem', background: 'rgba(242,100,25,.1)', border: '1px solid rgba(242,100,25,.3)', borderRadius: 20, padding: '4px 10px', color: '#f0c0a0' }}>
+                    {catalogById.get(id)?.name ?? 'Removed item'}
+                    <button onClick={() => set('accessoryIds', form.accessoryIds.filter(x => x !== id))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6a6a80', padding: 0, display: 'flex' }}><X size={12} /></button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <input
+              style={{ ...inp, fontSize: '.8rem' }}
+              value={accessorySearch}
+              onChange={e => setAccessorySearch(e.target.value)}
+              placeholder="Search the catalog to add an accessory…"
+            />
+            {accessorySearch.trim() && (() => {
+              const q = accessorySearch.trim().toLowerCase()
+              const matches = catalog
+                .filter(e => e.id !== existing?.id && !form.accessoryIds.includes(e.id) && e.name.toLowerCase().includes(q))
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .slice(0, 8)
+              return (
+                <div style={{ marginTop: 6, border: '1px solid #2a2a3a', borderRadius: 10, overflow: 'hidden' }}>
+                  {matches.length === 0 && <p style={{ fontSize: '.78rem', color: '#4a4a60', padding: '8px 12px' }}>No matching items</p>}
+                  {matches.map(e => (
+                    <button
+                      key={e.id}
+                      onClick={() => { set('accessoryIds', [...form.accessoryIds, e.id]); setAccessorySearch('') }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '7px 12px', background: '#12121a', border: 'none', borderBottom: '1px solid #1a1a25', color: '#f0f0f5', fontSize: '.8rem', cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      {e.imageUrl
+                        ? <img src={optimizeImageUrl(e.imageUrl)} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 6 }} />
+                        : <Package size={16} color="#4a4a60" />}
+                      <span style={{ flex: 1 }}>{e.name}</span>
+                      <span style={{ fontSize: '.65rem', color: '#6a6a80', fontWeight: 700 }}>{e.category}</span>
+                    </button>
+                  ))}
+                </div>
+              )
+            })()}
           </div>
 
           {/* Available for classes */}

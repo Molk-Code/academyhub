@@ -382,6 +382,63 @@ export default function EquipmentBookingPage() {
     return totalPrice + addCost > budgetInfo.equipmentBudget
   }
 
+  // ── Suggested accessories ────────────────────────────────────────────────────
+  // The item whose accessories are being offered after it went into the cart
+  const [accessoryFor, setAccessoryFor] = useState<EquipmentDoc | null>(null)
+
+  function accessoriesOf(item: EquipmentDoc): EquipmentDoc[] {
+    return (item.accessoryIds ?? [])
+      .map(id => equipment.find(e => e.id === id))
+      .filter((e): e is EquipmentDoc => !!e && e.id !== item.id)
+  }
+
+  function addWithSuggestions(item: EquipmentDoc, qty: number) {
+    addToCart(item, qty)
+    if (accessoriesOf(item).some(a => !cart.has(a.id))) setAccessoryFor(item)
+  }
+
+  function renderAccessoryRows(list: EquipmentDoc[]) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {list.map(acc => {
+          const inCart = cart.has(acc.id)
+          const locked = isItemLocked(acc)
+          const outOfStock = acc.available <= 0
+          const budgetBlocked = !inCart && isOverEquipmentBudget(acc)
+          const needsProduction = (productionRequired || !productionSettingsLoaded) && acc.requiresProduction !== false
+          const blockedReason = locked ? 'Not for your class' : outOfStock ? 'Out of stock' : budgetBlocked ? 'Over budget'
+            : needsProduction && !selectedProductionId ? 'Select a production first' : null
+          return (
+            <div key={acc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 8, background: '#12121a', border: `1px solid ${inCart ? 'rgba(242,100,25,.45)' : '#2a2a3a'}`, borderRadius: 12 }}>
+              <div
+                onClick={() => setModalItem(acc)}
+                style={{ width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: 'hidden', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                className="accessory-thumb"
+              >
+                <EquipmentImg url={acc.imageUrl} name={acc.name} fallback={<Package size={22} color="#9a9ab0" />} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p onClick={() => setModalItem(acc)} style={{ fontSize: '.88rem', fontWeight: 600, color: '#f0f0f5', cursor: 'pointer', margin: 0 }}>{acc.name}</p>
+                <p style={{ fontSize: '.72rem', margin: '2px 0 0', color: blockedReason && !inCart ? '#f59e0b' : '#6a6a80' }}>
+                  {blockedReason && !inCart ? blockedReason : `${acc.available} available`}
+                  {pricingEnabled && (acc.priceInclVat > 0 ? ` · ${acc.priceInclVat} kr/day` : ' · Free')}
+                </p>
+              </div>
+              <button
+                className={`add-to-cart-btn${inCart ? ' in-cart' : ''}`}
+                disabled={!inCart && !!blockedReason}
+                style={{ flexShrink: 0, opacity: !inCart && blockedReason ? 0.45 : 1 }}
+                onClick={() => inCart ? removeFromCart(acc.id) : addToCart(acc, 1)}
+              >
+                {inCart ? <><Check size={14} /> In Cart</> : '+ Add'}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   // Whole-booking over-budget check — this is the actual submit gate. Per-item
   // isOverEquipmentBudget only disables adding new items at the current
   // rental-day count; changing dates afterward can still push the cart over,
@@ -707,6 +764,49 @@ export default function EquipmentBookingPage() {
         )}
       </div>
 
+      {/* Suggested accessories, shown right after an item is added to the cart */}
+      {accessoryFor && (
+        <div
+          onClick={() => setAccessoryFor(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 290, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(6px)', padding: 16 }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 16, width: '100%', maxWidth: 460, maxHeight: '90dvh', overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 14 }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(76,217,100,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Check size={18} color="#4cd964" strokeWidth={3} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: '.75rem', color: '#4cd964', fontWeight: 700, margin: 0 }}>Added to cart</p>
+                <p style={{ fontSize: '1rem', color: '#f0f0f5', fontWeight: 700, margin: '2px 0 0' }}>{accessoryFor.name}</p>
+              </div>
+              <button onClick={() => setAccessoryFor(null)} aria-label="Close" style={{ background: 'none', border: 'none', color: '#6a6a80', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
+            </div>
+            <div>
+              <p style={INFO_LABEL}>Accessories for {accessoryFor.name}</p>
+              {renderAccessoryRows(accessoriesOf(accessoryFor))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setAccessoryFor(null)}
+                style={{ flex: 1, minWidth: 140, padding: '10px 14px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 10, color: '#f0f0f5', fontWeight: 600, fontSize: '.85rem', cursor: 'pointer' }}
+              >
+                Continue browsing
+              </button>
+              <button
+                className="primary-btn"
+                style={{ flex: 1, minWidth: 140, fontSize: '.85rem', padding: '10px 14px' }}
+                onClick={() => { setAccessoryFor(null); setCartOpen(false); fromDate && toDate ? setView('checkout') : setCartOpen(true) }}
+              >
+                Go to Checkout →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Item info popup — everything about the item, scrollable on small screens */}
       {modalItem && (
         <div
@@ -767,6 +867,13 @@ export default function EquipmentBookingPage() {
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {accessoriesOf(modalItem).length > 0 && (
+                <div>
+                  <p style={INFO_LABEL}>Accessories for {modalItem.name}</p>
+                  {renderAccessoryRows(accessoriesOf(modalItem))}
                 </div>
               )}
 
@@ -1009,7 +1116,7 @@ export default function EquipmentBookingPage() {
                             className={`add-to-cart-btn${inCart ? ' in-cart' : ''}`}
                             disabled={disabled || (needsProduction && !selectedProductionId)}
                             title={needsProduction && !selectedProductionId ? 'Select a production first' : undefined}
-                            onClick={() => inCart ? removeFromCart(item.id) : addToCart(item, qty)}
+                            onClick={() => inCart ? removeFromCart(item.id) : addWithSuggestions(item, qty)}
                           >
                             {inCart ? <><Check size={14} /> In Cart</> : '+ Add'}
                           </button>

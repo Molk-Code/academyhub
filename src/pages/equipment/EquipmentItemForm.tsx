@@ -5,21 +5,22 @@ import { useCollection } from '@/hooks/useFirestore'
 import { optimizeImageUrl } from '@/lib/cloudinary'
 import type { EquipmentDoc, EquipmentCategory, EquipmentCategoryDoc, CohortDoc } from '@/types'
 import {
-  Package, X, Check, AlertTriangle, Loader2, Upload, ToggleRight, ToggleLeft,
+  Package, X, Check, AlertTriangle, Loader2, Upload, ToggleRight, ToggleLeft, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { uploadEquipmentImage, inp } from './adminEquipmentShared'
+import { equipmentImages } from './ImageGallery'
 
 interface FormState {
   name: string; category: EquipmentCategory; description: string; notes: string
   location: string; totalQuantity: string; linkUrl: string
-  priceExclVat: string; priceInclVat: string; imageUrl: string
+  priceExclVat: string; priceInclVat: string; images: string[]
   included: string[]; accessoryIds: string[]; allowedCohortIds: string[]; requiresProduction: boolean; isActive: boolean
 }
 
 const EMPTY_FORM: FormState = {
   name: '', category: 'CAMERA', description: '', notes: '',
   location: '', totalQuantity: '1', linkUrl: '',
-  priceExclVat: '', priceInclVat: '', imageUrl: '',
+  priceExclVat: '', priceInclVat: '', images: [],
   included: [], accessoryIds: [], allowedCohortIds: [], requiresProduction: true, isActive: true,
 }
 
@@ -39,7 +40,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
     linkUrl: existing.linkUrl ?? '',
     priceExclVat: existing.priceExclVat ? String(existing.priceExclVat) : '',
     priceInclVat: existing.priceInclVat ? String(existing.priceInclVat) : '',
-    imageUrl: existing.imageUrl ?? '', included: existing.included ?? [],
+    images: equipmentImages(existing), included: existing.included ?? [],
     accessoryIds: existing.accessoryIds ?? [],
     allowedCohortIds: existing.allowedCohortIds ?? (existing.filmYear2Only
       ? cohorts.filter(c => c.programYear === 2).map(c => c.id)
@@ -64,12 +65,28 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
     }
   }
 
-  async function handleImageFile(file: File) {
-    if (!file.type.startsWith('image/')) { setError('Please upload an image file'); return }
+  // Uploads one at a time and appends; the first image is the main one
+  async function handleImageFiles(files: FileList | File[]) {
+    const list = [...files]
+    if (list.some(f => !f.type.startsWith('image/'))) { setError('Please upload image files only'); return }
+    if (list.length === 0) return
     setUploading(true); setError('')
-    try { set('imageUrl', await uploadEquipmentImage(file, p => setUploadPct(p))) }
+    try {
+      for (const file of list) {
+        const url = await uploadEquipmentImage(file, p => setUploadPct(p))
+        setForm(f => ({ ...f, images: [...f.images, url] }))
+      }
+    }
     catch (e: any) { setError(e?.message ?? 'Upload failed') }
     finally { setUploading(false); setUploadPct(0) }
+  }
+
+  function moveImage(i: number, dir: -1 | 1) {
+    const j = i + dir
+    if (j < 0 || j >= form.images.length) return
+    const next = [...form.images];
+    [next[i], next[j]] = [next[j], next[i]]
+    set('images', next)
   }
 
   async function handleSave() {
@@ -91,7 +108,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
       available,
       priceExclVat: parseFloat(form.priceExclVat) || 0,
       priceInclVat: parseFloat(form.priceInclVat) || 0,
-      imageUrl: form.imageUrl, qrCode: form.name.trim(),
+      imageUrl: form.images[0] ?? '', imageUrls: form.images, qrCode: form.name.trim(),
       included: form.included,
       accessoryIds: form.accessoryIds,
       allowedCohortIds: form.allowedCohortIds,
@@ -184,34 +201,49 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
             </div>
           </div>
 
-          {/* Image Upload */}
+          {/* Images — the first is the main image on cards; all are shown in the info gallery */}
           <div>
-            <label style={lbl}>Equipment Image</label>
+            <label style={lbl}>Equipment Images</label>
+            {form.images.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                {form.images.map((url, i) => (
+                  <div key={url + i} style={{ position: 'relative', width: 84 }}>
+                    <img src={optimizeImageUrl(url)} alt={`Image ${i + 1}`} style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 8, border: `2px solid ${i === 0 ? '#4cd964' : '#2a2a3a'}`, display: 'block' }} />
+                    {i === 0 && (
+                      <span style={{ position: 'absolute', top: 4, left: 4, fontSize: '.6rem', fontWeight: 700, background: '#4cd964', color: '#000', borderRadius: 6, padding: '1px 5px' }}>MAIN</span>
+                    )}
+                    <button
+                      type="button"
+                      aria-label="Remove image"
+                      onClick={() => set('images', form.images.filter((_, j) => j !== i))}
+                      style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,.7)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}
+                    >
+                      <X size={12} />
+                    </button>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                      <button type="button" disabled={i === 0} onClick={() => moveImage(i, -1)} aria-label="Move left"
+                        style={{ background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 6, color: '#c0c0d5', cursor: 'pointer', padding: '1px 6px', opacity: i === 0 ? 0.3 : 1 }}><ChevronLeft size={12} /></button>
+                      <button type="button" disabled={i === form.images.length - 1} onClick={() => moveImage(i, 1)} aria-label="Move right"
+                        style={{ background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 6, color: '#c0c0d5', cursor: 'pointer', padding: '1px 6px', opacity: i === form.images.length - 1 ? 0.3 : 1 }}><ChevronRight size={12} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div
               style={{ border: `2px dashed ${dragOver ? '#4cd964' : '#2a2a3a'}`, borderRadius: 10, padding: '1rem', cursor: 'pointer', transition: 'border-color .2s', background: dragOver ? 'rgba(76,217,100,.05)' : 'transparent' }}
               onDragOver={e => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
-              onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleImageFile(f) }}
-              onClick={() => fileRef.current?.click()}
+              onDrop={e => { e.preventDefault(); setDragOver(false); handleImageFiles(e.dataTransfer.files) }}
+              onClick={() => !uploading && fileRef.current?.click()}
             >
-              <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile(f) }} />
-              {form.imageUrl ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <img src={optimizeImageUrl(form.imageUrl)} alt="Preview" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8, border: '1px solid #2a2a3a' }} />
-                  <div>
-                    <p style={{ fontSize: '.85rem', color: '#f0f0f5', fontWeight: 600 }}>Image uploaded</p>
-                    <p style={{ fontSize: '.75rem', color: '#6a6a80' }}>Click to replace</p>
-                  </div>
-                  {uploading && <Loader2 size={16} color="#4cd964" style={{ marginLeft: 'auto', animation: 'spin 1s linear infinite' }} />}
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '1rem 0', color: '#4a4a60' }}>
-                  {uploading
-                    ? <><Loader2 size={24} style={{ margin: '0 auto 8px', display: 'block', animation: 'spin 1s linear infinite' }} /><p style={{ fontSize: '.8rem' }}>{uploadPct === 0 ? 'Preparing…' : `${uploadPct}%`}</p></>
-                    : <><Upload size={24} style={{ margin: '0 auto 8px', display: 'block' }} /><p style={{ fontSize: '.8rem' }}>Drag & drop or click to upload image</p></>
-                  }
-                </div>
-              )}
+              <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => { if (e.target.files) handleImageFiles(e.target.files); e.target.value = '' }} />
+              <div style={{ textAlign: 'center', padding: '.5rem 0', color: '#4a4a60' }}>
+                {uploading
+                  ? <><Loader2 size={24} style={{ margin: '0 auto 8px', display: 'block', animation: 'spin 1s linear infinite' }} /><p style={{ fontSize: '.8rem' }}>{uploadPct === 0 ? 'Preparing…' : `${uploadPct}%`}</p></>
+                  : <><Upload size={24} style={{ margin: '0 auto 8px', display: 'block' }} /><p style={{ fontSize: '.8rem' }}>{form.images.length ? 'Add more images — drag & drop or click' : 'Drag & drop or click to upload images'}</p></>
+                }
+              </div>
             </div>
           </div>
 

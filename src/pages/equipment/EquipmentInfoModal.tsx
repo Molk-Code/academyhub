@@ -1,6 +1,6 @@
 import type { EquipmentDoc, CohortDoc } from '@/types'
-import { X, Package, ExternalLink } from 'lucide-react'
-import { EquipmentImg } from './adminEquipmentShared'
+import { X, ExternalLink } from 'lucide-react'
+import { ImageGallery, equipmentImages } from './ImageGallery'
 import { LinkifiedText, externalHref } from './inventoryShared'
 
 export function InfoModal({ item, cohorts, pricingEnabled, onClose }: { item: EquipmentDoc; cohorts: CohortDoc[]; pricingEnabled: boolean; onClose: () => void }) {
@@ -8,12 +8,8 @@ export function InfoModal({ item, cohorts, pricingEnabled, onClose }: { item: Eq
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={onClose}>
       <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 16, width: '100%', maxWidth: 440, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
         <div style={{ position: 'relative' }}>
-          <EquipmentImg
-            url={item.imageUrl}
-            name={item.name}
-            fallback={<div style={{ width: '100%', height: 220, background: '#1a1a25', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3a3a4a' }}><Package size={40} /></div>}
-          />
-          <button className="close-btn" onClick={onClose} style={{ position: 'absolute', top: 10, right: 10, width: 32, height: 32, background: 'rgba(14,14,22,.85)' }}><X size={16} /></button>
+          <ImageGallery urls={equipmentImages(item)} name={item.name} />
+          <button className="close-btn" onClick={onClose} style={{ position: 'absolute', top: 10, right: 10, zIndex: 2, width: 32, height: 32, background: 'rgba(14,14,22,.85)' }}><X size={16} /></button>
         </div>
         <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>

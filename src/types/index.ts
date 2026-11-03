@@ -400,7 +400,8 @@ export interface EquipmentDoc {
   priceInclVat: number
   available: number
   totalQuantity: number
-  imageUrl: string
+  imageUrl: string              // main image (first of imageUrls)
+  imageUrls?: string[]          // every image in display order; absent on older items
   qrCode: string
   gtinNo?: number               // equipment number inside its EAN-14 code (assigned on first EAN-14 label)
   included: string[]

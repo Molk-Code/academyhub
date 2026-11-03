@@ -9,10 +9,11 @@ import { Link, useLocation } from 'react-router-dom'
 import {
   ShoppingCart, X, Search, Package, Calendar, Check,
   AlertTriangle, ChevronDown, ChevronRight, CheckCircle2, Clock, Truck, RotateCcw, XCircle, Lock, Trash2, Send,
-  ExternalLink, LayoutGrid, Camera as CameraIcon, Wrench, Lightbulb, Mic, MapPin, BookOpen, MoreHorizontal, type LucideIcon,
+  ExternalLink, Images, LayoutGrid, Camera as CameraIcon, Wrench, Lightbulb, Mic, MapPin, BookOpen, MoreHorizontal, type LucideIcon,
 } from 'lucide-react'
 import { optimizeImageUrl } from '@/lib/cloudinary'
 import { LinkifiedText, externalHref } from './inventoryShared'
+import { ImageGallery, equipmentImages } from './ImageGallery'
 import './molkom.css'
 
 const INFO_LABEL: React.CSSProperties = { fontSize: '.7rem', fontWeight: 700, color: '#6a6a80', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }
@@ -824,13 +825,7 @@ export default function EquipmentBookingPage() {
             >
               <X size={16} />
             </button>
-            <div className="info-modal-image" style={{ background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 160 }}>
-              <EquipmentImg
-                url={modalItem.imageUrl}
-                name={modalItem.name}
-                fallback={<div style={{ width: '100%', height: 220, background: '#1a1a25', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3a3a4a' }}><Package size={40} /></div>}
-              />
-            </div>
+            <ImageGallery urls={equipmentImages(modalItem)} name={modalItem.name} />
             <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <p style={{ fontWeight: 700, fontSize: '1.1rem', color: '#f0f0f5' }}>{modalItem.name}</p>
@@ -1077,6 +1072,11 @@ export default function EquipmentBookingPage() {
                           fallback={<div className="image-placeholder"><Package size={32} color="#3a3a4a" /><br />{item.name}</div>}
                         />
                         <span className="product-category-tag">{item.category}</span>
+                        {equipmentImages(item).length > 1 && (
+                          <span style={{ position: 'absolute', bottom: 8, right: 8, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '.65rem', fontWeight: 700, background: 'rgba(14,14,22,.8)', color: '#fff', borderRadius: 10, padding: '2px 7px' }}>
+                            <Images size={11} /> {equipmentImages(item).length}
+                          </span>
+                        )}
                         {locked && (
                           <span className="film-year2-badge"><Lock size={10} /> Restricted</span>
                         )}

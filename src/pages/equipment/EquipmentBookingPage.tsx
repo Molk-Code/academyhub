@@ -3,7 +3,7 @@ import { collection, addDoc, updateDoc, serverTimestamp, query, where, orderBy, 
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument } from '@/hooks/useFirestore'
-import type { EquipmentDoc, EquipmentBookingDoc, EquipmentBookingMessageDoc, CohortDoc, ProductionDoc, ProductionSceneDoc, ProductionCrewAssignmentDoc, ProductionCastDoc, ProductionLocationDoc, ProductionShootingDayDoc, CrewRoleDoc } from '@/types'
+import type { EquipmentDoc, EquipmentCategoryDoc, EquipmentBookingDoc, EquipmentBookingMessageDoc, CohortDoc, ProductionDoc, ProductionSceneDoc, ProductionCrewAssignmentDoc, ProductionCastDoc, ProductionLocationDoc, ProductionShootingDayDoc, CrewRoleDoc } from '@/types'
 import { calcRentalDays, billableDays, salaryCost as calcSalaryCost, equipmentCostForProduction } from '@/lib/productionBudget'
 import { Link, useLocation } from 'react-router-dom'
 import {
@@ -20,10 +20,11 @@ function EquipmentImg({ url, name, fallback }: { url: string | undefined | null;
   return <img src={optimizeImageUrl(url)} alt={name} onError={() => setFailed(true)} />
 }
 
-type EquipmentCategory = 'ALL' | 'CAMERA' | 'GRIP' | 'LIGHTS' | 'SOUND' | 'LOCATION' | 'BOOKS' | 'OTHER'
+// 'ALL' or the name of a category from Admin → Equipment → Categories
+type EquipmentCategory = string
 type ViewMode = 'browse' | 'checkout' | 'success' | 'my-bookings'
 
-const CATEGORY_ICONS: Record<EquipmentCategory, LucideIcon> = {
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
   ALL: LayoutGrid,
   CAMERA: CameraIcon,
   GRIP: Wrench,
@@ -157,6 +158,7 @@ export default function EquipmentBookingPage() {
   const isStaffBooker = useLocation().pathname.startsWith('/teacher')
 
   const { data: equipmentRaw } = useCollection<EquipmentDoc>('equipment')
+  const { data: categoryDocs } = useCollection<EquipmentCategoryDoc>('equipment_categories')
   const { data: cohort } = useDocument<CohortDoc>('cohorts', cohortId || null)
   const { data: navVis, loading: navVisLoading } = useDocument<{ id: string; student: Record<string, boolean> }>('settings', 'nav_visibility')
   const productionNavEnabled = navVis?.student?.['production'] !== false
@@ -561,7 +563,15 @@ export default function EquipmentBookingPage() {
     setToDate(last.toISOString().slice(0, 10))
   }, [selectedProductionId, productionShootingDays])
 
-  const CATEGORIES: EquipmentCategory[] = ['ALL', 'CAMERA', 'GRIP', 'LIGHTS', 'SOUND', 'LOCATION', 'BOOKS', 'OTHER']
+  // Categories in the admin's order, then any used on equipment but not in
+  // that list; only ones with something bookable in them are shown
+  const CATEGORIES: EquipmentCategory[] = (() => {
+    const ordered = [...categoryDocs]
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name))
+      .map(c => c.name)
+    const extra = Object.keys(categoryCounts).filter(c => c !== 'ALL' && !ordered.includes(c)).sort()
+    return ['ALL', ...[...ordered, ...extra].filter(c => (categoryCounts[c] ?? 0) > 0)]
+  })()
 
   return (
     <div className="molkom-app student-molkom-app" style={{ background: '#0a0a0f', minHeight: '100vh' }}>
@@ -839,7 +849,7 @@ export default function EquipmentBookingPage() {
             <div className="toolbar">
               <div className="category-filter">
                 {CATEGORIES.map(cat => {
-                  const Icon = CATEGORY_ICONS[cat]
+                  const Icon = CATEGORY_ICONS[cat] ?? Package
                   return (
                     <button
                       key={cat}

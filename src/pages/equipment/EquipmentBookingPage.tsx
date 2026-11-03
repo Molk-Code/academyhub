@@ -9,10 +9,14 @@ import { Link, useLocation } from 'react-router-dom'
 import {
   ShoppingCart, X, Search, Package, Calendar, Check,
   AlertTriangle, ChevronDown, ChevronRight, CheckCircle2, Clock, Truck, RotateCcw, XCircle, Lock, Trash2, Send,
-  LayoutGrid, Camera as CameraIcon, Wrench, Lightbulb, Mic, MapPin, BookOpen, MoreHorizontal, type LucideIcon,
+  ExternalLink, LayoutGrid, Camera as CameraIcon, Wrench, Lightbulb, Mic, MapPin, BookOpen, MoreHorizontal, type LucideIcon,
 } from 'lucide-react'
 import { optimizeImageUrl } from '@/lib/cloudinary'
+import { LinkifiedText, externalHref } from './inventoryShared'
 import './molkom.css'
+
+const INFO_LABEL: React.CSSProperties = { fontSize: '.7rem', fontWeight: 700, color: '#6a6a80', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }
+const INFO_TEXT: React.CSSProperties = { fontSize: '.88rem', color: '#c0c0d5', lineHeight: 1.5, whiteSpace: 'pre-line', margin: 0 }
 
 function EquipmentImg({ url, name, fallback }: { url: string | undefined | null; name: string; fallback: React.ReactNode }) {
   const [failed, setFailed] = useState(false)
@@ -703,23 +707,80 @@ export default function EquipmentBookingPage() {
         )}
       </div>
 
-      {/* Image modal */}
+      {/* Item info popup — everything about the item, scrollable on small screens */}
       {modalItem && (
-        <div className="image-modal-overlay" onClick={() => setModalItem(null)}>
-          <div className="image-modal" onClick={e => e.stopPropagation()}>
-            <button className="image-modal-close" onClick={() => setModalItem(null)}><X size={16} /></button>
-            <EquipmentImg
-              url={modalItem.imageUrl}
-              name={modalItem.name}
-              fallback={<div style={{ width: 400, height: 300, background: '#1a1a25', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6a6a80' }}>No image</div>}
-            />
-            <div className="image-modal-name">{modalItem.name}</div>
-            {modalItem.included?.length > 0 && (
-              <div className="image-modal-included">
-                <h4>Included Accessories</h4>
-                <ul>{modalItem.included.map((inc, i) => <li key={i}>{inc}</li>)}</ul>
+        <div
+          onClick={() => setModalItem(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(8px)', padding: 16 }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ position: 'relative', background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 16, width: '100%', maxWidth: 480, maxHeight: '90dvh', overflowY: 'auto' }}
+          >
+            <button
+              onClick={() => setModalItem(null)}
+              aria-label="Close"
+              style={{ position: 'sticky', top: 10, float: 'right', marginRight: 10, zIndex: 1, width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(14,14,22,.85)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <X size={16} />
+            </button>
+            <div className="info-modal-image" style={{ background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 160 }}>
+              <EquipmentImg
+                url={modalItem.imageUrl}
+                name={modalItem.name}
+                fallback={<div style={{ width: '100%', height: 220, background: '#1a1a25', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3a3a4a' }}><Package size={40} /></div>}
+              />
+            </div>
+            <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: '1.1rem', color: '#f0f0f5' }}>{modalItem.name}</p>
+                <p style={{ fontSize: '.72rem', fontWeight: 700, color: '#f26419', textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 2 }}>{modalItem.category}</p>
+                <p style={{ fontSize: '.8rem', fontWeight: 600, marginTop: 6, color: modalItem.available > 0 ? '#4cd964' : '#ff4757' }}>
+                  {isItemLocked(modalItem) ? 'Not available for your class' : modalItem.available > 0 ? `${modalItem.available} available` : 'Out of stock'}
+                  {pricingEnabled && (modalItem.priceInclVat > 0
+                    ? <span style={{ color: '#6a6a80', fontWeight: 500 }}> · {modalItem.priceInclVat} kr/day</span>
+                    : <span style={{ color: '#6a6a80', fontWeight: 500 }}> · Free</span>)}
+                </p>
               </div>
-            )}
+
+              {modalItem.description && (
+                <div>
+                  <p style={INFO_LABEL}>Description</p>
+                  <p style={INFO_TEXT}><LinkifiedText text={modalItem.description} /></p>
+                </div>
+              )}
+
+              {modalItem.notes && (
+                <div>
+                  <p style={{ ...INFO_LABEL, color: '#fbbf24' }}>Special Instructions / Notes</p>
+                  <p style={INFO_TEXT}><LinkifiedText text={modalItem.notes} /></p>
+                </div>
+              )}
+
+              {modalItem.included?.length > 0 && (
+                <div>
+                  <p style={INFO_LABEL}>Included Accessories</p>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {modalItem.included.map((inc, i) => (
+                      <li key={i} style={{ fontSize: '.85rem', color: '#c0c0d5', paddingLeft: 12, position: 'relative' }}>
+                        <span style={{ position: 'absolute', left: 0, color: '#f26419' }}>•</span>{inc}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {modalItem.linkUrl && (
+                <a
+                  href={externalHref(modalItem.linkUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 14px', background: 'rgba(242,100,25,.12)', border: '1px solid rgba(242,100,25,.35)', borderRadius: 10, color: '#f26419', fontWeight: 700, fontSize: '.9rem', textDecoration: 'none' }}
+                >
+                  <ExternalLink size={15} /> Product page
+                </a>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -914,7 +975,7 @@ export default function EquipmentBookingPage() {
                         )}
                       </div>
                       <div className="product-info">
-                        <div className="product-name">{item.name}</div>
+                        <div className="product-name" onClick={() => setModalItem(item)} style={{ cursor: 'pointer' }}>{item.name}</div>
                         {locked
                           ? <div style={{ fontSize: '.7rem', color: '#f59e0b', fontWeight: 600 }}>Not available for your class</div>
                           : outOfStock
@@ -923,7 +984,7 @@ export default function EquipmentBookingPage() {
                               ? <div style={{ fontSize: '.7rem', color: '#f87171', fontWeight: 600 }}>💰 Over budget</div>
                               : <div className="product-available">{item.available} available</div>
                         }
-                        {item.notes && <div className="product-notes">{item.notes}</div>}
+                        {item.notes && <div className="product-notes"><LinkifiedText text={item.notes} /></div>}
                         {item.description && <div className="product-description">{item.description}</div>}
                         {pricingEnabled && (
                           <div className="product-pricing">

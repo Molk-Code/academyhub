@@ -11,14 +11,14 @@ import { uploadEquipmentImage, inp } from './adminEquipmentShared'
 
 interface FormState {
   name: string; category: EquipmentCategory; description: string; notes: string
-  location: string; totalQuantity: string
+  location: string; totalQuantity: string; linkUrl: string
   priceExclVat: string; priceInclVat: string; imageUrl: string
   included: string[]; allowedCohortIds: string[]; requiresProduction: boolean; isActive: boolean
 }
 
 const EMPTY_FORM: FormState = {
   name: '', category: 'CAMERA', description: '', notes: '',
-  location: '', totalQuantity: '1',
+  location: '', totalQuantity: '1', linkUrl: '',
   priceExclVat: '', priceInclVat: '', imageUrl: '',
   included: [], allowedCohortIds: [], requiresProduction: true, isActive: true,
 }
@@ -33,6 +33,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
     name: existing.name, category: existing.category,
     description: existing.description ?? '', notes: existing.notes ?? '',
     location: existing.location ?? '', totalQuantity: String(existing.totalQuantity),
+    linkUrl: existing.linkUrl ?? '',
     priceExclVat: existing.priceExclVat ? String(existing.priceExclVat) : '',
     priceInclVat: existing.priceInclVat ? String(existing.priceInclVat) : '',
     imageUrl: existing.imageUrl ?? '', included: existing.included ?? [],
@@ -82,6 +83,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
       name: form.name.trim(), category: form.category,
       description: form.description.trim(), notes: form.notes.trim(),
       location: form.location.trim(), totalQuantity,
+      linkUrl: form.linkUrl.trim(),
       available,
       priceExclVat: parseFloat(form.priceExclVat) || 0,
       priceInclVat: parseFloat(form.priceInclVat) || 0,
@@ -145,6 +147,12 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
               <label style={lbl}>Special Instructions / Notes</label>
               <textarea style={{ ...inp, resize: 'none' }} rows={3} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Handling notes…" />
             </div>
+          </div>
+
+          {/* Product link */}
+          <div>
+            <label style={lbl}>Product Link</label>
+            <input style={inp} type="url" value={form.linkUrl} onChange={e => set('linkUrl', e.target.value)} placeholder="https://… — opens in a new tab from the item's info" />
           </div>
 
           {/* Quantity + Location */}

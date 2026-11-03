@@ -85,3 +85,30 @@ export function beep(freq: number) {
     osc.stop(ctx.currentTime + 0.3)
   } catch {}
 }
+
+// Web addresses typed into equipment text, made clickable (new tab)
+const URL_RE = /(https?:\/\/[^\s<>"]+|www\.[^\s<>"]+)/gi
+
+export function externalHref(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`
+}
+
+export function LinkifiedText({ text }: { text: string }) {
+  const parts = text.split(URL_RE)
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (i % 2 === 0) return part
+        // Keep sentence punctuation after a link out of the link itself
+        const trail = part.match(/[.,;:!?)]+$/)?.[0] ?? ''
+        const url = trail ? part.slice(0, -trail.length) : part
+        return (
+          <span key={i}>
+            <a href={externalHref(url)} target="_blank" rel="noopener noreferrer" style={{ color: '#f26419', textDecoration: 'underline', wordBreak: 'break-all' }}>{url}</a>
+            {trail}
+          </span>
+        )
+      })}
+    </>
+  )
+}

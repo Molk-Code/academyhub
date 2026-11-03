@@ -1,6 +1,7 @@
 import type { EquipmentDoc, CohortDoc } from '@/types'
-import { X, Package } from 'lucide-react'
+import { X, Package, ExternalLink } from 'lucide-react'
 import { EquipmentImg } from './adminEquipmentShared'
+import { LinkifiedText, externalHref } from './inventoryShared'
 
 export function InfoModal({ item, cohorts, pricingEnabled, onClose }: { item: EquipmentDoc; cohorts: CohortDoc[]; pricingEnabled: boolean; onClose: () => void }) {
   return (
@@ -44,14 +45,14 @@ export function InfoModal({ item, cohorts, pricingEnabled, onClose }: { item: Eq
           {item.description && (
             <div>
               <p style={{ fontSize: '.7rem', fontWeight: 700, color: '#6a6a80', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Description</p>
-              <p style={{ fontSize: '.85rem', color: '#c0c0d5', lineHeight: 1.5 }}>{item.description}</p>
+              <p style={{ fontSize: '.85rem', color: '#c0c0d5', lineHeight: 1.5, whiteSpace: 'pre-line' }}><LinkifiedText text={item.description} /></p>
             </div>
           )}
 
           {item.notes && (
             <div>
               <p style={{ fontSize: '.7rem', fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Special Instructions / Notes</p>
-              <p style={{ fontSize: '.85rem', color: '#c0c0d5', lineHeight: 1.5 }}>{item.notes}</p>
+              <p style={{ fontSize: '.85rem', color: '#c0c0d5', lineHeight: 1.5, whiteSpace: 'pre-line' }}><LinkifiedText text={item.notes} /></p>
             </div>
           )}
 
@@ -70,6 +71,17 @@ export function InfoModal({ item, cohorts, pricingEnabled, onClose }: { item: Eq
 
           {item.location && (
             <p style={{ fontSize: '.78rem', color: '#6a6a80' }}>📍 {item.location}</p>
+          )}
+
+          {item.linkUrl && (
+            <a
+              href={externalHref(item.linkUrl)}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 14px', background: 'rgba(242,100,25,.12)', border: '1px solid rgba(242,100,25,.35)', borderRadius: 10, color: '#f26419', fontWeight: 700, fontSize: '.85rem', textDecoration: 'none' }}
+            >
+              <ExternalLink size={14} /> Product page
+            </a>
           )}
         </div>
       </div>

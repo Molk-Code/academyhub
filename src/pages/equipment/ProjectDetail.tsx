@@ -820,28 +820,28 @@ export function ProjectDetail({
                   {item.status === 'checked-out' && (
                     <>
                       <button className="item-return-btn" title="Return" onClick={() => returnItem(item)}>
-                        <Check size={16} />
+                        <Check size={16} /><span className="item-action-label">Return</span>
                       </button>
                       <button
                         className="item-damage-toggle-btn"
                         title="Mark Damaged"
                         onClick={() => setInlineDamage(prev => ({ ...prev, [item.id]: '' }))}
                       >
-                        <AlertTriangle size={14} />
+                        <AlertTriangle size={14} /><span className="item-action-label">Damaged</span>
                       </button>
                       <button className="item-missing-btn" title="Mark Missing" onClick={() => markMissing(item)}>
-                        ?
+                        <span className="item-action-icon">?</span><span className="item-action-label">Missing</span>
                       </button>
                     </>
                   )}
                   {item.status === 'damaged' && (
                     <button className="item-return-btn" title="Resolved" onClick={() => resolveDamage(item)}>
-                      <Check size={16} />
+                      <Check size={16} /><span className="item-action-label">Resolved</span>
                     </button>
                   )}
                   {item.status === 'missing' && (
                     <button className="item-return-btn" title="Found" onClick={() => returnItem(item)}>
-                      <Check size={16} />
+                      <Check size={16} /><span className="item-action-label">Found</span>
                     </button>
                   )}
                   <button
@@ -853,10 +853,10 @@ export function ProjectDetail({
                       return n
                     })}
                   >
-                    <ArrowRightLeft size={14} />
+                    <ArrowRightLeft size={14} /><span className="item-action-label">Move</span>
                   </button>
                   <button className="item-remove-btn" title="Remove" onClick={() => removeItem(item)}>
-                    <Trash2 size={14} />
+                    <Trash2 size={14} /><span className="item-action-label">Remove</span>
                   </button>
                 </div>
               </div>

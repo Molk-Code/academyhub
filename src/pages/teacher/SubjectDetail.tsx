@@ -24,6 +24,8 @@ import { cn, initials, avatarColor, toDate } from '@/lib/utils'
 const PANEL = 'rounded-2xl bg-zinc-900 border border-white/[0.06] shadow-xl'
 
 const METHOD_OPTIONS = ['Lesson', 'Workshop', 'Assignment'] as const
+// Curriculum row columns on md+: order/status · topic · content · how · actions
+const TOPIC_GRID = 'md:grid md:grid-cols-[3.5rem_minmax(0,1fr)_minmax(0,2fr)_9rem_6rem]'
 
 const EMPTY_ITEM: Omit<CurriculumItem, 'id' | 'order'> = {
   semester: 1, title: '', content: '', method: 'Lesson',
@@ -236,6 +238,39 @@ export default function SubjectDetail() {
       return updated
     }))
     setEditingId(null)
+  }
+
+  // Add/edit form for a topic: stacked on phones, one row on wide screens
+  function topicForm(onSave: () => void, onCancel: () => void, saveLabel: string) {
+    const onEnter = (e: React.KeyboardEvent) => { if (e.key === 'Enter') onSave() }
+    return (
+      <div className="bg-brand-500/[0.06] px-4 py-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_10rem] md:items-start">
+        <div>
+          <label className="label text-xs">Topic</label>
+          <input autoFocus className="input py-2 text-sm" value={itemForm.title} onChange={e => setItemForm(f => ({ ...f, title: e.target.value }))} placeholder="Topic name" onKeyDown={onEnter} />
+        </div>
+        <div>
+          <label className="label text-xs">Content</label>
+          <textarea rows={2} className="input py-2 text-sm resize-y" value={itemForm.content} onChange={e => setItemForm(f => ({ ...f, content: e.target.value }))} placeholder="What is covered" />
+        </div>
+        <div className="space-y-2">
+          <label className="label text-xs">How</label>
+          <select className="input py-2 text-sm" value={itemForm.method} onChange={e => setItemForm(f => ({ ...f, method: e.target.value, assignmentId: undefined }))}>
+            {METHOD_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+          {itemForm.method === 'Assignment' && (
+            <select className="input py-2 text-sm" value={itemForm.assignmentId ?? ''} onChange={e => setItemForm(f => ({ ...f, assignmentId: e.target.value || undefined }))}>
+              <option value="">— pick assignment —</option>
+              {subjectAssignments.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
+            </select>
+          )}
+        </div>
+        <div className="flex gap-2 md:col-span-3 md:justify-end">
+          <button onClick={onCancel} className="btn-secondary py-2 text-sm flex-1 md:flex-none"><X className="w-4 h-4" /> Cancel</button>
+          <button onClick={onSave} disabled={saving || !itemForm.title.trim()} className="btn-primary py-2 text-sm flex-1 md:flex-none"><Check className="w-4 h-4" /> {saveLabel}</button>
+        </div>
+      </div>
+    )
   }
 
   // Move a topic one step up/down within its semester; renumbers that
@@ -592,133 +627,87 @@ export default function SubjectDetail() {
         const items = curriculum.filter(i => i.semester === sem).sort((a, b) => a.order - b.order)
         return (
           <div key={sem} className={cn(PANEL, 'overflow-hidden')}>
-            <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-white/[0.05]">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-3.5 border-b border-white/[0.05]">
               <div className="flex items-center gap-3 min-w-0">
                 <h2 className="section-title flex items-center gap-2"><BookOpen /> Semester {sem}</h2>
-                <span className="text-[11px] font-mono text-zinc-500">{items.filter(i => coveredIds.has(i.id)).length}/{items.length} covered</span>
+                <span className="text-[11px] font-mono text-zinc-500 whitespace-nowrap">{items.filter(i => coveredIds.has(i.id)).length}/{items.length} covered</span>
               </div>
-              <button onClick={() => startAdd(sem)} className="flex items-center gap-1 text-xs font-semibold text-brand-400 hover:text-brand-300 transition-colors">
+              <button onClick={() => startAdd(sem)} className="flex items-center gap-1 text-xs font-semibold text-brand-400 hover:text-brand-300 transition-colors whitespace-nowrap">
                 <Plus className="w-3.5 h-3.5" /> Add topic
               </button>
             </div>
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
-              <thead>
-                <tr className="border-b border-white/[0.05]">
-                  <th className="w-14 px-2 py-2.5" />
-                  <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5 w-1/4">Course / Topic</th>
-                  <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5">Content</th>
-                  <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5 w-36">How</th>
-                  <th className="w-16 px-4 py-2.5" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.05]">
-                {items.map((item, idx) => {
-                  const status = itemLessonMap[item.id]
-                  const completed = status?.completed ?? false
-                  const plannedDate = (!completed && status?.plannedDate) ? status.plannedDate : null
-                  return editingId === item.id ? (
-                    <tr key={item.id} className="bg-brand-500/[0.06]">
-                      <td className="px-4 py-2" />
-                      <td className="px-4 py-2"><input autoFocus className="input py-1.5 text-sm" value={itemForm.title} onChange={e => setItemForm(f => ({ ...f, title: e.target.value }))} placeholder="Topic name" /></td>
-                      <td className="px-4 py-2"><input className="input py-1.5 text-sm" value={itemForm.content} onChange={e => setItemForm(f => ({ ...f, content: e.target.value }))} placeholder="What is covered" /></td>
-                      <td className="px-4 py-2 space-y-1">
-                        <select className="input py-1.5 text-sm" value={itemForm.method} onChange={e => setItemForm(f => ({ ...f, method: e.target.value, assignmentId: undefined }))}>
-                          {METHOD_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
-                        </select>
-                        {itemForm.method === 'Assignment' && (
-                          <select className="input py-1 text-sm" value={itemForm.assignmentId ?? ''} onChange={e => setItemForm(f => ({ ...f, assignmentId: e.target.value || undefined }))}>
-                            <option value="">— pick assignment —</option>
-                            {subjectAssignments.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
-                          </select>
-                        )}
-                      </td>
-                      <td className="px-4 py-2"><div className="flex gap-1">
-                        <button onClick={confirmEdit} disabled={saving} className="p-1.5 text-emerald-500 hover:text-emerald-600 transition-colors"><Check className="w-4 h-4" /></button>
-                        <button onClick={() => setEditingId(null)} className="p-1.5 text-zinc-400 hover:text-zinc-400 transition-colors"><X className="w-4 h-4" /></button>
-                      </div></td>
-                    </tr>
-                  ) : (
-                    <tr key={item.id} className={`group hover:bg-white/5 transition-colors ${completed ? 'bg-emerald-500/[0.04]' : ''}`}>
-                      <td className="px-2 py-3 text-center">
-                        <div className="flex items-center gap-1">
-                          <div className="flex flex-col">
-                            <button onClick={() => moveItem(item.id, -1)} disabled={idx === 0 || saving} title="Move up" className="p-0.5 text-zinc-500 hover:text-zinc-200 disabled:opacity-20 disabled:hover:text-zinc-500 transition-colors"><ChevronUp className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => moveItem(item.id, 1)} disabled={idx === items.length - 1 || saving} title="Move down" className="p-0.5 text-zinc-500 hover:text-zinc-200 disabled:opacity-20 disabled:hover:text-zinc-500 transition-colors"><ChevronDown className="w-3.5 h-3.5" /></button>
-                          </div>
-                          <span className="w-4 flex justify-center">
+            {/* Column headings only on wide screens; phones get stacked cards */}
+            <div className={cn(TOPIC_GRID, 'hidden md:grid border-b border-white/[0.05] text-xs font-semibold text-zinc-400 uppercase tracking-wider py-2.5')}>
+              <span />
+              <span className="px-4">Course / Topic</span>
+              <span className="px-4">Content</span>
+              <span className="px-4">How</span>
+              <span />
+            </div>
+            <div className="divide-y divide-white/[0.05]">
+              {items.map((item, idx) => {
+                const status = itemLessonMap[item.id]
+                const completed = status?.completed ?? false
+                const plannedDate = (!completed && status?.plannedDate) ? status.plannedDate : null
+                if (editingId === item.id) return <div key={item.id}>{topicForm(confirmEdit, () => setEditingId(null), 'Save')}</div>
+                return (
+                  <div key={item.id} className={cn(TOPIC_GRID, 'group flex items-start gap-3 px-3 py-3 md:gap-0 md:px-0 md:items-center hover:bg-white/5 transition-colors', completed && 'bg-emerald-500/[0.04]')}>
+                    <div className="flex items-center gap-1 md:px-2">
+                      <div className="flex flex-col">
+                        <button onClick={() => moveItem(item.id, -1)} disabled={idx === 0 || saving} title="Move up" className="p-1 md:p-0.5 text-zinc-500 hover:text-zinc-200 disabled:opacity-20 disabled:hover:text-zinc-500 transition-colors"><ChevronUp className="w-4 h-4 md:w-3.5 md:h-3.5" /></button>
+                        <button onClick={() => moveItem(item.id, 1)} disabled={idx === items.length - 1 || saving} title="Move down" className="p-1 md:p-0.5 text-zinc-500 hover:text-zinc-200 disabled:opacity-20 disabled:hover:text-zinc-500 transition-colors"><ChevronDown className="w-4 h-4 md:w-3.5 md:h-3.5" /></button>
+                      </div>
+                      <span className="hidden md:flex w-4 justify-center">
                         {completed
-                          ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
+                          ? <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                           : plannedDate
-                            ? <span className="inline-block w-2 h-2 rounded-full bg-amber-400 mx-auto" title="Planned" />
-                            : null
-                        }
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-sm font-medium ${completed ? 'text-emerald-300' : 'text-zinc-100'}`}>{item.title}</span>
+                            ? <span className="inline-block w-2 h-2 rounded-full bg-amber-400" title="Planned" />
+                            : null}
+                      </span>
+                    </div>
+                    {/* md:contents lets these become grid cells on desktop */}
+                    <div className="flex-1 min-w-0 md:contents">
+                      <div className="min-w-0 md:px-4">
+                        <span className={cn('text-sm font-medium break-words', completed ? 'text-emerald-300' : 'text-zinc-100')}>
+                          {completed && <CheckCircle2 className="md:hidden inline w-3.5 h-3.5 text-emerald-500 mr-1 -mt-0.5" />}
+                          {item.title}
+                        </span>
                         {plannedDate && (
                           <p className="text-[11px] font-mono text-amber-400 mt-0.5">
                             Planned: {plannedDate.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
                           </p>
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-zinc-400">{item.content}</td>
-                      <td className="px-4 py-3">
+                      </div>
+                      {item.content && <p className="mt-1 md:mt-0 md:px-4 text-sm text-zinc-400 break-words">{item.content}</p>}
+                      <div className="mt-2 md:mt-0 md:px-4 min-w-0">
                         {item.method === 'Assignment' && item.assignmentId ? (
-                          <Link to={`/teacher/assignments`} className="inline-flex items-center gap-1 text-[11px] font-medium bg-brand-500/15 text-brand-300 border border-brand-500/30 px-2 py-0.5 rounded-md hover:bg-brand-500/25 transition-colors">
-                            <FileText className="w-3 h-3" /> {subjectAssignments.find(a => a.id === item.assignmentId)?.title ?? 'Assignment'}
+                          <Link to={`/teacher/assignments`} className="inline-flex items-center gap-1 max-w-full text-[11px] font-medium bg-brand-500/15 text-brand-300 border border-brand-500/30 px-2 py-0.5 rounded-md hover:bg-brand-500/25 transition-colors">
+                            <FileText className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{subjectAssignments.find(a => a.id === item.assignmentId)?.title ?? 'Assignment'}</span>
                           </Link>
                         ) : (
                           <span className="text-[11px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-md">{item.method}</span>
                         )}
-                      </td>
-                      <td className="px-4 py-3"><div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {completed && (
-                          <button
-                            onClick={() => showAbsentsForItem(item)}
-                            className="p-1.5 text-zinc-400 hover:text-amber-600 transition-colors"
-                            title="See who was absent"
-                          >
-                            <Users className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        <button onClick={() => startEdit(item)} className="p-1.5 text-zinc-400 hover:text-zinc-300 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => deleteItem(item.id)} className="p-1.5 text-zinc-400 hover:text-rose-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
-                      </div></td>
-                    </tr>
-                  )
-                })}
-
-                {addingSem === sem && (
-                  <tr className="bg-brand-500/[0.06]">
-                    <td className="px-4 py-2" />
-                    <td className="px-4 py-2"><input autoFocus className="input py-1.5 text-sm" value={itemForm.title} onChange={e => setItemForm(f => ({ ...f, title: e.target.value }))} placeholder="Topic name" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
-                    <td className="px-4 py-2"><input className="input py-1.5 text-sm" value={itemForm.content} onChange={e => setItemForm(f => ({ ...f, content: e.target.value }))} placeholder="What is covered" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
-                    <td className="px-4 py-2 space-y-1">
-                      <select className="input py-1.5 text-sm" value={itemForm.method} onChange={e => setItemForm(f => ({ ...f, method: e.target.value, assignmentId: undefined }))}>
-                        {METHOD_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
-                      </select>
-                      {itemForm.method === 'Assignment' && (
-                        <select className="input py-1 text-sm" value={itemForm.assignmentId ?? ''} onChange={e => setItemForm(f => ({ ...f, assignmentId: e.target.value || undefined }))}>
-                          <option value="">— pick assignment —</option>
-                          {subjectAssignments.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
-                        </select>
+                      </div>
+                    </div>
+                    {/* Always visible on touch screens; hover-revealed on desktop */}
+                    <div className="flex flex-col md:flex-row gap-1 md:px-4 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                      {completed && (
+                        <button onClick={() => showAbsentsForItem(item)} className="p-2 md:p-1.5 text-zinc-400 hover:text-amber-600 transition-colors" title="See who was absent">
+                          <Users className="w-4 h-4 md:w-3.5 md:h-3.5" />
+                        </button>
                       )}
-                    </td>
-                    <td className="px-4 py-2"><div className="flex gap-1">
-                      <button onClick={confirmAdd} disabled={saving || !itemForm.title.trim()} className="p-1.5 text-emerald-500 hover:text-emerald-600 transition-colors"><Check className="w-4 h-4" /></button>
-                      <button onClick={() => setAddingSem(null)} className="p-1.5 text-zinc-400 hover:text-zinc-400 transition-colors"><X className="w-4 h-4" /></button>
-                    </div></td>
-                  </tr>
-                )}
+                      <button onClick={() => startEdit(item)} title="Edit" className="p-2 md:p-1.5 text-zinc-400 hover:text-zinc-300 transition-colors"><Pencil className="w-4 h-4 md:w-3.5 md:h-3.5" /></button>
+                      <button onClick={() => deleteItem(item.id)} title="Delete" className="p-2 md:p-1.5 text-zinc-400 hover:text-rose-500 transition-colors"><Trash2 className="w-4 h-4 md:w-3.5 md:h-3.5" /></button>
+                    </div>
+                  </div>
+                )
+              })}
 
-                {items.length === 0 && addingSem !== sem && (
-                  <tr><td colSpan={5} className="px-5 py-4 text-sm text-zinc-400 text-center">No items yet — click "Add item" to start.</td></tr>
-                )}
-              </tbody>
-            </table>
+              {addingSem === sem && topicForm(confirmAdd, () => setAddingSem(null), 'Add topic')}
+
+              {items.length === 0 && addingSem !== sem && (
+                <p className="px-5 py-4 text-sm text-zinc-400 text-center">No topics yet — tap "Add topic" to start.</p>
+              )}
             </div>
           </div>
         )
@@ -729,39 +718,7 @@ export default function SubjectDetail() {
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.05]">
             <h2 className="section-title flex items-center gap-2"><BookOpen /> Semester {addingSem}</h2>
           </div>
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-white/[0.05]">
-                <th className="w-14 px-2 py-2.5" />
-                <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5 w-1/4">Course / Topic</th>
-                <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5">Content</th>
-                <th className="text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider px-4 py-2.5 w-36">How</th>
-                <th className="w-16 px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="bg-brand-500/[0.06]">
-                <td className="px-4 py-2" />
-                <td className="px-4 py-2"><input autoFocus className="input py-1.5 text-sm" value={itemForm.title} onChange={e => setItemForm(f => ({ ...f, title: e.target.value }))} placeholder="Topic name" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
-                <td className="px-4 py-2"><input className="input py-1.5 text-sm" value={itemForm.content} onChange={e => setItemForm(f => ({ ...f, content: e.target.value }))} placeholder="What is covered" onKeyDown={e => e.key === 'Enter' && confirmAdd()} /></td>
-                <td className="px-4 py-2 space-y-1">
-                  <select className="input py-1.5 text-sm" value={itemForm.method} onChange={e => setItemForm(f => ({ ...f, method: e.target.value, assignmentId: undefined }))}>
-                    {METHOD_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                  {itemForm.method === 'Assignment' && (
-                    <select className="input py-1 text-sm" value={itemForm.assignmentId ?? ''} onChange={e => setItemForm(f => ({ ...f, assignmentId: e.target.value || undefined }))}>
-                      <option value="">— pick assignment —</option>
-                      {subjectAssignments.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
-                    </select>
-                  )}
-                </td>
-                <td className="px-4 py-2"><div className="flex gap-1">
-                  <button onClick={confirmAdd} disabled={saving || !itemForm.title.trim()} className="p-1.5 text-emerald-500 hover:text-emerald-600 transition-colors"><Check className="w-4 h-4" /></button>
-                  <button onClick={() => setAddingSem(null)} className="p-1.5 text-zinc-400 hover:text-zinc-400 transition-colors"><X className="w-4 h-4" /></button>
-                </div></td>
-              </tr>
-            </tbody>
-          </table>
+          {topicForm(confirmAdd, () => setAddingSem(null), 'Add topic')}
         </div>
       )}
 
@@ -774,9 +731,9 @@ export default function SubjectDetail() {
 
       {/* ── Resources ──────────────────────────────────────────────────────── */}
       <div className={cn(PANEL, 'overflow-hidden')}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.05]">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-white/[0.05]">
           <h2 className="section-title flex items-center gap-2"><Link2 /> Resources</h2>
-          <div className="flex gap-2">
+          <div className="flex gap-2 w-full sm:w-auto [&>button]:flex-1 sm:[&>button]:flex-none [&>button]:whitespace-nowrap">
             <button onClick={openAddLink} className="btn-secondary py-1.5 text-xs gap-1.5">
               <Link2 className="w-3.5 h-3.5" /> Add link
             </button>
@@ -791,35 +748,35 @@ export default function SubjectDetail() {
         )}
 
         {addingRes === 'link' && (
-          <div className="px-5 py-4 bg-zinc-900/50 border-b border-white/8 flex items-end gap-3">
-            <div className="flex-1">
+          <div className="px-5 py-4 bg-zinc-900/50 border-b border-white/8 flex flex-wrap sm:flex-nowrap items-end gap-3">
+            <div className="w-full sm:flex-1">
               <label className="label text-xs">Title</label>
               <input autoFocus className="input py-2 text-sm" value={resTitle} onChange={e => setResTitle(e.target.value)} placeholder="e.g. Course slides" />
             </div>
-            <div className="flex-1">
+            <div className="w-full sm:flex-1">
               <label className="label text-xs">URL</label>
               <input className="input py-2 text-sm" value={resUrl} onChange={e => setResUrl(e.target.value)} placeholder="https://…" />
             </div>
-            <button onClick={confirmAddLink} disabled={!resTitle.trim() || !resUrl.trim() || saving} className="btn-primary py-2">Save</button>
-            <button onClick={cancelAddRes} className="btn-ghost py-2"><X className="w-4 h-4" /></button>
+            <button onClick={confirmAddLink} disabled={!resTitle.trim() || !resUrl.trim() || saving} className="btn-primary py-2 flex-1 sm:flex-none">Save</button>
+            <button onClick={cancelAddRes} className="btn-ghost py-2" title="Cancel"><X className="w-4 h-4" /></button>
           </div>
         )}
 
         {addingRes === 'file' && (
-          <div className="px-5 py-4 bg-zinc-900/50 border-b border-white/8 flex items-end gap-3">
-            <div className="flex-1">
+          <div className="px-5 py-4 bg-zinc-900/50 border-b border-white/8 flex flex-wrap sm:flex-nowrap items-end gap-3">
+            <div className="w-full sm:flex-1">
               <label className="label text-xs">Title</label>
               <input autoFocus className="input py-2 text-sm" value={resTitle} onChange={e => setResTitle(e.target.value)} placeholder="e.g. Week 3 handout" />
             </div>
-            <div className="flex-1">
+            <div className="w-full sm:flex-1">
               <label className="label text-xs">File</label>
               <button type="button" onClick={() => fileRef.current?.click()} className="input py-2 text-sm text-left text-zinc-500 cursor-pointer">
                 {resFile ? resFile.name : 'Choose file…'}
               </button>
               <input ref={fileRef} type="file" className="hidden" onChange={e => setResFile(e.target.files?.[0] ?? null)} />
             </div>
-            <button onClick={confirmAddFile} disabled={!resTitle.trim() || !resFile || saving} className="btn-primary py-2">{saving ? 'Uploading…' : 'Upload'}</button>
-            <button onClick={cancelAddRes} className="btn-ghost py-2"><X className="w-4 h-4" /></button>
+            <button onClick={confirmAddFile} disabled={!resTitle.trim() || !resFile || saving} className="btn-primary py-2 flex-1 sm:flex-none">{saving ? 'Uploading…' : 'Upload'}</button>
+            <button onClick={cancelAddRes} className="btn-ghost py-2" title="Cancel"><X className="w-4 h-4" /></button>
           </div>
         )}
 
@@ -840,7 +797,7 @@ export default function SubjectDetail() {
                 <button
                   onClick={() => deleteResource(res)}
                   disabled={deletingRes === res.id}
-                  className="p-1.5 text-zinc-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                  className="p-2 sm:p-1.5 text-zinc-400 hover:text-rose-500 transition-colors sm:opacity-0 sm:group-hover:opacity-100"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -852,7 +809,7 @@ export default function SubjectDetail() {
 
       {/* ── Teachers ───────────────────────────────────────────────────────── */}
       <div className={cn(PANEL, 'overflow-hidden')}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.05]">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-white/[0.05]">
           <h2 className="section-title flex items-center gap-2"><Users /> Teachers</h2>
           {!teacherPanel && (
             <button onClick={openAddTeacher} className="btn-secondary py-1.5 text-xs gap-1.5">
@@ -946,7 +903,7 @@ export default function SubjectDetail() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="label text-xs">Name</label>
                     <input
@@ -1022,18 +979,18 @@ export default function SubjectDetail() {
         {teachers.length === 0 && !teacherPanel ? (
           <p className="px-5 py-6 text-sm text-zinc-400 text-center">No teachers added yet.</p>
         ) : (
-          <div className="p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+          <div className="p-4 sm:p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-6">
             {teachers.map(t => (
               <div key={t.id} className="flex flex-col items-center text-center gap-3 group relative">
                 <div className="relative">
                   {t.imageUrl ? (
-                    <img src={t.imageUrl} alt={t.name} className="w-32 h-32 rounded-full object-cover ring-4 ring-white shadow-md" />
+                    <img src={t.imageUrl} alt={t.name} className="w-24 h-24 sm:w-32 sm:h-32 rounded-full object-cover ring-4 ring-white shadow-md" />
                   ) : (
-                    <div className={cn('w-32 h-32 rounded-full flex items-center justify-center text-white text-2xl font-bold ring-4 ring-white shadow-md', avatarColor(t.name))}>
+                    <div className={cn('w-24 h-24 sm:w-32 sm:h-32 rounded-full flex items-center justify-center text-white text-2xl font-bold ring-4 ring-white shadow-md', avatarColor(t.name))}>
                       {initials(t.name)}
                     </div>
                   )}
-                  <div className="absolute -top-1 -right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute -top-1 -right-1 flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     <button onClick={() => openEditTeacher(t)} className="p-1.5 bg-zinc-900 rounded-full shadow text-zinc-400 hover:text-zinc-300 transition-colors"><Pencil className="w-3 h-3" /></button>
                     <button onClick={() => deleteTeacher(t)} className="p-1.5 bg-zinc-900 rounded-full shadow text-zinc-400 hover:text-rose-500 transition-colors"><Trash2 className="w-3 h-3" /></button>
                   </div>

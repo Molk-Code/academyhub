@@ -419,6 +419,19 @@ export interface EquipmentBookingItem {
   equipmentId: string
   equipmentName: string
   quantity: number
+  category?: string   // catalog category, stamped server-side when the booking is created
+}
+
+// Which catalog categories a staff member handles booking requests for
+// (settings/equipment.responsibility[uid]). Unset = all categories.
+export type EquipmentResponsibility = 'all' | 'none' | string[]
+
+// One category's part of a booking, accepted or denied by whoever handles it
+export interface BookingPartDecision {
+  status: 'confirmed' | 'denied'
+  byUid: string
+  byName: string
+  at?: Timestamp
 }
 
 export interface EquipmentBookingDoc {
@@ -434,6 +447,9 @@ export interface EquipmentBookingDoc {
   status: EquipmentBookingStatus
   teacherNotes: string
   linkedProjectId?: string   // set once "Set Up in Inventory" has created the inventory_projects doc
+  linkedProjectIds?: string[]                        // every project set up from it (parts can go to different projects)
+  categoryDecisions?: Record<string, BookingPartDecision>  // per-category accept/deny (decideEquipmentBookingParts)
+  setUpCategories?: Record<string, string>           // category → project it was set up in
   closedByProject?: boolean  // closed automatically when its inventory project was archived/returned
   productionId?: string
   productionTitle?: string

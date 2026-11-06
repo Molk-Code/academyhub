@@ -1,14 +1,16 @@
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   collection, addDoc, deleteDoc, doc, serverTimestamp, writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
-import type { EquipmentBookingDoc, EquipmentBookingMessageDoc } from '@/types'
+import type { EquipmentBookingDoc, EquipmentBookingMessageDoc, EquipmentDoc } from '@/types'
+import { useEquipmentResponsibility } from '@/hooks/useEquipmentResponsibility'
+import { BookingPartsPanel } from '@/components/equipment/BookingPartsPanel'
+import { bookingParts, decideEquipmentBookingParts, myParts } from '@/lib/bookingParts'
 import {
-  Calendar, Check, X, Loader2, CheckCircle2, ArrowRight, ExternalLink, Send, Trash2,
+  Calendar, CheckCircle2, Send, Trash2,
 } from 'lucide-react'
 import { BOOKING_STATUSES, STATUS_COLOR, formatDate } from './adminEquipmentShared'
 
@@ -83,7 +85,6 @@ function BookingMessageThread({ bookingId }: { bookingId: string }) {
 // ── Bookings Tab ──────────────────────────────────────────────────────────────
 
 export function BookingsTab() {
-  const navigate = useNavigate()
   const { profile } = useAuth()
   const { data: bookings } = useCollection<EquipmentBookingDoc>('equipment_bookings')
   const sorted = useMemo(
@@ -94,15 +95,24 @@ export function BookingsTab() {
     }),
     [bookings],
   )
+  const { mine: responsibility } = useEquipmentResponsibility()
+  const { data: equipment } = useCollection<EquipmentDoc>('equipment')
+  const catalog = useMemo(() => new Map(equipment.map(e => [e.id, e])), [equipment])
+  // "Pending" means a part this person still has to decide
+  const awaitingMe = (b: EquipmentBookingDoc) => myParts(b, responsibility, catalog).pending.length > 0
   const [statusFilter, setStatusFilter] = useState<'all' | typeof BOOKING_STATUSES[number]>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
-  const [actionModal, setActionModal] = useState<{ booking: EquipmentBookingDoc; action: 'confirmed' | 'denied' } | null>(null)
+  const [actionModal, setActionModal] = useState<{ booking: EquipmentBookingDoc; action: 'confirmed' | 'denied'; categories: string[] } | null>(null)
   const [actionMessage, setActionMessage] = useState('')
+  const [actionError, setActionError] = useState('')
 
   const filtered = useMemo(
-    () => statusFilter === 'all' ? sorted : sorted.filter(b => b.status === statusFilter),
-    [sorted, statusFilter],
+    () => statusFilter === 'all' ? sorted
+      : statusFilter === 'pending' ? sorted.filter(awaitingMe)
+      : sorted.filter(b => b.status === statusFilter),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sorted, statusFilter, responsibility, catalog],
   )
 
   async function setStatus(id: string, newStatus: string, teacherNotes?: string) {
@@ -121,10 +131,30 @@ export function BookingsTab() {
     }
   }
 
+  async function decide(booking: EquipmentBookingDoc, categories: string[], decision: 'confirmed' | 'denied' | 'pending', note?: string) {
+    setSavingId(booking.id)
+    setActionError('')
+    try {
+      await decideEquipmentBookingParts(booking.id, categories, decision, note)
+      return true
+    } catch (e: any) {
+      setActionError(e?.message ?? 'Could not save.')
+      return false
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  function onDecide(booking: EquipmentBookingDoc, categories: string[], decision: 'confirmed' | 'denied' | 'pending') {
+    if (decision === 'pending') { decide(booking, categories, 'pending'); return }
+    setActionModal({ booking, action: decision, categories })
+    setActionMessage('')
+  }
+
   async function confirmAction() {
     if (!actionModal) return
     const note = actionMessage.trim()
-    await setStatus(actionModal.booking.id, actionModal.action, note)
+    if (!await decide(actionModal.booking, actionModal.categories, actionModal.action, note)) return
     if (note && profile) {
       await addDoc(collection(db, `equipment_bookings/${actionModal.booking.id}/messages`), {
         senderId: profile.uid,
@@ -151,14 +181,14 @@ export function BookingsTab() {
     }
   }
 
-  const pendingCount = sorted.filter(b => b.status === 'pending').length
+  const pendingCount = sorted.filter(awaitingMe).length
 
   return (
     <>
       {/* Status filters */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: '1rem' }}>
         {BOOKING_STATUSES.map(s => {
-          const count = s === 'all' ? sorted.length : sorted.filter(b => b.status === s).length
+          const count = s === 'all' ? sorted.length : s === 'pending' ? pendingCount : sorted.filter(b => b.status === s).length
           const active = statusFilter === s
           const col = s === 'all' ? '#4cd964' : STATUS_COLOR[s] ?? '#6b7280'
           return (
@@ -213,79 +243,24 @@ export function BookingsTab() {
 
                 {expanded && (
                   <div style={{ borderTop: '1px solid #2a2a3a', padding: '14px 16px', background: '#0a0a0f' }} onClick={e => e.stopPropagation()}>
-                    {/* Items */}
                     <div style={{ marginBottom: 12 }}>
-                      <p style={{ fontSize: '.7rem', fontWeight: 700, color: '#4a4a60', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>Equipment</p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        {b.items.map((it, i) => (
-                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.8rem', color: '#c0c0d5' }}>
-                            <span>{it.equipmentName}</span>
-                            <span style={{ color: '#6a6a80' }}>×{it.quantity}</span>
-                          </div>
-                        ))}
-                      </div>
+                      <BookingPartsPanel
+                        booking={b}
+                        catalog={catalog}
+                        responsibility={responsibility}
+                        inventoryPath="/admin/inventory"
+                        busy={savingId === b.id}
+                        onDecide={(cats, d) => onDecide(b, cats, d)}
+                      />
+                      {actionError && savingId === null && expandedId === b.id && !actionModal && (
+                        <p style={{ fontSize: '.75rem', color: '#f87171', marginTop: 6 }}>{actionError}</p>
+                      )}
                     </div>
 
                     <BookingMessageThread bookingId={b.id} />
 
                     {/* Actions */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {b.status === 'pending' && (
-                        <>
-                          <button
-                            disabled={savingId === b.id}
-                            onClick={() => { setActionModal({ booking: b, action: 'confirmed' }); setActionMessage('') }}
-                            style={{ padding: '6px 14px', background: 'rgba(76,217,100,.15)', border: '1px solid rgba(76,217,100,.3)', borderRadius: 8, color: '#4cd964', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                          >
-                            {savingId === b.id ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={12} />} Accept
-                          </button>
-                          <button
-                            disabled={savingId === b.id}
-                            onClick={() => { setActionModal({ booking: b, action: 'denied' }); setActionMessage('') }}
-                            style={{ padding: '6px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8, color: '#f87171', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }}
-                          >
-                            Deny
-                          </button>
-                        </>
-                      )}
-                      {b.status === 'confirmed' && !b.linkedProjectId && (
-                        <>
-                          <button
-                            disabled={savingId === b.id}
-                            title="Click to undo and move back to pending"
-                            onClick={() => setStatus(b.id, 'pending')}
-                            style={{ padding: '6px 14px', background: 'rgba(76,217,100,.15)', border: '1px solid rgba(76,217,100,.3)', borderRadius: 8, color: '#4cd964', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                          >
-                            <Check size={12} /> Accepted
-                          </button>
-                          <button
-                            disabled={savingId === b.id}
-                            onClick={() => navigate(`/admin/inventory?fromBooking=${b.id}`)}
-                            style={{ padding: '6px 14px', background: 'rgba(249,115,22,.15)', border: '1px solid rgba(249,115,22,.3)', borderRadius: 8, color: '#f97316', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                          >
-                            Set Up in Inventory <ArrowRight size={12} />
-                          </button>
-                        </>
-                      )}
-                      {b.status === 'denied' && (
-                        <button
-                          disabled={savingId === b.id}
-                          title="Click to undo and move back to pending"
-                          onClick={() => setStatus(b.id, 'pending')}
-                          style={{ padding: '6px 14px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8, color: '#f87171', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                        >
-                          <X size={12} /> Denied
-                        </button>
-                      )}
-                      {b.status === 'checked-out' && b.linkedProjectId && (
-                        <button
-                          disabled={savingId === b.id}
-                          onClick={() => navigate(`/admin/inventory?openProject=${b.linkedProjectId}`)}
-                          style={{ padding: '6px 14px', background: 'rgba(76,217,100,.1)', border: '1px solid rgba(76,217,100,.25)', borderRadius: 8, color: '#4cd964', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                        >
-                          View in Inventory <ExternalLink size={12} />
-                        </button>
-                      )}
                       {b.status === 'checked-out' && !b.linkedProjectId && (
                         <button
                           disabled={savingId === b.id}
@@ -325,7 +300,10 @@ export function BookingsTab() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setActionModal(null)}>
           <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 16, width: '100%', maxWidth: 400, padding: '1.5rem' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#f0f0f5', marginBottom: 6 }}>
-              {actionModal.action === 'confirmed' ? 'Accept booking' : 'Deny booking'}
+              {actionModal.action === 'confirmed' ? 'Accept' : 'Deny'}{' '}
+              {actionModal.categories.length === bookingParts(actionModal.booking, catalog).length
+                ? 'booking'
+                : actionModal.categories.join(' + ') + ' part'}
             </h3>
             <p style={{ fontSize: '.82rem', color: '#8a8aab', marginBottom: 14 }}>
               "{actionModal.booking.projectName}" — {actionModal.booking.studentName}
@@ -341,6 +319,7 @@ export function BookingsTab() {
               placeholder={actionModal.action === 'confirmed' ? 'e.g. Pick up from the equipment room after 2pm' : 'e.g. Dates conflict with another booking'}
               style={{ width: '100%', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 10, padding: '10px 12px', color: '#f0f0f5', fontSize: '.85rem', resize: 'none', marginBottom: 14, fontFamily: 'inherit' }}
             />
+            {actionError && <p style={{ fontSize: '.78rem', color: '#f87171', marginBottom: 10 }}>{actionError}</p>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 disabled={savingId === actionModal.booking.id}

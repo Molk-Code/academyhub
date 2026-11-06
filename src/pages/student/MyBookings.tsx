@@ -4,6 +4,8 @@ import { addDoc, collection, collectionGroup, deleteDoc, doc, onSnapshot, server
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useFeature } from '@/hooks/useFeature'
+import { BookingPartsSummary } from '@/components/equipment/BookingPartsPanel'
+import { bookingParts } from '@/lib/bookingParts'
 import { useCollection, useDocument, orderBy, where } from '@/hooks/useFirestore'
 import { markFoodBoxSeen, markMinivanSeen } from '@/hooks/useBookingBadge'
 import { LEGAL_TEXT } from '@/lib/equipmentContract'
@@ -117,7 +119,8 @@ function useEquipmentBookingRequests(uid: string, enabled: boolean) {
   // drop the raw booking request from this list so it isn't shown twice.
   return useMemo(
     () => bookings
-      .filter(b => !b.linkedProjectId)
+      // A booking split over several people stays until every part is set up
+      .filter(b => !(b.linkedProjectId && ['checked-out', 'returned'].includes(b.status)))
       .sort((a, b) => ((b.createdAt as any)?.toMillis?.() ?? 0) - ((a.createdAt as any)?.toMillis?.() ?? 0)),
     [bookings],
   )
@@ -435,7 +438,7 @@ function BookingRequestsSection({ bookings }: { bookings: EquipmentBookingDoc[] 
               </div>
               <StatusPill status={b.status} />
             </div>
-            {b.items?.length > 0 && (
+            {bookingParts(b).length > 1 ? <BookingPartsSummary booking={b} /> : b.items?.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {b.items.map((it, i) => (
                   <span key={i} className="text-xs px-2.5 py-1 rounded-full border bg-zinc-800/60 text-zinc-300 border-white/10">

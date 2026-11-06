@@ -15,6 +15,8 @@ import { optimizeImageUrl } from '@/lib/cloudinary'
 import { LinkifiedText, externalHref } from './inventoryShared'
 import { ImageGallery, equipmentImages } from './ImageGallery'
 import './molkom.css'
+import { BookingPartsSummary } from '@/components/equipment/BookingPartsPanel'
+import { bookingParts } from '@/lib/bookingParts'
 
 const INFO_LABEL: React.CSSProperties = { fontSize: '.7rem', fontWeight: 700, color: '#6a6a80', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }
 const INFO_TEXT: React.CSSProperties = { fontSize: '.88rem', color: '#c0c0d5', lineHeight: 1.5, whiteSpace: 'pre-line', margin: 0 }
@@ -1322,13 +1324,15 @@ export default function EquipmentBookingPage() {
                         <Calendar size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
                         {formatDate(b.checkoutDate)} – {formatDate(b.returnDate)}
                       </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                        {b.items.map((it, i) => (
-                          <span key={i} style={{ fontSize: '.72rem', background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 20, padding: '2px 8px', color: '#c0c0d5' }}>
-                            {it.quantity}× {it.equipmentName}
-                          </span>
-                        ))}
-                      </div>
+                      {bookingParts(b).length > 1 ? <BookingPartsSummary booking={b} /> : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                          {b.items.map((it, i) => (
+                            <span key={i} style={{ fontSize: '.72rem', background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 20, padding: '2px 8px', color: '#c0c0d5' }}>
+                              {it.quantity}× {it.equipmentName}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <BookingMessageThread bookingId={b.id} />
                       {(b.status === 'pending' || b.status === 'confirmed') && (
                         <button

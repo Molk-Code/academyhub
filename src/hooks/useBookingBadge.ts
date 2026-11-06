@@ -3,6 +3,8 @@ import { useCollection, where } from '@/hooks/useFirestore'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSeenRevision, emitSeenUpdate } from '@/lib/seenSignal'
 import type { FoodBoxOrderDoc, MinivanBookingDoc, EquipmentBookingDoc } from '@/types'
+import { useEquipmentResponsibility } from '@/hooks/useEquipmentResponsibility'
+import { myParts } from '@/lib/bookingParts'
 
 const FOOD_SEEN_KEY = (uid: string) => `foodBoxSeenAt:${uid}`
 const VAN_SEEN_KEY  = (uid: string) => `minivanSeenAt:${uid}`
@@ -37,10 +39,17 @@ function useBookingData() {
     [where('status', '==', 'pending')],
     isAdmin,
   )
-  const { data: pendingEquipment } = useCollection<EquipmentBookingDoc>(
+  const { data: pendingAllEquipment } = useCollection<EquipmentBookingDoc>(
     'equipment_bookings',
     [where('status', '==', 'pending')],
     isAdmin,
+  )
+  // Only bookings with a part this admin handles and hasn't seen decided yet.
+  // Items carry their category (stamped on creation); older ones without it count.
+  const { mine } = useEquipmentResponsibility()
+  const pendingEquipment = useMemo(
+    () => pendingAllEquipment.filter(b => b.items?.some(i => !i.category) || myParts(b, mine).pending.length > 0),
+    [pendingAllEquipment, mine],
   )
   const { data: myFood } = useCollection<FoodBoxOrderDoc>(
     'food_box_orders',

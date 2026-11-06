@@ -5,6 +5,8 @@ import { useCollection } from '@/hooks/useFirestore'
 import type { EquipmentCategoryDoc, EquipmentBookingDoc } from '@/types'
 import { Package, ToggleRight, ToggleLeft } from 'lucide-react'
 import { DEFAULT_CATEGORIES } from './adminEquipmentShared'
+import { useEquipmentResponsibility } from '@/hooks/useEquipmentResponsibility'
+import { myParts } from '@/lib/bookingParts'
 import { CatalogTab } from './EquipmentCatalogTab'
 import { BookingsTab } from './EquipmentBookingsTab'
 import { CategoriesTab } from './EquipmentCategoriesTab'
@@ -18,7 +20,8 @@ export default function AdminEquipmentPage() {
   const [tab, setTab] = useState<AdminTab>('catalog')
   const { data: bookings } = useCollection<EquipmentBookingDoc>('equipment_bookings')
   const { data: categoriesRaw, loading: catsLoading } = useCollection<EquipmentCategoryDoc>('equipment_categories')
-  const pendingCount = useMemo(() => bookings.filter(b => b.status === 'pending').length, [bookings])
+  const { mine: responsibility } = useEquipmentResponsibility()
+  const pendingCount = useMemo(() => bookings.filter(b => myParts(b, responsibility).pending.length > 0).length, [bookings, responsibility])
 
   const categories = useMemo(() => {
     if (catsLoading) return []

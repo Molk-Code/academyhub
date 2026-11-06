@@ -1,13 +1,15 @@
 import { useState, useMemo } from 'react'
-import { addDoc, collection, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
-import type { EquipmentBookingDoc, EquipmentBookingMessageDoc } from '@/types'
-import { Package, CheckCircle, XCircle, ChevronRight, Trash2, Send } from 'lucide-react'
+import type { EquipmentBookingDoc, EquipmentBookingMessageDoc, EquipmentDoc } from '@/types'
+import { Package, Trash2, Send } from 'lucide-react'
+import { useEquipmentResponsibility } from '@/hooks/useEquipmentResponsibility'
+import { BookingPartsPanel } from '@/components/equipment/BookingPartsPanel'
+import { bookingParts, decideEquipmentBookingParts, myParts } from '@/lib/bookingParts'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
-import { useNavigate } from 'react-router-dom'
 
 function BookingMessageThread({ bookingId }: { bookingId: string }) {
   const { profile } = useAuth()
@@ -84,10 +86,14 @@ const STATUS_STYLE: Record<string, string> = {
 type StatusFilter = 'pending' | 'confirmed' | 'all'
 
 export default function EquipmentRequests() {
-  const navigate = useNavigate()
   const { profile } = useAuth()
+  const { mine: responsibility } = useEquipmentResponsibility()
+  const { data: equipment } = useCollection<EquipmentDoc>('equipment')
+  const catalog = useMemo(() => new Map(equipment.map(e => [e.id, e])), [equipment])
+  const awaitingMe = (b: EquipmentBookingDoc) => myParts(b, responsibility, catalog).pending.length > 0
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending')
-  const [actionTarget, setActionTarget] = useState<{ booking: EquipmentBookingDoc; action: 'confirmed' | 'denied' } | null>(null)
+  const [actionTarget, setActionTarget] = useState<{ booking: EquipmentBookingDoc; action: 'confirmed' | 'denied'; categories: string[] } | null>(null)
+  const [actionError, setActionError] = useState('')
   const [actionMessage, setActionMessage] = useState('')
   const [actionSubmitting, setActionSubmitting] = useState(false)
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
@@ -99,20 +105,41 @@ export default function EquipmentRequests() {
 
   const filtered = useMemo(() => {
     if (statusFilter === 'all') return bookings
+    // "Pending" = a part this person still has to decide
+    if (statusFilter === 'pending') return bookings.filter(awaitingMe)
     return bookings.filter(b => b.status === statusFilter)
-  }, [bookings, statusFilter])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings, statusFilter, responsibility, catalog])
 
-  const pendingCount = useMemo(() => bookings.filter(b => b.status === 'pending').length, [bookings])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const pendingCount = useMemo(() => bookings.filter(awaitingMe).length, [bookings, responsibility, catalog])
+
+  async function decide(booking: EquipmentBookingDoc, categories: string[], decision: 'confirmed' | 'denied' | 'pending', note?: string) {
+    setConfirmingId(booking.id)
+    setActionError('')
+    try {
+      await decideEquipmentBookingParts(booking.id, categories, decision, note)
+      return true
+    } catch (e: any) {
+      setActionError(e?.message ?? 'Could not save.')
+      return false
+    } finally {
+      setConfirmingId(null)
+    }
+  }
+
+  function onDecide(booking: EquipmentBookingDoc, categories: string[], decision: 'confirmed' | 'denied' | 'pending') {
+    if (decision === 'pending') { decide(booking, categories, 'pending'); return }
+    setActionTarget({ booking, action: decision, categories })
+    setActionMessage('')
+  }
 
   async function handleAction() {
     if (!actionTarget) return
     setActionSubmitting(true)
     try {
       const note = actionMessage.trim()
-      await updateDoc(doc(db, 'equipment_bookings', actionTarget.booking.id), {
-        status: actionTarget.action,
-        teacherNotes: note,
-      })
+      if (!await decide(actionTarget.booking, actionTarget.categories, actionTarget.action, note)) return
       if (note && profile) {
         await addDoc(collection(db, `equipment_bookings/${actionTarget.booking.id}/messages`), {
           senderId: profile.uid,
@@ -126,19 +153,6 @@ export default function EquipmentRequests() {
       setActionMessage('')
     } finally {
       setActionSubmitting(false)
-    }
-  }
-
-  function handleCreateProject(booking: EquipmentBookingDoc) {
-    navigate(`/teacher/inventory?fromBooking=${booking.id}`)
-  }
-
-  async function handleReopen(id: string) {
-    setConfirmingId(id)
-    try {
-      await updateDoc(doc(db, 'equipment_bookings', id), { status: 'pending' })
-    } finally {
-      setConfirmingId(null)
     }
   }
 
@@ -214,55 +228,6 @@ export default function EquipmentRequests() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-                {booking.status === 'pending' && (
-                  <div className="flex gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => { setActionTarget({ booking, action: 'confirmed' }); setActionMessage('') }}
-                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white rounded-lg transition-colors"
-                    >
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      Accept
-                    </button>
-                    <button
-                      onClick={() => { setActionTarget({ booking, action: 'denied' }); setActionMessage('') }}
-                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded-lg transition-colors"
-                    >
-                      <XCircle className="w-3.5 h-3.5" />
-                      Deny
-                    </button>
-                  </div>
-                )}
-                {booking.status === 'confirmed' && !booking.linkedProjectId && (
-                  <div className="flex gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => handleReopen(booking.id)}
-                      disabled={confirmingId === booking.id}
-                      title="Click to undo and move back to pending"
-                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white rounded-lg transition-colors"
-                    >
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      Accepted
-                    </button>
-                    <button
-                      onClick={() => handleCreateProject(booking)}
-                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-brand-700 hover:bg-brand-600 text-white rounded-lg transition-colors"
-                    >
-                      Create Inventory Project
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-                {booking.status === 'denied' && (
-                  <button
-                    onClick={() => handleReopen(booking.id)}
-                    disabled={confirmingId === booking.id}
-                    title="Click to undo and move back to pending"
-                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded-lg transition-colors flex-shrink-0"
-                  >
-                    <XCircle className="w-3.5 h-3.5" />
-                    Denied
-                  </button>
-                )}
                   <button
                     onClick={() => handleDelete(booking)}
                     disabled={confirmingId === booking.id}
@@ -274,16 +239,14 @@ export default function EquipmentRequests() {
                 </div>
               </div>
 
-              {/* Items */}
-              {booking.items?.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {booking.items.map((item, i) => (
-                    <span key={i} className="text-xs bg-zinc-800 text-zinc-300 px-2.5 py-1 rounded-full">
-                      {item.quantity}× {item.equipmentName}
-                    </span>
-                  ))}
-                </div>
-              )}
+              <BookingPartsPanel
+                booking={booking}
+                catalog={catalog}
+                responsibility={responsibility}
+                inventoryPath="/teacher/inventory"
+                busy={confirmingId === booking.id}
+                onDecide={(cats, d) => onDecide(booking, cats, d)}
+              />
 
               <BookingMessageThread bookingId={booking.id} />
 
@@ -333,7 +296,10 @@ export default function EquipmentRequests() {
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-4">
             <h3 className="text-base font-semibold text-zinc-100">
-              {actionTarget.action === 'confirmed' ? 'Accept request' : 'Deny request'}
+              {actionTarget.action === 'confirmed' ? 'Accept' : 'Deny'}{' '}
+              {actionTarget.categories.length === bookingParts(actionTarget.booking, catalog).length
+                ? 'request'
+                : actionTarget.categories.join(' + ') + ' part'}
             </h3>
             <p className="text-sm text-zinc-400">
               {actionTarget.action === 'confirmed' ? 'Accepting' : 'Denying'}{' '}
@@ -349,6 +315,7 @@ export default function EquipmentRequests() {
                 placeholder={actionTarget.action === 'confirmed' ? 'Pick up from the equipment room after 2pm…' : 'Equipment unavailable, dates conflict…'}
               />
             </div>
+            {actionError && <p className="text-xs text-rose-400">{actionError}</p>}
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setActionTarget(null)}

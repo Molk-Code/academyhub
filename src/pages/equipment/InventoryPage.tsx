@@ -3,12 +3,13 @@ import { useSearchParams } from 'react-router-dom'
 import { StatsContent } from './InventoryStats'
 import {
   collection, collectionGroup, addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs,
-  serverTimestamp, query, where, onSnapshot, writeBatch,
+  serverTimestamp, query, where, onSnapshot, writeBatch, arrayUnion,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection } from '@/hooks/useFirestore'
-import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, InventoryPresetDoc, InventoryPresetItem, UserDoc, EquipmentBookingDoc } from '@/types'
+import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, InventoryPresetDoc, InventoryPresetItem, UserDoc, EquipmentBookingDoc, EquipmentResponsibility } from '@/types'
+import { bookingParts, myParts, partStatus, OTHER_CATEGORY } from '@/lib/bookingParts'
 import {
   Package, Calendar, Users, Clock, AlertTriangle, Check, Trash2, Plus, Minus,
   ChevronDown, ChevronRight, ArrowLeft, Edit2, CheckCircle2, ArchiveRestore,
@@ -133,6 +134,35 @@ function ProjectCard({
 
 // ── Create Project Form ────────────────────────────────────────────────────────
 
+type SetupBooking = EquipmentBookingDoc & { setUpParts: string[]; partCount: number; allItems: EquipmentBookingDoc['items'] }
+
+// A booking, trimmed to the parts this person may set up: confirmed, not yet
+// in a project, and in a category they handle (settings/equipment.responsibility)
+async function loadBookingForSetup(bookingId: string, uid: string): Promise<SetupBooking | null> {
+  const [snap, settings] = await Promise.all([
+    getDoc(doc(db, 'equipment_bookings', bookingId)),
+    getDoc(doc(db, 'settings', 'equipment')),
+  ])
+  if (!snap.exists()) return null
+  const raw = { id: snap.id, ...snap.data() } as EquipmentBookingDoc
+  // Older bookings lack item categories — look them up in the catalog
+  const allItems = await Promise.all((raw.items ?? []).map(async it => {
+    if (it.category || !it.equipmentId) return { ...it, category: it.category || OTHER_CATEGORY }
+    const eq = await getDoc(doc(db, 'equipment', it.equipmentId))
+    return { ...it, category: (eq.data()?.category as string) || OTHER_CATEGORY }
+  }))
+  const booking = { ...raw, items: allItems }
+  const resp = (settings.data()?.responsibility as Record<string, EquipmentResponsibility> | undefined)?.[uid]
+  const parts = myParts(booking, resp).toSetUp.map(p => p.category)
+  return {
+    ...booking,
+    items: allItems.filter(i => parts.includes(i.category!)),
+    allItems,
+    setUpParts: parts,
+    partCount: bookingParts(booking).length,
+  }
+}
+
 function CreateProjectForm({
   onBack,
   onCreate,
@@ -140,7 +170,8 @@ function CreateProjectForm({
 }: {
   onBack: () => void
   onCreate: (id: string) => void
-  fromBooking?: EquipmentBookingDoc | null
+  // Only the booking's confirmed parts this person handles (see loadBookingForSetup)
+  fromBooking?: SetupBooking | null
 }) {
   const { profile } = useAuth()
   const [name, setName] = useState(fromBooking?.projectName ?? '')
@@ -251,9 +282,19 @@ function CreateProjectForm({
         }
       }
       if (fromBooking) {
-        await updateDoc(doc(db, 'equipment_bookings', fromBooking.id), {
-          status: 'checked-out',
-          linkedProjectId: ref.id,
+        // Record which parts went into this project; the booking counts as
+        // checked out once every part is either set up or denied
+        const bookingRef = doc(db, 'equipment_bookings', fromBooking.id)
+        const fresh = { id: fromBooking.id, ...(await getDoc(bookingRef)).data() } as EquipmentBookingDoc
+        const setUpCategories = { ...(fresh.setUpCategories ?? {}) }
+        for (const c of fromBooking.setUpParts) setUpCategories[c] = ref.id
+        const after = { ...fresh, items: fromBooking.allItems, setUpCategories }
+        const done = bookingParts(after).every(p => ['set-up', 'denied'].includes(partStatus(after, p.category)))
+        await updateDoc(bookingRef, {
+          setUpCategories,
+          linkedProjectIds: arrayUnion(ref.id),
+          linkedProjectId: fresh.linkedProjectId ?? ref.id,
+          ...(done ? { status: 'checked-out' } : {}),
         })
       }
       onCreate(ref.id)
@@ -270,6 +311,9 @@ function CreateProjectForm({
       {fromBooking && (
         <div style={{ background: 'rgba(76,217,100,.08)', border: '1px solid rgba(76,217,100,.25)', borderRadius: 10, padding: '10px 14px', marginBottom: '1.25rem', fontSize: '.85rem', color: '#c0c0d5' }}>
           Setting up from <strong style={{ color: '#4cd964' }}>{fromBooking.studentName}</strong>'s accepted booking request. Project name, dates and equipment have been preloaded below — fill in the rest to finish checkout.
+          {fromBooking.setUpParts.length < fromBooking.partCount && (
+            <> Only the parts you handle are included: <strong style={{ color: '#4cd964' }}>{fromBooking.setUpParts.join(', ')}</strong>.</>
+          )}
         </div>
       )}
 
@@ -595,6 +639,7 @@ function useAllItems() {
 // ── Main InventoryPage ─────────────────────────────────────────────────────────
 
 export default function InventoryPage() {
+  const { profile } = useAuth()
   const { data: projects } = useCollection<InventoryProjectDoc>('inventory_projects')
   const { data: equipment } = useCollection<EquipmentDoc>('equipment')
   const allItems = useAllItems()
@@ -606,16 +651,15 @@ export default function InventoryPage() {
 
   // Handoff from an accepted equipment booking (see AdminEquipmentPage's Bookings tab)
   const [searchParams, setSearchParams] = useSearchParams()
-  const [fromBooking, setFromBooking] = useState<EquipmentBookingDoc | null>(null)
+  const [fromBooking, setFromBooking] = useState<SetupBooking | null>(null)
   useEffect(() => {
     const bookingId = searchParams.get('fromBooking')
     const openProjectId = searchParams.get('openProject')
+    // Which parts can be set up depends on who's signed in — wait for the profile
+    if (bookingId && !profile) return
     if (bookingId) {
-      getDoc(doc(db, 'equipment_bookings', bookingId)).then(snap => {
-        if (snap.exists()) {
-          setFromBooking({ id: snap.id, ...snap.data() } as EquipmentBookingDoc)
-          setCreateProject(true)
-        }
+      loadBookingForSetup(bookingId, profile?.uid ?? '').then(b => {
+        if (b) { setFromBooking(b); setCreateProject(true) }
       })
     } else if (openProjectId) {
       setSelectedProjectId(openProjectId)
@@ -624,7 +668,7 @@ export default function InventoryPage() {
       setSearchParams(prev => { prev.delete('fromBooking'); prev.delete('openProject'); return prev }, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [profile?.uid])
 
   const activeProjects = useMemo(
     () => projects.filter(p => ['active', 'checked-out'].includes(p.status))

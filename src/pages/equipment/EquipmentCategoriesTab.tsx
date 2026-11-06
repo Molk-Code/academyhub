@@ -4,6 +4,7 @@ import { db } from '@/lib/firebase'
 import type { EquipmentCategoryDoc } from '@/types'
 import { Loader2, Plus, ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
 import { COLOR_OPTIONS, catColors, inp } from './adminEquipmentShared'
+import { BookingResponsibility } from './EquipmentResponsibility'
 
 export function CategoriesTab({ categories }: { categories: EquipmentCategoryDoc[] }) {
   const [newName,  setNewName]  = useState('')
@@ -155,6 +156,8 @@ export function CategoriesTab({ categories }: { categories: EquipmentCategoryDoc
           </p>
         )}
       </div>
+
+      <BookingResponsibility categories={sorted} />
     </div>
   )
 }

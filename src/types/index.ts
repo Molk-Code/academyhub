@@ -468,6 +468,7 @@ export interface InventoryProjectDoc {
   bookingId?: string   // set when created via "Set Up in Inventory" from an equipment booking
   // Set by the requestEquipmentSignatures function when staff ask borrowers to sign
   signatureRequest?: { requestedAt?: Timestamp; requestedBy: string; requestedByName: string }
+  pendingSignatureUids?: string[]   // asked to sign and not yet signed (server-maintained)
   createdAt?: Timestamp
   updatedAt?: Timestamp
 }
@@ -507,6 +508,7 @@ export interface InventoryItemDoc {
   addonCollectedBy?: string
   addonManager?: string
   isManualEntry?: boolean
+  unit?: number          // physical unit scanned out (e.g. 1 for "#1"), when the code carries one
 }
 
 export interface InventoryPresetItem {

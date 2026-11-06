@@ -14,7 +14,7 @@ import { BrowserMultiFormatReader } from '@zxing/browser'
 import { NotFoundException } from '@zxing/library'
 import { QRCodeSVG } from 'qrcode.react'
 import { buildEquipmentContractHtml } from '@/lib/equipmentContract'
-import { isOverdue, formatDate, overdueDays, parseScanText, beep } from './inventoryShared'
+import { isOverdue, formatDate, overdueDays, parseScanText, beep, itemDisplayName, matchCheckoutScan, matchCheckinScan } from './inventoryShared'
 import { EquipmentPicker } from './EquipmentPicker'
 import { ContractSignatures } from './ContractSignatures'
 import { ScanFlash, useScanFlash, NotInProjectModal, type NotInProjectData } from './ScanFeedback'
@@ -140,10 +140,9 @@ export function ProjectDetail({
           // Re-subscribing (items changed) replays every earlier check-in as "added"
           if (handledCheckinsRef.current.has(change.doc.id)) continue
           handledCheckinsRef.current.add(change.doc.id)
-          const { equipmentName, equipmentId } = change.doc.data()
-          const match = items.find(i => i.status === 'checked-out' && i.equipmentName === equipmentName)
-            ?? (equipmentId ? items.find(i => i.status === 'checked-out' && i.equipmentId === equipmentId) : undefined)
-          if (match) flashItem(match.equipmentName, match.equipmentId || equipmentId, 'Returned')
+          const { equipmentName, equipmentId, unit } = change.doc.data()
+          const match = matchCheckinScan(items, equipmentId ?? '', equipmentName, unit ?? null)
+          if (match) flashItem(itemDisplayName(match), match.equipmentId || equipmentId, 'Returned')
           else { beep(220); reportNotInProject(equipmentName, equipmentId) }
           if (match) {
             await updateDoc(doc(db, `inventory_projects/${project.id}/items`, match.id), {
@@ -166,13 +165,16 @@ export function ProjectDetail({
       collection(db, `inventory_projects/${project.id}/items`),
       snap => {
         snap.docChanges().forEach(change => {
-          if (change.type !== 'added') return
+          if (change.type === 'removed') return
           const data = change.doc.data()
-          if (data.scannedViaSession === remoteSessionId && !handledCheckinsRef.current.has(change.doc.id)) {
-            handledCheckinsRef.current.add(change.doc.id)
+          // New rows and filled booked rows alike; the checkout time tells scans apart
+          const key = `${change.doc.id}:${data.checkoutTimestamp}`
+          if (data.scannedViaSession === remoteSessionId && data.status === 'checked-out' && !handledCheckinsRef.current.has(key)) {
+            handledCheckinsRef.current.add(key)
+            const name = itemDisplayName(data as InventoryItemDoc)
             beep(880)
-            flashItem(data.equipmentName, data.equipmentId, 'Checked out')
-            setScanEntries(prev => [{ name: data.equipmentName, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 19)])
+            flashItem(name, data.equipmentId, data.notInBooking ? 'Checked out — not in the booking' : 'Checked out', !!data.notInBooking)
+            setScanEntries(prev => [{ name, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 19)])
             setRemoteScanCount(c => c + 1)
           }
         })
@@ -305,9 +307,29 @@ export function ProjectDetail({
       ? (unit ? `${matchedEquip.name} #${unit}` : matchedEquip.name)
       : text
     if (scanMode === 'checkout') {
-      log(displayName, matchedEquip ? 'Checked out' : 'Not in the equipment list — added by its code', !matchedEquip)
-      flashItem(displayName, matchedEquip?.id, matchedEquip ? 'Checked out' : 'Added by its code — not in the equipment list', !matchedEquip)
-      if (!matchedEquip) beep(220)
+      const found = matchCheckoutScan(items, matchedEquip?.id ?? '', displayName, unit)
+      if (found.kind === 'duplicate') {
+        log(displayName, 'Already checked out in this project', true)
+        flashItem(displayName, matchedEquip?.id, 'Already scanned out', true)
+        beep(220)
+        return
+      }
+      if (found.kind === 'booked') {
+        log(displayName, 'Checked out — booked')
+        flashItem(displayName, matchedEquip?.id, 'Checked out')
+        await updateDoc(doc(db, `inventory_projects/${project.id}/items`, found.item.id), {
+          status: 'checked-out',
+          checkoutTimestamp: new Date().toISOString(),
+          ...(unit != null ? { unit } : {}),
+        })
+        return
+      }
+      // Nothing booked left for it: add it — flagged when the project came from a booking
+      const extra = !!project.bookingId
+      const note = !matchedEquip ? 'Not in the equipment list — added by its code' : extra ? 'Not in the booking — added as extra' : 'Checked out'
+      log(displayName, note, !matchedEquip || extra)
+      flashItem(displayName, matchedEquip?.id, !matchedEquip ? 'Added by its code — not in the equipment list' : extra ? 'Checked out — not in the booking' : 'Checked out', !matchedEquip || extra)
+      if (!matchedEquip || extra) beep(220)
       await addDoc(collection(db, `inventory_projects/${project.id}/items`), {
         equipmentId: matchedEquip?.id ?? '',
         equipmentName: displayName,
@@ -318,16 +340,13 @@ export function ProjectDetail({
         assignedTo: project.borrowers?.[0] ?? '',
       })
     } else {
-      const checkedOut = items.filter(i => i.status === 'checked-out')
-      const match = checkedOut.find(i => i.equipmentName === displayName)
-        // Items imported from a booking carry no unit number in their name
-        ?? (matchedEquip ? checkedOut.find(i => i.equipmentId === matchedEquip.id) : undefined)
-      log(match?.equipmentName ?? displayName,
+      const match = matchCheckinScan(items, matchedEquip?.id ?? '', displayName, unit)
+      log(match ? itemDisplayName(match) : displayName,
         match ? 'Returned' : matchedEquip ? 'Not checked out in this project' : 'Not in the equipment list',
         !match)
       if (!match) { beep(220); reportNotInProject(displayName, matchedEquip?.id) }
       if (match) {
-        flashItem(match.equipmentName, match.equipmentId || matchedEquip?.id, 'Returned')
+        flashItem(itemDisplayName(match), match.equipmentId || matchedEquip?.id, 'Returned')
         await updateDoc(doc(db, `inventory_projects/${project.id}/items`, match.id), {
           status: 'returned',
           checkinTimestamp: new Date().toISOString(),
@@ -793,7 +812,7 @@ export function ProjectDetail({
           {items.map(item => (
             <div key={item.id}>
               <div className={`project-item-row ${statusRowClass(item.status)}`}>
-                <span className="project-item-name">{item.equipmentName}</span>
+                <span className="project-item-name">{itemDisplayName(item)}</span>
                 <span className="project-item-time">
                   {item.status === 'returned' && item.checkinTimestamp
                     ? new Date(item.checkinTimestamp).toLocaleString()

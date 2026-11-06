@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { doc, addDoc, updateDoc, collection, serverTimestamp, onSnapshot, getDocs } from 'firebase/firestore'
+import { doc, addDoc, updateDoc, collection, serverTimestamp, onSnapshot, getDocs, getDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { NotFoundException } from '@zxing/library'
 import { Scan, Check, X, Wifi, WifiOff, LogIn, AlertTriangle } from 'lucide-react'
-import { parseScanText } from './inventoryShared'
+import { parseScanText, matchCheckoutScan, matchCheckinScan } from './inventoryShared'
 import { ScanFlash, useScanFlash } from './ScanFeedback'
 
 const COOLDOWN_MS = 2500 // ms to block re-scan after a successful scan
@@ -61,8 +61,10 @@ export default function ScanPage() {
   const equipmentCacheRef = useRef<Record<string, string>>({})
   const gtinCacheRef = useRef<Record<number, string>>({})   // EAN-14 equipment number → id
   const imageCacheRef = useRef<Record<string, string>>({})  // equipment id → image
-  // The project's checked-out items, so a check-in can be refused right here
-  const checkedOutRef = useRef<{ equipmentId: string; equipmentName: string }[] | null>(null)
+  // The project's items, so scans can fill booked rows and refuse bad check-ins here
+  type Row = { id: string; equipmentId: string; equipmentName: string; status: string; unit?: number }
+  const itemsRef = useRef<Row[] | null>(null)
+  const fromBookingRef = useRef(false)
   const { flash, show: showFlash } = useScanFlash()
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -81,12 +83,15 @@ export default function ScanPage() {
 
   useEffect(() => {
     if (!session?.projectId) return
+    getDoc(doc(db, 'inventory_projects', session.projectId))
+      .then(p => { fromBookingRef.current = !!p.data()?.bookingId })
+      .catch(() => {})
     return onSnapshot(collection(db, `inventory_projects/${session.projectId}/items`), snap => {
-      checkedOutRef.current = snap.docs
-        .map(d => d.data() as { equipmentId?: string; equipmentName?: string; status?: string })
-        .filter(i => i.status === 'checked-out')
-        .map(i => ({ equipmentId: i.equipmentId ?? '', equipmentName: i.equipmentName ?? '' }))
-    }, () => { checkedOutRef.current = null })
+      itemsRef.current = snap.docs.map(d => {
+        const i = d.data()
+        return { id: d.id, equipmentId: i.equipmentId ?? '', equipmentName: i.equipmentName ?? '', status: i.status ?? '', unit: i.unit }
+      })
+    }, () => { itemsRef.current = null })
   }, [session?.projectId])
 
   // Pre-load equipment name cache
@@ -145,26 +150,44 @@ export default function ScanPage() {
 
     try {
       if (sess.mode === 'checkout') {
-        await addDoc(collection(db, `inventory_projects/${sess.projectId}/items`), {
-          equipmentId,
-          equipmentName,
-          checkoutTimestamp: new Date().toISOString(),
-          checkinTimestamp: '',
-          status: 'checked-out',
-          damageNotes: '',
-          assignedTo: '',
-          scannedViaSession: sessionId,
-        })
+        const found = itemsRef.current ? matchCheckoutScan(itemsRef.current, equipmentId, equipmentName, unit) : { kind: 'new' as const }
+        if (found.kind === 'duplicate') {
+          message = 'Already scanned out in this project'
+          throw new Error(message)
+        }
+        if (found.kind === 'booked') {
+          // Fill the booked row rather than adding a second one
+          await updateDoc(doc(db, `inventory_projects/${sess.projectId}/items`, found.item.id), {
+            status: 'checked-out',
+            checkoutTimestamp: new Date().toISOString(),
+            scannedViaSession: sessionId,
+            ...(unit != null ? { unit } : {}),
+          })
+        } else {
+          if (fromBookingRef.current) message = 'Not in the booking — added as extra'
+          await addDoc(collection(db, `inventory_projects/${sess.projectId}/items`), {
+            equipmentId,
+            equipmentName,
+            checkoutTimestamp: new Date().toISOString(),
+            checkinTimestamp: '',
+            status: 'checked-out',
+            damageNotes: '',
+            assignedTo: '',
+            scannedViaSession: sessionId,
+            ...(fromBookingRef.current ? { notInBooking: true } : {}),
+          })
+        }
       } else {
         // Unknown until the item list loads; then refuse items not out in this project
-        const out = checkedOutRef.current
-        if (out && !out.some(i => i.equipmentName === equipmentName || (equipmentId && i.equipmentId === equipmentId))) {
+        const rows = itemsRef.current
+        if (rows && !matchCheckinScan(rows, equipmentId, equipmentName, unit)) {
           message = 'Not checked out in this project — check other projects'
           throw new Error(message)
         }
         await addDoc(collection(db, `scan_sessions/${sessionId}/checkins`), {
           equipmentName,
           equipmentId,
+          ...(unit != null ? { unit } : {}),
           scannedAt: serverTimestamp(),
         })
       }
@@ -176,7 +199,8 @@ export default function ScanPage() {
       showFlash({
         name: equipmentName,
         imageUrl: equipmentId ? imageCacheRef.current[equipmentId] : null,
-        label: sess.mode === 'checkout' ? 'Checked out' : 'Checked in',
+        label: message ?? (sess.mode === 'checkout' ? 'Checked out' : 'Checked in'),
+        warn: !!message,
       })
     }
     startCooldown(equipmentName, ok, message)

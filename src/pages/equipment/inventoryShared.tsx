@@ -71,6 +71,43 @@ export function parseScanText(raw: string): { base: string; unit: number | null;
   return { base: text, unit: null }
 }
 
+// ── Matching scans against a project's item rows ─────────────────────────────
+// Items imported from a booking arrive as generic "pending" rows — "2x Godox
+// TL60 Kit 2-kit" becomes two rows of that name. A checkout scan of a unit
+// ("Godox TL60 Kit 2-kit #1") fills one of those rows instead of adding a new
+// one. The row keeps its booked name (the signed contract lists that name) and
+// records which physical unit went out in `unit`.
+type ScanRow = { id: string; equipmentId: string; equipmentName: string; status: string; unit?: number | null }
+const OUT = new Set(['checked-out', 'damaged', 'missing'])
+
+// Name including the unit that was scanned out, e.g. "Godox TL60 Kit 2-kit #1"
+export function itemDisplayName(i: { equipmentName: string; unit?: number | null }): string {
+  return i.unit && !i.equipmentName.endsWith(`#${i.unit}`) ? `${i.equipmentName} #${i.unit}` : i.equipmentName
+}
+
+export type CheckoutMatch<T> = { kind: 'duplicate'; item: T } | { kind: 'booked'; item: T } | { kind: 'new' }
+
+export function matchCheckoutScan<T extends ScanRow>(items: T[], equipmentId: string, scannedName: string, unit: number | null): CheckoutMatch<T> {
+  const same = (i: T) => (equipmentId ? i.equipmentId === equipmentId : i.equipmentName === scannedName)
+  // The same physical unit can't go out twice (codes without a unit number
+  // can't tell units apart, so those always count as another one)
+  if (unit != null) {
+    const dup = items.find(i => OUT.has(i.status) && (itemDisplayName(i) === scannedName || (same(i) && i.unit === unit)))
+    if (dup) return { kind: 'duplicate', item: dup }
+  }
+  const pending = items.filter(i => i.status === 'pending' && same(i))
+  const slot = pending.find(i => i.equipmentName === scannedName) ?? pending[0]
+  return slot ? { kind: 'booked', item: slot } : { kind: 'new' }
+}
+
+export function matchCheckinScan<T extends ScanRow>(items: T[], equipmentId: string, scannedName: string, unit: number | null): T | undefined {
+  const out = items.filter(i => i.status === 'checked-out')
+  return out.find(i => itemDisplayName(i) === scannedName || i.equipmentName === scannedName)
+    ?? (equipmentId && unit != null ? out.find(i => i.equipmentId === equipmentId && i.unit === unit) : undefined)
+    // Rows without a recorded unit (older, or booked by name) take any unit back
+    ?? (equipmentId ? out.find(i => i.equipmentId === equipmentId && (unit == null || i.unit == null)) : undefined)
+}
+
 export function beep(freq: number) {
   try {
     const ctx = new AudioContext()

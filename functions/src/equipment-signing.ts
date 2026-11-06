@@ -88,6 +88,8 @@ export const requestEquipmentSignatures = functions.https.onCall(async (data, co
       requestedBy:     context.auth!.uid,
       requestedByName: (requester.data()?.displayName as string) ?? '',
     },
+    // Borrowers still asked to sign — drives the "contract to sign" bell entry
+    pendingSignatureUids: toAsk,
   })
 
   const withoutPush: string[] = []
@@ -159,6 +161,7 @@ export const signEquipmentContract = functions.https.onCall(async (data, context
     userAgent:    String(req?.headers?.['user-agent'] ?? '').slice(0, 300),
     method:       'cineforge-typed-name',
   })
+  await projRef.update({ pendingSignatureUids: admin.firestore.FieldValue.arrayRemove(uid) })
 
   return { signatureId: ref.id, contractHash: hash }
 })

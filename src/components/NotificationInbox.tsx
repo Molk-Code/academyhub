@@ -9,7 +9,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useBookingBadgeDetail } from '@/hooks/useBookingBadge'
 import { useChatUnreadCount } from '@/hooks/useChatUnread'
 import { useBugReportBadge } from '@/hooks/useBugReportBadge'
-import type { NotificationDoc } from '@/types'
+import { useFeature } from '@/hooks/useFeature'
+import type { InventoryProjectDoc, NotificationDoc } from '@/types'
 
 // Pending-item badges (food/van/equipment requests, open bug reports, unread
 // chat) live outside the `notifications` log — they're derived counts, not
@@ -23,12 +24,25 @@ function useSyntheticItems(): SyntheticItem[] {
   const chatUnread = useChatUnreadCount()
   const bugReports = useBugReportBadge()
   const chatUrl = role === 'admin' ? '/admin/chat' : role === 'teacher' ? '/teacher/chat' : '/chat'
+  // Equipment contracts the user was asked to sign — stays until they sign
+  const { profile } = useAuth()
+  const canEquipment = useFeature('equipment')
+  const { data: toSign } = useCollection<InventoryProjectDoc>(
+    'inventory_projects',
+    profile && canEquipment ? [where('pendingSignatureUids', 'array-contains', profile.uid)] : [],
+    !!profile && canEquipment,
+  )
+  const signUrl = role === 'student' ? '/my-bookings' : '/teacher/my-bookings'
 
   const items: SyntheticItem[] = []
   if (bugReports > 0) items.push({ id: 'synthetic-bug-reports', title: '🐛 Open bug reports', body: `${bugReports} report${bugReports === 1 ? '' : 's'} awaiting review`, url: '/admin/bug-reports' })
   if (equipment > 0)  items.push({ id: 'synthetic-equipment',   title: '📦 Pending equipment requests', body: `${equipment} request${equipment === 1 ? '' : 's'} awaiting review`, url: '/admin/equipment' })
   if (food > 0)       items.push({ id: 'synthetic-food',        title: '🍱 Pending food box orders', body: `${food} order${food === 1 ? '' : 's'} awaiting confirmation`, url: '/admin/food-box-orders' })
   if (van > 0)        items.push({ id: 'synthetic-van',         title: '🚐 Pending vehicle requests', body: `${van} request${van === 1 ? '' : 's'} awaiting review`, url: '/admin/minivan' })
+  for (const p of toSign) {
+    if (p.status === 'archived') continue
+    items.push({ id: `synthetic-sign-${p.id}`, title: '✍️ Equipment contract to sign', body: `${p.name} — review and sign in My Bookings`, url: signUrl })
+  }
   if (chatUnread > 0) items.push({ id: 'synthetic-chat',        title: '💬 Unread chat messages', body: `${chatUnread} channel${chatUnread === 1 ? '' : 's'} with new messages`, url: chatUrl })
   return items
 }

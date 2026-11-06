@@ -15,7 +15,7 @@ import { optimizeImageUrl } from '@/lib/cloudinary'
 import { LinkifiedText, externalHref } from './inventoryShared'
 import { ImageGallery, equipmentImages } from './ImageGallery'
 import './molkom.css'
-import { BookingPartsSummary } from '@/components/equipment/BookingPartsPanel'
+import { BookingPartsSummary, ProductionLink } from '@/components/equipment/BookingPartsPanel'
 import { bookingParts } from '@/lib/bookingParts'
 
 const INFO_LABEL: React.CSSProperties = { fontSize: '.7rem', fontWeight: 700, color: '#6a6a80', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }
@@ -1324,6 +1324,9 @@ export default function EquipmentBookingPage() {
                         <Calendar size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
                         {formatDate(b.checkoutDate)} – {formatDate(b.returnDate)}
                       </div>
+                      {(b.productionId || b.productionTitle) && (
+                        <div style={{ marginBottom: 8 }}><ProductionLink booking={b} staff={isStaffBooker} /></div>
+                      )}
                       {bookingParts(b).length > 1 ? <BookingPartsSummary booking={b} /> : (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                           {b.items.map((it, i) => (

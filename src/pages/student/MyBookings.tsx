@@ -4,7 +4,7 @@ import { addDoc, collection, collectionGroup, deleteDoc, doc, onSnapshot, server
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useFeature } from '@/hooks/useFeature'
-import { BookingPartsSummary } from '@/components/equipment/BookingPartsPanel'
+import { BookingPartsSummary, ProductionLink } from '@/components/equipment/BookingPartsPanel'
 import { bookingParts } from '@/lib/bookingParts'
 import { useCollection, useDocument, orderBy, where } from '@/hooks/useFirestore'
 import { markFoodBoxSeen, markMinivanSeen } from '@/hooks/useBookingBadge'
@@ -421,6 +421,7 @@ function BookingMessageThread({ bookingId }: { bookingId: string }) {
 }
 
 function BookingRequestsSection({ bookings }: { bookings: EquipmentBookingDoc[] }) {
+  const staff = useLocation().pathname.startsWith('/teacher')
   if (bookings.length === 0) return null
 
   return (
@@ -438,6 +439,7 @@ function BookingRequestsSection({ bookings }: { bookings: EquipmentBookingDoc[] 
               </div>
               <StatusPill status={b.status} />
             </div>
+            <ProductionLink booking={b} staff={staff} />
             {bookingParts(b).length > 1 ? <BookingPartsSummary booking={b} /> : b.items?.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {b.items.map((it, i) => (

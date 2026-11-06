@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import type { EquipmentBookingDoc, EquipmentBookingMessageDoc, EquipmentDoc } from '@/types'
 import { Package, Trash2, Send } from 'lucide-react'
 import { useEquipmentResponsibility } from '@/hooks/useEquipmentResponsibility'
-import { BookingPartsPanel } from '@/components/equipment/BookingPartsPanel'
+import { BookingPartsPanel, ProductionLink } from '@/components/equipment/BookingPartsPanel'
 import { bookingParts, decideEquipmentBookingParts, myParts } from '@/lib/bookingParts'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 
@@ -252,18 +252,8 @@ export default function EquipmentRequests() {
 
               {booking.productionTitle && (
                 <div className="mt-2 p-3 bg-white/5 rounded-xl">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-xs font-semibold text-zinc-300">🎬 {booking.productionTitle}</p>
-                    {booking.productionId && (
-                      <a
-                        href={`/production/planning/${booking.productionId}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-orange-400 hover:text-orange-300 underline"
-                      >
-                        View plan →
-                      </a>
-                    )}
+                  <div className="mb-2">
+                    <ProductionLink booking={booking} staff />
                   </div>
                   {booking.productionReadiness && (
                     <div className="flex flex-wrap gap-3 text-xs">

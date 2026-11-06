@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
 import type { EquipmentBookingDoc, EquipmentBookingMessageDoc, EquipmentDoc } from '@/types'
 import { useEquipmentResponsibility } from '@/hooks/useEquipmentResponsibility'
-import { BookingPartsPanel } from '@/components/equipment/BookingPartsPanel'
+import { BookingPartsPanel, ProductionLink } from '@/components/equipment/BookingPartsPanel'
 import { bookingParts, decideEquipmentBookingParts, myParts } from '@/lib/bookingParts'
 import {
   Calendar, CheckCircle2, Send, Trash2,
@@ -243,6 +243,9 @@ export function BookingsTab() {
 
                 {expanded && (
                   <div style={{ borderTop: '1px solid #2a2a3a', padding: '14px 16px', background: '#0a0a0f' }} onClick={e => e.stopPropagation()}>
+                    {(b.productionId || b.productionTitle) && (
+                      <div style={{ marginBottom: 10 }}><ProductionLink booking={b} staff /></div>
+                    )}
                     <div style={{ marginBottom: 12 }}>
                       <BookingPartsPanel
                         booking={b}

@@ -1,5 +1,5 @@
-import { useNavigate } from 'react-router-dom'
-import { Check, X, Undo2, ArrowRight, ExternalLink, Clock } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Check, X, Undo2, ArrowRight, ExternalLink, Clock, Clapperboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { bookingParts, handlesCategory, myParts, partStatus, type PartStatus } from '@/lib/bookingParts'
 import type { EquipmentBookingDoc, EquipmentResponsibility } from '@/types'
@@ -139,5 +139,26 @@ export function BookingPartsSummary({ booking }: { booking: EquipmentBookingDoc 
         </div>
       ))}
     </div>
+  )
+}
+
+// Bookings sent from a production link back to its planning page.
+// Staff open it under /teacher, students under their own routes.
+export function ProductionLink({ booking, staff }: { booking: EquipmentBookingDoc; staff: boolean }) {
+  if (!booking.productionId && !booking.productionTitle) return null
+  const label = booking.productionTitle || 'Production'
+  if (!booking.productionId) {
+    return <p className="inline-flex items-center gap-1.5 text-xs text-zinc-400"><Clapperboard className="w-3.5 h-3.5" /> {label}</p>
+  }
+  return (
+    <Link
+      to={`${staff ? '/teacher' : ''}/production/planning/${booking.productionId}`}
+      onClick={e => e.stopPropagation()}
+      className="inline-flex items-center gap-1.5 max-w-full text-xs font-semibold text-orange-300 hover:text-orange-200 bg-orange-500/10 border border-orange-500/25 rounded-lg px-2.5 py-1.5"
+    >
+      <Clapperboard className="w-3.5 h-3.5 flex-shrink-0" />
+      <span className="truncate">{label}</span>
+      <span className="flex-shrink-0 font-medium text-orange-300/80">Open production →</span>
+    </Link>
   )
 }

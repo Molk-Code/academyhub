@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import {
-  collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp, onSnapshot,
+  collection, addDoc, updateDoc, setDoc, getDoc, doc, serverTimestamp, Timestamp, onSnapshot,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -38,6 +38,8 @@ export default function AttendancePanel({
 
   const isActiveRef = useRef(false)
   const deviceIdRef = useRef<string | undefined>(undefined)
+  // Secret key from the display's link — the live token is written under it
+  const displayKeyRef = useRef<string | null>(null)
 
   const [devices,          setDevices]          = useState<QrDisplayDeviceDoc[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState('')
@@ -83,8 +85,15 @@ export default function AttendancePanel({
     setCountdown(SESSION_SECS)
 
     if (deviceId) {
+      const key = displayKeyRef.current
+      if (key) {
+        await setDoc(doc(db, 'qr_display_devices', deviceId, 'live', key), {
+          activeToken:    newToken,
+          tokenExpiresAt: expiresAt,
+        })
+      }
       await updateDoc(doc(db, 'qr_display_devices', deviceId), {
-        activeToken:    newToken,
+        activeToken:    null,
         tokenExpiresAt: expiresAt,
         activeLessonId: lessonId,
       })
@@ -114,7 +123,12 @@ export default function AttendancePanel({
     isActiveRef.current = true
     deviceIdRef.current = deviceId
     setIsActive(true)
+    displayKeyRef.current = null
     if (deviceId) {
+      try {
+        const cfg = await getDoc(doc(db, 'qr_display_devices', deviceId, 'private', 'config'))
+        displayKeyRef.current = (cfg.data()?.displayKey as string | undefined) ?? null
+      } catch { displayKeyRef.current = null }
       const device = devices.find(d => d.id === deviceId)
       const name = device?.name ?? ''
       setActiveDeviceName(name)
@@ -137,6 +151,10 @@ export default function AttendancePanel({
     }
 
     if (deviceId) {
+      const key = displayKeyRef.current
+      if (key) {
+        await setDoc(doc(db, 'qr_display_devices', deviceId, 'live', key), { activeToken: null, tokenExpiresAt: null })
+      }
       await updateDoc(doc(db, 'qr_display_devices', deviceId), {
         activeToken:    null,
         tokenExpiresAt: null,

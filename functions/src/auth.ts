@@ -60,6 +60,9 @@ export const onUserDocUpdated = functions.firestore
 
 // onUserDocCreated — backup claims setter in case the Auth onCreate trigger fails
 // (e.g. cold start timeout, transient error). Fires when AcceptInvite's setDoc lands.
+// The doc is written by the new user's own browser, so a staff role is only
+// honoured when the invitation it points at grants exactly that role to this
+// account's email — never on the doc's word alone.
 export const onUserDocCreated = functions.firestore
   .document('users/{uid}')
   .onCreate(async (snap, context) => {
@@ -70,6 +73,16 @@ export const onUserDocCreated = functions.firestore
       const existing = await admin.auth().getUser(uid)
       const claims   = existing.customClaims ?? {}
       if (claims.role === data.role && claims.cohortId === (data.cohortId ?? null)) return null
+      if (data.role !== 'student') {
+        const inv = data.inviteId ? await db.collection('invitations').doc(String(data.inviteId)).get() : null
+        const ok = !!inv?.exists
+          && inv.data()!.role === data.role
+          && String(inv.data()!.email ?? '').toLowerCase() === String(existing.email ?? '').toLowerCase()
+        if (!ok) {
+          console.warn('onUserDocCreated: staff role without a matching invitation — not granted', { uid, role: data.role })
+          return null
+        }
+      }
       await admin.auth().setCustomUserClaims(uid, {
         role:     data.role     ?? null,
         cohortId: data.cohortId ?? null,
@@ -246,9 +259,7 @@ export const resetPassword = functions.https.onCall(async (data, context) => {
 
 export const disableUser = functions.https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
-  const callerDoc = await db.collection('users').doc(context.auth.uid).get()
-  const callerRole = callerDoc.data()?.role
-  if (callerRole !== 'admin') {
+  if (context.auth.token.role !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'Admin only.')
   }
   const { uid } = data as { uid: string }
@@ -264,9 +275,7 @@ export const disableUser = functions.https.onCall(async (data, context) => {
 
 export const restoreUser = functions.https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
-  const callerDoc = await db.collection('users').doc(context.auth.uid).get()
-  const callerRole = callerDoc.data()?.role
-  if (callerRole !== 'admin') {
+  if (context.auth.token.role !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'Admin only.')
   }
   const { uid } = data as { uid: string }

@@ -88,7 +88,7 @@ function DeviceSelector() {
             {format(now, 'EEEE, d MMMM yyyy')}
           </p>
           <h1 className="text-5xl font-black tracking-tight">QR DISPLAY</h1>
-          <p className="text-gray-500 text-lg mt-2">Select a device to show attendance QR codes</p>
+          <p className="text-gray-500 text-lg mt-2">Open a display's own link from Admin → QR Devices to show attendance QR codes</p>
         </div>
         <div className="text-right">
           <p className="text-5xl font-mono font-bold tabular-nums">{format(now, 'HH:mm')}</p>
@@ -121,9 +121,11 @@ function DeviceSelector() {
 
 // ── Single device display ─────────────────────────────────────────────────────
 
-function QrDeviceDisplay({ deviceId }: { deviceId: string }) {
+function QrDeviceDisplay({ deviceId, displayKey }: { deviceId: string; displayKey: string | null }) {
   const [now, setNow] = useState(new Date())
   const [device, setDevice] = useState<QrDisplayDeviceDoc | null>(null)
+  // The live QR token is only readable with this display's secret link key
+  const [liveToken, setLiveToken] = useState<string | null>(null)
   const [attendeeCount, setAttendeeCount] = useState(0)
   const [pulse, setPulse] = useState(false)
 
@@ -141,6 +143,16 @@ function QrDeviceDisplay({ deviceId }: { deviceId: string }) {
     return unsub
   }, [deviceId])
 
+  useEffect(() => {
+    if (!displayKey) { setLiveToken(null); return }
+    const unsub = onSnapshot(
+      doc(db, 'qr_display_devices', deviceId, 'live', displayKey),
+      snap => setLiveToken((snap.data()?.activeToken as string | null | undefined) ?? null),
+      () => setLiveToken(null),
+    )
+    return unsub
+  }, [deviceId, displayKey])
+
   // Attendee count for the active lesson
   useEffect(() => {
     const lessonId = device?.activeLessonId
@@ -154,12 +166,12 @@ function QrDeviceDisplay({ deviceId }: { deviceId: string }) {
 
   // Pulsing idle animation
   useEffect(() => {
-    if (device?.activeToken) return
+    if (liveToken) return
     const id = setInterval(() => setPulse(p => !p), 1500)
     return () => clearInterval(id)
-  }, [device?.activeToken])
+  }, [liveToken])
 
-  const hasSession  = !!device?.activeToken
+  const hasSession  = !!liveToken
   const expiresMs   = device?.tokenExpiresAt?.toMillis?.() ?? 0
   const countdown   = Math.max(0, Math.ceil((expiresMs - now.getTime()) / 1000))
   const pct         = Math.min(1, countdown / SESSION_SECS)
@@ -187,7 +199,13 @@ function QrDeviceDisplay({ deviceId }: { deviceId: string }) {
             <p className={cn('text-5xl font-black transition-opacity duration-1000', pulse ? 'opacity-100' : 'opacity-40')}>
               WAITING FOR SESSION
             </p>
-            <p className="text-gray-500 text-xl">A teacher will start attendance shortly</p>
+            {displayKey ? (
+              <p className="text-gray-500 text-xl">A teacher will start attendance shortly</p>
+            ) : (
+              <p className="text-amber-400 text-xl max-w-xl">
+                This display link is missing its security key. Open this screen's link from Admin → QR Devices.
+              </p>
+            )}
           </div>
         </div>
         <InstallBanner />
@@ -225,7 +243,7 @@ function QrDeviceDisplay({ deviceId }: { deviceId: string }) {
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-4 gap-4">
         <div className="bg-white rounded-3xl shadow-2xl p-4" style={{ width: 'min(80vmin, 680px)', height: 'min(80vmin, 680px)' }}>
           <QRCodeSVG
-            value={device.activeToken!}
+            value={liveToken!}
             size={undefined as any}
             level="H"
             style={{ width: '100%', height: '100%' }}
@@ -253,6 +271,6 @@ function QrDeviceDisplay({ deviceId }: { deviceId: string }) {
 export default function QrDisplay() {
   const [searchParams] = useSearchParams()
   const deviceId = searchParams.get('device')
-  if (deviceId) return <QrDeviceDisplay deviceId={deviceId} />
+  if (deviceId) return <QrDeviceDisplay deviceId={deviceId} displayKey={searchParams.get('key')} />
   return <DeviceSelector />
 }

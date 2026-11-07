@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore'
+import { useEffect, useState } from 'react'
+import { addDoc, collection, deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import { nanoid } from 'nanoid'
 import { db } from '@/lib/firebase'
 import { useCollection } from '@/hooks/useFirestore'
 import type { QrDisplayDeviceDoc } from '@/types'
@@ -49,6 +50,50 @@ function UrlCard({ url, accentColor }: { url: string; accentColor: string }) {
   )
 }
 
+// Each display's link carries a secret key; the live QR token is stored under
+// it, so only a screen opened from this link can show (or read) the code.
+function DeviceLink({ deviceId }: { deviceId: string }) {
+  const [key, setKey]       = useState<string | null | undefined>(undefined)
+  const [copied, setCopied] = useState(false)
+  const configRef = doc(db, 'qr_display_devices', deviceId, 'private', 'config')
+
+  useEffect(() => {
+    getDoc(configRef)
+      .then(snap => setKey((snap.data()?.displayKey as string | undefined) ?? null))
+      .catch(() => setKey(null))
+  }, [deviceId])
+
+  async function createKey() {
+    const displayKey = nanoid(32)
+    await setDoc(configRef, { displayKey })
+    setKey(displayKey)
+  }
+
+  if (key === undefined) return <p className="text-xs text-zinc-600">Loading link…</p>
+  if (key === null) {
+    return (
+      <button onClick={createKey} className="text-xs text-amber-400 hover:text-amber-300">
+        Create secure display link →
+      </button>
+    )
+  }
+  const url = `${window.location.origin}/qr-display?device=${deviceId}&key=${key}`
+  return (
+    <div className="flex items-center gap-3 text-xs">
+      <a href={url} target="_blank" rel="noopener noreferrer"
+         className="text-zinc-500 hover:text-brand-400 transition-colors font-mono">
+        Open display →
+      </a>
+      <button
+        onClick={async () => { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+        className="text-zinc-500 hover:text-brand-400 flex items-center gap-1"
+      >
+        <Copy className="w-3 h-3" /> {copied ? 'Copied!' : 'Copy link'}
+      </button>
+    </div>
+  )
+}
+
 export default function QrDevices() {
   const { data: devices, loading } = useCollection<QrDisplayDeviceDoc>('qr_display_devices')
   const [newName, setNewName]   = useState('')
@@ -63,11 +108,12 @@ export default function QrDevices() {
     if (!name || devices.length >= MAX_DEVICES) return
     setAdding(true)
     try {
-      await addDoc(collection(db, 'qr_display_devices'), {
+      const ref = await addDoc(collection(db, 'qr_display_devices'), {
         name,
         isActive: true,
         createdAt: serverTimestamp(),
       })
+      await setDoc(doc(db, 'qr_display_devices', ref.id, 'private', 'config'), { displayKey: nanoid(32) })
       setNewName('')
     } finally {
       setAdding(false)
@@ -148,14 +194,7 @@ export default function QrDevices() {
               >
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-zinc-100">{device.name}</p>
-                  <a
-                    href={`/qr-display?device=${device.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-zinc-500 hover:text-brand-400 transition-colors font-mono"
-                  >
-                    /qr-display?device={device.id.slice(0, 12)}…
-                  </a>
+                  <DeviceLink deviceId={device.id} />
                 </div>
 
                 <button

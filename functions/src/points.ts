@@ -1,5 +1,5 @@
 import { admin, functions, db, requireTeacherOrAdmin } from './lib'
-import { sendPush, saveNotifications, pushToTeachersAndAdmins } from './notifications-core'
+import { sendPush, saveNotifications, pushToTeachersAndAdmins, tokensFor } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // processRedemption — validate and record a prize claim
@@ -181,7 +181,7 @@ export async function checkLevelUp(uid: string, newTotal: number) {
 
     if (levelName) {
       const userSnap = await db.collection('users').doc(uid).get()
-      const tokens: string[] = userSnap.data()?.fcmTokens ?? []
+      const tokens: string[] = await tokensFor([userSnap.id])
       await sendPush(tokens, {
         title: `🎉 New level: ${levelName}`,
         body:  `You've reached the "${levelName}" level with ${newTotal} points!`,
@@ -319,7 +319,7 @@ export const fulfillClaim = functions.https.onCall(async (data, context) => {
 
   // Notify student — in-app always, push only if they have a registered device
   const studentSnap = await db.collection('users').doc(claim.studentId as string).get()
-  const tokens: string[] = studentSnap.data()?.fcmTokens ?? []
+  const tokens: string[] = await tokensFor([studentSnap.id])
   const prizeSnap = await db.collection('prizes').doc(claim.prizeId as string).get()
   const prizeTitle = prizeSnap.data()?.title ?? 'your prize'
   const opts = action === 'fulfilled'

@@ -1,12 +1,14 @@
 import { getApp } from 'firebase/app'
 import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging'
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore'
+import { doc, setDoc, arrayUnion, arrayRemove } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from './firebase'
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined
 
 const FCM_TOKEN_KEY     = (uid: string) => `fcmTokenOk:${uid}`
+// Tokens live in push_tokens/{uid}, readable only by their owner
+const tokensDoc = (uid: string) => doc(db, 'push_tokens', uid)
 const FCM_TOKEN_VAL_KEY = (uid: string) => `fcmTokenVal:${uid}`
 
 async function getMsg() {
@@ -46,9 +48,9 @@ export async function initFCM(uid: string): Promise<string> {
     // when a user has registered from multiple contexts (Safari + PWA, scope change, etc.)
     const oldToken = localStorage.getItem(FCM_TOKEN_VAL_KEY(uid))
     if (oldToken && oldToken !== token) {
-      await updateDoc(doc(db, 'users', uid), { fcmTokens: arrayRemove(oldToken) })
+      await setDoc(tokensDoc(uid), { tokens: arrayRemove(oldToken) }, { merge: true })
     }
-    await updateDoc(doc(db, 'users', uid), { fcmTokens: arrayUnion(token) })
+    await setDoc(tokensDoc(uid), { tokens: arrayUnion(token) }, { merge: true })
     // A device belongs to whoever is signed in on it: drop this token from any
     // other account (e.g. after switching accounts on the same phone), or that
     // account's notifications keep arriving here too — sometimes twice.
@@ -78,7 +80,7 @@ export async function onForegroundMessage(cb: (p: FcmPayload) => void): Promise<
 }
 
 export async function removeFcmToken(uid: string, token: string): Promise<void> {
-  await updateDoc(doc(db, 'users', uid), { fcmTokens: arrayRemove(token) })
+  await setDoc(tokensDoc(uid), { tokens: arrayRemove(token) }, { merge: true })
 }
 
 /** On sign-out: stop sending this account's pushes to this device. */

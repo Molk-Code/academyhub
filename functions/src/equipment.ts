@@ -1,5 +1,5 @@
 import { functions, db, admin, requireTeacherOrAdmin } from './lib'
-import { sendPush, saveNotifications } from './notifications-core'
+import { sendPush, saveNotifications, tokensFor } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Booking parts — each catalog category of a booking is accepted or denied by
@@ -55,7 +55,8 @@ async function staffForCategories(categories: string[]): Promise<{ uids: string[
     if (r === undefined ? isAdmin : categories.some(c => handlesCategory(r, c))) picked.push(d)
   }
   const list = picked.length ? picked : admins
-  return { uids: list.map(d => d.id), tokens: list.flatMap(d => (d.data()?.fcmTokens as string[]) ?? []) }
+  const uids = list.map(d => d.id)
+  return { uids, tokens: await tokensFor(uids) }
 }
 
 async function pushToResponsibleStaff(categories: string[], title: string, body: string, url: string) {
@@ -90,7 +91,7 @@ export const onEquipmentBookingCreated = functions.firestore
     if (pendingSnap.size >= 5) {
       // Notify the student before deleting so they know why it was rejected
       const studentSnap = await db.collection('users').doc(booking.studentId as string).get()
-      const tokens: string[] = studentSnap.data()?.fcmTokens ?? []
+      const tokens: string[] = await tokensFor([studentSnap.id])
       await pushAndSave(booking.studentId as string, tokens, {
         title: '⚠️ Equipment booking limit reached',
         body: 'You already have 5 pending requests. Cancel or wait for one to be confirmed before adding more.',
@@ -116,7 +117,7 @@ export const onEquipmentBookingCreated = functions.firestore
       const programYear: number = cohortSnap?.data()?.programYear ?? 1
       if (equip.filmYear2Only && programYear !== 2) {
         await snap.ref.delete()
-        const tokens: string[] = studentData?.fcmTokens ?? []
+        const tokens: string[] = await tokensFor([booking.studentId as string])
         await pushAndSave(booking.studentId as string, tokens, {
           title: '🚫 Booking rejected',
           body: `"${equip.name}" is only available to Year 2 students`,
@@ -127,7 +128,7 @@ export const onEquipmentBookingCreated = functions.firestore
       }
       if (equip.allowedCohortIds?.length > 0 && studentData?.cohortId && !equip.allowedCohortIds.includes(studentData.cohortId)) {
         await snap.ref.delete()
-        const tokens: string[] = studentData?.fcmTokens ?? []
+        const tokens: string[] = await tokensFor([booking.studentId as string])
         await pushAndSave(booking.studentId as string, tokens, {
           title: '🚫 Booking rejected',
           body: `"${equip.name}" is not available for your class`,
@@ -178,7 +179,7 @@ export const onEquipmentBookingMessageCreated = functions.firestore
       )
     } else {
       const studentSnap = await db.collection('users').doc(booking.studentId as string).get()
-      const tokens: string[] = studentSnap.data()?.fcmTokens ?? []
+      const tokens: string[] = await tokensFor([studentSnap.id])
       const opts = {
         title: '💬 New message on your booking',
         body:  `"${booking.projectName}": ${message.text}`,
@@ -209,7 +210,7 @@ export const onEquipmentBookingUpdated = functions.firestore
     if (after.closedByProject && !before.closedByProject) return null
     const studentId = after.studentId as string
     const studentSnap = await db.collection('users').doc(studentId).get()
-    const tokens: string[] = studentSnap.data()?.fcmTokens ?? []
+    const tokens: string[] = await tokensFor([studentSnap.id])
 
     let opts: { title: string; body: string; url: string } | null = null
     if (after.status === 'confirmed') {
@@ -267,7 +268,7 @@ export const onInventoryProjectCreated = functions.firestore
     const borrowerIds: string[] = project.borrowerIds ?? []
     if (borrowerIds.length === 0) return null
     const usersSnaps = await Promise.all(borrowerIds.map(uid => db.collection('users').doc(uid).get()))
-    const tokens = usersSnaps.flatMap(s => (s.data()?.fcmTokens ?? []) as string[])
+    const tokens = await tokensFor(usersSnaps.map(s => s.id))
     const opts = {
       title: '📦 Equipment project created',
       body:  `"${project.name}" — return by ${project.returnDate}`,
@@ -332,7 +333,7 @@ export const onInventoryProjectUpdated = functions.firestore
     }
     if (!opts) return null
     const usersSnaps = await Promise.all(borrowerIds.map(uid => db.collection('users').doc(uid).get()))
-    const tokens = usersSnaps.flatMap(s => (s.data()?.fcmTokens ?? []) as string[])
+    const tokens = await tokensFor(usersSnaps.map(s => s.id))
     await Promise.all([
       sendPush(tokens, { ...opts, tag: 'inventory' }),
       saveNotifications(borrowerIds, opts),
@@ -458,7 +459,7 @@ export const decideEquipmentBookingParts = functions.https.onCall(async (data, c
     }
     const studentId = b.studentId as string
     if (studentId) {
-      const tokens: string[] = (await db.collection('users').doc(studentId).get()).data()?.fcmTokens ?? []
+      const tokens: string[] = await tokensFor([studentId])
       await Promise.all([
         sendPush(tokens, { ...opts, tag: 'equipment-booking' }),
         saveNotifications([studentId], opts),

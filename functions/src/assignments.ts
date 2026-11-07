@@ -1,5 +1,5 @@
 import { admin, functions, db, requireTeacherOrAdmin } from './lib'
-import { sendPush, saveNotifications } from './notifications-core'
+import { sendPush, saveNotifications, tokensFor } from './notifications-core'
 import { updateProgress, checkLevelUp } from './points'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -454,7 +454,7 @@ export const gradeShortAnswers = functions.https.onCall(async (data, context) =>
 
   // Push notification to student — test result available
   const studentSnap = await db.collection('users').doc(sub.studentId as string).get()
-  const tokens: string[] = studentSnap.data()?.fcmTokens ?? []
+  const tokens: string[] = await tokensFor([studentSnap.id])
   const testOpts = {
     title: passed ? '✅ Test passed!' : '📝 Test result available',
     body:  `You scored ${percentageScore}% on your test.`,

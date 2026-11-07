@@ -4,12 +4,32 @@ import { admin, db, functions } from './lib'
 // Push notification helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Device push tokens live in push_tokens/{uid} ({ tokens: string[] }), readable
+// only by their owner — not on users/{uid}, which every signed-in user can list.
+export async function tokensFor(uids: string[]): Promise<string[]> {
+  const ids = [...new Set(uids.filter(Boolean))]
+  if (ids.length === 0) return []
+  const snaps = await db.getAll(...ids.map(id => db.collection('push_tokens').doc(id)))
+  return [...new Set(snaps.flatMap(s => (s.data()?.tokens as string[] | undefined) ?? []))]
+}
+
+// Drop tokens FCM reports as no longer registered
+export async function removeStaleTokens(stale: string[]) {
+  for (let i = 0; i < stale.length; i += 30) {
+    const chunk = stale.slice(i, i + 30)
+    const holders = await db.collection('push_tokens').where('tokens', 'array-contains-any', chunk).get()
+    await Promise.all(holders.docs.map(d =>
+      d.ref.update({ tokens: admin.firestore.FieldValue.arrayRemove(...chunk) }),
+    ))
+  }
+}
+
 export async function sendPush(
   tokens: string[],
   opts: { title: string; body: string; url?: string; tag?: string },
 ) {
   if (tokens.length === 0) {
-    console.log('sendPush skipped — recipient has no registered fcmTokens', { title: opts.title })
+    console.log('sendPush skipped — recipient has no registered push tokens', { title: opts.title })
     return
   }
   const uniqueTokens = [...new Set(tokens)]
@@ -58,14 +78,7 @@ export async function sendPush(
       const stale = res.responses
         .map((r, idx) => (!r.success ? chunk[idx] : null))
         .filter(Boolean) as string[]
-      if (stale.length > 0) {
-        const usersSnap = await db.collection('users')
-          .where('fcmTokens', 'array-contains-any', stale)
-          .get()
-        await Promise.all(usersSnap.docs.map(d =>
-          d.ref.update({ fcmTokens: admin.firestore.FieldValue.arrayRemove(...stale) }),
-        ))
-      }
+      if (stale.length > 0) await removeStaleTokens(stale)
     }
   } catch (err: any) {
     console.error('sendPush error', { message: err?.message })
@@ -175,16 +188,8 @@ async function usersWithAnyRole(targetRoles: string[]): Promise<{ tokens: string
     db.collection('users').where('role', 'in', targetRoles).get(),
     db.collection('users').where('roles', 'array-contains-any', targetRoles).get(),
   ])
-  const seen = new Set<string>()
-  const tokens: string[] = []
-  const uids: string[] = []
-  for (const d of [...byRole.docs, ...byRoles.docs]) {
-    if (seen.has(d.id)) continue
-    seen.add(d.id)
-    tokens.push(...(d.data().fcmTokens ?? []))
-    uids.push(d.id)
-  }
-  return { tokens, uids }
+  const uids = [...new Set([...byRole.docs, ...byRoles.docs].map(d => d.id))]
+  return { tokens: await tokensFor(uids), uids }
 }
 
 export async function pushToAdmins(title: string, body: string, url: string) {
@@ -205,7 +210,7 @@ export async function pushToTeachersAndAdmins(title: string, body: string, url: 
 
 export async function pushToStudent(studentId: string, title: string, body: string) {
   const snap = await db.collection('users').doc(studentId).get()
-  const tokens: string[] = snap.data()?.fcmTokens ?? []
+  const tokens: string[] = await tokensFor([snap.id])
   const opts = { title, body, url: '/my-bookings' }
   await Promise.all([
     sendPush(tokens, { ...opts, tag: 'booking-update' }),
@@ -215,7 +220,7 @@ export async function pushToStudent(studentId: string, title: string, body: stri
 
 export async function pushToUser(uid: string, title: string, body: string, url: string, tag?: string) {
   const snap = await db.collection('users').doc(uid).get()
-  const tokens: string[] = snap.data()?.fcmTokens ?? []
+  const tokens: string[] = await tokensFor([snap.id])
   await Promise.all([
     sendPush(tokens, { title, body, url, tag: tag ?? 'update' }),
     saveNotifications([uid], { title, body, url }),
@@ -236,15 +241,15 @@ export const claimFcmToken = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'token is required.')
   }
   const uid = context.auth.uid
-  const holders = await db.collection('users').where('fcmTokens', 'array-contains', token).get()
+  const holders = await db.collection('push_tokens').where('tokens', 'array-contains', token).get()
   const batch = db.batch()
   let removed = 0
   for (const d of holders.docs) {
     if (d.id === uid) continue
-    batch.update(d.ref, { fcmTokens: admin.firestore.FieldValue.arrayRemove(token) })
+    batch.update(d.ref, { tokens: admin.firestore.FieldValue.arrayRemove(token) })
     removed++
   }
-  batch.update(db.collection('users').doc(uid), { fcmTokens: admin.firestore.FieldValue.arrayUnion(token) })
+  batch.set(db.collection('push_tokens').doc(uid), { tokens: admin.firestore.FieldValue.arrayUnion(token) }, { merge: true })
   await batch.commit()
   return { removedFromOtherAccounts: removed }
 })

@@ -1,6 +1,6 @@
 import { createHash } from 'crypto'
 import { admin, db, functions, requireTeacherOrAdmin } from './lib'
-import { sendPush, saveNotifications } from './notifications-core'
+import { sendPush, saveNotifications, tokensFor } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Electronic signing of equipment loan contracts
@@ -96,7 +96,7 @@ export const requestEquipmentSignatures = functions.https.onCall(async (data, co
   if (toAsk.length > 0) {
     const users = await Promise.all(toAsk.map(uid => db.collection('users').doc(uid).get()))
     for (const u of users) {
-      if (!((u.data()?.fcmTokens as string[]) ?? []).length) withoutPush.push((u.data()?.displayName as string) ?? 'A borrower')
+      if (!(await tokensFor([u.id])).length) withoutPush.push((u.data()?.displayName as string) ?? 'A borrower')
     }
     // Teachers can be borrowers too — their My Bookings lives under /teacher
     const isStaff = (u: FirebaseFirestore.DocumentSnapshot) => {
@@ -114,9 +114,8 @@ export const requestEquipmentSignatures = functions.https.onCall(async (data, co
         body:  `${project.name ?? 'Your equipment loan'} — please review and sign in My Bookings.`,
         url:   g.url,
       }
-      const tokens = g.users.flatMap(u => (u.data()?.fcmTokens as string[]) ?? [])
       return [
-        sendPush([...new Set(tokens)], { ...msg, tag: `sign-${projectId}` }),
+        tokensFor(g.users.map(u => u.id)).then(tokens => sendPush(tokens, { ...msg, tag: `sign-${projectId}` })),
         saveNotifications(g.users.map(u => u.id), msg),
       ]
     }))

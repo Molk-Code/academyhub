@@ -1,5 +1,5 @@
-import { admin, functions, db, escapeHtml, getResend, getEmailConfig } from './lib'
-import { sendPush, saveNotifications, sendFcmToTokens } from './notifications-core'
+import { admin, functions, db, escapeHtml, getResend, getEmailConfig, requireTeacherOrAdmin } from './lib'
+import { sendPush, saveNotifications, sendFcmToTokens, tokensFor } from './notifications-core'
 import { checkLevelUp } from './points'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,6 +94,32 @@ export const checkInAttendance = functions.https.onCall(async (data, context) =>
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// onRoomBookingWritten — keep room_slots in step with room_bookings. The
+// signed-out hallway display reads room_slots, which carries only the room,
+// time and the booker's first name — never the student's id or full name.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function roomSlotFrom(b: FirebaseFirestore.DocumentData) {
+  return {
+    roomId:      b.roomId ?? null,
+    blockId:     b.blockId ?? null,
+    date:        b.date ?? null,
+    startTime:   b.startTime ?? null,
+    endTime:     b.endTime ?? null,
+    studentName: String(b.studentName ?? '').trim().split(/\s+/)[0] ?? '',
+  }
+}
+
+export const onRoomBookingWritten = functions.firestore
+  .document('room_bookings/{id}')
+  .onWrite(async (change, context) => {
+    const ref = db.collection('room_slots').doc(context.params.id)
+    if (!change.after.exists) { await ref.delete(); return null }
+    await ref.set(roomSlotFrom(change.after.data()!))
+    return null
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
 // onBookingConfirmed — push to the student who made the booking
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -121,7 +147,7 @@ export const onBookingConfirmed = functions.firestore
     if (!uid) return null
 
     const userSnap = await db.collection('users').doc(uid).get()
-    const tokens: string[] = userSnap.data()?.fcmTokens ?? []
+    const tokens: string[] = await tokensFor([userSnap.id])
 
     const bookingOpts = after.status === 'confirmed'
       ? { title: '✅ Room booking confirmed', body: `Your booking for ${after.roomName ?? 'the room'} has been confirmed.`, url: '/booking' }
@@ -159,15 +185,12 @@ export const onSemesterEventStart = functions.pubsub
       .where('isActive', '==', true)
       .get()
 
-    const tokens: string[] = []
-    for (const uDoc of usersSnap.docs) {
+    const staffIds = usersSnap.docs.filter(uDoc => {
       const u = uDoc.data()
       const roles: string[] = u.roles ?? []
-      if (roles.includes('teacher') || roles.includes('admin') || u.role === 'teacher' || u.role === 'admin') {
-        const fcm: string[] = u.fcmTokens ?? []
-        tokens.push(...fcm)
-      }
-    }
+      return roles.includes('teacher') || roles.includes('admin') || u.role === 'teacher' || u.role === 'admin'
+    }).map(uDoc => uDoc.id)
+    const tokens = await tokensFor(staffIds)
 
     for (const evDoc of eventsSnap.docs) {
       const ev = evDoc.data()
@@ -530,7 +553,7 @@ async function reconcile(req: functions.https.Request, res: functions.Response) 
 
 // ── sendGuestTeacherBookingEmail ──────────────────────────────────────────────
 export const sendGuestTeacherBookingEmail = functions.runWith({ secrets: ['RESEND_API_KEY'] }).https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  requireTeacherOrAdmin(context)
 
   const { guestTeacherId, lessonId } = data as { guestTeacherId: string; lessonId: string }
 

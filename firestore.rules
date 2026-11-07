@@ -85,27 +85,60 @@ service cloud.firestore {
 
     // ── Users ─────────────────────────────────────────────────────────────────
 
+    function validNewUser(d) {
+      return d.get('totalPoints', 0) == 0
+        && d.get('pointsRedeemed', 0) == 0
+        && d.get('disabled', false) == false
+        && (
+          // Student — no class, or the class of the class invite used
+          (d.role == 'student' && d.get('roles', ['student']) == ['student']
+            && (d.get('cohortId', null) == null
+                || (d.get('classInviteId', '') != ''
+                    && get(/databases/$(database)/documents/classInvites/$(d.classInviteId)).data.cohortId == d.cohortId)))
+          ||
+          // Email invitation — role and class must be exactly what it grants
+          (d.get('inviteId', '') != ''
+            && get(/databases/$(database)/documents/invitations/$(d.inviteId)).data.email.lower() == request.auth.token.email.lower()
+            && get(/databases/$(database)/documents/invitations/$(d.inviteId)).data.role == d.role
+            && d.get('roles', [d.role]) == [d.role]
+            && get(/databases/$(database)/documents/invitations/$(d.inviteId)).data.get('cohortId', null) == d.get('cohortId', null))
+        );
+    }
+
     match /users/{userId} {
       // get (single doc by ID): self or staff — guards FCM tokens and email from bulk scraping
       allow get: if request.auth.uid == userId || isTeacherOrAdmin();
       // list (collection queries): any signed-in user — required for DM picker and leaderboard
       allow list: if isSignedIn();
-      // Self can update non-privileged display fields (not points/role)
+      // Self can update their own display/profile fields only — never role(s),
+      // class, points, active/disabled state or anything else privileged
       allow update: if isSelf(userId)
-        && !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['role', 'totalPoints', 'pointsRedeemed']);
-      // Any signed-in user can update their own lastReadAt (cross-device badge clearing)
-      allow update: if isSelf(userId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastReadAt']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'displayName', 'phoneNumber', 'schoolEmail', 'email', 'avatarUrl',
+          'bio', 'portfolioUrl', 'calendarColor', 'hasSeenWelcome',
+          'gdprConsent', 'privacyAcceptedAt', 'lastReadAt',
+        ]);
       // Teachers/admins may update totalPoints (absence penalty)
       allow update: if isTeacherOrAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints']);
       // Admins can update any field (cohortId, isActive, roles, etc.)
       allow update: if isAdmin();
-      // Users create their own document during invite signup
-      allow create: if isSelf(userId);
+      // Users create their own document during invite signup. The browser writes
+      // it, so role and class are checked against the invite it came from: a
+      // plain signup is always a student, staff roles need a matching invitation.
+      allow create: if isSelf(userId) && validNewUser(request.resource.data);
       // Only admins can delete users
       allow delete: if isAdmin();
+    }
+
+    // Device push tokens — only the owner reads/writes; functions use the Admin SDK
+    match /push_tokens/{userId} {
+      allow read: if isSelf(userId);
+      allow create, update: if isSelf(userId)
+        && request.resource.data.keys().hasOnly(['tokens'])
+        && request.resource.data.tokens is list
+        && request.resource.data.tokens.size() <= 20;
+      allow delete: if isSelf(userId);
     }
 
     // ── Cohorts ───────────────────────────────────────────────────────────────
@@ -283,17 +316,34 @@ service cloud.firestore {
 
     // ── Attendance sessions ───────────────────────────────────────────────────
 
+    // Holds the live check-in token — staff only. Displays read the token from
+    // qr_display_devices/{id}/live/{displayKey} instead.
     match /attendance_sessions/{sessionId} {
-      allow read: if true; // public — QR display devices need unauthenticated read
+      allow read: if isTeacherOrAdmin();
       allow write: if isTeacherOrAdmin();
     }
 
     // ── QR Display Devices ────────────────────────────────────────────────────
 
     match /qr_display_devices/{deviceId} {
-      allow read: if true; // public — display devices are unauthenticated
+      allow read: if true; // public — display devices are unauthenticated (name/state only)
       allow create, delete: if isAdmin();
-      allow update: if isTeacherOrAdmin(); // teachers write session state; admins manage device config
+      // teachers write session state; admins manage device config. The token itself
+      // never goes on this public doc.
+      allow update: if isTeacherOrAdmin() && request.resource.data.get('activeToken', null) == null;
+
+      // The display's secret link key — staff need it to publish the token
+      match /private/{docId} {
+        allow read: if isTeacherOrAdmin();
+        allow write: if isAdmin();
+      }
+      // Live token, stored under the secret key: readable only by whoever has
+      // the display link (get by exact id, never listed)
+      match /live/{displayKey} {
+        allow get: if true;
+        allow list: if false;
+        allow write: if isTeacherOrAdmin();
+      }
     }
 
     // ── Lesson attendance (subcollection) ────────────────────────────────────
@@ -316,8 +366,15 @@ service cloud.firestore {
       allow write: if isStaff();
     }
 
+    // Public, reduced copy for the signed-out room display — written by the
+    // onRoomBookingWritten function only (room, time, first name)
+    match /room_slots/{slotId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /room_bookings/{bookingId} {
-      allow read: if isSignedIn() || request.auth == null; // signed-in users + iPad display
+      allow read: if isSignedIn();
       allow create: if isSignedIn()
         && request.resource.data.studentId == request.auth.uid;
       allow delete: if isStaff()
@@ -344,24 +401,27 @@ service cloud.firestore {
       allow update, delete: if isTeacherOrAdmin();
 
       match /messages/{messageId} {
-        // Message read requires channel access: public, member, role-match, or cohort-match
-        allow read: if isSignedIn() && (
-          isTeacherOrAdmin()
-          || get(/databases/$(database)/documents/chat_channels/$(channelId)).data.get('isPublic', true) != false
-          || request.auth.uid in get(/databases/$(database)/documents/chat_channels/$(channelId)).data.get('memberIds', [])
-          || role() in get(/databases/$(database)/documents/chat_channels/$(channelId)).data.get('allowedRoles', [])
-          || (request.auth.token.cohortId != null
-              && request.auth.token.cohortId in get(/databases/$(database)/documents/chat_channels/$(channelId)).data.get('allowedCohortIds', []))
-        );
-        // Any signed-in user can post — server enforces channel membership via rules above
-        allow create: if isSignedIn()
+        // Channel access: public, member, role-match, or cohort-match. DMs are
+        // never public — only their members (and staff) get in.
+        function canAccessChannel() {
+          let ch = get(/databases/$(database)/documents/chat_channels/$(channelId)).data;
+          return isTeacherOrAdmin()
+            || (ch.get('isDM', false) != true && ch.get('isPublic', true) != false)
+            || request.auth.uid in ch.get('memberIds', [])
+            || role() in ch.get('allowedRoles', [])
+            || (request.auth.token.get('cohortId', null) != null
+                && request.auth.token.cohortId in ch.get('allowedCohortIds', []));
+        }
+        allow read: if isSignedIn() && canAccessChannel();
+        // Only people who can see the channel may post in it, as themselves
+        allow create: if isSignedIn() && canAccessChannel()
           && request.resource.data.authorId == request.auth.uid;
         // Author or staff can delete
         allow delete: if isSignedIn()
           && (resource.data.authorId == request.auth.uid || isStaff());
-        // Reactions: only the fields 'reactions' and 'pushSent' may be updated
-        allow update: if isSignedIn()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions', 'pushSent']);
+        // Reactions only, by people who can see the channel
+        allow update: if isSignedIn() && canAccessChannel()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']);
       }
     }
 
@@ -413,7 +473,7 @@ service cloud.firestore {
 
     match /video_lab/{videoId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.uploaderId == request.auth.uid;
       allow update: if isTeacherOrAdmin()
         || (isStudent() && resource.data.uploaderId == request.auth.uid);
       allow delete: if isTeacherOrAdmin()
@@ -459,7 +519,8 @@ service cloud.firestore {
       allow read: if isTeacherOrAdmin()
         || (isStudent() && resource.data.studentId == request.auth.uid);
       allow create: if isStudent()
-        && request.resource.data.studentId == request.auth.uid;
+        && request.resource.data.studentId == request.auth.uid
+        && request.resource.data.status == 'pending';
       allow update: if isTeacherOrAdmin();
       allow delete: if isTeacherOrAdmin();
     }
@@ -470,7 +531,8 @@ service cloud.firestore {
       allow read: if isTeacherOrAdmin()
         || (isStudent() && resource.data.studentId == request.auth.uid);
       allow create: if isStudent()
-        && request.resource.data.studentId == request.auth.uid;
+        && request.resource.data.studentId == request.auth.uid
+        && request.resource.data.status == 'pending';
       allow update: if isTeacherOrAdmin();
       allow delete: if isTeacherOrAdmin();
     }
@@ -499,10 +561,16 @@ service cloud.firestore {
     match /equipment_bookings/{bookingId} {
       allow read: if (isAdmin() || tierHasFeature('equipment'))
         && (isTeacherOrAdmin() || (isSignedIn() && resource.data.studentId == request.auth.uid));
-      allow create: if (isSignedIn() && tierHasFeature('equipment')
-        && request.resource.data.studentId == request.auth.uid)
-        || (isRentalMode() && request.resource.data.get('guestEmail', '') != ''
-            && request.resource.data.get('isGuest', false) == true);
+      // New bookings start pending, without decisions or project links (staff/functions set those)
+      allow create: if request.resource.data.status == 'pending'
+        && !request.resource.data.keys().hasAny(['categoryDecisions', 'setUpCategories', 'linkedProjectIds', 'linkedProjectId'])
+        && (
+          (isSignedIn() && tierHasFeature('equipment')
+            && request.resource.data.studentId == request.auth.uid)
+          || (isRentalMode() && request.resource.data.get('guestEmail', '') != ''
+              && request.resource.data.get('isGuest', false) == true
+              && request.resource.data.get('studentId', '') == '')
+        );
       allow update: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))
         || (isSignedIn() && resource.data.studentId == request.auth.uid
             && resource.data.status in ['pending', 'confirmed']
@@ -568,7 +636,7 @@ service cloud.firestore {
 
       match /checkins/{checkinId} {
         allow read: if isSignedIn();
-        allow create: if isSignedIn(); // mobile scanners write check-in signals
+        allow create: if isTeacherOrAdmin(); // staff phones write check-in signals
       }
     }
 
@@ -704,21 +772,25 @@ service cloud.firestore {
       allow delete: if isSignedIn() && (isAdmin() || tierHasFeature('production'))
         && (prodData().createdBy == request.auth.uid || isTeacherOrAdmin());
 
-      match /shotlog/{entryId} {
-        allow read: if isSignedIn();
-        allow write: if isSignedIn();
-      }
-
+      // Every subcollection (cast, crew, budget, shotlog, …) follows the
+      // production's own read/edit access
       match /{subcol}/{docId} {
         function parentProd() {
           return get(/databases/$(database)/documents/productions/$(productionId)).data;
         }
         function canEditSub() {
           return parentProd().createdBy == request.auth.uid
-            || request.auth.uid in parentProd().collaborators
+            || request.auth.uid in parentProd().get('collaborators', [])
             || isTeacherOrAdmin();
         }
-        allow read: if isSignedIn();
+        function canReadSub() {
+          let p = parentProd();
+          return canEditSub()
+            || (p.get('isPublic', false) == true && p.get('cohortId', null) == request.auth.token.get('cohortId', null))
+            || request.auth.token.get('cohortId', '') in p.get('sharedCohortIds', [])
+            || request.auth.uid in p.get('viewerIds', []);
+        }
+        allow read: if isSignedIn() && canReadSub();
         allow write: if isSignedIn() && canEditSub();
       }
     }
@@ -760,7 +832,8 @@ service cloud.firestore {
     // ── Schools ───────────────────────────────────────────────────────────────
 
     function isSuperAdmin() {
-      return isSignedIn() && request.auth.token.email in ['fredrik.fridlund@gmail.com'];
+      return isSignedIn() && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.email in ['fredrik.fridlund@gmail.com'];
     }
 
     match /_client_errors/{errorId} {

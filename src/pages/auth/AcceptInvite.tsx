@@ -138,7 +138,9 @@ export default function AcceptInvite() {
         role,
         roles:              [role],
         avatarUrl:          null,
-        cohortId,
+        cohortId:           cohortId ?? null,
+        // Lets the rules (and onUserDocCreated) check the role/class against the invite
+        ...(invite ? { inviteId: token } : { classInviteId: classToken }),
         enrolledAt:         serverTimestamp(),
         totalPoints:        0,
         pointsRedeemed:     0,

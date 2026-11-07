@@ -1,5 +1,5 @@
 import { admin, functions, db } from './lib'
-import { sendPush, sendFcmToTokens, pushToTeachersAndAdmins, saveNotifications } from './notifications-core'
+import { sendPush, sendFcmToTokens, pushToTeachersAndAdmins, saveNotifications, tokensFor } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // purgeChatMessages — delete messages older than the configured retention window
@@ -46,7 +46,7 @@ export const sendInventoryReturnReminders = functions.pubsub
       const borrowerIds: string[] = project.borrowerIds ?? []
       if (borrowerIds.length === 0) return
       const usersSnaps = await Promise.all(borrowerIds.map(uid => db.collection('users').doc(uid).get()))
-      const tokens = usersSnaps.flatMap(s => (s.data()?.fcmTokens ?? []) as string[])
+      const tokens = await tokensFor(usersSnaps.map(s => s.id))
       const opts = { title, body, url: '/my-bookings' }
       await Promise.all([
         sendPush(tokens, { ...opts, tag: `${tag}-${doc.id}` }),
@@ -111,7 +111,7 @@ export const sendEquipmentBookingOverdueReminders = functions.pubsub
       const opts  = { title, body, url: '/booking/equipment' }
 
       const userSnap = await db.collection('users').doc(booking.studentId).get()
-      const tokens: string[] = (userSnap.data()?.fcmTokens ?? []) as string[]
+      const tokens: string[] = (await tokensFor([userSnap.id])) as string[]
 
       await Promise.all([
         sendPush(tokens, { ...opts, tag: `equipment-overdue-${bookingDoc.id}` }),
@@ -153,12 +153,12 @@ export const sendEventInviteNotifications = functions.https.onCall(async (data, 
       // Primary: look up by document ID (inviteeIds now stores the Firestore doc ID = auth UID)
       const byId = await db.collection('users').doc(uid).get()
       if (byId.exists) {
-        const tokens = (byId.data()?.fcmTokens ?? []) as string[]
+        const tokens = (await tokensFor([byId.id])) as string[]
         if (tokens.length) return tokens
       }
       // Fallback: query by uid field (for any legacy stored values)
       const byField = await db.collection('users').where('uid', '==', uid).get()
-      return byField.docs.flatMap(d => (d.data().fcmTokens ?? []) as string[])
+      return tokensFor(byField.docs.map(d => d.id))
     })
   )).flat()
   if (!tokens.length) return { sent: 0 }
@@ -213,9 +213,7 @@ export const sendEventReminders = functions.pubsub
           .where('cohortId', '==', lesson.cohortId)
           .where('isActive', '==', true)
           .get()
-        const studentTokens = studentsSnap.docs
-          .flatMap(d => (d.data().fcmTokens as string[] | undefined) ?? [])
-          .filter(Boolean)
+        const studentTokens = await tokensFor(studentsSnap.docs.map(d => d.id))
         await sendFcmToTokens(studentTokens, notifTitle, notifBody)
       }
 
@@ -227,7 +225,7 @@ export const sendEventReminders = functions.pubsub
 
       for (const tid of teacherIds) {
         const tSnap = await db.collection('users').doc(tid).get()
-        const tokens: string[] = (tSnap.data()?.fcmTokens ?? []) as string[]
+        const tokens: string[] = (await tokensFor([tSnap.id])) as string[]
         await sendFcmToTokens(tokens, notifTitle, notifBody)
       }
     }
@@ -246,13 +244,13 @@ export const sendEventReminders = functions.pubsub
       const notifBody  = `Starts at ${timeStr}${ev.location ? ` · ${ev.location}` : ''}`
 
       const uSnap  = await db.collection('users').doc(ev.userId).get()
-      const ownerTokens: string[] = (uSnap.data()?.fcmTokens ?? []) as string[]
+      const ownerTokens: string[] = (await tokensFor([uSnap.id])) as string[]
 
       const inviteeIds: string[] = ev.inviteeIds ?? []
       const inviteeTokens: string[] = []
       if (inviteeIds.length > 0) {
         const inviteeSnaps = await Promise.all(inviteeIds.map(uid => db.collection('users').doc(uid).get()))
-        inviteeSnaps.forEach(s => inviteeTokens.push(...((s.data()?.fcmTokens ?? []) as string[])))
+        inviteeTokens.push(...(await tokensFor(inviteeSnaps.map(s => s.id))))
       }
 
       await sendFcmToTokens([...ownerTokens, ...inviteeTokens], notifTitle, notifBody)

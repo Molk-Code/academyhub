@@ -1,5 +1,5 @@
 import { admin, functions, db } from './lib'
-import { sendPush, saveNotifications } from './notifications-core'
+import { sendPush, saveNotifications, tokensFor, removeStaleTokens } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // onAssignmentPublished — push to all students in the cohort
@@ -21,8 +21,7 @@ export const onAssignmentPublished = functions.firestore
       .where('role', '==', 'student')
       .get()
 
-    const tokens: string[] = []
-    studentsSnap.docs.forEach(d => tokens.push(...(d.data().fcmTokens ?? [])))
+    const tokens = await tokensFor(studentsSnap.docs.map(d => d.id))
 
     const opts = {
       title: '📋 New assignment posted',
@@ -63,7 +62,7 @@ export const onSubmissionCreated = functions.firestore
 
     const teacherSnaps = await Promise.all(teacherIds.map(uid => db.collection('users').doc(uid).get()))
     const tokens: string[] = []
-    teacherSnaps.forEach(d => tokens.push(...(d.data()?.fcmTokens ?? [])))
+    tokens.push(...(await tokensFor(teacherSnaps.map(d => d.id))))
 
     const opts = {
       title: '📝 Submission ready to grade',
@@ -97,7 +96,7 @@ export const onAbsenceReportCreated = functions.firestore
 
     const teacherSnaps = await Promise.all(teacherIds.map(uid => db.collection('users').doc(uid).get()))
     const tokens: string[] = []
-    teacherSnaps.forEach(d => tokens.push(...(d.data()?.fcmTokens ?? [])))
+    tokens.push(...(await tokensFor(teacherSnaps.map(d => d.id))))
 
     const studentName: string = report.studentName ?? 'A student'
     const when = report.type === 'lesson' && report.lessonTitle
@@ -169,36 +168,27 @@ export const onChatMessage = functions.firestore
 
     if (isDM) {
       // DMs: only notify the other member
-      await Promise.all(
-        chMemberIds.filter(uid => uid !== senderId).map(async uid => {
-          const u = await db.collection('users').doc(uid).get()
-          ;(u.data()?.fcmTokens ?? []).forEach((t: string) => { if (t) tokens.push(t) })
-        }),
-      )
+      tokens.push(...await tokensFor(chMemberIds.filter(uid => uid !== senderId)))
+    } else if (isPublic && allowedRoles.length === 0 && allowedCohortIds.length === 0 && chMemberIds.length === 0) {
+      // Open channel: everyone with a registered device
+      const all = await db.collection('push_tokens').get()
+      all.docs.forEach(d => { if (d.id !== senderId) tokens.push(...((d.data().tokens as string[] | undefined) ?? [])) })
     } else {
-      // Channel: apply same access rules as client-side canAccessChannel()
-      const usersSnap = await db.collection('users').get()
-      usersSnap.forEach(userDoc => {
-        if (userDoc.id === senderId) return
-        const u = userDoc.data()
-        const userRole: string = u.role ?? ''
-        const userRoles: string[] = u.roles?.length ? u.roles : [userRole]
-        const userCohortId: string | null = u.cohortId ?? null
-        const isStaff = userRoles.some((r: string) => r === 'teacher' || r === 'admin')
-
-        const canAccess = isStaff
-          || isPublic && allowedRoles.length === 0 && allowedCohortIds.length === 0 && chMemberIds.length === 0
-          || allowedRoles.some(r => userRoles.includes(r))
-          || chMemberIds.includes(userDoc.id)
-          || (userCohortId !== null && allowedCohortIds.includes(userCohortId))
-
-        if (canAccess) {
-          const fcmTokens = u.fcmTokens
-          if (Array.isArray(fcmTokens)) {
-            fcmTokens.forEach((t: string) => { if (t) tokens.push(t) })
-          }
-        }
-      })
+      // Restricted channel: same access rules as client-side canAccessChannel(),
+      // looked up by query instead of reading every user
+      const staffRoles = ['teacher', 'admin']
+      const roleSet = [...new Set([...staffRoles, ...allowedRoles])]
+      const queries: Promise<FirebaseFirestore.QuerySnapshot>[] = [
+        db.collection('users').where('role', 'in', roleSet).get(),
+        db.collection('users').where('roles', 'array-contains-any', roleSet).get(),
+      ]
+      for (let i = 0; i < allowedCohortIds.length; i += 30) {
+        queries.push(db.collection('users').where('cohortId', 'in', allowedCohortIds.slice(i, i + 30)).get())
+      }
+      const uids = new Set<string>(chMemberIds)
+      for (const snap of await Promise.all(queries)) snap.docs.forEach(d => uids.add(d.id))
+      uids.delete(senderId)
+      tokens.push(...await tokensFor([...uids]))
     }
 
     if (tokens.length === 0) return null
@@ -236,20 +226,8 @@ export const onChatMessage = functions.firestore
       })
     }
 
-    // Remove stale tokens from user docs so they don't accumulate
-    if (staleTokens.length > 0) {
-      const staleSet = new Set(staleTokens)
-      const usersWithStale = await db.collection('users')
-        .where('fcmTokens', 'array-contains-any', staleTokens.slice(0, 10))
-        .get()
-      await Promise.all(
-        usersWithStale.docs.map(d =>
-          d.ref.update({
-            fcmTokens: admin.firestore.FieldValue.arrayRemove(...[...staleSet]),
-          }),
-        ),
-      )
-    }
+    // Remove stale tokens so they don't accumulate
+    if (staleTokens.length > 0) await removeStaleTokens(staleTokens)
 
     return null
   })
@@ -277,7 +255,7 @@ export const onPlanComment = functions.firestore
     const stepLabel = stepLabels[step] ?? step
 
     const userSnap = await db.collection('users').doc(studentId).get()
-    const tokens: string[] = userSnap.data()?.fcmTokens ?? []
+    const tokens: string[] = await tokensFor([userSnap.id])
     if (!tokens.length) return null
 
     const planOpts = {

@@ -1,10 +1,10 @@
 /**
  * Public room display page — designed for iPad/screen at room entrances.
- * Requires Firestore public read rules for: rooms, room_bookings, settings/semester.
+ * Requires Firestore public read rules for: rooms, room_slots, settings/semester.
  *
  * Add to firestore.rules:
  *   match /rooms/{id}         { allow read: if true; }
- *   match /room_bookings/{id} { allow read: if true; }
+ *   match /room_slots/{id} { allow read: if true; }
  */
 import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -411,8 +411,9 @@ export default function RoomDisplay() {
   const displayDayNum = displayDate.getDay()
 
   const { data: allRooms, loading: roomsLoading, error: roomsError } = useCollection<RoomDoc>('rooms', [where('isActive', '==', true)])
+  // room_slots: public copy of room_bookings without student ids (first names only)
   const { data: bookings, error: bookingsError } = useCollection<RoomBookingDoc>(
-    'room_bookings',
+    'room_slots',
     [where('date', '==', displayStr)],
     true,
     displayStr,

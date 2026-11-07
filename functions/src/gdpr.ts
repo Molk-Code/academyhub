@@ -44,9 +44,7 @@ export const exportUserData = functions.https.onCall(async (data, context) => {
   const uid = userId ?? context.auth.uid
 
   // Only the account owner or an admin may export
-  const callerDoc = await db.collection('users').doc(context.auth.uid).get()
-  const callerRole = callerDoc.data()?.role ?? context.auth.token.role
-  if (uid !== context.auth.uid && callerRole !== 'admin') {
+  if (uid !== context.auth.uid && context.auth.token.role !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'You may only export your own data.')
   }
 
@@ -99,9 +97,7 @@ export const deleteUserData = functions.https.onCall(async (data, context) => {
   const { userId } = data as { userId?: string }
   const uid = userId ?? context.auth.uid
 
-  const callerDoc = await db.collection('users').doc(context.auth.uid).get()
-  const callerRole = callerDoc.data()?.role ?? context.auth.token.role
-  const isAdmin    = callerRole === 'admin'
+  const isAdmin = context.auth.token.role === 'admin'
   if (uid !== context.auth.uid && !isAdmin) {
     throw new functions.https.HttpsError('permission-denied', 'You may only delete your own account.')
   }

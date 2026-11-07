@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { StatsContent } from './InventoryStats'
 import {
-  collection, collectionGroup, addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs,
-  serverTimestamp, query, where, onSnapshot, writeBatch, arrayUnion,
+  collection, collectionGroup, addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, setDoc,
+  serverTimestamp, query, where, onSnapshot, writeBatch, arrayUnion, arrayRemove, runTransaction,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -243,11 +243,37 @@ function CreateProjectForm({
   }
 
   async function handleCreate() {
-    if (!name || !returnDate) return
+    if (!name.trim() || !returnDate) return
     setSubmitting(true)
+    const ref = doc(collection(db, 'inventory_projects'))
+    const bookingRef = fromBooking ? doc(db, 'equipment_bookings', fromBooking.id) : null
+    let claimed: { prevStatus: string } | null = null
     try {
-      const ref = await addDoc(collection(db, 'inventory_projects'), {
-        name,
+      if (fromBooking && bookingRef) {
+        // Claim this booking's parts first, atomically — if someone else (or
+        // another tab) set any of them up meanwhile, stop before creating a
+        // second project. The booking counts as checked out once every part
+        // is either set up or denied.
+        claimed = await runTransaction(db, async tx => {
+          const snap = await tx.get(bookingRef)
+          const fresh = { id: fromBooking.id, ...snap.data() } as EquipmentBookingDoc
+          const taken = fromBooking.setUpParts.filter(c => fresh.setUpCategories?.[c])
+          if (taken.length) throw new Error(`Already set up in another project: ${taken.join(', ')}. Reload to see what's left.`)
+          const setUpCategories = { ...(fresh.setUpCategories ?? {}) }
+          for (const c of fromBooking.setUpParts) setUpCategories[c] = ref.id
+          const after = { ...fresh, items: fromBooking.allItems, setUpCategories }
+          const done = bookingParts(after).every(p => ['set-up', 'denied'].includes(partStatus(after, p.category)))
+          tx.update(bookingRef, {
+            setUpCategories,
+            linkedProjectIds: arrayUnion(ref.id),
+            linkedProjectId: fresh.linkedProjectId ?? ref.id,
+            ...(done ? { status: 'checked-out' } : {}),
+          })
+          return { prevStatus: fresh.status }
+        })
+      }
+      await setDoc(ref, {
+        name: name.trim(),
         borrowers,
         // Students and teachers can both borrow; ids let them see the project in My Bookings
         borrowerIds: [...new Set([...students, ...teachers].filter(s => borrowers.includes(s.displayName)).map(s => s.id))],
@@ -281,23 +307,26 @@ function CreateProjectForm({
           })
         }
       }
-      if (fromBooking) {
-        // Record which parts went into this project; the booking counts as
-        // checked out once every part is either set up or denied
-        const bookingRef = doc(db, 'equipment_bookings', fromBooking.id)
-        const fresh = { id: fromBooking.id, ...(await getDoc(bookingRef)).data() } as EquipmentBookingDoc
-        const setUpCategories = { ...(fresh.setUpCategories ?? {}) }
-        for (const c of fromBooking.setUpParts) setUpCategories[c] = ref.id
-        const after = { ...fresh, items: fromBooking.allItems, setUpCategories }
-        const done = bookingParts(after).every(p => ['set-up', 'denied'].includes(partStatus(after, p.category)))
-        await updateDoc(bookingRef, {
-          setUpCategories,
-          linkedProjectIds: arrayUnion(ref.id),
-          linkedProjectId: fresh.linkedProjectId ?? ref.id,
-          ...(done ? { status: 'checked-out' } : {}),
-        })
-      }
       onCreate(ref.id)
+    } catch (err: any) {
+      // Project creation failed after the parts were claimed: release them
+      if (claimed && fromBooking && bookingRef) {
+        const prevStatus = claimed.prevStatus
+        await runTransaction(db, async tx => {
+          const b = (await tx.get(bookingRef)).data() as EquipmentBookingDoc | undefined
+          if (!b) return
+          const setUpCategories = { ...(b.setUpCategories ?? {}) }
+          for (const c of fromBooking.setUpParts) if (setUpCategories[c] === ref.id) delete setUpCategories[c]
+          tx.update(bookingRef, {
+            setUpCategories,
+            linkedProjectIds: arrayRemove(ref.id),
+            ...(b.linkedProjectId === ref.id ? { linkedProjectId: null } : {}),
+            ...(b.status === 'checked-out' ? { status: prevStatus } : {}),
+          })
+        }).catch(e => console.error('Could not release booking parts', e))
+      }
+      console.error('Create project failed', err)
+      alert(err?.message ?? 'Could not create the project. Check your connection and try again.')
     } finally {
       setSubmitting(false)
     }
@@ -432,7 +461,7 @@ function CreateProjectForm({
 
         <button
           className="primary-btn"
-          disabled={submitting || !name || !returnDate}
+          disabled={submitting || !name.trim() || !returnDate}
           onClick={handleCreate}
         >
           {submitting ? 'Creating...' : 'Create Project'}

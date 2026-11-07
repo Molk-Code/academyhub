@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { doc, updateDoc, addDoc, deleteDoc, collection } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
+import { useSingleFlight } from '@/hooks/useSingleFlight'
 import { cn } from '@/lib/utils'
 import type { ProductionCastDoc, ProductionSceneDoc } from '@/types'
 import { Plus, Trash2 } from 'lucide-react'
@@ -69,7 +70,9 @@ export function CastTab({ productionId, canEdit }: Props) {
     })
   }
 
-  async function addMember() {
+  const once = useSingleFlight()
+  const addMember = () => once(() => addMemberNow())
+  async function addMemberNow() {
     const maxId = cast.reduce((m, c) => Math.max(m, c.castId), 0)
     await addDoc(collection(db, `productions/${productionId}/cast`), {
       castId: maxId + 1,

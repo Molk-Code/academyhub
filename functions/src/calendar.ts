@@ -110,11 +110,54 @@ export function roomSlotFrom(b: FirebaseFirestore.DocumentData) {
   }
 }
 
+// Mon–Sun week of a "YYYY-MM-DD" date, as date strings
+function weekRange(date: string): [string, string] {
+  const d = new Date(`${date}T00:00:00Z`)
+  const monday = new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000)
+  const sunday = new Date(monday.getTime() + 6 * 86400000)
+  return [monday.toISOString().slice(0, 10), sunday.toISOString().slice(0, 10)]
+}
+
+// Server-side copy of the room booking limit the booking page shows: a student
+// over their class/school limit (e.g. by booking from two devices at once) gets
+// the extra booking removed. Returns true when the booking was removed.
+async function enforceRoomLimit(id: string, b: FirebaseFirestore.DocumentData): Promise<boolean> {
+  if (!b.studentId || !b.date) return false
+  const [userSnap, settingsSnap] = await Promise.all([
+    db.collection('users').doc(b.studentId).get(),
+    db.collection('settings').doc('booking').get(),
+  ])
+  const u = userSnap.data() ?? {}
+  const roles: string[] = (u.roles as string[])?.length ? u.roles : [u.role]
+  if (roles.some(r => r === 'teacher' || r === 'admin')) return false
+  const settings = settingsSnap.data() ?? {}
+  const classLimit = u.cohortId ? settings.roomLimitsByCohort?.[u.cohortId] : undefined
+  const max: number | null = classLimit ? classLimit.max : (settings.maxBookingsPerWeek ?? null)
+  if (max === null || max === undefined) return false
+  const perDay = (classLimit ? classLimit.period : settings.maxBookingsPeriod) === 'day'
+  const [from, to] = perDay ? [b.date, b.date] : weekRange(b.date)
+
+  const mine = await db.collection('room_bookings').where('studentId', '==', b.studentId).get()
+  const inPeriod = mine.docs
+    .filter(d => d.data().date >= from && d.data().date <= to)
+    .sort((x, y) => (x.data().createdAt?.toMillis?.() ?? 0) - (y.data().createdAt?.toMillis?.() ?? 0) || x.id.localeCompare(y.id))
+  if (inPeriod.findIndex(d => d.id === id) < max) return false
+
+  await db.collection('room_bookings').doc(id).delete()
+  await saveNotifications([b.studentId], {
+    title: 'Room booking removed',
+    body:  `You can book ${max} room slot${max === 1 ? '' : 's'} per ${perDay ? 'day' : 'week'} — your extra booking on ${b.date} was removed.`,
+    url:   '/booking',
+  })
+  return true
+}
+
 export const onRoomBookingWritten = functions.firestore
   .document('room_bookings/{id}')
   .onWrite(async (change, context) => {
     const ref = db.collection('room_slots').doc(context.params.id)
     if (!change.after.exists) { await ref.delete(); return null }
+    if (!change.before.exists && await enforceRoomLimit(context.params.id, change.after.data()!)) return null
     await ref.set(roomSlotFrom(change.after.data()!))
     return null
   })

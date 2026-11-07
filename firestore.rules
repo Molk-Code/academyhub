@@ -89,6 +89,7 @@ service cloud.firestore {
       return d.get('totalPoints', 0) == 0
         && d.get('pointsRedeemed', 0) == 0
         && d.get('disabled', false) == false
+        && d.get('displayName', '').size() <= 80
         && (
           // Student — no class, or the class of the class invite used
           (d.role == 'student' && d.get('roles', ['student']) == ['student']
@@ -117,7 +118,11 @@ service cloud.firestore {
           'displayName', 'phoneNumber', 'schoolEmail', 'email', 'avatarUrl',
           'bio', 'portfolioUrl', 'calendarColor', 'hasSeenWelcome',
           'gdprConsent', 'privacyAcceptedAt', 'lastReadAt',
-        ]);
+        ])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['displayName'])
+            || (request.resource.data.displayName is string
+                && request.resource.data.displayName.trim().size() >= 2
+                && request.resource.data.displayName.size() <= 80));
       // Teachers/admins may update totalPoints (absence penalty)
       allow update: if isTeacherOrAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints']);
@@ -415,7 +420,8 @@ service cloud.firestore {
         allow read: if isSignedIn() && canAccessChannel();
         // Only people who can see the channel may post in it, as themselves
         allow create: if isSignedIn() && canAccessChannel()
-          && request.resource.data.authorId == request.auth.uid;
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.get('content', '').size() <= 4000;
         // Author or staff can delete
         allow delete: if isSignedIn()
           && (resource.data.authorId == request.auth.uid || isStaff());
@@ -879,7 +885,7 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.description is string
-        && request.resource.data.description.size() > 0
+        && request.resource.data.description.trim().size() > 0
         && request.resource.data.description.size() <= 2000;
       allow read: if isAdmin() || isSelf(resource.data.uid);
       allow update: if isAdmin();

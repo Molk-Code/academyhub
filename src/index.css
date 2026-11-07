@@ -34,6 +34,9 @@
     background: var(--bg-primary);
     color: var(--text-primary);
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+    /* Very long unbroken text (pasted links, keyboard mashing) wraps instead of
+       pushing cards off the side of a phone screen */
+    overflow-wrap: break-word;
   }
 
   * {

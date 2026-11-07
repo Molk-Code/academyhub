@@ -6,13 +6,13 @@ import { z } from 'zod'
 import { motion } from 'framer-motion'
 import { Film, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { doc, getDoc, getDocs, updateDoc, setDoc, deleteDoc, serverTimestamp, collection, query, where, arrayUnion, increment } from 'firebase/firestore'
-import { createUserWithEmailAndPassword as createUser, updateProfile as updateFbProfile } from 'firebase/auth'
+import { createUserWithEmailAndPassword as createUser, signInWithEmailAndPassword, updateProfile as updateFbProfile } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
 
 const schema = z.object({
-  displayName: z.string().min(2, 'Enter your full name'),
+  displayName: z.string().trim().min(2, 'Enter your full name').max(80, 'Keep your name under 80 characters'),
   email: z.string().email('Enter a valid email address'),
   password: z
     .string()
@@ -59,6 +59,7 @@ export default function AcceptInvite() {
   const [done,         setDone]         = useState(false)
   // GDPR step: null = not yet decided, true = accepted, false = declined
   const [gdprAccepted, setGdprAccepted] = useState<boolean | null>(null)
+  const [resumeNotice, setResumeNotice] = useState(false)
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, setValue } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -70,7 +71,11 @@ export default function AcceptInvite() {
         if (snap.exists()) {
           const data = snap.data() as Invitation
           if (data.used) {
-            setError('This invite link has already been used.')
+            // Usually a signup that was interrupted (refresh/back) after the account
+            // was created — let them finish with the same email and password.
+            setInvite(data)
+            setValue('email', data.email)
+            setResumeNotice(true)
           } else if (data.expiresAt && data.expiresAt.toDate() < new Date()) {
             setError('This invite link has expired.')
           } else {
@@ -111,10 +116,28 @@ export default function AcceptInvite() {
     // Firebase Auth normalizes token.email to lowercase — invitation update rule compares against it
     const normalizedEmail = data.email.trim().toLowerCase()
     let cred: Awaited<ReturnType<typeof createUser>> | null = null
+    let resumed = false   // the Auth account already existed (an earlier, interrupted signup)
     let stage = 'init'
     try {
       stage = 'create-auth-account'
-      cred = await createUser(auth, normalizedEmail, data.password)
+      try {
+        cred = await createUser(auth, normalizedEmail, data.password)
+      } catch (err: any) {
+        if (err?.code !== 'auth/email-already-in-use') throw err
+        stage = 'resume-sign-in'
+        try {
+          cred = await signInWithEmailAndPassword(auth, normalizedEmail, data.password)
+        } catch {
+          throw new Error('An account with this email already exists. Sign in with its password, or use "Forgot password" on the login page.')
+        }
+        resumed = true
+        // Already fully set up — this is just a sign-in
+        if ((await getDoc(doc(db, 'users', cred.user.uid)).catch(() => null))?.exists()) {
+          setDone(true)
+          setTimeout(() => navigate('/'), 1200)
+          return
+        }
+      }
       stage = 'update-auth-profile'
       await updateFbProfile(cred.user, { displayName: data.displayName })
 
@@ -203,12 +226,13 @@ export default function AcceptInvite() {
       const raw = e instanceof Error ? e.message : String(e)
       const code = (e as { code?: string })?.code
       console.error(`AcceptInvite failed at stage=${stage}`, { code, raw, error: e })
-      // If Auth account was created but Firestore setup failed, delete the orphaned Auth account
-      // so the user can retry with the same email rather than being permanently locked out.
-      if (cred) {
+      // If this attempt created the Auth account but its profile was never written,
+      // delete the account so the user can retry cleanly. Never after the profile
+      // exists (that would orphan it), and never for a resumed account.
+      if (cred && !resumed && ['update-auth-profile', 'orphan-cleanup', 'create-user-doc'].includes(stage)) {
         try { await cred.user.delete() } catch { /* best-effort cleanup */ }
       }
-      setError(`Signup failed at "${stage}": ${raw}`)
+      setError(stage === 'resume-sign-in' ? raw : `Signup failed at "${stage}": ${raw}`)
     }
   }
 
@@ -235,6 +259,11 @@ export default function AcceptInvite() {
             <h1 className="text-2xl font-bold text-zinc-100">Join {shortName}</h1>
             {invite && (
               <p className="text-sm text-zinc-500 mt-1">Creating account for <strong>{invite.email}</strong></p>
+            )}
+            {resumeNotice && (
+              <p className="text-xs text-amber-400 mt-2 text-center">
+                This invite was already started. Enter the same email and password to finish setting up your account.
+              </p>
             )}
             {classInvite && (
               <p className="text-sm text-zinc-500 mt-1">Joining class <strong>{classInvite.cohortName}</strong></p>

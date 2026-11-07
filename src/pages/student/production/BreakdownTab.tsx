@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { doc, updateDoc, addDoc, deleteDoc, collection, serverTimestamp, getDocs, query, where, writeBatch } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
+import { useSingleFlight } from '@/hooks/useSingleFlight'
 import { cn } from '@/lib/utils'
 import type { ProductionSceneDoc, ProductionCastDoc, ProductionLocationDoc, ProductionCostumeDoc, ProductionMakeupDoc, ProductionPropsDoc } from '@/types'
 import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, MapPin } from 'lucide-react'
@@ -271,7 +272,9 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
       return next
     })
   }
-  async function addScene() {
+  const once = useSingleFlight()
+  const addScene = () => once(() => addSceneNow())
+  async function addSceneNow() {
     const maxNum = scenes.reduce((m, s) => Math.max(m, s.sceneNumber), 0)
     await addDoc(collection(db, `productions/${productionId}/scenes`), {
       sceneNumber: maxNum + 1, dayNight: 'Day', intExt: 'INT',

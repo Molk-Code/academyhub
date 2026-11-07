@@ -75,7 +75,7 @@ export default function VehicleBooking() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (!profile) return
+    if (!profile || submitting || formProblem(form)) return
     setSubmitting(true)
     setStatus('idle')
     try {
@@ -204,7 +204,7 @@ export default function VehicleBooking() {
           </div>
           <div>
             <label className="label text-xs">Additional notes</label>
-            <textarea value={form.notes} onChange={e => set('notes', e.target.value)}
+            <textarea value={form.notes} maxLength={2000} onChange={e => set('notes', e.target.value)}
               rows={3} className="input w-full resize-none" placeholder="Any extra information…" />
           </div>
         </div>
@@ -226,14 +226,25 @@ export default function VehicleBooking() {
 
         <button
           type="submit"
-          disabled={submitting || !form.vehicle || !form.dateFrom || !form.timeFrom ||
-            !form.dateTo || !form.timeTo || !form.destination || !form.purpose ||
-            !form.driverName || !form.contactPerson || !form.phoneNumber}
+          disabled={submitting || formProblem(form) !== null}
           className="w-full btn-primary py-3 text-base disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {submitting ? 'Submitting…' : 'Request Vehicle'}
         </button>
+        {form.dateFrom && form.timeFrom && form.dateTo && form.timeTo && formProblem(form) === 'The return must be after the departure.' && (
+          <p className="text-xs text-amber-400 text-center -mt-2">The return must be after the departure.</p>
+        )}
       </form>
     </div>
   )
+}
+
+// Why the form can't be sent yet, or null when it's ready. Fields with only
+// spaces count as empty; a same-day trip can't return before it leaves.
+function formProblem(f: FormState): string | null {
+  const blank = (v: string) => !v.trim()
+  if (!f.vehicle || !f.dateFrom || !f.timeFrom || !f.dateTo || !f.timeTo) return 'Fill in the vehicle, dates and times.'
+  if ([f.destination, f.purpose, f.driverName, f.contactPerson, f.phoneNumber].some(blank)) return 'Fill in every required field.'
+  if (f.dateTo < f.dateFrom || (f.dateTo === f.dateFrom && f.timeTo <= f.timeFrom)) return 'The return must be after the departure.'
+  return null
 }

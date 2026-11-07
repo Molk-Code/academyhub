@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { doc, updateDoc, addDoc, deleteDoc, collection, arrayUnion, arrayRemove, getDoc, writeBatch } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
+import { useSingleFlight } from '@/hooks/useSingleFlight'
 import { cn } from '@/lib/utils'
 import type {
   ProductionShootingDayDoc, ProductionSceneDoc, ProductionCastDoc, LocationMove,
@@ -380,7 +381,9 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
     })
   }
 
-  async function addDay() {
+  const once = useSingleFlight()
+  const addDay = () => once(() => addDayNow())
+  async function addDayNow() {
     const maxNum = days.reduce((m, d) => Math.max(m, d.dayNumber), 0)
     await addDoc(collection(db, `productions/${productionId}/shootingDays`), {
       dayNumber: maxNum + 1, date: '', workHours: '', startTime: '08:00', endTime: '17:00',

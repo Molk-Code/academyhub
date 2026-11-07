@@ -505,7 +505,7 @@ export default function Profile() {
         <h2 className="font-semibold text-zinc-200">Edit Profile</h2>
         <div>
           <label className="label">Display name</label>
-          <input value={name} onChange={e => { setName(e.target.value); setSaved(false) }} className="input" placeholder="Your full name" />
+          <input value={name} maxLength={80} onChange={e => { setName(e.target.value); setSaved(false) }} className="input" placeholder="Your full name" />
         </div>
         <div>
           <label className="label">Email</label>
@@ -520,7 +520,7 @@ export default function Profile() {
           <>
             <div>
               <label className="label">Bio / Description</label>
-              <textarea rows={3} value={bio} onChange={e => { setBio(e.target.value); setSaved(false) }} className="input resize-none" placeholder="Short background or description shown on subject pages…" />
+              <textarea rows={3} maxLength={1000} value={bio} onChange={e => { setBio(e.target.value); setSaved(false) }} className="input resize-none" placeholder="Short background or description shown on subject pages…" />
             </div>
             <div>
               <label className="label">Portfolio link <span className="text-zinc-400 font-normal">(optional)</span></label>

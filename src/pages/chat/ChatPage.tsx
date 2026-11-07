@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import {
-  collection, addDoc, deleteDoc, doc, updateDoc,
+  collection, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc,
   serverTimestamp, arrayUnion, arrayRemove,
 } from 'firebase/firestore'
 import { uploadWithQuota } from '@/lib/uploadWithQuota'
@@ -23,6 +23,20 @@ import { ChatGlobalSettingsModal } from './ChatGlobalSettingsModal'
 import { ChannelSettingsModal } from './ChannelSettingsModal'
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '🔥', '🎉', '👀', '✅', '💯', '🙌', '😢', '👎']
+
+// DM channels are named "A & B" — return the other person's part. Plain string
+// work, not a RegExp built from a name (names may contain "(", "+", "[" …).
+function otherDmName(channelName: string, ownName?: string | null): string {
+  if (!ownName) return channelName
+  const own = ownName.trim().toLowerCase()
+  const other = channelName.split(/\s*&\s*/).filter(part => part.trim().toLowerCase() !== own)
+  return other.join(' & ').trim() || channelName
+}
+
+// Turns a typed channel name into its slug; empty when nothing usable is left (e.g. only emoji)
+function channelSlug(raw: string): string {
+  return raw.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '')
+}
 
 function dateDividerLabel(date: Date): string {
   if (isToday(date)) return 'Today'
@@ -64,6 +78,7 @@ export default function ChatPage() {
   const [inputText,          setInputText]          = useState('')
   const [pendingFiles,       setPendingFiles]       = useState<File[]>([])
   const [sending,            setSending]            = useState(false)
+  const creatingChannel = useRef(false)
   const [emojiPickerMsgId,   setEmojiPickerMsgId]   = useState<string | null>(null)
   const [settingsChannelId,  setSettingsChannelId]  = useState<string | null>(null)
   const [addChannelOpen,     setAddChannelOpen]     = useState(false)
@@ -113,10 +128,7 @@ export default function ChatPage() {
     const otherId = active.memberIds.find(id => id !== profile?.uid)
     const found = allUsers.find(u => u.id === otherId)
     if (found) return found
-    const fallbackName = active.name
-      .replace(new RegExp(`\\s*&\\s*${profile?.displayName}`, 'i'), '')
-      .replace(new RegExp(`${profile?.displayName}\\s*&\\s*`, 'i'), '')
-      .trim() || active.name
+    const fallbackName = otherDmName(active.name, profile?.displayName)
     return { id: otherId ?? '', displayName: fallbackName, avatarUrl: null } as any
   }, [activeChannelId, channels, allUsers, profile?.uid, profile?.displayName])
 
@@ -233,8 +245,10 @@ export default function ChatPage() {
   }
 
   async function createChannel() {
-    if (!newChannelName.trim() || !profile) return
-    const name    = newChannelName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+    const name = channelSlug(newChannelName)
+    if (!name || !profile || creatingChannel.current) return
+    creatingChannel.current = true
+    try {
     const newRef  = await addDoc(collection(db, 'chat_channels'), {
       name,
       description:      newChannelDesc.trim(),
@@ -251,6 +265,9 @@ export default function ChatPage() {
     setNewChannelName('')
     setNewChannelDesc('')
     setAddChannelOpen(false)
+    } finally {
+      creatingChannel.current = false
+    }
   }
 
   async function startDM(targetUser: UserDoc) {
@@ -258,7 +275,14 @@ export default function ChatPage() {
     setDmPickerOpen(false)
     const existing = dmChannels.find(ch => ch.memberIds.includes(targetUser.id))
     if (existing) { setActiveChannelId(existing.id); setMobileChatView('messages'); return }
-    const newRef = await addDoc(collection(db, 'chat_channels'), {
+    // One fixed id per pair, so two devices (or a double tap) can't create two DMs
+    const dmRef = doc(db, 'chat_channels', `dm_${[profile.uid, targetUser.id].sort().join('_')}`)
+    const open = () => { setActiveChannelId(dmRef.id); setMobileChatView('messages') }
+    try {
+      if ((await getDoc(dmRef)).exists()) { open(); return }
+    } catch { /* fall through and try to create */ }
+    try {
+    await setDoc(dmRef, {
       isDM:             true,
       memberIds:        [profile.uid, targetUser.id],
       name:             `${profile.displayName} & ${targetUser.displayName}`,
@@ -271,8 +295,10 @@ export default function ChatPage() {
       createdAt:        serverTimestamp(),
       createdBy:        profile.uid,
     })
-    setActiveChannelId(newRef.id)
-    setMobileChatView('messages')
+    } catch {
+      // The other device won the race — the channel exists now; just open it
+    }
+    open()
   }
 
   // Open DM from ?dm=UID URL param (e.g. teacher navigating from student detail)
@@ -392,7 +418,7 @@ export default function ChatPage() {
               const otherId   = ch.memberIds.find(id => id !== profile?.uid)
               const otherUser = allUsers.find(u => u.id === otherId)
               const unread    = !isActive && unreadChannelIds.has(ch.id)
-              const fallback = ch.name.replace(new RegExp(`\\s*&\\s*${profile?.displayName}`, 'i'), '').replace(new RegExp(`${profile?.displayName}\\s*&\\s*`, 'i'), '').trim() || ch.name
+              const fallback = otherDmName(ch.name, profile?.displayName)
               const displayName = otherUser?.displayName ?? fallback
               const avatarUrl = otherUser?.avatarUrl ?? null
               return (
@@ -458,7 +484,7 @@ export default function ChatPage() {
                   <div className="flex gap-1.5">
                     <button
                       onClick={createChannel}
-                      disabled={!newChannelName.trim()}
+                      disabled={!channelSlug(newChannelName)}
                       className="flex-1 bg-brand-600 hover:bg-brand-700 disabled:opacity-40 text-white text-xs font-semibold rounded-lg py-1.5 transition-colors"
                     >
                       Create
@@ -801,6 +827,7 @@ export default function ChatPage() {
                   <textarea
                     ref={textareaRef}
                     value={inputText}
+                    maxLength={4000}
                     onChange={e => setInputText(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder={activeChannel.isDM ? `Message ${dmOtherUser?.displayName ?? ''}` : `Message #${activeChannel.name}`}

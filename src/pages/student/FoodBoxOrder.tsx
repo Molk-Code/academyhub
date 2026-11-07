@@ -313,6 +313,7 @@ setSubmitting(true)
           <p className="text-sm font-semibold text-zinc-200">Other Notes</p>
           <textarea
             value={form.otherNotes}
+            maxLength={2000}
             onChange={e => set('otherNotes', e.target.value)}
             rows={3}
             className="input w-full resize-none"
@@ -351,7 +352,7 @@ setSubmitting(true)
 
         <button
           type="submit"
-          disabled={submitting || tooSoon || !form.date || !hasFullName(form.contactPerson) || !form.phoneNumber ||
+          disabled={submitting || tooSoon || !form.date || !hasFullName(form.contactPerson) || !form.phoneNumber.trim() ||
             (!form.morningStudents.length && !form.lunchStudents.length && !form.dinnerStudents.length)}
           className="w-full btn-primary py-3 text-base disabled:opacity-40 disabled:cursor-not-allowed"
         >

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { addDoc, collection, deleteDoc, doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
+import { useSingleFlight } from '@/hooks/useSingleFlight'
 import { cn } from '@/lib/utils'
 import type { ProductionCostumeDoc, ProductionCastDoc, ProductionSceneDoc } from '@/types'
 import { Plus, Trash2 } from 'lucide-react'
@@ -166,7 +167,9 @@ export function ItemTab({
     await updateDoc(doc(db, `productions/${productionId}/${collectionName}`, id), { [field]: value })
   }
 
-  async function addItem() {
+  const once = useSingleFlight()
+  const addItem = () => once(() => addItemNow())
+  async function addItemNow() {
     if (!canEdit) return
     const next: Omit<ProductionCostumeDoc, 'id'> = {
       order: items.length,

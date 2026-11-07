@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { doc, updateDoc, addDoc, deleteDoc, collection, writeBatch } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
+import { useSingleFlight } from '@/hooks/useSingleFlight'
 import { cn } from '@/lib/utils'
 import type { ProductionShotDoc, ProductionSceneDoc, ProductionShootingDayDoc } from '@/types'
 import { Plus, Trash2, Camera, Clock, GripVertical } from 'lucide-react'
@@ -288,7 +289,9 @@ export function ShotListTab({ productionId, canEdit }: Props) {
     })
   }
 
-  async function addShot(sceneId: string) {
+  const once = useSingleFlight()
+  const addShot = (sceneId: string) => once(() => addShotNow(sceneId))
+  async function addShotNow(sceneId: string) {
     const sceneShots = shots.filter(s => s.sceneId === sceneId)
     const maxNum = sceneShots.reduce((m, s) => Math.max(m, s.shotNumber), 0)
     await addDoc(collection(db, `productions/${productionId}/shots`), {

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { addDays, format, startOfWeek, isToday, getDay } from 'date-fns'
-import { addDoc, collection, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, doc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -152,7 +152,8 @@ export default function BookingOverview() {
     if (!profile) return
     setCancelling(true)
     try {
-      await addDoc(collection(db, 'room_bookings'), {
+      // Same fixed per-slot id as student bookings — no double-booking
+      await setDoc(doc(db, 'room_bookings', `${room.id}_${selectedDateStr}_${slot.startTime}`), {
         roomId:      room.id,
         startTime:   slot.startTime,
         endTime:     slot.endTime,
@@ -162,7 +163,9 @@ export default function BookingOverview() {
         createdAt:   serverTimestamp(),
       })
     } catch (e: any) {
-      alert(e.message ?? 'Could not book this slot.')
+      alert(e?.code === 'permission-denied'
+        ? 'Someone just booked this slot. Pick another time.'
+        : (e?.message ?? 'Could not book this slot.'))
     } finally {
       setCancelling(false)
     }

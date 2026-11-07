@@ -161,7 +161,8 @@ export default function BookingHub() {
     if (!profile) return
     setCancelling(true)
     try {
-      await addDoc(collection(db, 'room_bookings'), {
+      // Same fixed per-slot id as student bookings — no double-booking
+      await setDoc(doc(db, 'room_bookings', `${room.id}_${selectedDateStr}_${slot.startTime}`), {
         roomId:      room.id,
         startTime:   slot.startTime,
         endTime:     slot.endTime,
@@ -171,7 +172,9 @@ export default function BookingHub() {
         createdAt:   serverTimestamp(),
       })
     } catch (e: any) {
-      alert(e.message ?? 'Could not book this slot.')
+      alert(e?.code === 'permission-denied'
+        ? 'Someone just booked this slot. Pick another time.'
+        : (e?.message ?? 'Could not book this slot.'))
     } finally {
       setCancelling(false)
     }

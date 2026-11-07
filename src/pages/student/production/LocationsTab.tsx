@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
+import { useSingleFlight } from '@/hooks/useSingleFlight'
 import { MapPin, Plus, Pencil, Trash2, Check, X } from 'lucide-react'
 import type { ProductionLocationDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
@@ -89,7 +90,9 @@ export function LocationsTab({ productionId, canEdit }: Props) {
   const [adding,    setAdding]    = useState(false)
   const [newForm,   setNewForm]   = useState<LocForm>(empty)
 
-  async function addLocation() {
+  const once = useSingleFlight()
+  const addLocation = () => once(() => addLocationNow())
+  async function addLocationNow() {
     if (!newForm.scriptName.trim() || !newForm.name.trim()) return
     await addDoc(collection(db, `productions/${productionId}/locations`), {
       scriptName: newForm.scriptName.trim(),

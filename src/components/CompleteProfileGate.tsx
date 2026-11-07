@@ -160,6 +160,7 @@ function ProfileCompleteOverlay() {
             <input
               required
               value={name}
+              maxLength={80}
               onChange={e => setName(e.target.value)}
               className="input w-full"
               placeholder="Your full name"

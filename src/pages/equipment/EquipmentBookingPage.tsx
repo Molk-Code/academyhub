@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument } from '@/hooks/useFirestore'
 import type { EquipmentDoc, EquipmentCategoryDoc, EquipmentBookingDoc, EquipmentBookingMessageDoc, CohortDoc, ProductionDoc, ProductionSceneDoc, ProductionCrewAssignmentDoc, ProductionCastDoc, ProductionLocationDoc, ProductionShootingDayDoc, CrewRoleDoc } from '@/types'
 import { calcRentalDays, billableDays, salaryCost as calcSalaryCost, equipmentCostForProduction } from '@/lib/productionBudget'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import {
   ShoppingCart, X, Search, Package, Calendar, Check,
   AlertTriangle, ChevronDown, ChevronRight, CheckCircle2, Clock, Truck, RotateCcw, XCircle, Lock, Trash2, Send,
@@ -222,7 +222,18 @@ export default function EquipmentBookingPage() {
 
   const [cart, setCart] = useState<Map<string, CartEntry>>(new Map())
   const [draftQty, setDraftQty] = useState<Map<string, number>>(new Map())
-  const [view, setView] = useState<ViewMode>('browse')
+  // The step lives in the URL (?step=checkout) so the browser/iPhone Back
+  // gesture steps back through the flow instead of leaving the page
+  const [searchParams, setSearchParams] = useSearchParams()
+  const stepParam = searchParams.get('step') as ViewMode | null
+  const view: ViewMode = stepParam && ['browse', 'checkout', 'success', 'my-bookings'].includes(stepParam) ? stepParam : 'browse'
+  function setView(v: ViewMode) {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      if (v === 'browse') next.delete('step'); else next.set('step', v)
+      return next
+    }, { replace: v === 'success' })
+  }
   const [cancellingId, setCancellingId] = useState<string | null>(null)
 
   async function cancelBooking(id: string) {
@@ -262,6 +273,48 @@ export default function EquipmentBookingPage() {
   // Checkout form
   const [contactName, setContactName] = useState(profile?.displayName ?? '')
   const [projectName, setProjectName] = useState('')
+
+  // Keep the cart and dates across a refresh or an accidental Back (session only)
+  const draftKey = `equipmentBookingDraft:${profile?.uid ?? ''}:${isStaffBooker ? 'staff' : 'student'}`
+  const [draftLoaded, setDraftLoaded] = useState(false)
+  useEffect(() => {
+    if (draftLoaded || !profile?.uid || equipment.length === 0) return
+    try {
+      const raw = sessionStorage.getItem(draftKey)
+      if (raw) {
+        const d = JSON.parse(raw) as { cart?: [string, number][]; fromDate?: string; toDate?: string; projectName?: string; productionId?: string | null }
+        const byId = new Map(equipment.map(e => [e.id, e]))
+        const restored = new Map<string, CartEntry>()
+        for (const [id, quantity] of d.cart ?? []) {
+          const item = byId.get(id)
+          if (item && quantity > 0) restored.set(id, { item, quantity })
+        }
+        if (restored.size) setCart(restored)
+        const today = new Date().toISOString().slice(0, 10)
+        if (d.fromDate && d.fromDate >= today) setFromDate(d.fromDate)
+        if (d.toDate && d.toDate >= today) setToDate(d.toDate)
+        if (d.projectName) setProjectName(d.projectName)
+        if (d.productionId) setSelectedProductionId(d.productionId)
+      }
+    } catch { /* storage unavailable or corrupt — start fresh */ }
+    setDraftLoaded(true)
+  }, [draftLoaded, profile?.uid, equipment, draftKey])
+  useEffect(() => {
+    if (!draftLoaded || view === 'success') return
+    try {
+      if (cart.size === 0) sessionStorage.removeItem(draftKey)
+      else sessionStorage.setItem(draftKey, JSON.stringify({
+        cart: Array.from(cart.entries()).map(([id, e]) => [id, e.quantity]),
+        fromDate, toDate, projectName, productionId: selectedProductionId,
+      }))
+    } catch { /* ignore */ }
+  }, [draftLoaded, cart, fromDate, toDate, projectName, selectedProductionId, draftKey])
+  // Checkout with nothing in the cart (e.g. Back after sending, or a stale link) → browse
+  useEffect(() => {
+    if (draftLoaded && view === 'checkout' && cart.size === 0) {
+      setSearchParams(prev => { const next = new URLSearchParams(prev); next.delete('step'); return next }, { replace: true })
+    }
+  }, [draftLoaded, view, cart.size, setSearchParams])
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
@@ -449,7 +502,7 @@ export default function EquipmentBookingPage() {
   const isOverBudget = pricingEnabled && budgetInfo != null && totalPrice > budgetInfo.equipmentBudget
 
   async function handleSubmit() {
-    if (!fromDate || !toDate) return
+    if (!fromDate || !toDate || !contactName.trim() || !projectName.trim()) return
     const today = new Date().toISOString().slice(0, 10)
     if (fromDate < today) { setSubmitError('Checkout date cannot be in the past'); return }
     if (toDate < fromDate) { setSubmitError('Return date must be on or after the checkout date'); return }
@@ -485,6 +538,7 @@ export default function EquipmentBookingPage() {
         createdAt: serverTimestamp() as any,
       }
       await addDoc(collection(db, 'equipment_bookings'), bookingData)
+      try { sessionStorage.removeItem(draftKey) } catch { /* ignore */ }
       setView('success')
       setCartOpen(false)
     } catch (err: any) {
@@ -1206,7 +1260,7 @@ export default function EquipmentBookingPage() {
                   )}
                   <button
                     className="primary-btn"
-                    disabled={submitting || !contactName || !projectName || !fromDate || !toDate || isOverBudget}
+                    disabled={submitting || !contactName.trim() || !projectName.trim() || !fromDate || !toDate || isOverBudget}
                     onClick={handleSubmit}
                   >
                     {submitting ? 'Sending...' : 'Send Booking'}

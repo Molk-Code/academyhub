@@ -844,6 +844,7 @@ export default function Lessons() {
 
   async function saveEditEvent() {
     if (!editingEvent || !editTitle.trim()) return
+    if (!editingEvent.allDay && editEnd <= editStart) { alert('The end time must be after the start time.'); return }
     setSavingEdit(true)
     try {
       const startTime = editingEvent.allDay
@@ -976,6 +977,7 @@ export default function Lessons() {
 
   async function savePersonalEvent() {
     if (!profile || !newEventTitle.trim() || !addEventModal) return
+    if (!addEventModal.allDay && addEventModal.end <= addEventModal.start) { alert('The end time must be after the start time.'); return }
     setSavingPersonal(true)
     try {
       const { date, start, end, allDay } = addEventModal

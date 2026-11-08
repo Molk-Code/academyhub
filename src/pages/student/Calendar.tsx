@@ -575,6 +575,7 @@ export default function StudentCalendar() {
 
   async function savePersonalEvent() {
     if (!profile || !newEventTitle.trim() || !addEventModal) return
+    if (!addEventModal.allDay && addEventModal.end <= addEventModal.start) { alert('The end time must be after the start time.'); return }
     setSavingPersonal(true)
     const title    = newEventTitle.trim()
     const location = newEventLocation.trim()
@@ -650,6 +651,7 @@ export default function StudentCalendar() {
 
   async function saveEditEvent() {
     if (!editingEvent || !editTitle.trim() || !profile) return
+    if (!editingEvent.allDay && editEnd <= editStart) { alert('The end time must be after the start time.'); return }
     setSavingEdit(true)
     try {
       const startTime = editingEvent.allDay

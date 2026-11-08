@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -18,7 +18,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export default function Login() {
-  const { signIn } = useAuth()
+  const { signIn, user, role, loading } = useAuth()
   const { shortName } = useSchool()
   const navigate = useNavigate()
   const [showPw,            setShowPw]            = useState(false)
@@ -85,6 +85,10 @@ export default function Login() {
       setResetSending(false)
     }
   }
+
+  // Already signed in (old bookmark, mistyped link, or the catch-all route):
+  // go to the app instead of showing a login form
+  if (!loading && user && role) return <Navigate to="/" replace />
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-brand-900 to-slate-900 overflow-y-auto flex items-start sm:items-center justify-center px-4 py-8">

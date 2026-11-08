@@ -16,7 +16,7 @@ const schema = z.object({
   startDate:   z.string().min(1),
   endDate:     z.string().min(1),
   programYear: z.coerce.number().min(1).max(2) as z.ZodType<1 | 2>,
-})
+}).refine(d => d.endDate >= d.startDate, { message: 'End date must be after the start date', path: ['endDate'] })
 type FormData = z.infer<typeof schema>
 
 export default function CohortManager() {
@@ -82,6 +82,7 @@ export default function CohortManager() {
             <div>
               <label className="label text-zinc-300">End date</label>
               <input {...register('endDate')} type="date" className="input bg-zinc-700 border-slate-600 text-white" />
+              {errors.endDate && <p className="text-xs text-rose-400 mt-1">{errors.endDate.message}</p>}
             </div>
             <div>
               <label className="label text-zinc-300">Program year</label>

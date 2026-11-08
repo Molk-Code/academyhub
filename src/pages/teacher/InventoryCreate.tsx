@@ -86,6 +86,7 @@ export default function InventoryCreate() {
 
     if (!projectName.trim())  { setError('Project name is required.'); return }
     if (!returnDate)           { setError('Return date is required.'); return }
+    if (returnDate < checkoutDate) { setError("The return date can't be before the checkout date."); return }
     if (!managerId)            { setError('Equipment manager is required.'); return }
 
     const managerDoc = managers.find(m => m.id === managerId)

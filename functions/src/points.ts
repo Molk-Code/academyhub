@@ -1,19 +1,21 @@
-import { admin, functions, db, requireTeacherOrAdmin } from './lib'
+import { admin, functions, db, requireTeacherOrAdmin, LIMITS, requireMember } from './lib'
 import { sendPush, saveNotifications, pushToTeachersAndAdmins, tokensFor } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // processRedemption — validate and record a prize claim
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const processRedemption = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+export const processRedemption = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+  await requireMember(context)
 
   const { prizeId } = data as { prizeId: string }
-  const uid = context.auth.uid
+  const uid = context.auth!.uid
 
   const prizeRef  = db.collection('prizes').doc(prizeId)
   const userRef   = db.collection('users').doc(uid)
 
+  // Many students redeeming the same prize at once contend on one document;
+  // the SDK retries, and if it still loses, say "busy" rather than "internal"
   await db.runTransaction(async (tx) => {
     const prizeSnap = await tx.get(prizeRef)
     const userSnap  = await tx.get(userRef)
@@ -67,6 +69,13 @@ export const processRedemption = functions.https.onCall(async (data, context) =>
       awardedBy:   null,
       createdAt:   admin.firestore.FieldValue.serverTimestamp(),
     })
+  }).catch((err: any) => {
+    if (err instanceof functions.https.HttpsError) throw err
+    // gRPC 10 = ABORTED (too much contention after the SDK's retries)
+    if (err?.code === 10 || err?.code === 'aborted') {
+      throw new functions.https.HttpsError('unavailable', 'Lots of people are claiming right now — try again in a moment.')
+    }
+    throw err
   })
 
   return { success: true }
@@ -126,7 +135,7 @@ export async function updateProgress(studentId: string, cohortId: string) {
   }, { merge: true })
 }
 
-export const recalculateProgress = functions.https.onCall(async (data, context) => {
+export const recalculateProgress = functions.runWith(LIMITS).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
   const { studentId, cohortId } = data as { studentId: string; cohortId: string }
   if (!studentId || typeof studentId !== 'string') {
@@ -198,7 +207,7 @@ export async function checkLevelUp(uid: string, newTotal: number) {
 // awardPoints — teacher/admin adjusts a student's points and writes the log entry
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const awardPoints = functions.https.onCall(async (data, context) => {
+export const awardPoints = functions.runWith(LIMITS).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
 
   const { studentId, points, reason, referenceId } = data as {
@@ -236,7 +245,7 @@ export const awardPoints = functions.https.onCall(async (data, context) => {
 // onPrizeClaimed — push teachers/admins when a student claims a prize
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onPrizeClaimed = functions.firestore
+export const onPrizeClaimed = functions.runWith(LIMITS).firestore
   .document('prize_claims/{claimId}')
   .onCreate(async (snap) => {
     const claim = snap.data()
@@ -261,9 +270,9 @@ export const onPrizeClaimed = functions.firestore
 // fulfillClaim — teacher/admin fulfils or rejects a prize claim
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const fulfillClaim = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
-  const role = (context.auth.token as any).role
+export const fulfillClaim = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+  await requireMember(context)
+  const role = (context.auth!.token as any).role
   if (role !== 'teacher' && role !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'Teachers and admins only.')
   }
@@ -338,7 +347,7 @@ export const fulfillClaim = functions.https.onCall(async (data, context) => {
 // missed a lesson without reporting absence. Skips lessons already processed.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const applyAbsencePenalties = functions.pubsub
+export const applyAbsencePenalties = functions.runWith(LIMITS).pubsub
   .schedule('every 15 minutes')
   .onRun(async () => {
     const now     = admin.firestore.Timestamp.now()

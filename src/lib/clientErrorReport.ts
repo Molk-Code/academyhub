@@ -24,12 +24,13 @@ export async function reportClientError(message: string, stack: string | undefin
   if (!shouldReport(message)) return
   try {
     await addDoc(collection(db, '_client_errors'), {
-      message,
-      stack: stack ?? null,
-      context,
-      uid:   auth.currentUser?.uid ?? null,
-      url:   window.location.href,
-      ua:    navigator.userAgent,
+      // Trimmed to the rules' size caps
+      message: String(message).slice(0, 2000),
+      stack:   stack ? stack.slice(0, 10000) : null,
+      context: String(context).slice(0, 2000),
+      uid:     auth.currentUser?.uid ?? null,
+      url:     window.location.href.slice(0, 2000),
+      ua:      navigator.userAgent.slice(0, 500),
       ts:    serverTimestamp(),
     })
   } catch {

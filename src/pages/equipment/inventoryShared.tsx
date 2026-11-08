@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { collection, doc, runTransaction } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 import { optimizeImageUrl } from '@/lib/cloudinary'
 
 export function EquipmentImg({ url, name, fallback }: { url: string | undefined | null; name: string; fallback: React.ReactNode }) {
@@ -98,6 +100,59 @@ export function matchCheckoutScan<T extends ScanRow>(items: T[], equipmentId: st
   const pending = items.filter(i => i.status === 'pending' && same(i))
   const slot = pending.find(i => i.equipmentName === scannedName) ?? pending[0]
   return slot ? { kind: 'booked', item: slot } : { kind: 'new' }
+}
+
+// Checkout a scan safely when two scanners (desktop + phone) work the same
+// project at once. matchCheckoutScan picks from each device's own copy of the
+// list, which can be a moment old, so the write is re-checked atomically:
+//  · a booked row is only filled if it is still "pending" (else the next one)
+//  · a numbered unit holds a marker inventory_projects/{id}/unit_out/{equipmentId}__{unit}
+//    while it is out — a second scan of it is refused. A marker whose item is
+//    no longer out (returned by any route) is stale and simply replaced.
+export type CheckoutResult = { kind: 'duplicate' } | { kind: 'booked'; id: string } | { kind: 'new'; id: string }
+
+export async function checkoutScan<T extends ScanRow>(opts: {
+  projectId: string
+  items: T[]
+  equipmentId: string
+  scannedName: string
+  unit: number | null
+  bookedFields?: Record<string, unknown>   // extra fields when filling a booked row
+  newRow: Record<string, unknown>          // the row to add when nothing booked is left
+}): Promise<CheckoutResult> {
+  const { projectId, items, equipmentId, scannedName, unit } = opts
+  const first = matchCheckoutScan(items, equipmentId, scannedName, unit)
+  if (first.kind === 'duplicate') return { kind: 'duplicate' }
+
+  const same = (i: T) => (equipmentId ? i.equipmentId === equipmentId : i.equipmentName === scannedName)
+  const pending = items.filter(i => i.status === 'pending' && same(i))
+  const candidates = [...pending.filter(i => i.equipmentName === scannedName), ...pending.filter(i => i.equipmentName !== scannedName)]
+  const itemsCol = collection(db, 'inventory_projects', projectId, 'items')
+  const lockRef = equipmentId && unit != null ? doc(db, 'inventory_projects', projectId, 'unit_out', `${equipmentId}__${unit}`) : null
+  const now = new Date().toISOString()
+
+  return runTransaction(db, async tx => {
+    if (lockRef) {
+      const lock = await tx.get(lockRef)
+      const heldId = lock.exists() ? (lock.data().itemId as string | undefined) : undefined
+      if (heldId) {
+        const held = await tx.get(doc(itemsCol, heldId))
+        if (held.exists() && OUT.has(held.data().status)) return { kind: 'duplicate' } as const
+      }
+    }
+    for (const c of candidates) {
+      const row = await tx.get(doc(itemsCol, c.id))
+      if (row.exists() && row.data().status === 'pending') {
+        tx.update(row.ref, { status: 'checked-out', checkoutTimestamp: now, ...(unit != null ? { unit } : {}), ...(opts.bookedFields ?? {}) })
+        if (lockRef) tx.set(lockRef, { itemId: c.id })
+        return { kind: 'booked', id: c.id } as const
+      }
+    }
+    const ref = doc(itemsCol)
+    tx.set(ref, { checkoutTimestamp: now, ...opts.newRow, ...(unit != null ? { unit } : {}) })
+    if (lockRef) tx.set(lockRef, { itemId: ref.id })
+    return { kind: 'new', id: ref.id } as const
+  })
 }
 
 export function matchCheckinScan<T extends ScanRow>(items: T[], equipmentId: string, scannedName: string, unit: number | null): T | undefined {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { addDoc, collection, collectionGroup, deleteDoc, doc, onSnapshot, serverTimestamp } from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useFeature } from '@/hooks/useFeature'
@@ -77,19 +77,25 @@ function StatusPill({ status }: { status: string }) {
 
 // ── Data hooks ────────────────────────────────────────────────────────────────
 
+// One listener per own project's items — not a collection-group listener over
+// every item of every project ever (which grew with the whole school's history)
 function useProjectItems(projectIds: string[]) {
-  const [items, setItems] = useState<(InventoryItemDoc & { projectId: string })[]>([])
+  const [byProject, setByProject] = useState<Record<string, (InventoryItemDoc & { projectId: string })[]>>({})
+  const key = projectIds.join(',')
   useEffect(() => {
-    const unsub = onSnapshot(collectionGroup(db, 'items'), snap => {
-      setItems(snap.docs.map(d => {
-        const projectId = d.ref.parent.parent?.id ?? ''
-        return { id: d.id, projectId, ...d.data() } as InventoryItemDoc & { projectId: string }
-      }))
-    })
-    return unsub
-  }, [])
-  const idSet = useMemo(() => new Set(projectIds), [projectIds])
-  return useMemo(() => items.filter(i => idSet.has(i.projectId)), [items, idSet])
+    const ids = key ? key.split(',') : []
+    setByProject(prev => Object.fromEntries(Object.entries(prev).filter(([id]) => ids.includes(id))))
+    const unsubs = ids.map(projectId => onSnapshot(
+      collection(db, 'inventory_projects', projectId, 'items'),
+      snap => setByProject(prev => ({
+        ...prev,
+        [projectId]: snap.docs.map(d => ({ id: d.id, projectId, ...d.data() }) as InventoryItemDoc & { projectId: string }),
+      })),
+      err => console.warn('items listener failed', projectId, err),
+    ))
+    return () => unsubs.forEach(u => u())
+  }, [key])
+  return useMemo(() => Object.values(byProject).flat(), [byProject])
 }
 
 function useEquipmentProjects(uid: string, enabled: boolean) {

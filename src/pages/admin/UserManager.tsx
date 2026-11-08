@@ -8,6 +8,7 @@ import { auth } from '@/lib/firebase'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
 import { useCollection, where } from '@/hooks/useFirestore'
+import { useAllUsers } from '@/hooks/useAllUsers'
 import type { UserDoc, CohortDoc, ClassInviteDoc } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { Copy, Check, UserPlus, UserX, UserCheck, Mail, ShieldCheck, Trash2, KeyRound, X, Users, ClipboardCopy, ChevronDown, ChevronUp, RotateCcw, Link, QrCode, Download, Ban, Trophy } from 'lucide-react'
@@ -69,7 +70,7 @@ export default function UserManager() {
   }
 
   const { profile } = useAuth()
-  const { data: users,       loading } = useCollection<UserDoc>('users')
+  const { data: users,       loading } = useAllUsers()
   const { data: cohorts }              = useCollection<CohortDoc>('cohorts')
   const { data: invitations }          = useCollection<Invitation>('invitations')
   const { data: classInvites }         = useCollection<ClassInviteDoc>('classInvites')

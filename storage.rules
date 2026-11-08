@@ -3,8 +3,13 @@ service firebase.storage {
   match /b/{bucket}/o {
 
     // Shared helper
+    // A member of the school (role claim, or a profile doc for older accounts
+    // without claims) — not just any Firebase Auth login
     function isSignedIn() {
-      return request.auth != null;
+      return request.auth != null && (
+        request.auth.token.get('role', '') in ['student', 'teacher', 'admin']
+        || firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+      );
     }
 
     function isTeacherOrAdmin() {

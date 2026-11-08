@@ -1,11 +1,11 @@
-import { admin, functions, db } from './lib'
+import { admin, functions, db, LIMITS, allow } from './lib'
 import { sendPush, saveNotifications, tokensFor, removeStaleTokens } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // onAssignmentPublished — push to all students in the cohort
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onAssignmentPublished = functions.firestore
+export const onAssignmentPublished = functions.runWith(LIMITS).firestore
   .document('assignments/{id}')
   .onWrite(async (change) => {
     const before = change.before.data()
@@ -37,7 +37,7 @@ export const onAssignmentPublished = functions.firestore
 // ─────────────────────────────────────────────────────────────────────────────
 // onSubmissionCreated — push to cohort teachers when a student submits an assignment
 // ─────────────────────────────────────────────────────────────────────────────
-export const onSubmissionCreated = functions.firestore
+export const onSubmissionCreated = functions.runWith(LIMITS).firestore
   .document('submissions/{submissionId}')
   .onCreate(async (snap) => {
     const data = snap.data()
@@ -79,7 +79,7 @@ export const onSubmissionCreated = functions.firestore
 // onAbsenceReportCreated — push to the cohort's assigned teacher(s)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onAbsenceReportCreated = functions.firestore
+export const onAbsenceReportCreated = functions.runWith(LIMITS).firestore
   .document('absence_reports/{reportId}')
   .onCreate(async (snap) => {
     const report = snap.data()
@@ -87,6 +87,9 @@ export const onAbsenceReportCreated = functions.firestore
     // 'reviewed' in that flow) — only notify for student self-reports, so a
     // teacher doesn't get pushed about their own action.
     if (report.status !== 'pending') return null
+    // Rate limit on notifying staff — a script creating these in a loop would
+    // otherwise push every staff phone each time (the doc itself is kept)
+    if (!(await allow(String(report.studentId ?? 'unknown'), 'absence-notify', 5))) return null
     const cohortId = report.cohortId as string | undefined
     if (!cohortId) return null
 
@@ -119,7 +122,7 @@ export const onAbsenceReportCreated = functions.firestore
 // onChatMessage — push notification to all channel members except the sender
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onChatMessage = functions.firestore
+export const onChatMessage = functions.runWith(LIMITS).firestore
   .document('chat_channels/{channelId}/messages/{msgId}')
   .onCreate(async (snap, context) => {
     const msg = snap.data()
@@ -155,6 +158,21 @@ export const onChatMessage = functions.firestore
     // Fetch channel doc
     const channelDoc = await db.collection('chat_channels').doc(channelId).get()
     const isDM = channelDoc.data()?.isDM === true
+
+    // Channels: at most one push per channel every 30 s. A busy (or spammed)
+    // channel otherwise fans out to every member on every single message; the
+    // pushes share a tag, so the latest one replaces the previous on phones
+    // anyway. DMs reach one person and always push.
+    if (!isDM && channelDoc.exists) {
+      const due = await db.runTransaction(async tx => {
+        const c = await tx.get(channelDoc.ref)
+        const last = (c.get('lastPushAt') as FirebaseFirestore.Timestamp | undefined)?.toMillis() ?? 0
+        if (Date.now() - last < 30_000) return false
+        tx.update(channelDoc.ref, { lastPushAt: admin.firestore.FieldValue.serverTimestamp() })
+        return true
+      })
+      if (!due) return null
+    }
     const channelName = isDM ? null : (channelDoc.exists ? ((channelDoc.data()?.name as string) ?? 'Chat') : 'Chat')
 
     // Collect FCM tokens — DMs only push to the other member, channels push to all
@@ -236,7 +254,7 @@ export const onChatMessage = functions.firestore
 // onPlanComment — push notification to student when teacher leaves feedback
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onPlanComment = functions.firestore
+export const onPlanComment = functions.runWith(LIMITS).firestore
   .document('plan_comments/{commentId}')
   .onCreate(async (snap) => {
     const data = snap.data()

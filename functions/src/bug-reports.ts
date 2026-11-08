@@ -1,17 +1,20 @@
-import { functions } from './lib'
+import { functions, LIMITS, allow } from './lib'
 import { pushToTeachersAndAdmins, pushToUser } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // onBugReportCreated — notify admins/teachers of a new bug report
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onBugReportCreated = functions.firestore
+export const onBugReportCreated = functions.runWith(LIMITS).firestore
   .document('bug_reports/{id}')
   .onCreate(async (snap) => {
     if (snap.data().notifSent === true) return null
     await snap.ref.update({ notifSent: true })
 
     const d = snap.data()
+    // Rate limit on notifying staff — a script creating these in a loop would
+    // otherwise push every staff phone each time (the doc itself is kept)
+    if (!(await allow(String(d.uid ?? 'unknown'), 'bug-report-notify', 5))) return null
     await pushToTeachersAndAdmins(
       '🐛 New bug report',
       `${d.displayName ?? 'Someone'}: ${(d.description ?? '').slice(0, 120)}`,
@@ -31,7 +34,7 @@ const STATUS_MESSAGE: Record<string, { title: string; body: string }> = {
   wont_fix:    { title: '📋 Bug report closed',        body: "Your bug report was reviewed and marked won't fix." },
 }
 
-export const onBugReportUpdated = functions.firestore
+export const onBugReportUpdated = functions.runWith(LIMITS).firestore
   .document('bug_reports/{id}')
   .onUpdate(async (change) => {
     const before = change.before.data()

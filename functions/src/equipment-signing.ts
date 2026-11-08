@@ -1,5 +1,5 @@
 import { createHash } from 'crypto'
-import { admin, db, functions, requireTeacherOrAdmin } from './lib'
+import { admin, db, functions, requireTeacherOrAdmin, LIMITS, requireMember } from './lib'
 import { sendPush, saveNotifications, tokensFor } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -56,15 +56,7 @@ async function buildSnapshot(projectId: string) {
   return { project: p, projRef, snapshot, hash }
 }
 
-// Latest contract hash each borrower has signed.
-async function signedHashes(projRef: FirebaseFirestore.DocumentReference) {
-  const sigs = await projRef.collection('signatures').orderBy('signedAt', 'asc').get()
-  const latest = new Map<string, string>()
-  for (const d of sigs.docs) latest.set(d.data().uid as string, d.data().contractHash as string)
-  return latest
-}
-
-export const requestEquipmentSignatures = functions.https.onCall(async (data, context) => {
+export const requestEquipmentSignatures = functions.runWith(LIMITS).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
   const { projectId } = data as { projectId?: string }
   if (!projectId || typeof projectId !== 'string') {
@@ -77,19 +69,25 @@ export const requestEquipmentSignatures = functions.https.onCall(async (data, co
     throw new functions.https.HttpsError('failed-precondition', 'This project has no borrowers with a CineForge account.')
   }
 
-  // Only ask those who haven't signed the contract as it stands now
-  const signed = await signedHashes(projRef)
-  const toAsk = borrowerIds.filter(uid => signed.get(uid) !== hash)
-
   const requester = await db.collection('users').doc(context.auth!.uid).get()
-  await projRef.update({
-    signatureRequest: {
-      requestedAt:     admin.firestore.FieldValue.serverTimestamp(),
-      requestedBy:     context.auth!.uid,
-      requestedByName: (requester.data()?.displayName as string) ?? '',
-    },
-    // Borrowers still asked to sign — drives the "contract to sign" bell entry
-    pendingSignatureUids: toAsk,
+  // Read who has signed and write the pending list in one transaction, so a
+  // signature landing at the same moment can't be overwritten back to "to sign"
+  const toAsk = await db.runTransaction(async tx => {
+    const sigs = await tx.get(projRef.collection('signatures').orderBy('signedAt', 'asc'))
+    const signed = new Map<string, string>()
+    for (const d of sigs.docs) signed.set(d.data().uid as string, d.data().contractHash as string)
+    // Only ask those who haven't signed the contract as it stands now
+    const ask = borrowerIds.filter(uid => signed.get(uid) !== hash)
+    tx.update(projRef, {
+      signatureRequest: {
+        requestedAt:     admin.firestore.FieldValue.serverTimestamp(),
+        requestedBy:     context.auth!.uid,
+        requestedByName: (requester.data()?.displayName as string) ?? '',
+      },
+      // Borrowers still asked to sign — drives the "contract to sign" bell entry
+      pendingSignatureUids: ask,
+    })
+    return ask
   })
 
   const withoutPush: string[] = []
@@ -124,8 +122,8 @@ export const requestEquipmentSignatures = functions.https.onCall(async (data, co
   return { notified: toAsk.length, alreadySigned: borrowerIds.length - toAsk.length, withoutPush }
 })
 
-export const signEquipmentContract = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+export const signEquipmentContract = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+  await requireMember(context)
   const { projectId, typedName, accepted } = data as { projectId?: string; typedName?: string; accepted?: boolean }
   if (!projectId || typeof projectId !== 'string') {
     throw new functions.https.HttpsError('invalid-argument', 'projectId is required.')
@@ -138,7 +136,7 @@ export const signEquipmentContract = functions.https.onCall(async (data, context
     throw new functions.https.HttpsError('invalid-argument', 'Type your full name to sign.')
   }
 
-  const uid = context.auth.uid
+  const uid = context.auth!.uid
   const { project, projRef, snapshot, hash } = await buildSnapshot(projectId)
   if (!((project.borrowerIds as string[]) ?? []).includes(uid)) {
     throw new functions.https.HttpsError('permission-denied', 'You are not a borrower on this project.')
@@ -148,11 +146,14 @@ export const signEquipmentContract = functions.https.onCall(async (data, context
   const req = context.rawRequest
   const forwarded = String(req?.headers?.['x-forwarded-for'] ?? '').split(',')[0].trim()
 
-  const ref = await projRef.collection('signatures').add({
+  // The signature and leaving the pending list happen together (see request above)
+  const ref = projRef.collection('signatures').doc()
+  const batch = db.batch()
+  batch.set(ref, {
     uid,
     typedName:    name,
     accountName:  (user.displayName as string) ?? '',
-    email:        (context.auth.token.email as string) ?? (user.email as string) ?? '',
+    email:        (context.auth!.token.email as string) ?? (user.email as string) ?? '',
     signedAt:     admin.firestore.FieldValue.serverTimestamp(),
     contractHash: hash,
     snapshot,
@@ -160,7 +161,8 @@ export const signEquipmentContract = functions.https.onCall(async (data, context
     userAgent:    String(req?.headers?.['user-agent'] ?? '').slice(0, 300),
     method:       'cineforge-typed-name',
   })
-  await projRef.update({ pendingSignatureUids: admin.firestore.FieldValue.arrayRemove(uid) })
+  batch.update(projRef, { pendingSignatureUids: admin.firestore.FieldValue.arrayRemove(uid) })
+  await batch.commit()
 
   return { signatureId: ref.id, contractHash: hash }
 })

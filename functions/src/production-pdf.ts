@@ -1,12 +1,13 @@
 import * as path from 'path'
-import { functions, db, PDFDocument } from './lib'
+import { functions, db, PDFDocument, LIMITS, requireMember, requireAllowed } from './lib'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // exportProductionPdf — callable: generate production breakdown PDF
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const exportProductionPdf = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+export const exportProductionPdf = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+  await requireMember(context)
+  await requireAllowed(context.auth!.uid, 'production-pdf', 10)
 
   const { productionId } = data as { productionId: string }
   if (!productionId) throw new functions.https.HttpsError('invalid-argument', 'productionId required.')
@@ -15,8 +16,8 @@ export const exportProductionPdf = functions.https.onCall(async (data, context) 
   if (!prodSnap.exists) throw new functions.https.HttpsError('not-found', 'Production not found.')
   const prod = prodSnap.data()!
 
-  const uid    = context.auth.uid
-  const claims = context.auth.token as any
+  const uid    = context.auth!.uid
+  const claims = context.auth!.token as any
   const isStaff = claims.role === 'teacher' || claims.role === 'admin'
   const canAccess =
     isStaff ||

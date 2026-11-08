@@ -1,4 +1,4 @@
-import { admin, functions, db } from './lib'
+import { admin, functions, db, LIMITS } from './lib'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // onCohortCreated — give every new class its own private chat channel
@@ -8,7 +8,7 @@ export function classChannelName(cohortName: string): string {
   return cohortName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
 }
 
-export const onCohortCreated = functions.firestore
+export const onCohortCreated = functions.runWith(LIMITS).firestore
   .document('cohorts/{cohortId}')
   .onCreate(async (snap, context) => {
     const cohortId = context.params.cohortId as string

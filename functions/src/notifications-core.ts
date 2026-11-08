@@ -1,4 +1,4 @@
-import { admin, db, functions } from './lib'
+import { admin, db, functions, LIMITS, requireMember, requireAllowed } from './lib'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Push notification helpers
@@ -234,13 +234,14 @@ export async function pushToUser(uid: string, title: string, body: string, url: 
 // account's notifications, or the same notification twice.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const claimFcmToken = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+export const claimFcmToken = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+  await requireMember(context)
+  await requireAllowed(context.auth!.uid, 'claim-token', 10)
   const { token } = data as { token: string }
   if (!token || typeof token !== 'string' || token.length > 4096) {
     throw new functions.https.HttpsError('invalid-argument', 'token is required.')
   }
-  const uid = context.auth.uid
+  const uid = context.auth!.uid
   const holders = await db.collection('push_tokens').where('tokens', 'array-contains', token).get()
   const batch = db.batch()
   let removed = 0

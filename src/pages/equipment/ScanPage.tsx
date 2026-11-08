@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { NotFoundException } from '@zxing/library'
 import { Scan, Check, X, Wifi, WifiOff, LogIn, AlertTriangle } from 'lucide-react'
-import { parseScanText, matchCheckoutScan, matchCheckinScan } from './inventoryShared'
+import { parseScanText, checkoutScan, matchCheckinScan } from './inventoryShared'
 import { ScanFlash, useScanFlash } from './ScanFeedback'
 
 const COOLDOWN_MS = 2500 // ms to block re-scan after a successful scan
@@ -150,33 +150,26 @@ export default function ScanPage() {
 
     try {
       if (sess.mode === 'checkout') {
-        const found = itemsRef.current ? matchCheckoutScan(itemsRef.current, equipmentId, equipmentName, unit) : { kind: 'new' as const }
-        if (found.kind === 'duplicate') {
-          message = 'Already scanned out in this project'
-          throw new Error(message)
-        }
-        if (found.kind === 'booked') {
-          // Fill the booked row rather than adding a second one
-          await updateDoc(doc(db, `inventory_projects/${sess.projectId}/items`, found.item.id), {
-            status: 'checked-out',
-            checkoutTimestamp: new Date().toISOString(),
-            scannedViaSession: sessionId,
-            ...(unit != null ? { unit } : {}),
-          })
-        } else {
-          if (fromBookingRef.current) message = 'Not in the booking — added as extra'
-          await addDoc(collection(db, `inventory_projects/${sess.projectId}/items`), {
+        // Atomic: the desktop scanner on the same project can't take the same row or unit
+        const result = await checkoutScan({
+          projectId: sess.projectId, items: itemsRef.current ?? [], equipmentId, scannedName: equipmentName, unit,
+          bookedFields: { scannedViaSession: sessionId },
+          newRow: {
             equipmentId,
             equipmentName,
-            checkoutTimestamp: new Date().toISOString(),
             checkinTimestamp: '',
             status: 'checked-out',
             damageNotes: '',
             assignedTo: '',
             scannedViaSession: sessionId,
             ...(fromBookingRef.current ? { notInBooking: true } : {}),
-          })
+          },
+        })
+        if (result.kind === 'duplicate') {
+          message = 'Already scanned out in this project'
+          throw new Error(message)
         }
+        if (result.kind === 'new' && fromBookingRef.current) message = 'Not in the booking — added as extra'
       } else {
         // Unknown until the item list loads; then refuse items not out in this project
         const rows = itemsRef.current

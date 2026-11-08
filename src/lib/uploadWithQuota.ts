@@ -94,6 +94,8 @@ export async function uploadScreenplayViaFunction(
   productionId: string,
   onProgress?: (pct: number) => void,
 ): Promise<string> {
+  // Must match MAX_BYTES in functions/src/production-upload.ts
+  if (file.size > 15 * 1024 * 1024) throw new Error('The screenplay PDF is too large (max 15 MB). Export it with smaller images and try again.')
   await assertQuota(file.size)
 
   // Reading+encoding the file is the only phase we can report real progress

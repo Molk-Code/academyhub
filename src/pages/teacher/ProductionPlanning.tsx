@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, where } from '@/hooks/useFirestore'
+import { useAllUsers } from '@/hooks/useAllUsers'
 import type { ProductionDoc, UserDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { Film, Clock, Globe, Lock, Users } from 'lucide-react'
@@ -19,7 +20,7 @@ export default function TeacherProductionPlanning() {
   const { profile, cohortId: ctxCohortId } = useAuth()
   const navigate = useNavigate()
 
-  const { data: allUsers } = useCollection<UserDoc>('users')
+  const { data: allUsers } = useAllUsers()
 
   // Fetch all productions (no cohort filter for teachers — see all)
   const { data: productions, loading } = useCollection<ProductionDoc>('productions')

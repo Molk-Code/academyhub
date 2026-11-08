@@ -5,6 +5,7 @@ import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
+import { useAllUsers } from '@/hooks/useAllUsers'
 import { shortDate, timeStr, toDate } from '@/lib/utils'
 import type { LessonDoc, SubjectDoc, CohortDoc, LessonBlockDoc, SemesterSettingsDoc, LessonCategoryDoc, UserDoc, PersonalEventDoc, SyncedEventDoc, GuestTeacherDoc, GuestTeacherBookingDoc } from '@/types'
 import { Plus, Pencil, Trash2, CalendarDays, LayoutGrid, X, QrCode, Circle, SlidersHorizontal, ChevronDown, Check, MapPin, Download } from 'lucide-react'
@@ -361,7 +362,7 @@ export default function Lessons() {
   const { data: syncedEvents } = useCollection<SyncedEventDoc>('synced_events', [])
 
   // All users for invitee picker
-  const { data: allUsers } = useCollection<UserDoc>('users')
+  const { data: allUsers } = useAllUsers()
   const invitableGroups = useMemo(() => {
     type Group = { repId: string; allIds: string[]; displayName: string; roles: string[] }
     const groups: Group[] = []

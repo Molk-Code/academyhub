@@ -1,4 +1,4 @@
-import { admin, functions, db, requireTeacherOrAdmin } from './lib'
+import { admin, functions, db, requireTeacherOrAdmin, LIMITS, requireMember } from './lib'
 import { sendPush, saveNotifications, tokensFor } from './notifications-core'
 import { updateProgress, checkLevelUp } from './points'
 
@@ -6,8 +6,8 @@ import { updateProgress, checkLevelUp } from './points'
 // getTestQuestions — strips correct answers before sending to students
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const getTestQuestions = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+export const getTestQuestions = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+  await requireMember(context)
 
   const { assignmentId } = data as { assignmentId: string }
   if (!assignmentId) throw new functions.https.HttpsError('invalid-argument', 'assignmentId required.')
@@ -23,7 +23,7 @@ export const getTestQuestions = functions.https.onCall(async (data, context) => 
   const test = testSnap.docs[0].data()
 
   // Check attempt limit
-  const uid = context.auth.uid
+  const uid = context.auth!.uid
   const attemptsSnap = await db.collection('submissions')
     .where('assignmentId', '==', assignmentId)
     .where('studentId',    '==', uid)
@@ -59,7 +59,7 @@ export const getTestQuestions = functions.https.onCall(async (data, context) => 
 // gradeSubmission — auto-grade a test or record manual grade; award points
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const gradeSubmission = functions.https.onCall(async (data, context) => {
+export const gradeSubmission = functions.runWith(LIMITS).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
 
   const { submissionId, score, feedback } = data as {
@@ -134,8 +134,8 @@ export const gradeSubmission = functions.https.onCall(async (data, context) => {
 // submitTestAnswers — auto-grade objective questions, queue short answers
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const submitTestAnswers = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+export const submitTestAnswers = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+  await requireMember(context)
 
   const { assignmentId, answers, timeTakenSeconds } = data as {
     assignmentId: string
@@ -143,7 +143,7 @@ export const submitTestAnswers = functions.https.onCall(async (data, context) =>
     timeTakenSeconds?: number
   }
 
-  const uid = context.auth.uid
+  const uid = context.auth!.uid
 
   // Load assignment
   const assignSnap = await db.collection('assignments').doc(assignmentId).get()
@@ -276,8 +276,8 @@ export const submitTestAnswers = functions.https.onCall(async (data, context) =>
 // submitChecklist — student marks every step complete; auto-graded, no review
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const submitChecklist = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+export const submitChecklist = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+  await requireMember(context)
 
   const { assignmentId, checkedItemIds } = data as {
     assignmentId: string
@@ -285,7 +285,7 @@ export const submitChecklist = functions.https.onCall(async (data, context) => {
   }
   if (!assignmentId) throw new functions.https.HttpsError('invalid-argument', 'assignmentId required.')
 
-  const uid = context.auth.uid
+  const uid = context.auth!.uid
 
   const assignSnap = await db.collection('assignments').doc(assignmentId).get()
   if (!assignSnap.exists) throw new functions.https.HttpsError('not-found', 'Assignment not found.')
@@ -369,7 +369,7 @@ export const submitChecklist = functions.https.onCall(async (data, context) => {
 // gradeShortAnswers — teacher marks short-answer questions correct/incorrect
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const gradeShortAnswers = functions.https.onCall(async (data, context) => {
+export const gradeShortAnswers = functions.runWith(LIMITS).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
 
   const { submissionId, answers } = data as {
@@ -474,7 +474,7 @@ export const gradeShortAnswers = functions.https.onCall(async (data, context) =>
 // is recalculated, so totals stay consistent with the remaining work.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const deleteSubmission = functions.https.onCall(async (data, context) => {
+export const deleteSubmission = functions.runWith(LIMITS).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
 
   const { submissionId } = data as { submissionId: string }

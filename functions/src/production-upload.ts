@@ -1,5 +1,5 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
-import { admin, db } from './lib'
+import { admin, db, allow } from './lib'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // uploadScreenplay — callable: upload a production's screenplay PDF.
@@ -13,12 +13,22 @@ import { admin, db } from './lib'
 // a larger request-body ceiling than 1st-gen's ~10MB.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MAX_BYTES = 25 * 1024 * 1024 // 25 MB
+// 15 MB: the file travels base64-encoded (+33 %), which has to stay under the
+// 32 MB request limit; 1 GiB and at most 4 uploads per instance keep several
+// of them from running one instance out of memory.
+const MAX_BYTES = 15 * 1024 * 1024 // 15 MB
 
 export const uploadScreenplay = onCall(
-  { region: 'us-central1' },
+  { region: 'us-central1', memory: '1GiB', concurrency: 4, maxInstances: 20 },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+    const role = request.auth.token.role
+    if (!['student', 'teacher', 'admin'].includes(role) && !(await db.collection('users').doc(request.auth.uid).get()).exists) {
+      throw new HttpsError('permission-denied', 'This account is not part of the school.')
+    }
+    if (!(await allow(request.auth.uid, 'screenplay-upload', 10))) {
+      throw new HttpsError('resource-exhausted', 'Too many uploads — wait a minute and try again.')
+    }
 
     const { productionId, fileBase64 } = (request.data ?? {}) as { productionId?: string; fileBase64?: string }
     if (!productionId || !fileBase64) {

@@ -6,6 +6,7 @@ import {
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, where, orderBy } from '@/hooks/useFirestore'
+import { useAllUsers } from '@/hooks/useAllUsers'
 import type { CohortDoc, UserDoc, ProductionTeamDoc, Commandment, ChatChannelDoc, ProductionDoc } from '@/types'
 import { Plus, Trash2, Check, X, Pencil, Users, Clapperboard, Film, Clock, Globe, Lock, CalendarRange, ArrowLeft } from 'lucide-react'
 import TeacherProductionPeriod from '@/pages/teacher/ProductionPeriod'
@@ -53,7 +54,7 @@ export default function TeacherProduction() {
 
   const { data: allTeams } = useCollection<ProductionTeamDoc>('production_teams')
   const { data: allChannels, loading: channelsLoading } = useCollection<ChatChannelDoc>('chat_channels')
-  const { data: allUsers } = useCollection<UserDoc>('users')
+  const { data: allUsers } = useAllUsers()
 
   // Crew channels use a deterministic id so concurrent writers (createTeam, this
   // sync, other open tabs) converge on one doc instead of creating duplicates.

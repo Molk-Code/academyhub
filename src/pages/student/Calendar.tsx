@@ -7,6 +7,7 @@ import interactionPlugin from '@fullcalendar/interaction'
 import type { EventInput } from '@fullcalendar/core'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
+import { useAllUsers } from '@/hooks/useAllUsers'
 import { toDate, cn, initials, avatarColor } from '@/lib/utils'
 import type { LessonDoc, AssignmentDoc, SubjectDoc, SemesterSettingsDoc, LessonCategoryDoc, CohortDoc, PersonalEventDoc, UserDoc, SyncedEventDoc, GuestTeacherDoc } from '@/types'
 import { addDoc, collection, serverTimestamp, Timestamp, updateDoc, deleteDoc, doc } from 'firebase/firestore'
@@ -369,7 +370,7 @@ export default function StudentCalendar() {
     showAllSynced ? '__staff__' : cohortId ?? 'none',
   )
 
-  const { data: allUsers } = useCollection<UserDoc>('users')
+  const { data: allUsers } = useAllUsers()
   const { data: guestTeachers } = useCollection<GuestTeacherDoc>('guest_teachers')
   // Group duplicate docs by displayName, collecting all their IDs — ensures profile.uid always matches
   const invitableGroups = useMemo(() => {
@@ -688,15 +689,13 @@ export default function StudentCalendar() {
     setSavingEdit(true)
     try {
       const allIds = editingEvent.inviteeIds ?? []
-      await deleteDoc(doc(db, 'personal_events', editingEvent.id))
+      // Tell invitees first — the server reads the event, so it must still exist
       if (allIds.length > 0 && profile) {
         const fn = httpsCallable(functions, 'sendEventInviteNotifications')
-        fn({ eventId: editingEvent.id, inviteeIds: allIds, organizerName: profile.displayName,
-          title: editingEvent.title, dateStr: editDate,
-          timeStr: editingEvent.allDay ? 'All day' : editStart,
-          location: editingEvent.location ?? '', canceled: true,
-        }).catch(e => console.error('cancel notify failed', e))
+        await fn({ eventId: editingEvent.id, inviteeIds: allIds, canceled: true })
+          .catch(e => console.error('cancel notify failed', e))
       }
+      await deleteDoc(doc(db, 'personal_events', editingEvent.id))
       closeEditEvent()
     } finally {
       setSavingEdit(false)

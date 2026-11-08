@@ -3,6 +3,7 @@ import { collection, query, orderBy, getDocs, doc, updateDoc, addDoc, serverTime
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
 import { useCollection } from '@/hooks/useFirestore'
+import { useAllUsers } from '@/hooks/useAllUsers'
 import { useAuth } from '@/contexts/AuthContext'
 import type { UserDoc } from '@/types'
 import { Shield, Trash2, Download, AlertTriangle } from 'lucide-react'
@@ -69,7 +70,7 @@ function ConfirmDeleteDialog({
 
 export default function GdprDashboard() {
   const { profile } = useAuth()
-  const { data: users, loading: usersLoading } = useCollection<UserDoc>('users')
+  const { data: users, loading: usersLoading } = useAllUsers()
   const { data: deletionLog, loading: logLoading } = useCollection<DeletionLogDoc>(
     'deletion_log',
     [orderBy('requestedAt', 'desc')],

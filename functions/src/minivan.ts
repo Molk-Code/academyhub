@@ -1,12 +1,12 @@
 import * as path from 'path'
-import { functions, db, escapeHtml, getResend, getEmailConfig, requireTeacherOrAdmin, PDFDocument } from './lib'
+import { functions, db, escapeHtml, sendEmailOrThrow, getEmailConfig, requireTeacherOrAdmin, PDFDocument, LIMITS, allow } from './lib'
 import { getOrCreateBookingsChannel, postToBookingsChannel, pushToAdmins, pushToStudent } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // sendMinivanEmail — notify staff about a new minivan booking request via Resend
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const sendMinivanEmail = functions.runWith({ secrets: ['RESEND_API_KEY'] }).https.onCall(async (data, context) => {
+export const sendMinivanEmail = functions.runWith({ ...LIMITS, secrets: ['RESEND_API_KEY'] }).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
 
   const emailCfg = await getEmailConfig()
@@ -27,7 +27,7 @@ export const sendMinivanEmail = functions.runWith({ secrets: ['RESEND_API_KEY'] 
     d.notes ? `<b>Notes:</b> ${escapeHtml(d.notes)}` : '',
   ].filter(Boolean).join('<br>')
 
-  await getResend().emails.send({
+  await sendEmailOrThrow({
     from:      `${fromName} <${fromEmail}>`,
     to:        [emailCfg.minivanEmail],
     replyTo:  d.studentEmail || undefined,
@@ -42,12 +42,15 @@ export const sendMinivanEmail = functions.runWith({ secrets: ['RESEND_API_KEY'] 
 // onMinivanBookingCreated — notify teachers/admins via chat + push
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onMinivanBookingCreated = functions.firestore
+export const onMinivanBookingCreated = functions.runWith(LIMITS).firestore
   .document('minivan_bookings/{id}')
   .onCreate(async (snap) => {
     if (snap.data().notifSent === true) return
     await snap.ref.update({ notifSent: true })
     const d = snap.data()
+    // Rate limit on notifying staff — a script creating these in a loop would
+    // otherwise push every staff phone each time (the doc itself is kept)
+    if (!(await allow(String(d.studentId ?? 'unknown'), 'minivan-notify', 5))) return
     const text = `🚐 **New minivan request** from ${d.studentName}\n${d.dateFrom} → ${d.dateTo}  ·  ${d.destination}  ·  Driver: ${d.driverName || '–'}`
 
     const channelId = await getOrCreateBookingsChannel()
@@ -63,7 +66,7 @@ export const onMinivanBookingCreated = functions.firestore
 // onMinivanBookingUpdated — push student when status changes
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onMinivanBookingUpdated = functions.firestore
+export const onMinivanBookingUpdated = functions.runWith(LIMITS).firestore
   .document('minivan_bookings/{id}')
   .onUpdate(async (change) => {
     const before = change.before.data()
@@ -99,7 +102,7 @@ export const onMinivanBookingUpdated = functions.firestore
 // exportMinivanPdf — admin callable: generate minivan booking PDF
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const exportMinivanPdf = functions.https.onCall(async (data, context) => {
+export const exportMinivanPdf = functions.runWith(LIMITS).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
   const claims = context.auth.token as any
   if (claims.role !== 'admin' && claims.role !== 'teacher') {

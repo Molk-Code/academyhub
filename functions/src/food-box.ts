@@ -1,4 +1,4 @@
-import { functions, db, getResend, getEmailConfig, requireTeacherOrAdmin, PDFDocument } from './lib'
+import { functions, db, sendEmailOrThrow, getEmailConfig, requireTeacherOrAdmin, PDFDocument, LIMITS, allow } from './lib'
 import { getOrCreateBookingsChannel, postToBookingsChannel, pushToAdmins, pushToStudent } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -275,7 +275,7 @@ export const _pdfHelpers = { pdfTextBox, pdfHeatRowSwedish, pdfHeatRow }
 
 const FOOD_BOX_RECIPIENT = 'fredrik.fridlund@regionvarmland.se'
 
-export const sendFoodBoxEmail = functions.runWith({ secrets: ['RESEND_API_KEY'] }).https.onCall(async (data, context) => {
+export const sendFoodBoxEmail = functions.runWith({ ...LIMITS, secrets: ['RESEND_API_KEY'] }).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
 
   const d = data as any
@@ -292,7 +292,7 @@ export const sendFoodBoxEmail = functions.runWith({ secrets: ['RESEND_API_KEY'] 
   const fromName  = emailCfg?.fromName  || 'CineForge'
   const fromEmail = emailCfg?.fromEmail || 'onboarding@resend.dev'
 
-  await getResend().emails.send({
+  await sendEmailOrThrow({
     from:        `${fromName} <${fromEmail}>`,
     to:          [...recipients],
     replyTo:    d.studentEmail || undefined,
@@ -308,12 +308,15 @@ export const sendFoodBoxEmail = functions.runWith({ secrets: ['RESEND_API_KEY'] 
 // onFoodBoxOrderCreated — notify teachers/admins via chat + push
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onFoodBoxOrderCreated = functions.firestore
+export const onFoodBoxOrderCreated = functions.runWith(LIMITS).firestore
   .document('food_box_orders/{id}')
   .onCreate(async (snap) => {
     if (snap.data().notifSent === true) return
     await snap.ref.update({ notifSent: true })
     const d = snap.data()
+    // Rate limit on notifying staff — a script creating these in a loop would
+    // otherwise push every staff phone each time (the doc itself is kept)
+    if (!(await allow(String(d.studentId ?? 'unknown'), 'foodbox-notify', 5))) return
     const meals = [
       (d.morningStudents?.length > 0) ? `🏠 Internat ×${d.morningStudents.length}` : '',
       (d.lunchStudents?.length   > 0) ? `🥗 Lunch ×${d.lunchStudents.length}`   : '',
@@ -335,7 +338,7 @@ export const onFoodBoxOrderCreated = functions.firestore
 // onFoodBoxOrderUpdated — push student when status changes
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onFoodBoxOrderUpdated = functions.firestore
+export const onFoodBoxOrderUpdated = functions.runWith(LIMITS).firestore
   .document('food_box_orders/{id}')
   .onUpdate(async (change) => {
     const before = change.before.data()
@@ -367,7 +370,7 @@ export const onFoodBoxOrderUpdated = functions.firestore
 // foodBoxPickupReminder — runs every 5 min, pushes student 30 min before pick-up
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const foodBoxPickupReminder = functions.pubsub
+export const foodBoxPickupReminder = functions.runWith(LIMITS).pubsub
   .schedule('every 5 minutes')
   .onRun(async () => {
     const now = new Date()
@@ -409,7 +412,7 @@ export const foodBoxPickupReminder = functions.pubsub
 // exportFoodBoxPdf — admin callable: load order, generate Swedish PDF, return base64
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const exportFoodBoxPdf = functions.https.onCall(async (data, context) => {
+export const exportFoodBoxPdf = functions.runWith(LIMITS).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
   const claims = context.auth.token as any
   if (claims.role !== 'admin' && claims.role !== 'teacher') {

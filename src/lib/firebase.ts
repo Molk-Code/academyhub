@@ -4,6 +4,7 @@ import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 import { getFunctions } from 'firebase/functions'
 import { getPerformance } from 'firebase/performance'
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check'
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -15,6 +16,19 @@ const firebaseConfig = {
 }
 
 const app = initializeApp(firebaseConfig)
+
+// App Check: proves requests come from this app, not a script holding the
+// public API key. Off until a reCAPTCHA v3 site key is set in
+// VITE_RECAPTCHA_V3_SITE_KEY (and the app is registered under App Check in the
+// Firebase console); enforcement is then switched on per product there.
+const appCheckKey = import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY as string | undefined
+if (appCheckKey) {
+  try {
+    initializeAppCheck(app, { provider: new ReCaptchaV3Provider(appCheckKey), isTokenAutoRefreshEnabled: true })
+  } catch (err) {
+    console.warn('App Check not started', err)
+  }
+}
 
 export const auth      = getAuth(app)
 export const db        = getFirestore(app)

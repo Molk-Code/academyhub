@@ -14,7 +14,7 @@ import { BrowserMultiFormatReader } from '@zxing/browser'
 import { NotFoundException } from '@zxing/library'
 import { QRCodeSVG } from 'qrcode.react'
 import { buildEquipmentContractHtml } from '@/lib/equipmentContract'
-import { isOverdue, formatDate, overdueDays, parseScanText, beep, itemDisplayName, matchCheckoutScan, matchCheckinScan } from './inventoryShared'
+import { isOverdue, formatDate, overdueDays, parseScanText, beep, itemDisplayName, checkoutScan, matchCheckinScan } from './inventoryShared'
 import { EquipmentPicker } from './EquipmentPicker'
 import { ContractSignatures } from './ContractSignatures'
 import { ScanFlash, useScanFlash, NotInProjectModal, type NotInProjectData } from './ScanFeedback'
@@ -307,38 +307,44 @@ export function ProjectDetail({
       ? (unit ? `${matchedEquip.name} #${unit}` : matchedEquip.name)
       : text
     if (scanMode === 'checkout') {
-      const found = matchCheckoutScan(items, matchedEquip?.id ?? '', displayName, unit)
-      if (found.kind === 'duplicate') {
+      // Atomic: another scanner on this project can't take the same row or unit
+      let result
+      try {
+        result = await checkoutScan({
+          projectId: project.id, items, equipmentId: matchedEquip?.id ?? '', scannedName: displayName, unit,
+          newRow: {
+            equipmentId: matchedEquip?.id ?? '',
+            equipmentName: displayName,
+            checkinTimestamp: '',
+            status: 'checked-out',
+            damageNotes: '',
+            assignedTo: project.borrowers?.[0] ?? '',
+          },
+        })
+      } catch (err) {
+        console.error('Checkout scan failed', err)
+        log(displayName, 'Could not save — scan again', true)
+        flashItem(displayName, matchedEquip?.id, 'Not saved — scan again', true)
+        beep(220)
+        return
+      }
+      if (result.kind === 'duplicate') {
         log(displayName, 'Already checked out in this project', true)
         flashItem(displayName, matchedEquip?.id, 'Already scanned out', true)
         beep(220)
         return
       }
-      if (found.kind === 'booked') {
+      if (result.kind === 'booked') {
         log(displayName, 'Checked out — booked')
         flashItem(displayName, matchedEquip?.id, 'Checked out')
-        await updateDoc(doc(db, `inventory_projects/${project.id}/items`, found.item.id), {
-          status: 'checked-out',
-          checkoutTimestamp: new Date().toISOString(),
-          ...(unit != null ? { unit } : {}),
-        })
         return
       }
-      // Nothing booked left for it: add it — flagged when the project came from a booking
+      // Nothing booked was left for it: added — flagged when the project came from a booking
       const extra = !!project.bookingId
       const note = !matchedEquip ? 'Not in the equipment list — added by its code' : extra ? 'Not in the booking — added as extra' : 'Checked out'
       log(displayName, note, !matchedEquip || extra)
       flashItem(displayName, matchedEquip?.id, !matchedEquip ? 'Added by its code — not in the equipment list' : extra ? 'Checked out — not in the booking' : 'Checked out', !matchedEquip || extra)
       if (!matchedEquip || extra) beep(220)
-      await addDoc(collection(db, `inventory_projects/${project.id}/items`), {
-        equipmentId: matchedEquip?.id ?? '',
-        equipmentName: displayName,
-        checkoutTimestamp: new Date().toISOString(),
-        checkinTimestamp: '',
-        status: 'checked-out',
-        damageNotes: '',
-        assignedTo: project.borrowers?.[0] ?? '',
-      })
     } else {
       const match = matchCheckinScan(items, matchedEquip?.id ?? '', displayName, unit)
       log(match ? itemDisplayName(match) : displayName,

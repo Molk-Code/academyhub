@@ -4,8 +4,21 @@ service cloud.firestore {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    function isSignedIn() {
+    // Any Firebase Auth login, including one created straight against the API
+    // without an invite. Only for the signup steps themselves (own profile doc,
+    // own push tokens) — school data uses isSignedIn() below.
+    function isAuthed() {
       return request.auth != null;
+    }
+
+    // A member of the school: has a role claim (set from an invite / class
+    // signup) or, for older accounts without claims, a profile doc. The
+    // exists() read only runs when the claim is missing.
+    function isSignedIn() {
+      return request.auth != null && (
+        request.auth.token.get('role', '') in ['student', 'teacher', 'admin']
+        || exists(/databases/$(database)/documents/users/$(request.auth.uid))
+      );
     }
 
     function role() {
@@ -57,7 +70,7 @@ service cloud.firestore {
     }
 
     function isSelf(uid) {
-      return isSignedIn() && request.auth.uid == uid;
+      return isAuthed() && request.auth.uid == uid;
     }
 
     // ── Tier / Feature gating ─────────────────────────────────────────────────
@@ -91,11 +104,11 @@ service cloud.firestore {
         && d.get('disabled', false) == false
         && d.get('displayName', '').size() <= 80
         && (
-          // Student — no class, or the class of the class invite used
+          // Student from an active class invite (QR) — joins exactly that class
           (d.role == 'student' && d.get('roles', ['student']) == ['student']
-            && (d.get('cohortId', null) == null
-                || (d.get('classInviteId', '') != ''
-                    && get(/databases/$(database)/documents/classInvites/$(d.classInviteId)).data.cohortId == d.cohortId)))
+            && d.get('classInviteId', '') != ''
+            && get(/databases/$(database)/documents/classInvites/$(d.classInviteId)).data.get('active', false) == true
+            && get(/databases/$(database)/documents/classInvites/$(d.classInviteId)).data.cohortId == d.get('cohortId', null))
           ||
           // Email invitation — role and class must be exactly what it grants
           (d.get('inviteId', '') != ''
@@ -421,7 +434,16 @@ service cloud.firestore {
         // Only people who can see the channel may post in it, as themselves
         allow create: if isSignedIn() && canAccessChannel()
           && request.resource.data.authorId == request.auth.uid
-          && request.resource.data.get('content', '').size() <= 4000;
+          && request.resource.data.get('content', '').size() <= 4000
+          && postThrottled();
+        // One message per second per person: the same batch must stamp
+        // chat_throttle/{uid}.lastPost with this request's time, and the
+        // previous stamp must be over a second old
+        function postThrottled() {
+          let path = /databases/$(database)/documents/chat_throttle/$(request.auth.uid);
+          return getAfter(path).data.lastPost == request.time
+            && (!exists(path) || request.time > get(path).data.lastPost + duration.value(1, 's'));
+        }
         // Author or staff can delete
         allow delete: if isSignedIn()
           && (resource.data.authorId == request.auth.uid || isStaff());
@@ -429,6 +451,13 @@ service cloud.firestore {
         allow update: if isSignedIn() && canAccessChannel()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']);
       }
+    }
+
+    match /chat_throttle/{userId} {
+      allow read: if isSelf(userId);
+      allow create, update: if isSelf(userId)
+        && request.resource.data.keys().hasOnly(['lastPost'])
+        && request.resource.data.lastPost == request.time;
     }
 
     // ── Production teams ──────────────────────────────────────────────────────
@@ -608,6 +637,11 @@ service cloud.firestore {
         allow write: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('inventory'));
       }
 
+      // "This unit is out" markers used by the scanners (checkoutScan)
+      match /unit_out/{lockId} {
+        allow read, write: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('inventory'));
+      }
+
       // Contract e-signatures — written only by the signEquipmentContract
       // function (server-captured evidence), never edited. Borrowers see their own.
       match /signatures/{sigId} {
@@ -696,9 +730,15 @@ service cloud.firestore {
       allow read: if isSignedIn()
         && (resource.data.userId == request.auth.uid
             || request.auth.uid in resource.data.inviteeIds);
+      // notifiedIds is kept by sendEventInviteNotifications only (who has been told)
       allow create: if isSignedIn()
-        && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && !request.resource.data.keys().hasAny(['notifiedIds']);
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['notifiedIds']);
+      allow delete: if isSignedIn()
         && resource.data.userId == request.auth.uid;
     }
 
@@ -843,7 +883,14 @@ service cloud.firestore {
     }
 
     match /_client_errors/{errorId} {
-      allow create: if isSignedIn();
+      // Size-capped so a script can't stuff huge documents in
+      allow create: if isSignedIn()
+        && request.resource.data.keys().size() <= 20
+        && request.resource.data.get('message', '').size() <= 2000
+        && (request.resource.data.get('stack', null) == null || request.resource.data.stack.size() <= 10000)
+        && request.resource.data.get('context', '').size() <= 2000
+        && request.resource.data.get('url', '').size() <= 2000
+        && request.resource.data.get('ua', '').size() <= 500;
       allow read, update, delete: if isAdmin();
     }
 

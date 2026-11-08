@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import {
-  collection, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc,
+  collection, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc, writeBatch, limitToLast,
   serverTimestamp, arrayUnion, arrayRemove,
 } from 'firebase/firestore'
 import { uploadWithQuota } from '@/lib/uploadWithQuota'
@@ -14,6 +14,7 @@ import { format, isToday, isYesterday, differenceInMinutes } from 'date-fns'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, orderBy, where } from '@/hooks/useFirestore'
+import { useAllUsers } from '@/hooks/useAllUsers'
 import type { ChatChannelDoc, ChatMessageDoc, UserDoc, ProductionTeamDoc } from '@/types'
 import { canAccessChannel, markChannelRead } from '@/lib/chat'
 import { useSeenRevision } from '@/lib/seenSignal'
@@ -96,7 +97,7 @@ export default function ChatPage() {
     'chat_channels',
     [orderBy('order', 'asc')],
   )
-  const { data: allUsers } = useCollection<UserDoc>('users')
+  const { data: allUsers } = useAllUsers()
 
   const channels = allChannels.filter(ch =>
     canAccessChannel(ch, profile?.uid ?? '', roles, profile?.cohortId ?? null, myTeamIds),
@@ -132,12 +133,17 @@ export default function ChatPage() {
     return { id: otherId ?? '', displayName: fallbackName, avatarUrl: null } as any
   }, [activeChannelId, channels, allUsers, profile?.uid, profile?.displayName])
 
+  // Only the latest messages are loaded; "Load older" raises the limit
+  const PAGE = 50
+  const [msgLimit, setMsgLimit] = useState(PAGE)
+  useEffect(() => { setMsgLimit(PAGE) }, [activeChannelId])
   const { data: messages, loading: msgsLoading } = useCollection<ChatMessageDoc>(
     activeChannelId ? `chat_channels/${activeChannelId}/messages` : 'chat_channels',
-    [orderBy('createdAt', 'asc')],
+    [orderBy('createdAt', 'asc'), limitToLast(msgLimit)],
     !!activeChannelId,
-    activeChannelId ?? '',
+    `${activeChannelId ?? ''}_${msgLimit}`,
   )
+  const mayHaveOlder = messages.length >= msgLimit
 
   const displayedMessages = useMemo(() => {
     if (!searchQuery.trim()) return messages
@@ -173,9 +179,11 @@ export default function ChatPage() {
     setSearchQuery('')
   }, [activeChannelId])
 
+  // Follow new messages at the bottom — but not when older ones load above
+  const newestId = messages[messages.length - 1]?.id
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length])
+  }, [newestId])
 
   useEffect(() => {
     const ta = textareaRef.current
@@ -200,7 +208,10 @@ export default function ChatPage() {
           return { url, name: file.name, type: file.type, size: file.size }
         }),
       )
-      await addDoc(collection(db, `chat_channels/${activeChannelId}/messages`), {
+      // The message and the sender's throttle stamp go together — the rules
+      // allow one message per second per person (stops scripted spam)
+      const batch = writeBatch(db)
+      batch.set(doc(collection(db, `chat_channels/${activeChannelId}/messages`)), {
         authorId:        profile.uid,
         authorName:      profile.displayName,
         authorAvatarUrl: profile.avatarUrl ?? null,
@@ -209,6 +220,8 @@ export default function ChatPage() {
         reactions:       {},
         createdAt:       serverTimestamp(),
       })
+      batch.set(doc(db, 'chat_throttle', profile.uid), { lastPost: serverTimestamp() })
+      await batch.commit()
       // Reset immediately after the message is saved — don't wait for the channel update
       setInputText('')
       setPendingFiles([])
@@ -222,6 +235,11 @@ export default function ChatPage() {
           lastMessageAt: serverTimestamp(),
         }).catch(() => { /* the server stamps it anyway */ })
       }
+    } catch (err: any) {
+      // The typed text stays in the box, so nothing is lost
+      alert(err?.code === 'permission-denied'
+        ? 'Slow down a little — wait a second and send again.'
+        : 'Could not send the message. Check your connection and try again.')
     } finally {
       setSending(false)
     }
@@ -631,6 +649,16 @@ export default function ChatPage() {
                   </div>
                 ) : (
                   <div className="space-y-px">
+                    {mayHaveOlder && !searchQuery && (
+                      <div className="flex justify-center pb-3">
+                        <button
+                          onClick={() => setMsgLimit(n => n + PAGE)}
+                          className="text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-800/60 hover:bg-zinc-800 rounded-full px-3 py-1 transition-colors"
+                        >
+                          Load older messages
+                        </button>
+                      </div>
+                    )}
                     {displayedMessages.map((msg, index) => {
                       const grouped   = searchQuery ? false : isGrouped(index)
                       const divider   = searchQuery ? null  : getDivider(index)

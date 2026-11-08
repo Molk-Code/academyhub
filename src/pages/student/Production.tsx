@@ -4,6 +4,7 @@ import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from '
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where } from '@/hooks/useFirestore'
+import { useAllUsers } from '@/hooks/useAllUsers'
 import type { ProductionTeamDoc, UserDoc, ProductionDoc, ProductionPeriodDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { cn } from '@/lib/utils'
@@ -144,7 +145,7 @@ export default function StudentProduction() {
     cohortId ?? '',
   )
 
-  const { data: allUsers } = useCollection<UserDoc>('users')
+  const { data: allUsers } = useAllUsers()
 
   // Firestore rules require queries to match one of the canReadProd() branches, so
   // fetch each accessible slice separately and merge below.

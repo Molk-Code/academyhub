@@ -3,6 +3,7 @@ import { addDoc, updateDoc, deleteDoc, doc, setDoc, collection, getDocs, writeBa
 import { db } from '@/lib/firebase'
 import { SCHOOL_ID } from '@/lib/school'
 import { useCollection, useDocument, orderBy } from '@/hooks/useFirestore'
+import { useAllUsers } from '@/hooks/useAllUsers'
 import { useSchool, type CurrencyCode } from '@/contexts/SchoolContext'
 import type { LessonBlockDoc, ClassroomDoc, UserDoc, SemesterSettingsDoc } from '@/types'
 import { Plus, Pencil, Trash2, Check, X, Clock, Sun, DoorOpen, Users, Star, CalendarRange, GraduationCap, Link2, Coins } from 'lucide-react'
@@ -60,7 +61,7 @@ export default function SchoolInfo() {
   const { data: attendanceDoc }      = useDocument<AttendancePointsDoc>('settings', 'attendance')
   const { data: semesterDoc }        = useDocument<SemesterSettingsDoc>('settings', 'semester')
   const { data: schoolDoc }          = useDocument<{ id: string; name?: string }>('settings', 'school')
-  const { data: allUsers }           = useCollection<UserDoc>('users')
+  const { data: allUsers }           = useAllUsers()
   const teachers = allUsers.filter(u => (u.roles?.length ? u.roles : [u.role]).includes('teacher'))
   const { currency: currentCurrency } = useSchool()
 

@@ -1,10 +1,10 @@
-import { admin, functions, db } from './lib'
+import { admin, functions, db, LIMITS, requireMember, withTimeout, requireAllowed } from './lib'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // dailyFirestoreBackup — export Firestore to Cloud Storage every night at 02:00 Stockholm
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const dailyFirestoreBackup = functions.pubsub
+export const dailyFirestoreBackup = functions.runWith(LIMITS).pubsub
   .schedule('0 2 * * *')
   .timeZone('Europe/Stockholm')
   .onRun(async () => {
@@ -14,7 +14,7 @@ export const dailyFirestoreBackup = functions.pubsub
     const outputUri  = `${bucket}/firestore-backups/${dateStr}`
 
     const token = await admin.app().options.credential!.getAccessToken()
-    const res   = await fetch(
+    const res   = await withTimeout(fetch(
       `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default):exportDocuments`,
       {
         method:  'POST',
@@ -24,7 +24,7 @@ export const dailyFirestoreBackup = functions.pubsub
         },
         body: JSON.stringify({ outputUriPrefix: outputUri }),
       }
-    )
+    ), 60_000, 'Firestore export request')
     if (!res.ok) {
       const text = await res.text()
       throw new Error(`Firestore export failed (${res.status}): ${text}`)
@@ -37,14 +37,15 @@ export const dailyFirestoreBackup = functions.pubsub
 // exportUserData — GDPR right of access (callable, owner or admin only)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const exportUserData = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+export const exportUserData = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+  await requireMember(context)
 
   const { userId } = data as { userId?: string }
-  const uid = userId ?? context.auth.uid
+  const uid = userId ?? context.auth!.uid
+  await requireAllowed(context.auth!.uid, 'gdpr-export', 5)
 
   // Only the account owner or an admin may export
-  if (uid !== context.auth.uid && context.auth.token.role !== 'admin') {
+  if (uid !== context.auth!.uid && context.auth!.token.role !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'You may only export your own data.')
   }
 
@@ -91,14 +92,14 @@ export const exportUserData = functions.https.onCall(async (data, context) => {
 // deleteUserData — GDPR right to erasure (callable, owner or admin only)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const deleteUserData = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+export const deleteUserData = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+  await requireMember(context)
 
   const { userId } = data as { userId?: string }
-  const uid = userId ?? context.auth.uid
+  const uid = userId ?? context.auth!.uid
 
-  const isAdmin = context.auth.token.role === 'admin'
-  if (uid !== context.auth.uid && !isAdmin) {
+  const isAdmin = context.auth!.token.role === 'admin'
+  if (uid !== context.auth!.uid && !isAdmin) {
     throw new functions.https.HttpsError('permission-denied', 'You may only delete your own account.')
   }
 
@@ -196,7 +197,7 @@ export const deleteUserData = functions.https.onCall(async (data, context) => {
   try {
     await db.collection('deletion_log').add({
       uid,
-      deletedBy:  isAdmin ? context.auth.uid : uid,
+      deletedBy:  isAdmin ? context.auth!.uid : uid,
       deletedAt:  admin.firestore.FieldValue.serverTimestamp(),
       method:     isAdmin ? 'admin-panel' : 'self-service',
     })
@@ -208,8 +209,8 @@ export const deleteUserData = functions.https.onCall(async (data, context) => {
 })
 
 // ── One-time migration: copy cohorts → classes ───────────────────────────────
-export const migrateCohortsToClasses = functions.https.onCall(async (_data, context) => {
-  if (!context.auth || context.auth.token.role !== 'admin') {
+export const migrateCohortsToClasses = functions.runWith(LIMITS).https.onCall(async (_data, context) => {
+  if (!context.auth || context.auth!.token.role !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'Admin only.')
   }
   const snap = await db.collection('cohorts').get()

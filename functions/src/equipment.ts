@@ -1,4 +1,4 @@
-import { functions, db, admin, requireTeacherOrAdmin } from './lib'
+import { functions, db, admin, requireTeacherOrAdmin, LIMITS, allow } from './lib'
 import { sendPush, saveNotifications, tokensFor } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ async function pushAndSave(studentId: string, tokens: string[], opts: { title: s
 // onEquipmentBookingCreated — notify teachers/admins of new equipment requests
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onEquipmentBookingCreated = functions.firestore
+export const onEquipmentBookingCreated = functions.runWith(LIMITS).firestore
   .document('equipment_bookings/{bookingId}')
   .onCreate(async (snap) => {
     const booking = snap.data()
@@ -149,6 +149,11 @@ export const onEquipmentBookingCreated = functions.firestore
     await snap.ref.update({ items: stamped })
 
     const categories = [...new Set(stamped.map(i => i.category as string))]
+    // Rate limit on notifying staff — a script creating these in a loop would
+    // otherwise push every staff phone each time (the doc itself is kept)
+    // Signed-out rental guests share one budget
+    const who = (booking.studentId as string) || 'rental-guests'
+    if (!(await allow(who, 'booking-notify', booking.studentId ? 5 : 10))) return null
     await pushToResponsibleStaff(
       categories,
       '📦 Equipment booking request',
@@ -162,7 +167,7 @@ export const onEquipmentBookingCreated = functions.firestore
 // onEquipmentBookingMessageCreated — notify the other side of a reply
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onEquipmentBookingMessageCreated = functions.firestore
+export const onEquipmentBookingMessageCreated = functions.runWith(LIMITS).firestore
   .document('equipment_bookings/{bookingId}/messages/{messageId}')
   .onCreate(async (snap, context) => {
     const message = snap.data()
@@ -170,6 +175,7 @@ export const onEquipmentBookingMessageCreated = functions.firestore
     if (!bookingSnap.exists) return null
     const booking = bookingSnap.data()!
 
+    if (!(await allow(String(message.senderId ?? 'unknown'), 'booking-msg-notify', 10))) return null
     if (message.senderRole === 'student') {
       await pushToResponsibleStaff(
         await bookingCategories(booking.items ?? []),
@@ -197,7 +203,7 @@ export const onEquipmentBookingMessageCreated = functions.firestore
 // onEquipmentBookingUpdated — notify student when booking status changes
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onEquipmentBookingUpdated = functions.firestore
+export const onEquipmentBookingUpdated = functions.runWith(LIMITS).firestore
   .document('equipment_bookings/{bookingId}')
   .onUpdate(async (change) => {
     const before = change.before.data()
@@ -261,7 +267,7 @@ export const onEquipmentBookingUpdated = functions.firestore
 // onInventoryProjectCreated — notify borrowers when a project is set up for them
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onInventoryProjectCreated = functions.firestore
+export const onInventoryProjectCreated = functions.runWith(LIMITS).firestore
   .document('inventory_projects/{projectId}')
   .onCreate(async (snap) => {
     const project = snap.data()
@@ -286,7 +292,7 @@ export const onInventoryProjectCreated = functions.firestore
 // step with the project, and notify borrowers of returns and new dates
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onInventoryProjectUpdated = functions.firestore
+export const onInventoryProjectUpdated = functions.runWith(LIMITS).firestore
   .document('inventory_projects/{projectId}')
   .onUpdate(async (change) => {
     const before = change.before.data()
@@ -350,22 +356,27 @@ export const onInventoryProjectUpdated = functions.firestore
 
 const OUT_STATUSES = ['checked-out', 'damaged', 'missing']
 
+// Read and write in one transaction: when many units are scanned at once,
+// each recount retries if another scan changed the items meanwhile, so the
+// last write can't be based on a stale count.
 export async function recomputeEquipmentAvailable(equipmentId: string): Promise<void> {
   const equipRef = db.collection('equipment').doc(equipmentId)
-  const [equipSnap, itemsSnap] = await Promise.all([
-    equipRef.get(),
-    db.collectionGroup('items').where('equipmentId', '==', equipmentId).get(),
-  ])
-  if (!equipSnap.exists) return
-  const out = itemsSnap.docs.filter(d =>
-    d.ref.parent.parent?.parent.id === 'inventory_projects' && OUT_STATUSES.includes(d.data().status),
-  ).length
-  const total = Number(equipSnap.data()?.totalQuantity ?? 0)
-  const available = Math.max(0, total - out)
-  if (equipSnap.data()?.available !== available) await equipRef.update({ available })
+  await db.runTransaction(async tx => {
+    const [equipSnap, itemsSnap] = await Promise.all([
+      tx.get(equipRef),
+      tx.get(db.collectionGroup('items').where('equipmentId', '==', equipmentId)),
+    ])
+    if (!equipSnap.exists) return
+    const out = itemsSnap.docs.filter(d =>
+      d.ref.parent.parent?.parent.id === 'inventory_projects' && OUT_STATUSES.includes(d.data().status),
+    ).length
+    const total = Number(equipSnap.data()?.totalQuantity ?? 0)
+    const available = Math.max(0, total - out)
+    if (equipSnap.data()?.available !== available) tx.update(equipRef, { available })
+  })
 }
 
-export const onInventoryItemWritten = functions.firestore
+export const onInventoryItemWritten = functions.runWith(LIMITS).firestore
   .document('inventory_projects/{projectId}/items/{itemId}')
   .onWrite(async (change) => {
     const before = change.before.exists ? change.before.data() : undefined
@@ -385,7 +396,7 @@ export const onInventoryItemWritten = functions.firestore
 // denied if every part was denied, otherwise confirmed.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const decideEquipmentBookingParts = functions.https.onCall(async (data, context) => {
+export const decideEquipmentBookingParts = functions.runWith(LIMITS).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
   const { bookingId, categories, decision, note } = data as {
     bookingId?: string; categories?: string[]; decision?: string; note?: string

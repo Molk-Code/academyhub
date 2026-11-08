@@ -386,7 +386,7 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
   async function addDayNow() {
     const maxNum = days.reduce((m, d) => Math.max(m, d.dayNumber), 0)
     await addDoc(collection(db, `productions/${productionId}/shootingDays`), {
-      dayNumber: maxNum + 1, date: '', workHours: '', startTime: '08:00', endTime: '17:00',
+      dayNumber: maxNum + 1, date: '', workHours: '', startTime: '08:00', endTime: '16:00',
       rtsTime: '', sceneIds: [], notes: '', locationMoves: [],
     })
   }

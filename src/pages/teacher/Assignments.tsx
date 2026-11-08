@@ -61,7 +61,7 @@ export default function Assignments() {
           <h1 className="page-title">Assignments</h1>
           <p className="text-zinc-400 text-sm mt-1">{assignments.length} total</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Link to="/teacher/tests/new" className="btn bg-zinc-700 text-zinc-100 hover:bg-zinc-600 py-2.5">
             <ClipboardList className="w-4 h-4" /> New Form/Test
           </Link>

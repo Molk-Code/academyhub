@@ -317,7 +317,7 @@ export default function Students() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-zinc-800 p-1 rounded-xl w-fit overflow-x-auto">
+      <div className="flex gap-1 bg-zinc-800 p-1 rounded-xl w-fit max-w-full overflow-x-auto">
         {tabs.map(tab => (
           <button
             key={tab.id}

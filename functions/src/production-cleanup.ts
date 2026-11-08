@@ -16,3 +16,11 @@ export const onProductionDeleted = functions.runWith(LIMITS).firestore
       .deleteFiles({ prefix: `productions/${context.params.id}/` })
       .catch(err => console.error('onProductionDeleted: storage cleanup failed', err))
   })
+
+// Same for equipment projects: the app removes their items, but contract
+// signatures (names, signing details) stayed behind.
+export const onInventoryProjectDeleted = functions.runWith(LIMITS).firestore
+  .document('inventory_projects/{id}')
+  .onDelete(async (snap) => {
+    await db.recursiveDelete(snap.ref)
+  })

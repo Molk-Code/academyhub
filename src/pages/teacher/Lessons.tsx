@@ -1325,6 +1325,8 @@ export default function Lessons() {
                 hiddenDays: [0, 6],
                 buttonText: 'work week',
               },
+              // Month columns span many weeks — a date in the header was wrong
+              dayGridMonth: { dayHeaderFormat: { weekday: 'short' } },
             }}
             events={allEvents}
             height={

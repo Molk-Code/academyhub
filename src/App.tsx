@@ -1,4 +1,4 @@
-import { lazy } from 'react'
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { MicrosoftAuthProvider } from '@/contexts/MicrosoftAuthContext'
@@ -128,6 +128,9 @@ export default function App() {
       <BrowserRouter>
         <NotificationInit />
         <BugReportHighlighter />
+        {/* Catches lazily loaded pages outside the layouts (shop, scanner, …) —
+            without it, opening one from inside the app crashed (React #426) */}
+        <Suspense fallback={<div className="min-h-screen bg-zinc-950" />}>
         <Routes>
           {/* ── Public ──────────────────────────────────────────────────── */}
           <Route path="/login"         element={<Login />} />
@@ -264,6 +267,7 @@ export default function App() {
           {/* ── Fallback ────────────────────────────────────────────────── */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </MicrosoftAuthProvider>
     </AuthProvider>

@@ -243,7 +243,7 @@ function CreateProjectForm({
   }
 
   async function handleCreate() {
-    if (!name.trim() || !returnDate) return
+    if (!name.trim() || !returnDate || returnDate < checkoutDate) return
     setSubmitting(true)
     const ref = doc(collection(db, 'inventory_projects'))
     const bookingRef = fromBooking ? doc(db, 'equipment_bookings', fromBooking.id) : null
@@ -456,12 +456,15 @@ function CreateProjectForm({
 
         <div className="form-group">
           <label>Return Date</label>
-          <input type="date" className="form-input" value={returnDate} onChange={e => setReturnDate(e.target.value)} />
+          <input type="date" className="form-input" value={returnDate} min={checkoutDate} onChange={e => setReturnDate(e.target.value)} />
+          {returnDate && returnDate < checkoutDate && (
+            <p style={{ color: '#f87171', fontSize: '.8rem', marginTop: '.35rem' }}>The return date can't be before the checkout date.</p>
+          )}
         </div>
 
         <button
           className="primary-btn"
-          disabled={submitting || !name.trim() || !returnDate}
+          disabled={submitting || !name.trim() || !returnDate || returnDate < checkoutDate}
           onClick={handleCreate}
         >
           {submitting ? 'Creating...' : 'Create Project'}

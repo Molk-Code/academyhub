@@ -7,7 +7,7 @@
 //    (--finish also deletes users/{uid}.fcmTokens, which every signed-in user can list)
 // 2. QR displays: give every device a secret link key and clear the token
 //    from its public doc
-// 3. Room display: backfill room_slots for bookings from today onward
+// 3. Room display: backfill room_slots for every booking (past days stay visible)
 import admin from 'firebase-admin'
 import { readFileSync } from 'fs'
 import { randomBytes } from 'crypto'
@@ -51,8 +51,7 @@ for (const d of devices.docs) {
 console.log(`qr displays: ${devices.size} total, ${keyed} given a secure link key`)
 
 // 3 ── room_slots backfill (mirrors functions/src/calendar.ts roomSlotFrom)
-const today = new Date().toISOString().slice(0, 10)
-const bookings = await db.collection('room_bookings').where('date', '>=', today).get()
+const bookings = await db.collection('room_bookings').get()
 bulk = db.bulkWriter()
 for (const d of bookings.docs) {
   const b = d.data()
@@ -66,4 +65,4 @@ for (const d of bookings.docs) {
   })
 }
 await bulk.close()
-console.log(`room slots: ${bookings.size} upcoming bookings mirrored`)
+console.log(`room slots: ${bookings.size} bookings mirrored`)

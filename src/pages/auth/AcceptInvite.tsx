@@ -87,8 +87,11 @@ export default function AcceptInvite() {
           setError('Invalid or expired invite link.')
         }
         setLoading(false)
-      }).catch(() => {
-        setError('Failed to load invite. Check your connection and try again.')
+      }).catch((err: { code?: string }) => {
+        // A made-up or deleted invite id is refused by the rules rather than "not found"
+        setError(err?.code === 'permission-denied'
+          ? 'Invalid or expired invite link.'
+          : 'Failed to load invite. Check your connection and try again.')
         setLoading(false)
       })
     } else if (classToken) {

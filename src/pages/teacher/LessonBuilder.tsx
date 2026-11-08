@@ -131,7 +131,11 @@ const schema = z.object({
   teacherIds:      z.array(z.string()),
   guestTeacherIds: z.array(z.string()),
   resources:   z.array(resourceSchema),
-})
+}).refine(
+  d => !d.date || !d.endDate || !d.startTime || !d.endTime
+    || `${d.endDate}T${d.endTime}` > `${d.date}T${d.startTime}`,
+  { message: 'End must be after start', path: ['endTime'] },
+)
 
 type FormData = z.infer<typeof schema>
 

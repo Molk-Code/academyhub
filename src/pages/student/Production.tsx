@@ -122,7 +122,10 @@ function relTime(ts: any): string {
 }
 
 export default function StudentProduction() {
-  const { profile, cohortId: ctxCohortId, previewCohortId, loading: authLoading } = useAuth()
+  const { profile, role, cohortId: ctxCohortId, previewCohortId, loading: authLoading } = useAuth()
+  const noClassMessage = role === 'student'
+    ? "You're not in a class yet — ask your teacher to add you, then you can create a production."
+    : 'No class selected — switch to Student Preview for a class to create a production.'
   const cohortId = ctxCohortId ?? previewCohortId ?? profile?.cohortId ?? null
   const navigate = useNavigate()
   const [showNew,         setShowNew]         = useState(false)
@@ -251,7 +254,7 @@ export default function StudentProduction() {
   async function createProduction() {
     setCreateError(null)
     if (!newTitle.trim() || !profile) return
-    if (!cohortId) { setCreateError('No class selected — switch to Student Preview for a class first.'); return }
+    if (!cohortId) { setCreateError(noClassMessage); return }
     if (productionType === 'custom' && !newDescription.trim()) return
     setCreating(true)
     const linkedPeriod = productionType === 'period' && selectedPeriodId
@@ -635,7 +638,7 @@ export default function StudentProduction() {
             )}
             {!cohortId && (
               <p className="text-xs text-amber-400 bg-amber-950/30 rounded-lg px-3 py-2">
-                No class selected — switch to Student Preview for a class to create a production.
+                {noClassMessage}
               </p>
             )}
             {createError && (

@@ -536,7 +536,7 @@ export default function StudentLayout() {
       </aside>
 
       {/* ── Content column: main + bottom nav ────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0">
       <main
         ref={mainRef}
         style={{ '--header-h': '4rem' } as React.CSSProperties}

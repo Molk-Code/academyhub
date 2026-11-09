@@ -6,6 +6,7 @@ import {
   BarChart2, Package, TrendingUp, XCircle, AlertTriangle,
 } from 'lucide-react'
 import { calcRentalDays, billableDays } from '@/lib/productionBudget'
+import { isDueThisWeek } from './inventoryShared'
 import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, UserDoc, CohortDoc } from '@/types'
 import './molkom.css'
 
@@ -14,6 +15,7 @@ type Item = InventoryItemDoc & { projectId: string }
 const TABS = [
   { id: 'equipment-status', label: 'Equipment Status' },
   { id: 'overdue',          label: 'Overdue' },
+  { id: 'due-this-week',    label: 'Due This Week' },
   { id: 'damaged',          label: 'Damaged' },
   { id: 'missing',          label: 'Missing' },
   { id: 'manual',           label: 'Manual Checkouts' },
@@ -533,6 +535,14 @@ export function StatsContent({
     [overdueItems, resets],
   )
 
+  const dueThisWeekItems = useMemo(() =>
+    allItems.filter(i => {
+      if (i.status !== 'checked-out') return false
+      const proj = projectMap[i.projectId]
+      return proj && ['active', 'checked-out'].includes(proj.status) && isDueThisWeek(proj.returnDate)
+    }).sort((a, b) => (projectMap[a.projectId]?.returnDate ?? '').localeCompare(projectMap[b.projectId]?.returnDate ?? '')),
+  [allItems, projectMap])
+
   const visibleDamagedItems = useMemo(
     () => allItems.filter(i => i.status === 'damaged' && afterCutoff('damaged', i.checkoutTimestamp)),
     [allItems, resets],
@@ -558,6 +568,7 @@ export function StatsContent({
     ...t,
     count:
       t.id === 'overdue'  ? visibleOverdueItems.length :
+      t.id === 'due-this-week' ? dueThisWeekItems.length :
       t.id === 'damaged'  ? visibleDamagedItems.length :
       t.id === 'missing'  ? visibleMissingItems.length :
       t.id === 'manual'   ? visibleManualItems.length :
@@ -628,6 +639,23 @@ export function StatsContent({
           }}
           emptyMsg="No overdue items"
           borderColor="#f87171"
+        />}
+        {activeTab === 'due-this-week' && <SimpleItemsTab
+          items={dueThisWeekItems}
+          projectMap={projectMap}
+          columns={['Equipment', 'Project', 'Due Date', 'Due']}
+          renderRow={item => {
+            const proj = projectMap[item.projectId]
+            const days = proj ? Math.round((new Date(proj.returnDate + 'T12:00:00').getTime() - new Date(today() + 'T12:00:00').getTime()) / 86400000) : 0
+            return [
+              item.equipmentName,
+              proj ? <button onClick={() => onOpenProject(proj.id)} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>{proj.name}</button> : '—',
+              <span style={{ color: '#f97316' }}>{proj ? formatDate(proj.returnDate) : '—'}</span>,
+              <span style={{ color: days <= 1 ? '#fbbf24' : '#a1a1aa', fontWeight: 700 }}>{days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `In ${days} days`}</span>,
+            ]
+          }}
+          emptyMsg="Nothing due back this week"
+          borderColor="#fbbf24"
         />}
         {activeTab === 'damaged' && <SimpleItemsTab
           items={visibleDamagedItems}

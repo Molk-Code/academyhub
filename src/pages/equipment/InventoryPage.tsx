@@ -15,7 +15,7 @@ import {
   ChevronDown, ChevronRight, ArrowLeft, Edit2, CheckCircle2, ArchiveRestore,
   Layers, Search, X, ZapOff, Scan, Smartphone, QrCode, ClipboardList, Pencil,
 } from 'lucide-react'
-import { EquipmentImg, today, isOverdue, formatDate, overdueDays, parseScanText, beep } from './inventoryShared'
+import { EquipmentImg, today, isOverdue, isDueThisWeek, formatDate, overdueDays, parseScanText, beep } from './inventoryShared'
 import { EquipmentPicker } from './EquipmentPicker'
 import { ProjectDetail } from './ProjectDetail'
 import './molkom.css'
@@ -726,6 +726,7 @@ export default function InventoryPage() {
     [projects],
   )
   const overdueProjects = activeProjects.filter(p => isOverdue(p.returnDate))
+  const dueThisWeekProjects = activeProjects.filter(p => isDueThisWeek(p.returnDate))
 
   // Items belonging to active projects only
   const activeProjectIds = useMemo(() => new Set(activeProjects.map(p => p.id)), [activeProjects])
@@ -734,11 +735,11 @@ export default function InventoryPage() {
   // Aggregate stats
   const stats = useMemo(() => ({
     itemsOut:     activeItems.filter(i => i.status === 'checked-out').length,
-    returned:     activeItems.filter(i => i.status === 'returned').length,
+    dueThisWeek:  dueThisWeekProjects.length,
     missing:      allItems.filter(i => i.status === 'missing').length,
     damaged:      allItems.filter(i => i.status === 'damaged').length,
     overdue:      overdueProjects.length,
-  }), [activeItems, allItems, overdueProjects])
+  }), [activeItems, allItems, overdueProjects, dueThisWeekProjects])
 
   async function updateProject(id: string, data: Partial<InventoryProjectDoc>) {
     await updateDoc(doc(db, 'inventory_projects', id), { ...data, updatedAt: serverTimestamp() })
@@ -828,11 +829,11 @@ export default function InventoryPage() {
                   <span className="inv-stat-label">Items Out</span>
                 </div>
               </div>
-              <div className="inv-stat-card">
-                <Check size={20} />
+              <div className="inv-stat-card clickable" {...statLink('due-this-week')}>
+                <Calendar size={20} />
                 <div>
-                  <span className="inv-stat-value">{stats.returned}</span>
-                  <span className="inv-stat-label">Returned</span>
+                  <span className="inv-stat-value">{stats.dueThisWeek}</span>
+                  <span className="inv-stat-label">Due Back This Week</span>
                 </div>
               </div>
               <div className={`inv-stat-card clickable${stats.overdue > 0 ? ' warning' : ''}`} {...statLink('overdue')}>

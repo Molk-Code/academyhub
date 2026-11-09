@@ -18,6 +18,14 @@ export function isOverdue(returnDate: string): boolean {
   return returnDate < today()
 }
 
+// Due back today or within the next 6 days — not yet overdue
+export function isDueThisWeek(returnDate: string): boolean {
+  if (!returnDate) return false
+  const end = new Date(today() + 'T12:00:00')
+  end.setDate(end.getDate() + 6)
+  return returnDate >= today() && returnDate <= end.toISOString().slice(0, 10)
+}
+
 export function formatDate(d: string) {
   if (!d) return '—'
   const dt = new Date(d + 'T12:00:00')

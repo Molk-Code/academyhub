@@ -273,6 +273,13 @@ function SimpleItemsTab({
   )
 }
 
+type BorrowerSortKey = 'name' | 'cohort' | 'projects' | 'active' | 'out' | 'returned' | 'missing' | 'damaged'
+const BORROWER_COLUMNS: { key: BorrowerSortKey; header: string }[] = [
+  { key: 'name', header: 'Borrower' }, { key: 'cohort', header: 'Class' }, { key: 'projects', header: 'Projects' },
+  { key: 'active', header: 'Active' }, { key: 'out', header: 'Items Out' }, { key: 'returned', header: 'Returned' },
+  { key: 'missing', header: 'Missing' }, { key: 'damaged', header: 'Damaged' },
+]
+
 function BorrowersTab({
   users, projects, allItems, cohortNames,
 }: {
@@ -281,6 +288,7 @@ function BorrowersTab({
   allItems: Item[]
   cohortNames: Record<string, string>
 }) {
+  const [sort, setSort] = useState<{ key: BorrowerSortKey; dir: 1 | -1 }>({ key: 'projects', dir: -1 })
   const rows = useMemo(() => {
     const known = users.map(u => ({ id: u.id, displayName: u.displayName, cohortId: u.cohortId ?? '' }))
     const unknownNames = new Set<string>()
@@ -307,8 +315,26 @@ function BorrowersTab({
         damaged:  uItems.filter(i => i.status === 'damaged').length,
         missing:  uItems.filter(i => i.status === 'missing').length,
       }
-    }).filter(Boolean).sort((a, b) => b!.projects - a!.projects) as NonNullable<ReturnType<typeof all.map>[0]>[]
+    }).filter(r => r !== null)
   }, [users, projects, allItems])
+
+  const sorted = useMemo(() => {
+    const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'sv')
+    const cohort = (r: { cohortId: string }) => cohortNames[r.cohortId] ?? r.cohortId
+    return [...rows].sort((a, b) => {
+      if (sort.key === 'name') return byName(a, b) * sort.dir
+      if (sort.key === 'cohort') {
+        // Borrowers without a class sort last either way
+        const x = cohort(a), y = cohort(b)
+        return (!x === !y ? x.localeCompare(y, 'sv') * sort.dir : x ? -1 : 1) || byName(a, b)
+      }
+      return (a[sort.key] - b[sort.key]) * sort.dir || byName(a, b)
+    })
+  }, [rows, sort, cohortNames])
+
+  // Names and classes start A–Z, counts start highest first
+  const toggleSort = (key: BorrowerSortKey) =>
+    setSort(s => s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: key === 'name' || key === 'cohort' ? 1 : -1 })
 
   if (rows.length === 0) return <Empty msg="No borrower data" />
 
@@ -317,13 +343,20 @@ function BorrowersTab({
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
         <thead>
           <tr style={{ borderBottom: '1px solid #2a2a3a' }}>
-            {['Borrower', 'Class', 'Projects', 'Active', 'Items Out', 'Returned', 'Missing', 'Damaged'].map(h => (
-              <th key={h} style={{ textAlign: 'left', padding: '.5rem .75rem', color: '#6a6a80', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}>{h}</th>
+            {BORROWER_COLUMNS.map(({ key, header }) => (
+              <th key={key} aria-sort={sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined} style={{ textAlign: 'left', padding: 0 }}>
+                <button
+                  onClick={() => toggleSort(key)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '.5rem .75rem', color: sort.key === key ? '#f97316' : '#6a6a80', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}
+                >
+                  {header}{sort.key === key ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
+                </button>
+              </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map((r: any, i: number) => (
+          {sorted.map((r: any, i: number) => (
             <tr key={i} style={{ borderBottom: '1px solid #1a1a25' }}>
               <td style={{ padding: '.5rem .75rem', color: '#f0f0f5', fontWeight: 600 }}>{r.name}</td>
               <td style={{ padding: '.5rem .75rem' }}><CohortBadge cohortId={r.cohortId} cohorts={cohortNames} /></td>

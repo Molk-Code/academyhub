@@ -85,6 +85,15 @@ function MostBorrowedTab({ allItems }: { allItems: Item[] }) {
   )
 }
 
+type StatusSortKey = 'name' | 'category' | 'status' | 'project'
+// In column order — also feeds the table headers
+const STATUS_SORTS: { key: StatusSortKey; label: string; header: string }[] = [
+  { key: 'name',     label: 'A–Z',      header: 'Equipment' },
+  { key: 'category', label: 'Category', header: 'Category' },
+  { key: 'status',   label: 'Status',   header: 'Status' },
+  { key: 'project',  label: 'Project',  header: 'Project' },
+]
+
 function EquipmentStatusTab({
   equipment, allItems, projectMap, onOpenProject,
 }: {
@@ -94,18 +103,10 @@ function EquipmentStatusTab({
   onOpenProject: (id: string) => void
 }) {
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<{ key: StatusSortKey; dir: 1 | -1 }>({ key: 'status', dir: 1 })
   const filtered = equipment.filter(e => e.name?.toLowerCase().includes(search.toLowerCase()))
 
-  // Group order: damaged/missing first, then pending checkout, then checked-out (incl. overdue), then available — alphabetical within each group.
-  const statusPriority = (status: 'damaged' | 'missing' | 'pending' | 'checked-out' | 'available') =>
-    status === 'damaged' || status === 'missing' ? 0 : status === 'pending' ? 1 : status === 'checked-out' ? 2 : 3
-
   const rows = useMemo(() => {
-    const toStatus = (item?: Item): 'damaged' | 'missing' | 'pending' | 'checked-out' | 'available' =>
-      item?.status === 'damaged' ? 'damaged' :
-      item?.status === 'missing' ? 'missing' :
-      item?.status === 'pending' ? 'pending' :
-      item?.status === 'checked-out' ? 'checked-out' : 'available'
     const open = allItems.filter(i => i.status !== 'returned')
     // Old items saved without an id still match the catalog by name; items
     // typed by hand never do, so they don't count against a catalog item
@@ -118,38 +119,77 @@ function EquipmentStatusTab({
       return {
         key: e.id, name: e.name, category: e.category, manual: false,
         activeItem, proj: activeItem ? projectMap[activeItem.projectId] : undefined,
-        status: toStatus(activeItem),
         checkedOutCount: matching.filter(i => i.status === 'checked-out').length,
       }
     })
+    // Hand-typed items carry no category: borrow one from a catalog item with
+    // the same name (any case), and "(BOOK) …" titles count as books
+    const categoryByName = new Map(equipment.map(e => [e.name.trim().toLowerCase(), e.category]))
+    const guessCategory = (name: string) =>
+      categoryByName.get(name.trim().toLowerCase())
+      ?? (/^\(book\)/i.test(name.trim()) ? (equipment.find(e => /^books?$/i.test(e.category))?.category ?? 'BOOKS') : '')
     // Hand-typed items show only while they're out, then drop off the list
     const q = search.toLowerCase()
     const manualRows = open
       .filter(i => !i.equipmentId && (i.isManualEntry || !catalogNames.has(i.equipmentName)))
       .filter(i => i.equipmentName.toLowerCase().includes(q))
       .map(i => ({
-        key: `manual-${i.projectId}-${i.id}`, name: i.equipmentName, category: '', manual: true,
-        activeItem: i, proj: projectMap[i.projectId], status: toStatus(i), checkedOutCount: 0,
+        key: `manual-${i.projectId}-${i.id}`, name: i.equipmentName, category: guessCategory(i.equipmentName), manual: true,
+        activeItem: i, proj: projectMap[i.projectId], checkedOutCount: 0,
       }))
-    return [...catalogRows, ...manualRows]
-      .sort((a, b) => statusPriority(a.status) - statusPriority(b.status) || a.name.localeCompare(b.name))
-  }, [filtered, equipment, allItems, projectMap, search])
+    // Status order: overdue, damaged, missing, pending, checked out, available
+    const STATUS_ORDER = ['Overdue', 'Damaged', 'Missing', 'Pending Checkout', 'Checked Out', 'Available']
+    const statusRank = (r: { activeItem?: Item; proj?: InventoryProjectDoc }) =>
+      STATUS_ORDER.indexOf(getStatusDisplay(r.activeItem, r.proj).label)
+    const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'sv')
+    // Empty categories and projects sort last whichever way the column runs
+    const byText = (x: string, y: string) => !x === !y ? x.localeCompare(y, 'sv') * sort.dir : x ? -1 : 1
+    return [...catalogRows, ...manualRows].sort((a, b) => {
+      switch (sort.key) {
+        case 'name':     return byName(a, b) * sort.dir
+        case 'category': return byText(a.category, b.category) || byName(a, b)
+        case 'project':  return byText(a.proj?.name ?? '', b.proj?.name ?? '') || byName(a, b)
+        default:         return (statusRank(a) - statusRank(b)) * sort.dir || byName(a, b)
+      }
+    })
+  }, [filtered, equipment, allItems, projectMap, search, sort])
+
+  const toggleSort = (key: StatusSortKey) =>
+    setSort(s => s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: 1 })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <input
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        placeholder="Search equipment…"
-        className="manual-add-input"
-        style={{ maxWidth: 320 }}
-      />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search equipment…"
+          className="manual-add-input"
+          style={{ maxWidth: 320, flex: '1 1 200px' }}
+        />
+        <select
+          value={sort.key}
+          onChange={e => setSort({ key: e.target.value as StatusSortKey, dir: 1 })}
+          className="manual-add-input"
+          style={{ width: 'auto' }}
+          aria-label="Sort by"
+        >
+          {STATUS_SORTS.map(s => <option key={s.key} value={s.key}>Sort: {s.label}</option>)}
+        </select>
+      </div>
       <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 12, overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #2a2a3a' }}>
-              {['Equipment', 'Category', 'Status', 'Project'].map(h => (
-                <th key={h} style={{ textAlign: 'left', padding: '.5rem .75rem', color: '#6a6a80', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
+              {STATUS_SORTS.map(({ key, header }) => (
+                <th key={key} aria-sort={sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined} style={{ textAlign: 'left', padding: 0 }}>
+                  <button
+                    onClick={() => toggleSort(key)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '.5rem .75rem', color: sort.key === key ? '#f97316' : '#6a6a80', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}
+                  >
+                    {header}{sort.key === key ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
+                  </button>
+                </th>
               ))}
             </tr>
           </thead>
@@ -167,7 +207,7 @@ function EquipmentStatusTab({
                     )}
                   </td>
                   <td style={{ padding: '.5rem .75rem', color: '#f97316', fontSize: '.7rem', fontWeight: 700 }}>{category || '—'}</td>
-                  <td style={{ padding: '.5rem .75rem' }}><span style={{ color }}>{dot} {label}</span></td>
+                  <td style={{ padding: '.5rem .75rem', whiteSpace: 'nowrap' }}><span style={{ color }}>{dot} {label}</span></td>
                   <td style={{ padding: '.5rem .75rem', color: '#6a6a80' }}>
                     {proj
                       ? <button onClick={() => onOpenProject(proj.id)} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>{proj.name}</button>

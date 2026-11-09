@@ -175,8 +175,14 @@ export default function SchoolInfo() {
     }
   }, [semesterDoc])
 
+  const semError =
+    semStart && semEnd && semEnd < semStart       ? 'Semester 1 must end after it starts.'
+    : !sem2Start !== !sem2End                     ? 'Semester 2 needs both a start and an end date.'
+    : sem2Start && sem2End && sem2End < sem2Start ? 'Semester 2 must end after it starts.'
+    : ''
+
   async function saveSemester() {
-    if (!semStart || !semEnd) return
+    if (!semStart || !semEnd || semError) return
     setSemSaving(true)
     await setDoc(doc(db, 'settings', 'semester'), {
       startDate: semStart,
@@ -216,17 +222,23 @@ export default function SchoolInfo() {
   }, [attendanceDoc])
 
   async function saveAttendancePoints() {
-    const pts     = parseInt(apPoints, 10) || 0
-    const penalty = parseInt(apPenalty, 10) || -5
+    // || would turn a deliberate 0 penalty back into -5
+    const pts     = parseInt(apPoints, 10)
+    const penalty = parseInt(apPenalty, 10)
     setApSaving(true)
-    await setDoc(doc(db, 'settings', 'attendance'), { pointsPerCheckIn: pts, absencePenalty: penalty }, { merge: true })
+    await setDoc(doc(db, 'settings', 'attendance'), {
+      pointsPerCheckIn: Number.isNaN(pts) ? 0 : pts,
+      absencePenalty:   Number.isNaN(penalty) ? -5 : penalty,
+    }, { merge: true })
     setApSaving(false)
     setApSaved(true)
     setTimeout(() => setApSaved(false), 2000)
   }
 
+  const sdError = sdStart && sdEnd && sdEnd <= sdStart ? 'The day must end after it starts.' : ''
+
   async function saveSchoolDay() {
-    if (!sdStart || !sdEnd) return
+    if (!sdStart || !sdEnd || sdError) return
     setSdSaving(true)
     await setDoc(doc(db, 'settings', 'schoolDay'), { startTime: sdStart, endTime: sdEnd }, { merge: true })
     setSdSaving(false)
@@ -402,7 +414,8 @@ export default function SchoolInfo() {
             </div>
           </div>
 
-          <button onClick={saveSemester} disabled={semSaving || !semStart || !semEnd} className="btn-primary py-2 px-4 text-sm flex items-center gap-2">
+          {semError && <p className="text-xs text-rose-400">{semError}</p>}
+          <button onClick={saveSemester} disabled={semSaving || !semStart || !semEnd || !!semError} className="btn-primary py-2 px-4 text-sm flex items-center gap-2">
             <Check className="w-4 h-4" />
             {semSaved ? 'Saved!' : semSaving ? 'Saving…' : 'Save'}
           </button>
@@ -426,11 +439,12 @@ export default function SchoolInfo() {
             <input type="time" className="input w-36" value={sdEnd} onChange={e => setSdEnd(e.target.value)} />
           </div>
           {sdStart && sdEnd && <p className="text-xs text-zinc-400 pb-2.5">{duration(sdStart, sdEnd)}</p>}
-          <button onClick={saveSchoolDay} disabled={sdSaving || !sdStart || !sdEnd} className="btn-primary py-2 px-4 text-sm pb-2.5">
+          <button onClick={saveSchoolDay} disabled={sdSaving || !sdStart || !sdEnd || !!sdError} className="btn-primary py-2 px-4 text-sm pb-2.5">
             <Check className="w-4 h-4" />
             {sdSaved ? 'Saved!' : sdSaving ? 'Saving…' : 'Save'}
           </button>
         </div>
+        {sdError && <p className="text-xs text-rose-400 mt-2">{sdError}</p>}
       </div>
 
       {/* ── Attendance Points ─────────────────────────────────────────── */}

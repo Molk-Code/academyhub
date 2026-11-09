@@ -27,9 +27,14 @@ export default function ProductionRoles() {
   }, [])
 
   const saveSettings = async () => {
+    // An emptied or out-of-range field would otherwise save 0 and flag every shooting day
+    const hours = Math.min(24, Math.max(1, Math.round(maxHours) || 1))
+    const shots = Math.min(200, Math.max(1, Math.round(maxShots) || 1))
+    setMaxHours(hours)
+    setMaxShots(shots)
     await setDoc(doc(db, 'settings', 'production'), {
-      maxHoursPerDay: maxHours,
-      maxShotsPerDay: maxShots,
+      maxHoursPerDay: hours,
+      maxShotsPerDay: shots,
     }, { merge: true })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -118,6 +123,7 @@ export default function ProductionRoles() {
   async function saveEdit(id: string) {
     if (!editName.trim()) return
     const dayRate = editDayRate !== '' ? Number(editDayRate) : undefined
+    if (dayRate !== undefined && !(dayRate >= 0)) return
     await updateDoc(doc(db, 'crew_roles', id), {
       name: editName.trim(),
       ...(dayRate !== undefined ? { dayRate } : {}),

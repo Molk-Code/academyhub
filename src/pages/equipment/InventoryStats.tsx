@@ -474,13 +474,15 @@ export function StatsContent({
   projects,
   allItems,
   onOpenProject,
+  initialTab = 'most-borrowed',
 }: {
   equipment: EquipmentDoc[]
   projects: InventoryProjectDoc[]
   allItems: Item[]
   onOpenProject: (id: string) => void
+  initialTab?: string
 }) {
-  const [activeTab, setActiveTab] = useState('most-borrowed')
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [users, setUsers] = useState<UserDoc[]>([])
   const [cohorts, setCohorts] = useState<CohortDoc[]>([])
   const { data: resets } = useDocument<{ id: string } & Record<string, Timestamp | undefined>>('settings', 'inventory_stats_resets')

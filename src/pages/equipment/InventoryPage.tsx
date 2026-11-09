@@ -677,6 +677,19 @@ export default function InventoryPage() {
   const allItems = useAllItems()
 
   const [tab, setTab] = useState<InvTab>('dashboard')
+  // A dashboard stat card opens Statistics on its matching tab; n remounts
+  // StatsContent so the same card works again after switching tabs there
+  const [statsJump, setStatsJump] = useState<{ tab: string; n: number } | null>(null)
+  const openStats = (statsTab: string) => {
+    setStatsJump(prev => ({ tab: statsTab, n: (prev?.n ?? 0) + 1 }))
+    setTab('statistics')
+  }
+  const statLink = (statsTab: string) => ({
+    role: 'button' as const,
+    tabIndex: 0,
+    onClick: () => openStats(statsTab),
+    onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openStats(statsTab) } },
+  })
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [createProject, setCreateProject] = useState(false)
   const [archivedOpen, setArchivedOpen] = useState(false)
@@ -808,7 +821,7 @@ export default function InventoryPage() {
                   <span className="inv-stat-label">Active Projects</span>
                 </div>
               </div>
-              <div className="inv-stat-card">
+              <div className="inv-stat-card clickable" {...statLink('equipment-status')}>
                 <Layers size={20} />
                 <div>
                   <span className="inv-stat-value">{stats.itemsOut}</span>
@@ -822,21 +835,21 @@ export default function InventoryPage() {
                   <span className="inv-stat-label">Returned</span>
                 </div>
               </div>
-              <div className={`inv-stat-card${stats.overdue > 0 ? ' warning' : ''}`}>
+              <div className={`inv-stat-card clickable${stats.overdue > 0 ? ' warning' : ''}`} {...statLink('overdue')}>
                 <Clock size={20} />
                 <div>
                   <span className="inv-stat-value">{stats.overdue}</span>
                   <span className="inv-stat-label">Overdue</span>
                 </div>
               </div>
-              <div className={`inv-stat-card${stats.missing > 0 ? ' danger' : ''}`}>
+              <div className={`inv-stat-card clickable${stats.missing > 0 ? ' danger' : ''}`} {...statLink('missing')}>
                 <AlertTriangle size={20} />
                 <div>
                   <span className="inv-stat-value">{stats.missing}</span>
                   <span className="inv-stat-label">Missing</span>
                 </div>
               </div>
-              <div className={`inv-stat-card${stats.damaged > 0 ? ' warning' : ''}`}>
+              <div className={`inv-stat-card clickable${stats.damaged > 0 ? ' warning' : ''}`} {...statLink('damaged')}>
                 <AlertTriangle size={20} />
                 <div>
                   <span className="inv-stat-value">{stats.damaged}</span>
@@ -898,7 +911,7 @@ export default function InventoryPage() {
         )}
 
         {/* Statistics tab */}
-        {tab === 'statistics' && <StatsContent equipment={equipment} projects={projects} allItems={allItems} onOpenProject={setSelectedProjectId} />}
+        {tab === 'statistics' && <StatsContent key={statsJump?.n ?? 0} initialTab={statsJump?.tab} equipment={equipment} projects={projects} allItems={allItems} onOpenProject={setSelectedProjectId} />}
 
         {/* Presets tab */}
         {tab === 'presets' && <PresetsManager />}

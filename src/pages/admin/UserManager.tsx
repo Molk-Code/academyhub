@@ -38,6 +38,9 @@ export default function UserManager() {
   const [saving,            setSaving]            = useState(false)
   const [resetEmailSent,    setResetEmailSent]    = useState<string | null>(null)
   const [copiedResetLink,   setCopiedResetLink]   = useState<string | null>(null)
+  // Account actions go through Cloud Functions that can take several seconds
+  // to cold-start; without this the row looks unchanged and invites re-clicks.
+  const [busyUserId,        setBusyUserId]        = useState<string | null>(null)
   const [toastMsg,          setToastMsg]          = useState<string | null>(null)
   const [lastInviteUrl,     setLastInviteUrl]     = useState<string | null>(null)
   const [copiedLastInvite,  setCopiedLastInvite]  = useState(false)
@@ -184,10 +187,15 @@ export default function UserManager() {
 
   async function disableUser(user: UserDoc) {
     if (!confirm(`Disable ${user.displayName}? They won't be able to log in until restored.`)) return
+    // No doc-only fallback: marking the doc disabled while the sign-in still
+    // works would show the account as blocked when it isn't.
+    setBusyUserId(user.id)
     try {
-      await httpsCallable(functions, 'disableUser')({ uid: user.uid })
-    } catch {
-      await updateDoc(doc(db, 'users', user.id), { disabled: true, isActive: false })
+      await httpsCallable(functions, 'disableUser')({ uid: user.uid ?? user.id })
+    } catch (err: any) {
+      alert(`Couldn't disable the account: ${err?.message ?? 'Unknown error'}`)
+    } finally {
+      setBusyUserId(null)
     }
   }
 
@@ -197,7 +205,7 @@ export default function UserManager() {
     )
     if (!confirmed) return
     try {
-      await httpsCallable(functions, 'deleteUserData')({ userId: user.uid })
+      await httpsCallable(functions, 'deleteUserData')({ userId: user.uid ?? user.id })
       setToastMsg(`${user.displayName} deleted.`)
     } catch (err: any) {
       alert(`Delete failed: ${err?.message ?? 'Unknown error'}`)
@@ -205,10 +213,13 @@ export default function UserManager() {
   }
 
   async function restoreUser(user: UserDoc) {
+    setBusyUserId(user.id)
     try {
-      await httpsCallable(functions, 'restoreUser')({ uid: user.uid })
-    } catch {
-      await updateDoc(doc(db, 'users', user.id), { disabled: false, isActive: true })
+      await httpsCallable(functions, 'restoreUser')({ uid: user.uid ?? user.id })
+    } catch (err: any) {
+      alert(`Couldn't restore the account: ${err?.message ?? 'Unknown error'}`)
+    } finally {
+      setBusyUserId(null)
     }
   }
 
@@ -286,6 +297,7 @@ export default function UserManager() {
 
   async function switchPrimaryRole(user: UserDoc, newRole: 'student' | 'teacher' | 'admin') {
     if (!confirm(`Switch ${user.displayName}'s primary role to ${newRole}? They will need to sign out and back in for the change to take full effect.`)) return
+    setBusyUserId(user.id)
     const isStaff = (r: string) => r === 'teacher' || r === 'admin'
     let next: string[]
     if (newRole === 'student') {
@@ -299,6 +311,8 @@ export default function UserManager() {
       await httpsCallable(functions, 'setUserRole')({ uid: user.id, role: newRole, roles: next })
     } catch (err: any) {
       alert(`Failed to update role: ${err?.message ?? err}`)
+    } finally {
+      setBusyUserId(null)
     }
   }
 
@@ -703,7 +717,7 @@ export default function UserManager() {
         const totalCount = users.length
 
         const renderUser = (user: UserDoc) => (
-          <div key={user.id} className={`bg-zinc-900 border rounded-xl px-4 py-3 flex items-center gap-3 ${selectedIds.has(user.id) ? 'border-orange-500/40 bg-orange-500/5' : user.disabled ? 'border-rose-900/50 opacity-60' : 'border-white/10'}`}>
+          <div key={user.id} aria-busy={busyUserId === user.id} className={`bg-zinc-900 border rounded-xl px-4 py-3 flex items-center gap-3 ${selectedIds.has(user.id) ? 'border-orange-500/40 bg-orange-500/5' : user.disabled ? 'border-rose-900/50 opacity-60' : 'border-white/10'} ${busyUserId === user.id ? 'opacity-50 pointer-events-none animate-pulse' : ''}`}>
             <input
               type="checkbox"
               checked={selectedIds.has(user.id)}

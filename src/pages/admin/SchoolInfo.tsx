@@ -39,6 +39,10 @@ interface AttendancePointsDoc { id: string; pointsPerCheckIn: number; absencePen
 const EMPTY_BLOCK: BlockEditState = { id: null, name: '', startTime: '', endTime: '', daysOfWeek: DEFAULT_DAYS }
 const EMPTY_ROOM: RoomEditState   = { id: null, name: '', notes: '' }
 
+// The edit forms sit above their lists, so editing a row further down would
+// otherwise open a form off-screen. Module-level so it only runs on mount.
+const revealOnMount = (el: HTMLElement | null) => el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+
 function duration(start: string, end: string) {
   if (!start || !end) return ''
   const [sh, sm] = start.split(':').map(Number)
@@ -497,7 +501,7 @@ export default function SchoolInfo() {
         </div>
 
         {editBlock && (
-          <div className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm p-5 space-y-4">
+          <div key={editBlock.id ?? 'new'} ref={revealOnMount} className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm p-5 space-y-4">
             <p className="text-sm font-semibold text-zinc-300">{editBlock.id ? 'Edit block' : 'New block'}</p>
             {blockError && <p className="text-xs text-rose-500">{blockError}</p>}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -591,7 +595,7 @@ export default function SchoolInfo() {
         </div>
 
         {editRoom && (
-          <div className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm p-5 space-y-4">
+          <div key={editRoom.id ?? 'new'} ref={revealOnMount} className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm p-5 space-y-4">
             <p className="text-sm font-semibold text-zinc-300">{editRoom.id ? 'Edit room' : 'New room'}</p>
             {roomError && <p className="text-xs text-rose-500">{roomError}</p>}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

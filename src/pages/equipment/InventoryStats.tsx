@@ -477,12 +477,14 @@ export function StatsContent({
   allItems,
   onOpenProject,
   initialTab = 'most-borrowed',
+  onOpenDashboard,
 }: {
   equipment: EquipmentDoc[]
   projects: InventoryProjectDoc[]
   allItems: Item[]
   onOpenProject: (id: string) => void
   initialTab?: string
+  onOpenDashboard?: () => void
 }) {
   const [activeTab, setActiveTab] = useState(initialTab)
   const [users, setUsers] = useState<UserDoc[]>([])
@@ -577,18 +579,27 @@ export function StatsContent({
   }))
 
   const statCards = [
-    { label: 'Total Equipment', value: equipment.length,  icon: <Package size={18} />,       color: '#60a5fa' },
-    { label: 'Currently Out',   value: itemsCheckedOut,    icon: <TrendingUp size={18} />,    color: '#f97316' },
-    { label: 'Total Projects',  value: projects.length,    icon: <BarChart2 size={18} />,     color: '#a78bfa' },
-    { label: 'Missing Items',   value: missingItems,       icon: <XCircle size={18} />,       color: '#f87171' },
-    { label: 'Damaged Items',   value: damagedItems,       icon: <AlertTriangle size={18} />, color: '#fbbf24' },
+    { label: 'Total Equipment', value: equipment.length,  icon: <Package size={18} />,       color: '#60a5fa', open: () => setActiveTab('equipment-status') },
+    { label: 'Currently Out',   value: itemsCheckedOut,    icon: <TrendingUp size={18} />,    color: '#f97316', open: () => setActiveTab('equipment-status') },
+    { label: 'Total Projects',  value: projects.length,    icon: <BarChart2 size={18} />,     color: '#a78bfa', open: onOpenDashboard },
+    { label: 'Damaged Items',   value: damagedItems,       icon: <AlertTriangle size={18} />, color: '#fbbf24', open: () => setActiveTab('damaged') },
+    { label: 'Missing Items',   value: missingItems,       icon: <XCircle size={18} />,       color: '#f87171', open: () => setActiveTab('missing') },
   ]
 
   return (
     <>
       <div className="inv-stats-row" style={{ marginTop: '1rem' }}>
         {statCards.map(c => (
-          <div key={c.label} className="inv-stat-card">
+          <div
+            key={c.label}
+            className={`inv-stat-card${c.open ? ' clickable' : ''}`}
+            {...(c.open && {
+              role: 'button',
+              tabIndex: 0,
+              onClick: c.open,
+              onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); c.open!() } },
+            })}
+          >
             <span style={{ color: c.color }}>{c.icon}</span>
             <div>
               <span className="inv-stat-value" style={{ color: '#f0f0f5' }}>{c.value}</span>

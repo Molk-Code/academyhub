@@ -912,7 +912,7 @@ export default function InventoryPage() {
         )}
 
         {/* Statistics tab */}
-        {tab === 'statistics' && <StatsContent key={statsJump?.n ?? 0} initialTab={statsJump?.tab} equipment={equipment} projects={projects} allItems={allItems} onOpenProject={setSelectedProjectId} />}
+        {tab === 'statistics' && <StatsContent key={statsJump?.n ?? 0} initialTab={statsJump?.tab} onOpenDashboard={() => setTab('dashboard')} equipment={equipment} projects={projects} allItems={allItems} onOpenProject={setSelectedProjectId} />}
 
         {/* Presets tab */}
         {tab === 'presets' && <PresetsManager />}

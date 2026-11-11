@@ -5,12 +5,19 @@ functions/node_modules
 # Build output
 dist
 dist-eu
+dist-*
+# Generated per customer by scripts/build-rules.mjs
+firestore.*.rules
 functions/lib
 
 # Environment variables — never commit these
 .env
 .env.local
 .env.eu
+# Per-customer build env (scripts/provision-customer.mjs) — never commit
+/.env.*
+!/.env.example
+!/.env.emulator
 .secret.local
 .env.*.local
 

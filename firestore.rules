@@ -76,8 +76,15 @@ service cloud.firestore {
     // ── Tier / Feature gating ─────────────────────────────────────────────────
     // Mirrors src/lib/features.ts — keep the two in sync when tier features change.
 
+    // The one school this deployment serves. The id below is the only place
+    // it appears: scripts/build-rules.mjs <schoolId> writes a per-customer
+    // copy (firestore.<schoolId>.rules) with it replaced.
+    function schoolDoc() {
+      return get(/databases/$(database)/documents/schools/molkom).data;
+    }
+
     function schoolTier() {
-      return get(/databases/$(database)/documents/schools/molkom).data.get('tier', null);
+      return schoolDoc().get('tier', null);
     }
 
     function tierHasFeature(feature) {
@@ -94,14 +101,14 @@ service cloud.firestore {
 
 
     // ── Modules ───────────────────────────────────────────────────────────────
-    // schools/molkom.modules = { academy, production, rentalInventory }, set by
+    // schoolDoc().modules = { academy, production, rentalInventory }, set by
     // the superadmin. Absent (every legacy school) → every module on, so the
     // tier checks above keep deciding exactly as before. Added as an extra
     // condition on the collections of each module, with no admin bypass.
     // Same document as schoolTier(), so where both run it is one read.
 
     function moduleOn(flag) {
-      let modules = get(/databases/$(database)/documents/schools/molkom).data.get('modules', null);
+      let modules = schoolDoc().get('modules', null);
       return modules == null || modules.get(flag, false) == true;
     }
 
@@ -109,7 +116,7 @@ service cloud.firestore {
     // exactly when it was (rental mode). Module-based schools: the publicShop
     // flag — off unless switched on — and only with Rental & Inventory.
     function publicShopOpen() {
-      let school = get(/databases/$(database)/documents/schools/molkom).data;
+      let school = schoolDoc();
       return school.get('modules', null) == null
         ? school.get('productType', null) == 'rental'
         : school.get('publicShop', false) == true && school.modules.get('rentalInventory', false) == true;

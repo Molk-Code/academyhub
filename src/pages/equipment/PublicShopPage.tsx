@@ -3,6 +3,7 @@ import {
   collection, getDocs, addDoc, serverTimestamp, query, where, getDoc, doc,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { SCHOOL_ID } from '@/lib/school'
 import type { EquipmentDoc, EquipmentCategoryDoc } from '@/types'
 import { ShoppingCart, X, Plus, Minus, Package, ChevronRight, CheckCircle2, Search } from 'lucide-react'
 
@@ -77,7 +78,7 @@ export default function PublicShopPage() {
 
   // ── Load school doc for password ───────────────────────────────────────────
   useEffect(() => {
-    getDoc(doc(db, 'schools', 'molkom')).then(snap => {
+    getDoc(doc(db, 'schools', SCHOOL_ID)).then(snap => {
       if (snap.exists()) {
         const data = snap.data()
         setShopPassword(data.shopPassword ?? null)

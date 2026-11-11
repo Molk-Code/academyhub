@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom'
-import { legal } from '@/config/legal'
+import { useLegal } from '@/lib/publicConfig'
 
 // Provider details for the signed-out pages (login, contact, privacy).
 // Lines whose value in src/config/legal.ts is still a placeholder are hidden.
 export function ProviderDetails({ className = '' }: { className?: string }) {
+  const legal = useLegal()
   const name    = legal('providerName')
   const org     = legal('orgNumber')
   const street  = legal('streetAddress')

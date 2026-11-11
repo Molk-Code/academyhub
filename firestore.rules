@@ -951,6 +951,13 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
     }
 
+    // ── Login page profile (public, read before sign-in) ─────────────────────
+
+    match /public_config/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
     // ── Contact requests (public contact form) ───────────────────────────────
 
     match /contact_requests/{id} {

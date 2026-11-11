@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { httpsCallable } from 'firebase/functions'
 import { ArrowLeft, CheckCircle2, AlertCircle, Mail } from 'lucide-react'
 import { functions } from '@/lib/firebase'
-import { legal } from '@/config/legal'
+import { useLegal } from '@/lib/publicConfig'
 import { ProviderDetails } from '@/components/LegalFooter'
 
 // All UI text in one place so it can be translated (e.g. to Swedish) later
@@ -43,7 +43,7 @@ export default function Contact() {
   const [form, setForm] = useState({ name: '', email: '', organisation: '', category: 'school_enquiry' as Category, message: '', website: '' })
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
   const [error, setError] = useState('')
-  const contactEmail = legal('contactEmail')
+  const contactEmail = useLegal()('contactEmail')
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }))
 

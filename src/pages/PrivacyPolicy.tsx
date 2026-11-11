@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom'
 import { Shield } from 'lucide-react'
-import { LEGAL, legal } from '@/config/legal'
+import { LEGAL } from '@/config/legal'
+import { useLegal } from '@/lib/publicConfig'
 import { ProviderDetails } from '@/components/LegalFooter'
 
 export default function PrivacyPolicy() {
-  const privacyEmail = legal('privacyContactEmail')
+  const privacyEmail = useLegal()('privacyContactEmail')
   const contactMonths = LEGAL.contactRetentionMonths
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-200">

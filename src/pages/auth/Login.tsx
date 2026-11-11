@@ -4,13 +4,14 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
-import { Eye, EyeOff, AlertCircle, ArrowLeft } from 'lucide-react'
+import { Eye, EyeOff, AlertCircle, ArrowLeft, Package } from 'lucide-react'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
 import LegalFooter from '@/components/LegalFooter'
 import firePng from '@/assets/fire.png'
+import { usePublicConfig } from '@/lib/publicConfig'
 
 const schema = z.object({
   email:    z.string().email('Enter a valid email'),
@@ -22,6 +23,11 @@ type FormData = z.infer<typeof schema>
 export default function Login() {
   const { signIn, user, role, loading } = useAuth()
   const { shortName } = useSchool()
+  // Login page profile (public_config/main); without one, the built-in look
+  const { config: profile, loading: profileLoading } = usePublicConfig()
+  const displayName = profile?.shortName || profile?.name || shortName
+  const accent      = profile?.primaryColor
+  const [showInviteHelp, setShowInviteHelp] = useState(false)
   const navigate = useNavigate()
   const [showPw,            setShowPw]            = useState(false)
   const [error,             setError]             = useState('')
@@ -105,10 +111,12 @@ export default function Login() {
         className="relative w-full max-w-sm"
       >
         <div className="bg-zinc-900 rounded-3xl shadow-2xl p-8">
-          <div className="flex flex-col items-center mb-8">
-            <img src={firePng} alt="CineForge" className="w-14 h-14 object-contain mb-3" />
-            <h1 className="text-2xl font-bold text-zinc-100">{shortName}</h1>
-            <p className="text-sm text-zinc-500 mt-1">Filmmaking Education Platform</p>
+          {/* Hidden (not removed) until a first-visit profile loads, so a
+              customer's brand never flashes the built-in one; same layout */}
+          <div className={`flex flex-col items-center mb-8 transition-opacity ${profileLoading ? 'opacity-0' : 'opacity-100'}`}>
+            <img src={profile?.logoUrl || firePng} alt={displayName} className="w-14 h-14 object-contain mb-3" />
+            <h1 className="text-2xl font-bold text-zinc-100">{displayName}</h1>
+            <p className="text-sm text-zinc-500 mt-1">{profile?.tagline || 'Filmmaking Education Platform'}</p>
           </div>
 
           {!showForgotPw ? (
@@ -161,6 +169,7 @@ export default function Login() {
                   type="submit"
                   disabled={isSubmitting}
                   className="btn-primary w-full py-3 text-base mt-2"
+                  style={accent ? { backgroundColor: accent } : undefined}
                 >
                   {isSubmitting ? 'Signing in…' : 'Sign in'}
                 </button>
@@ -228,11 +237,32 @@ export default function Login() {
           )}
 
           {/* "Setting up a new school? Register here" (/signup) hidden until the multi-school launch */}
-          {!showForgotPw && (
+          {/* Secondary actions depend on the customer's front door */}
+          {!showForgotPw && !profile?.frontDoor && (
             <p className="text-center text-xs text-zinc-400 mt-6">
               No account yet? Your teacher will send you an invite link.
             </p>
           )}
+          {!showForgotPw && profile?.frontDoor === 'academy' && (
+            <div className="text-center text-xs text-zinc-400 mt-6 space-y-2">
+              <p>Access is by invitation only.</p>
+              <button type="button" onClick={() => setShowInviteHelp(v => !v)} className="text-zinc-300 hover:text-white transition-colors underline-offset-2 hover:underline">
+                Accepting an invite?
+              </button>
+              {showInviteHelp && (
+                <p className="text-zinc-500">Open the link in your invitation email — it creates your account and puts you in the right class.</p>
+              )}
+            </div>
+          )}
+          {!showForgotPw && profile?.frontDoor === 'rental_inventory' && (
+            <a
+              href="/shop"
+              className="mt-6 flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-white/10 text-sm text-zinc-200 hover:bg-white/5 transition-colors"
+            >
+              <Package className="w-4 h-4" /> Browse equipment
+            </a>
+          )}
+          {/* production: staff sign-in only — no secondary action */}
           <LegalFooter />
         </div>
       </motion.div>

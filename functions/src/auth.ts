@@ -1,4 +1,4 @@
-import { admin, functions, db, escapeHtml, sendEmailOrThrow, LIMITS, REGION } from './lib'
+import { admin, functions, db, escapeHtml, sendEmailOrThrow, LIMITS, REGION, APP_URL } from './lib'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // onUserCreate — set custom claims from invitation
@@ -104,7 +104,7 @@ export const generatePasswordResetLink = functions.region(REGION).runWith(LIMITS
   const { email } = data as { email: string }
   if (!email) throw new functions.https.HttpsError('invalid-argument', 'email required.')
   const link = await admin.auth().generatePasswordResetLink(email, {
-    url: 'https://academy-hub-c252f.web.app/login',
+    url: `${APP_URL}/login`,
   })
   return { link }
 })
@@ -202,7 +202,7 @@ export const sendPasswordResetLink = functions
     }
 
     const resetLink = await admin.auth().generatePasswordResetLink(email, {
-      url: 'https://academy-hub-c252f.web.app/login',
+      url: `${APP_URL}/login`,
     })
 
     await sendEmailOrThrow({

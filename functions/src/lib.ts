@@ -13,6 +13,10 @@ export { admin, functions }
 // EU project sets FUNCTIONS_REGION in functions/.env.cineforge-eu.
 export const REGION = process.env.FUNCTIONS_REGION ?? 'us-central1'
 
+// Site that password-reset and invite links send users back to. Unset
+// (production) keeps today's URL; set it to the custom domain at cutover.
+export const APP_URL = process.env.APP_URL ?? 'https://academy-hub-c252f.web.app'
+
 export function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
 }

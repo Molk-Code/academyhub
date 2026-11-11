@@ -9,7 +9,8 @@ export const dailyFirestoreBackup = functions.region(REGION).runWith(LIMITS).pub
   .timeZone('Europe/Stockholm')
   .onRun(async () => {
     const projectId  = process.env.GCLOUD_PROJECT ?? 'academy-hub-c252f'
-    const bucket     = `gs://${projectId}.appspot.com`
+    // BACKUP_BUCKET (gs://…) overrides the default for projects without an appspot.com bucket
+    const bucket     = process.env.BACKUP_BUCKET ?? `gs://${projectId}.appspot.com`
     const dateStr    = new Date().toISOString().slice(0, 10)
     const outputUri  = `${bucket}/firestore-backups/${dateStr}`
 

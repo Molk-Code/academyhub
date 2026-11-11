@@ -1,4 +1,4 @@
-import { functions, LIMITS, admin, db } from './lib'
+import { functions, LIMITS, admin, db, REGION } from './lib'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // onProductionDeleted — remove everything that belonged to a production.
@@ -8,7 +8,7 @@ import { functions, LIMITS, admin, db } from './lib'
 // keeps the screenplay, so deleted productions left student data behind.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onProductionDeleted = functions.runWith(LIMITS).firestore
+export const onProductionDeleted = functions.region(REGION).runWith(LIMITS).firestore
   .document('productions/{id}')
   .onDelete(async (snap, context) => {
     await db.recursiveDelete(snap.ref)
@@ -19,7 +19,7 @@ export const onProductionDeleted = functions.runWith(LIMITS).firestore
 
 // Same for equipment projects: the app removes their items, but contract
 // signatures (names, signing details) stayed behind.
-export const onInventoryProjectDeleted = functions.runWith(LIMITS).firestore
+export const onInventoryProjectDeleted = functions.region(REGION).runWith(LIMITS).firestore
   .document('inventory_projects/{id}')
   .onDelete(async (snap) => {
     await db.recursiveDelete(snap.ref)

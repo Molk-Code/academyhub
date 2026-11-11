@@ -1,11 +1,11 @@
-import { functions, LIMITS, allow } from './lib'
+import { functions, LIMITS, allow, REGION } from './lib'
 import { pushToTeachersAndAdmins, pushToUser } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // onBugReportCreated — notify admins/teachers of a new bug report
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onBugReportCreated = functions.runWith(LIMITS).firestore
+export const onBugReportCreated = functions.region(REGION).runWith(LIMITS).firestore
   .document('bug_reports/{id}')
   .onCreate(async (snap) => {
     if (snap.data().notifSent === true) return null
@@ -34,7 +34,7 @@ const STATUS_MESSAGE: Record<string, { title: string; body: string }> = {
   wont_fix:    { title: '📋 Bug report closed',        body: "Your bug report was reviewed and marked won't fix." },
 }
 
-export const onBugReportUpdated = functions.runWith(LIMITS).firestore
+export const onBugReportUpdated = functions.region(REGION).runWith(LIMITS).firestore
   .document('bug_reports/{id}')
   .onUpdate(async (change) => {
     const before = change.before.data()

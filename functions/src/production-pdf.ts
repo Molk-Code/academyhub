@@ -1,11 +1,11 @@
 import * as path from 'path'
-import { functions, db, PDFDocument, LIMITS, requireMember, requireAllowed } from './lib'
+import { functions, db, PDFDocument, LIMITS, requireMember, requireAllowed, REGION } from './lib'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // exportProductionPdf — callable: generate production breakdown PDF
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const exportProductionPdf = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const exportProductionPdf = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   await requireMember(context)
   await requireAllowed(context.auth!.uid, 'production-pdf', 10)
 

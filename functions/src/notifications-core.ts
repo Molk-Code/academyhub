@@ -1,4 +1,4 @@
-import { admin, db, functions, LIMITS, requireMember, requireAllowed } from './lib'
+import { admin, db, functions, LIMITS, requireMember, requireAllowed, REGION } from './lib'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Push notification helpers
@@ -234,7 +234,7 @@ export async function pushToUser(uid: string, title: string, body: string, url: 
 // account's notifications, or the same notification twice.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const claimFcmToken = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const claimFcmToken = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   await requireMember(context)
   await requireAllowed(context.auth!.uid, 'claim-token', 10)
   const { token } = data as { token: string }

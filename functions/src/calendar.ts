@@ -1,4 +1,4 @@
-import { admin, functions, db, escapeHtml, sendEmailOrThrow, getEmailConfig, requireTeacherOrAdmin, LIMITS, requireMember } from './lib'
+import { admin, functions, db, escapeHtml, sendEmailOrThrow, getEmailConfig, requireTeacherOrAdmin, LIMITS, requireMember, REGION } from './lib'
 import { sendPush, saveNotifications, sendFcmToTokens, tokensFor } from './notifications-core'
 import { checkLevelUp } from './points'
 
@@ -6,7 +6,7 @@ import { checkLevelUp } from './points'
 // checkInAttendance — validate rotating QR token and record student presence
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const checkInAttendance = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const checkInAttendance = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   await requireMember(context)
 
   const { token } = data as { token: string }
@@ -152,7 +152,7 @@ async function enforceRoomLimit(id: string, b: FirebaseFirestore.DocumentData): 
   return true
 }
 
-export const onRoomBookingWritten = functions.runWith(LIMITS).firestore
+export const onRoomBookingWritten = functions.region(REGION).runWith(LIMITS).firestore
   .document('room_bookings/{id}')
   .onWrite(async (change, context) => {
     const ref = db.collection('room_slots').doc(context.params.id)
@@ -166,7 +166,7 @@ export const onRoomBookingWritten = functions.runWith(LIMITS).firestore
 // onBookingConfirmed — push to the student who made the booking
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onBookingConfirmed = functions.runWith(LIMITS).firestore
+export const onBookingConfirmed = functions.region(REGION).runWith(LIMITS).firestore
   .document('room_bookings/{id}')
   .onUpdate(async (change) => {
     const before = change.before.data()
@@ -206,7 +206,7 @@ export const onBookingConfirmed = functions.runWith(LIMITS).firestore
 // onSemesterEventStart — daily push to teachers/admins for events starting today
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onSemesterEventStart = functions.runWith(LIMITS).pubsub
+export const onSemesterEventStart = functions.region(REGION).runWith(LIMITS).pubsub
   .schedule('0 8 * * *')
   .timeZone('Europe/Stockholm')
   .onRun(async () => {
@@ -269,7 +269,7 @@ function toBool(v: boolean | string | undefined): boolean {
   return String(v ?? '').toLowerCase() === 'true'
 }
 
-export const receiveOfficeCalendarEvent = functions.runWith(LIMITS).https.onRequest(async (req, res) => {
+export const receiveOfficeCalendarEvent = functions.region(REGION).runWith(LIMITS).https.onRequest(async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed. Use POST.' })
     return
@@ -441,6 +441,7 @@ function parseUtc(v: string | undefined): Date | null {
 }
 
 export const reconcileOfficeCalendar = functions
+  .region(REGION)
   .runWith({ ...LIMITS, timeoutSeconds: 300, memory: '512MB' })
   .https.onRequest(async (req, res) => {
     try {
@@ -595,7 +596,7 @@ async function reconcile(req: functions.https.Request, res: functions.Response) 
 }
 
 // ── sendGuestTeacherBookingEmail ──────────────────────────────────────────────
-export const sendGuestTeacherBookingEmail = functions.runWith({ ...LIMITS, secrets: ['RESEND_API_KEY'] }).https.onCall(async (data, context) => {
+export const sendGuestTeacherBookingEmail = functions.region(REGION).runWith({ ...LIMITS, secrets: ['RESEND_API_KEY'] }).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
 
   const { guestTeacherId, lessonId } = data as { guestTeacherId: string; lessonId: string }

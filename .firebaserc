@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "academy-hub-c252f"
+    "default": "academy-hub-c252f",
+    "eu": "cineforge-eu"
   }
 }

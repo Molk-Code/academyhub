@@ -1,4 +1,4 @@
-import { admin, functions, db, requireTeacherOrAdmin, LIMITS, requireMember } from './lib'
+import { admin, functions, db, requireTeacherOrAdmin, LIMITS, requireMember, REGION } from './lib'
 import { sendPush, saveNotifications, tokensFor } from './notifications-core'
 import { updateProgress, checkLevelUp } from './points'
 
@@ -6,7 +6,7 @@ import { updateProgress, checkLevelUp } from './points'
 // getTestQuestions — strips correct answers before sending to students
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const getTestQuestions = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const getTestQuestions = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   await requireMember(context)
 
   const { assignmentId } = data as { assignmentId: string }
@@ -59,7 +59,7 @@ export const getTestQuestions = functions.runWith(LIMITS).https.onCall(async (da
 // gradeSubmission — auto-grade a test or record manual grade; award points
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const gradeSubmission = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const gradeSubmission = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
 
   const { submissionId, score, feedback } = data as {
@@ -134,7 +134,7 @@ export const gradeSubmission = functions.runWith(LIMITS).https.onCall(async (dat
 // submitTestAnswers — auto-grade objective questions, queue short answers
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const submitTestAnswers = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const submitTestAnswers = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   await requireMember(context)
 
   const { assignmentId, answers, timeTakenSeconds } = data as {
@@ -276,7 +276,7 @@ export const submitTestAnswers = functions.runWith(LIMITS).https.onCall(async (d
 // submitChecklist — student marks every step complete; auto-graded, no review
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const submitChecklist = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const submitChecklist = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   await requireMember(context)
 
   const { assignmentId, checkedItemIds } = data as {
@@ -369,7 +369,7 @@ export const submitChecklist = functions.runWith(LIMITS).https.onCall(async (dat
 // gradeShortAnswers — teacher marks short-answer questions correct/incorrect
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const gradeShortAnswers = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const gradeShortAnswers = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
 
   const { submissionId, answers } = data as {
@@ -474,7 +474,7 @@ export const gradeShortAnswers = functions.runWith(LIMITS).https.onCall(async (d
 // is recalculated, so totals stay consistent with the remaining work.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const deleteSubmission = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const deleteSubmission = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
 
   const { submissionId } = data as { submissionId: string }

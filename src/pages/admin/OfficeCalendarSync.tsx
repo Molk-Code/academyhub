@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db, FUNCTIONS_REGION } from '@/lib/firebase'
 import { useCollection } from '@/hooks/useFirestore'
 import { useAuth } from '@/contexts/AuthContext'
 import type { OfficeCalendarSyncDoc, CohortDoc } from '@/types'
@@ -11,8 +11,13 @@ import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { format } from 'date-fns'
 
-const WEBHOOK_BASE = 'https://us-central1-academy-hub-c252f.cloudfunctions.net/receiveOfficeCalendarEvent'
-const RECONCILE_BASE = 'https://us-central1-academy-hub-c252f.cloudfunctions.net/reconcileOfficeCalendar'
+// Functions host of the project this build talks to; falls back to production
+const PROJECT_ID = import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined
+const FUNCTIONS_HOST = PROJECT_ID
+  ? `https://${FUNCTIONS_REGION}-${PROJECT_ID}.cloudfunctions.net`
+  : 'https://us-central1-academy-hub-c252f.cloudfunctions.net'
+const WEBHOOK_BASE = `${FUNCTIONS_HOST}/receiveOfficeCalendarEvent`
+const RECONCILE_BASE = `${FUNCTIONS_HOST}/reconcileOfficeCalendar`
 
 function genSecret(): string {
   // 32 bytes of randomness, URL-safe

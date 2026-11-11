@@ -1,5 +1,5 @@
 import { createHash } from 'crypto'
-import { admin, db, functions, requireTeacherOrAdmin, LIMITS, requireMember } from './lib'
+import { admin, db, functions, requireTeacherOrAdmin, LIMITS, requireMember, REGION } from './lib'
 import { sendPush, saveNotifications, tokensFor } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ async function buildSnapshot(projectId: string) {
   return { project: p, projRef, snapshot, hash }
 }
 
-export const requestEquipmentSignatures = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const requestEquipmentSignatures = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
   const { projectId } = data as { projectId?: string }
   if (!projectId || typeof projectId !== 'string') {
@@ -122,7 +122,7 @@ export const requestEquipmentSignatures = functions.runWith(LIMITS).https.onCall
   return { notified: toAsk.length, alreadySigned: borrowerIds.length - toAsk.length, withoutPush }
 })
 
-export const signEquipmentContract = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const signEquipmentContract = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   await requireMember(context)
   const { projectId, typedName, accepted } = data as { projectId?: string; typedName?: string; accepted?: boolean }
   if (!projectId || typeof projectId !== 'string') {

@@ -1,12 +1,12 @@
 import * as path from 'path'
-import { functions, db, escapeHtml, sendEmailOrThrow, getEmailConfig, requireTeacherOrAdmin, PDFDocument, LIMITS, allow } from './lib'
+import { functions, db, escapeHtml, sendEmailOrThrow, getEmailConfig, requireTeacherOrAdmin, PDFDocument, LIMITS, allow, REGION } from './lib'
 import { getOrCreateBookingsChannel, postToBookingsChannel, pushToAdmins, pushToStudent } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // sendMinivanEmail — notify staff about a new minivan booking request via Resend
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const sendMinivanEmail = functions.runWith({ ...LIMITS, secrets: ['RESEND_API_KEY'] }).https.onCall(async (data, context) => {
+export const sendMinivanEmail = functions.region(REGION).runWith({ ...LIMITS, secrets: ['RESEND_API_KEY'] }).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
 
   const emailCfg = await getEmailConfig()
@@ -42,7 +42,7 @@ export const sendMinivanEmail = functions.runWith({ ...LIMITS, secrets: ['RESEND
 // onMinivanBookingCreated — notify teachers/admins via chat + push
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onMinivanBookingCreated = functions.runWith(LIMITS).firestore
+export const onMinivanBookingCreated = functions.region(REGION).runWith(LIMITS).firestore
   .document('minivan_bookings/{id}')
   .onCreate(async (snap) => {
     if (snap.data().notifSent === true) return
@@ -66,7 +66,7 @@ export const onMinivanBookingCreated = functions.runWith(LIMITS).firestore
 // onMinivanBookingUpdated — push student when status changes
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onMinivanBookingUpdated = functions.runWith(LIMITS).firestore
+export const onMinivanBookingUpdated = functions.region(REGION).runWith(LIMITS).firestore
   .document('minivan_bookings/{id}')
   .onUpdate(async (change) => {
     const before = change.before.data()
@@ -102,7 +102,7 @@ export const onMinivanBookingUpdated = functions.runWith(LIMITS).firestore
 // exportMinivanPdf — admin callable: generate minivan booking PDF
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const exportMinivanPdf = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const exportMinivanPdf = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
   const claims = context.auth.token as any
   if (claims.role !== 'admin' && claims.role !== 'teacher') {

@@ -1,11 +1,11 @@
-import { admin, functions, db, LIMITS, requireMember, requireAllowed } from './lib'
+import { admin, functions, db, LIMITS, requireMember, requireAllowed, REGION } from './lib'
 import { sendPush, sendFcmToTokens, pushToTeachersAndAdmins, saveNotifications, tokensFor } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // purgeChatMessages — delete messages older than the configured retention window
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const purgeChatMessages = functions.runWith(LIMITS).pubsub.schedule('every 24 hours').onRun(async () => {
+export const purgeChatMessages = functions.region(REGION).runWith(LIMITS).pubsub.schedule('every 24 hours').onRun(async () => {
   const settingsSnap = await db.collection('chat_settings').doc('global').get()
   if (!settingsSnap.exists) return null
 
@@ -44,7 +44,7 @@ export const purgeChatMessages = functions.runWith(LIMITS).pubsub.schedule('ever
 // today or overdue
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const sendInventoryReturnReminders = functions.runWith(LIMITS).pubsub
+export const sendInventoryReturnReminders = functions.region(REGION).runWith(LIMITS).pubsub
   .schedule('0 8 * * *')
   .timeZone('Europe/Stockholm')
   .onRun(async () => {
@@ -98,7 +98,7 @@ export const sendInventoryReturnReminders = functions.runWith(LIMITS).pubsub
 // project.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const sendEquipmentBookingOverdueReminders = functions.runWith(LIMITS).pubsub
+export const sendEquipmentBookingOverdueReminders = functions.region(REGION).runWith(LIMITS).pubsub
   .schedule('0 8 * * *')
   .timeZone('Europe/Stockholm')
   .onRun(async () => {
@@ -152,7 +152,7 @@ function eventWhen(ev: FirebaseFirestore.DocumentData): { dateStr: string; timeS
   }
 }
 
-export const sendEventInviteNotifications = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const sendEventInviteNotifications = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   const uid = await requireMember(context)
   await requireAllowed(uid, 'event-invite', 20)
 
@@ -209,7 +209,7 @@ export const sendEventInviteNotifications = functions.runWith(LIMITS).https.onCa
 // Runs every 5 minutes; sends to events starting in 13–18 min window
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const sendEventReminders = functions.runWith(LIMITS).pubsub
+export const sendEventReminders = functions.region(REGION).runWith(LIMITS).pubsub
   .schedule('every 5 minutes')
   .onRun(async () => {
     const now     = Date.now()
@@ -287,7 +287,7 @@ export const sendEventReminders = functions.runWith(LIMITS).pubsub
 // dailyTeacherSummary — Mon–Fri 08:00 morning briefing push to teachers/admins
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const dailyTeacherSummary = functions.runWith(LIMITS).pubsub
+export const dailyTeacherSummary = functions.region(REGION).runWith(LIMITS).pubsub
   .schedule('0 8 * * 1-5')
   .timeZone('Europe/Stockholm')
   .onRun(async () => {

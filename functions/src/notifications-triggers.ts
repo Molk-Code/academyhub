@@ -1,11 +1,11 @@
-import { admin, functions, db, LIMITS, allow } from './lib'
+import { admin, functions, db, LIMITS, allow, REGION } from './lib'
 import { sendPush, saveNotifications, tokensFor, removeStaleTokens } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // onAssignmentPublished — push to all students in the cohort
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onAssignmentPublished = functions.runWith(LIMITS).firestore
+export const onAssignmentPublished = functions.region(REGION).runWith(LIMITS).firestore
   .document('assignments/{id}')
   .onWrite(async (change) => {
     const before = change.before.data()
@@ -37,7 +37,7 @@ export const onAssignmentPublished = functions.runWith(LIMITS).firestore
 // ─────────────────────────────────────────────────────────────────────────────
 // onSubmissionCreated — push to cohort teachers when a student submits an assignment
 // ─────────────────────────────────────────────────────────────────────────────
-export const onSubmissionCreated = functions.runWith(LIMITS).firestore
+export const onSubmissionCreated = functions.region(REGION).runWith(LIMITS).firestore
   .document('submissions/{submissionId}')
   .onCreate(async (snap) => {
     const data = snap.data()
@@ -79,7 +79,7 @@ export const onSubmissionCreated = functions.runWith(LIMITS).firestore
 // onAbsenceReportCreated — push to the cohort's assigned teacher(s)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onAbsenceReportCreated = functions.runWith(LIMITS).firestore
+export const onAbsenceReportCreated = functions.region(REGION).runWith(LIMITS).firestore
   .document('absence_reports/{reportId}')
   .onCreate(async (snap) => {
     const report = snap.data()
@@ -122,7 +122,7 @@ export const onAbsenceReportCreated = functions.runWith(LIMITS).firestore
 // onChatMessage — push notification to all channel members except the sender
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onChatMessage = functions.runWith(LIMITS).firestore
+export const onChatMessage = functions.region(REGION).runWith(LIMITS).firestore
   .document('chat_channels/{channelId}/messages/{msgId}')
   .onCreate(async (snap, context) => {
     const msg = snap.data()
@@ -254,7 +254,7 @@ export const onChatMessage = functions.runWith(LIMITS).firestore
 // onPlanComment — push notification to student when teacher leaves feedback
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onPlanComment = functions.runWith(LIMITS).firestore
+export const onPlanComment = functions.region(REGION).runWith(LIMITS).firestore
   .document('plan_comments/{commentId}')
   .onCreate(async (snap) => {
     const data = snap.data()

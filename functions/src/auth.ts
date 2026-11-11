@@ -1,10 +1,10 @@
-import { admin, functions, db, escapeHtml, sendEmailOrThrow, LIMITS } from './lib'
+import { admin, functions, db, escapeHtml, sendEmailOrThrow, LIMITS, REGION } from './lib'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // onUserCreate — set custom claims from invitation
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onUserCreate = functions.runWith(LIMITS).auth.user().onCreate(async (user) => {
+export const onUserCreate = functions.region(REGION).runWith(LIMITS).auth.user().onCreate(async (user) => {
   // Find an unused invitation matching this email
   const snap = await db.collection('invitations')
     .where('email', '==', user.email)
@@ -40,7 +40,7 @@ export const onUserCreate = functions.runWith(LIMITS).auth.user().onCreate(async
 // onUserDocUpdated — keep Auth custom claims in sync when role/cohortId changes
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onUserDocUpdated = functions.runWith(LIMITS).firestore
+export const onUserDocUpdated = functions.region(REGION).runWith(LIMITS).firestore
   .document('users/{uid}')
   .onUpdate(async (change, context) => {
     const before = change.before.data()
@@ -62,7 +62,7 @@ export const onUserDocUpdated = functions.runWith(LIMITS).firestore
 // The doc is written by the new user's own browser, so a staff role is only
 // honoured when the invitation it points at grants exactly that role to this
 // account's email — never on the doc's word alone.
-export const onUserDocCreated = functions.runWith(LIMITS).firestore
+export const onUserDocCreated = functions.region(REGION).runWith(LIMITS).firestore
   .document('users/{uid}')
   .onCreate(async (snap, context) => {
     const uid  = context.params.uid
@@ -96,7 +96,7 @@ export const onUserDocCreated = functions.runWith(LIMITS).firestore
 // generatePasswordResetLink — admin gets a reset link to send manually (e.g. paste into email/Teams)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const generatePasswordResetLink = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const generatePasswordResetLink = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
   if (context.auth.token.role !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'Admin only.')
@@ -113,6 +113,7 @@ export const generatePasswordResetLink = functions.runWith(LIMITS).https.onCall(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const sendInviteEmail = functions
+  .region(REGION)
   .runWith({ ...LIMITS, secrets: ['RESEND_API_KEY'] })
   .https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
@@ -179,6 +180,7 @@ export const sendInviteEmail = functions
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const sendPasswordResetLink = functions
+  .region(REGION)
   .runWith({ ...LIMITS, secrets: ['RESEND_API_KEY'] })
   .https.onCall(async (data, context) => {
     if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
@@ -232,7 +234,7 @@ export const sendPasswordResetLink = functions
 // resetPassword — admin sets a new password for any non-admin user
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const resetPassword = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const resetPassword = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
   if (context.auth.token.role !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'Only admins can reset passwords.')
@@ -256,7 +258,7 @@ export const resetPassword = functions.runWith(LIMITS).https.onCall(async (data,
 // disableUser — disable Firebase Auth account + mark Firestore doc disabled
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const disableUser = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const disableUser = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
   if (context.auth.token.role !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'Admin only.')
@@ -272,7 +274,7 @@ export const disableUser = functions.runWith(LIMITS).https.onCall(async (data, c
 // restoreUser — re-enable Firebase Auth account + clear disabled flag
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const restoreUser = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const restoreUser = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
   if (context.auth.token.role !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'Admin only.')
@@ -288,7 +290,7 @@ export const restoreUser = functions.runWith(LIMITS).https.onCall(async (data, c
 // Usage: { uid, fix: false } → inspect only  |  { uid, fix: true } → clear claim
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const inspectUserClaims = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const inspectUserClaims = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
   if (context.auth.token.role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'Admin only.')
 
@@ -326,7 +328,7 @@ export const inspectUserClaims = functions.runWith(LIMITS).https.onCall(async (d
 // setUserRole — admin sets a user's primary role and updates Auth custom claims immediately
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const setUserRole = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const setUserRole = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
   if (context.auth.token.role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'Admin only.')
 
@@ -362,7 +364,7 @@ export const setUserRole = functions.runWith(LIMITS).https.onCall(async (data, c
 // fixAllTeacherClaims — admin: scan all teacher/admin users and clear stale cohortId claims
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const fixAllTeacherClaims = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const fixAllTeacherClaims = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
   if (context.auth.token.role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'Admin only.')
 
@@ -396,7 +398,7 @@ export const fixAllTeacherClaims = functions.runWith(LIMITS).https.onCall(async 
 // Pass { merge: true } to merge each orphan into the canonical doc and delete it.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const findDuplicateUserDocs = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const findDuplicateUserDocs = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
   if (context.auth.token.role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'Admin only.')
 

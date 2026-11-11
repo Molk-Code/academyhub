@@ -33,7 +33,9 @@ if (appCheckKey) {
 export const auth      = getAuth(app)
 export const db        = getFirestore(app)
 export const storage   = getStorage(app)
-export const functions = getFunctions(app, 'us-central1')
+// Production (no VITE_FUNCTIONS_REGION) stays on us-central1; .env.eu sets europe-west1
+export const FUNCTIONS_REGION: string = import.meta.env.VITE_FUNCTIONS_REGION || 'us-central1'
+export const functions = getFunctions(app, FUNCTIONS_REGION)
 export const perf      = getPerformance(app)
 
 // Persist auth across browser sessions (survives tab/window close)

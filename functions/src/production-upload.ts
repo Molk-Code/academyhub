@@ -1,5 +1,5 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
-import { admin, db, allow } from './lib'
+import { admin, db, allow, REGION } from './lib'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // uploadScreenplay — callable: upload a production's screenplay PDF.
@@ -19,7 +19,7 @@ import { admin, db, allow } from './lib'
 const MAX_BYTES = 15 * 1024 * 1024 // 15 MB
 
 export const uploadScreenplay = onCall(
-  { region: 'us-central1', memory: '1GiB', concurrency: 4, maxInstances: 20 },
+  { region: REGION, memory: '1GiB', concurrency: 4, maxInstances: 20 },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
     const role = request.auth.token.role

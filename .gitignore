@@ -4,11 +4,13 @@ functions/node_modules
 
 # Build output
 dist
+dist-eu
 functions/lib
 
 # Environment variables — never commit these
 .env
 .env.local
+.env.eu
 .env.*.local
 
 # Firebase

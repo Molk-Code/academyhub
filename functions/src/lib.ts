@@ -9,6 +9,10 @@ export const db = admin.firestore()
 
 export { admin, functions }
 
+// Region every function deploys to. Unset (production) keeps us-central1; the
+// EU project sets FUNCTIONS_REGION in functions/.env.cineforge-eu.
+export const REGION = process.env.FUNCTIONS_REGION ?? 'us-central1'
+
 export function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
 }

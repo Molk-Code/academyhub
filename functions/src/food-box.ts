@@ -1,4 +1,4 @@
-import { functions, db, sendEmailOrThrow, getEmailConfig, requireTeacherOrAdmin, PDFDocument, LIMITS, allow } from './lib'
+import { functions, db, sendEmailOrThrow, getEmailConfig, requireTeacherOrAdmin, PDFDocument, LIMITS, allow, REGION } from './lib'
 import { getOrCreateBookingsChannel, postToBookingsChannel, pushToAdmins, pushToStudent } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -275,7 +275,7 @@ export const _pdfHelpers = { pdfTextBox, pdfHeatRowSwedish, pdfHeatRow }
 
 const FOOD_BOX_RECIPIENT = 'fredrik.fridlund@regionvarmland.se'
 
-export const sendFoodBoxEmail = functions.runWith({ ...LIMITS, secrets: ['RESEND_API_KEY'] }).https.onCall(async (data, context) => {
+export const sendFoodBoxEmail = functions.region(REGION).runWith({ ...LIMITS, secrets: ['RESEND_API_KEY'] }).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
 
   const d = data as any
@@ -308,7 +308,7 @@ export const sendFoodBoxEmail = functions.runWith({ ...LIMITS, secrets: ['RESEND
 // onFoodBoxOrderCreated — notify teachers/admins via chat + push
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onFoodBoxOrderCreated = functions.runWith(LIMITS).firestore
+export const onFoodBoxOrderCreated = functions.region(REGION).runWith(LIMITS).firestore
   .document('food_box_orders/{id}')
   .onCreate(async (snap) => {
     if (snap.data().notifSent === true) return
@@ -338,7 +338,7 @@ export const onFoodBoxOrderCreated = functions.runWith(LIMITS).firestore
 // onFoodBoxOrderUpdated — push student when status changes
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onFoodBoxOrderUpdated = functions.runWith(LIMITS).firestore
+export const onFoodBoxOrderUpdated = functions.region(REGION).runWith(LIMITS).firestore
   .document('food_box_orders/{id}')
   .onUpdate(async (change) => {
     const before = change.before.data()
@@ -370,7 +370,7 @@ export const onFoodBoxOrderUpdated = functions.runWith(LIMITS).firestore
 // foodBoxPickupReminder — runs every 5 min, pushes student 30 min before pick-up
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const foodBoxPickupReminder = functions.runWith(LIMITS).pubsub
+export const foodBoxPickupReminder = functions.region(REGION).runWith(LIMITS).pubsub
   .schedule('every 5 minutes')
   .onRun(async () => {
     const now = new Date()
@@ -412,7 +412,7 @@ export const foodBoxPickupReminder = functions.runWith(LIMITS).pubsub
 // exportFoodBoxPdf — admin callable: load order, generate Swedish PDF, return base64
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const exportFoodBoxPdf = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const exportFoodBoxPdf = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
   const claims = context.auth.token as any
   if (claims.role !== 'admin' && claims.role !== 'teacher') {

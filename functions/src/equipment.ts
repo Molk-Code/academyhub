@@ -1,4 +1,4 @@
-import { functions, db, admin, requireTeacherOrAdmin, LIMITS, allow } from './lib'
+import { functions, db, admin, requireTeacherOrAdmin, LIMITS, allow, REGION } from './lib'
 import { sendPush, saveNotifications, tokensFor } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ async function pushAndSave(studentId: string, tokens: string[], opts: { title: s
 // onEquipmentBookingCreated — notify teachers/admins of new equipment requests
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onEquipmentBookingCreated = functions.runWith(LIMITS).firestore
+export const onEquipmentBookingCreated = functions.region(REGION).runWith(LIMITS).firestore
   .document('equipment_bookings/{bookingId}')
   .onCreate(async (snap) => {
     const booking = snap.data()
@@ -167,7 +167,7 @@ export const onEquipmentBookingCreated = functions.runWith(LIMITS).firestore
 // onEquipmentBookingMessageCreated — notify the other side of a reply
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onEquipmentBookingMessageCreated = functions.runWith(LIMITS).firestore
+export const onEquipmentBookingMessageCreated = functions.region(REGION).runWith(LIMITS).firestore
   .document('equipment_bookings/{bookingId}/messages/{messageId}')
   .onCreate(async (snap, context) => {
     const message = snap.data()
@@ -203,7 +203,7 @@ export const onEquipmentBookingMessageCreated = functions.runWith(LIMITS).firest
 // onEquipmentBookingUpdated — notify student when booking status changes
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onEquipmentBookingUpdated = functions.runWith(LIMITS).firestore
+export const onEquipmentBookingUpdated = functions.region(REGION).runWith(LIMITS).firestore
   .document('equipment_bookings/{bookingId}')
   .onUpdate(async (change) => {
     const before = change.before.data()
@@ -267,7 +267,7 @@ export const onEquipmentBookingUpdated = functions.runWith(LIMITS).firestore
 // onInventoryProjectCreated — notify borrowers when a project is set up for them
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onInventoryProjectCreated = functions.runWith(LIMITS).firestore
+export const onInventoryProjectCreated = functions.region(REGION).runWith(LIMITS).firestore
   .document('inventory_projects/{projectId}')
   .onCreate(async (snap) => {
     const project = snap.data()
@@ -292,7 +292,7 @@ export const onInventoryProjectCreated = functions.runWith(LIMITS).firestore
 // step with the project, and notify borrowers of returns and new dates
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onInventoryProjectUpdated = functions.runWith(LIMITS).firestore
+export const onInventoryProjectUpdated = functions.region(REGION).runWith(LIMITS).firestore
   .document('inventory_projects/{projectId}')
   .onUpdate(async (change) => {
     const before = change.before.data()
@@ -376,7 +376,7 @@ export async function recomputeEquipmentAvailable(equipmentId: string): Promise<
   })
 }
 
-export const onInventoryItemWritten = functions.runWith(LIMITS).firestore
+export const onInventoryItemWritten = functions.region(REGION).runWith(LIMITS).firestore
   .document('inventory_projects/{projectId}/items/{itemId}')
   .onWrite(async (change) => {
     const before = change.before.exists ? change.before.data() : undefined
@@ -396,7 +396,7 @@ export const onInventoryItemWritten = functions.runWith(LIMITS).firestore
 // denied if every part was denied, otherwise confirmed.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const decideEquipmentBookingParts = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const decideEquipmentBookingParts = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
   const { bookingId, categories, decision, note } = data as {
     bookingId?: string; categories?: string[]; decision?: string; note?: string

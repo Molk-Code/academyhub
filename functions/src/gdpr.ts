@@ -1,10 +1,10 @@
-import { admin, functions, db, LIMITS, requireMember, withTimeout, requireAllowed } from './lib'
+import { admin, functions, db, LIMITS, requireMember, withTimeout, requireAllowed, REGION } from './lib'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // dailyFirestoreBackup — export Firestore to Cloud Storage every night at 02:00 Stockholm
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const dailyFirestoreBackup = functions.runWith(LIMITS).pubsub
+export const dailyFirestoreBackup = functions.region(REGION).runWith(LIMITS).pubsub
   .schedule('0 2 * * *')
   .timeZone('Europe/Stockholm')
   .onRun(async () => {
@@ -37,7 +37,7 @@ export const dailyFirestoreBackup = functions.runWith(LIMITS).pubsub
 // exportUserData — GDPR right of access (callable, owner or admin only)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const exportUserData = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const exportUserData = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   await requireMember(context)
 
   const { userId } = data as { userId?: string }
@@ -92,7 +92,7 @@ export const exportUserData = functions.runWith(LIMITS).https.onCall(async (data
 // deleteUserData — GDPR right to erasure (callable, owner or admin only)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const deleteUserData = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const deleteUserData = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   await requireMember(context)
 
   const { userId } = data as { userId?: string }
@@ -209,7 +209,7 @@ export const deleteUserData = functions.runWith(LIMITS).https.onCall(async (data
 })
 
 // ── One-time migration: copy cohorts → classes ───────────────────────────────
-export const migrateCohortsToClasses = functions.runWith(LIMITS).https.onCall(async (_data, context) => {
+export const migrateCohortsToClasses = functions.region(REGION).runWith(LIMITS).https.onCall(async (_data, context) => {
   if (!context.auth || context.auth!.token.role !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'Admin only.')
   }

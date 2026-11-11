@@ -1,11 +1,11 @@
-import { admin, functions, db, requireTeacherOrAdmin, LIMITS, requireMember } from './lib'
+import { admin, functions, db, requireTeacherOrAdmin, LIMITS, requireMember, REGION } from './lib'
 import { sendPush, saveNotifications, pushToTeachersAndAdmins, tokensFor } from './notifications-core'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // processRedemption — validate and record a prize claim
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const processRedemption = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const processRedemption = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   await requireMember(context)
 
   const { prizeId } = data as { prizeId: string }
@@ -135,7 +135,7 @@ export async function updateProgress(studentId: string, cohortId: string) {
   }, { merge: true })
 }
 
-export const recalculateProgress = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const recalculateProgress = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
   const { studentId, cohortId } = data as { studentId: string; cohortId: string }
   if (!studentId || typeof studentId !== 'string') {
@@ -207,7 +207,7 @@ export async function checkLevelUp(uid: string, newTotal: number) {
 // awardPoints — teacher/admin adjusts a student's points and writes the log entry
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const awardPoints = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const awardPoints = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   requireTeacherOrAdmin(context)
 
   const { studentId, points, reason, referenceId } = data as {
@@ -245,7 +245,7 @@ export const awardPoints = functions.runWith(LIMITS).https.onCall(async (data, c
 // onPrizeClaimed — push teachers/admins when a student claims a prize
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onPrizeClaimed = functions.runWith(LIMITS).firestore
+export const onPrizeClaimed = functions.region(REGION).runWith(LIMITS).firestore
   .document('prize_claims/{claimId}')
   .onCreate(async (snap) => {
     const claim = snap.data()
@@ -270,7 +270,7 @@ export const onPrizeClaimed = functions.runWith(LIMITS).firestore
 // fulfillClaim — teacher/admin fulfils or rejects a prize claim
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const fulfillClaim = functions.runWith(LIMITS).https.onCall(async (data, context) => {
+export const fulfillClaim = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
   await requireMember(context)
   const role = (context.auth!.token as any).role
   if (role !== 'teacher' && role !== 'admin') {
@@ -347,7 +347,7 @@ export const fulfillClaim = functions.runWith(LIMITS).https.onCall(async (data, 
 // missed a lesson without reporting absence. Skips lessons already processed.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const applyAbsencePenalties = functions.runWith(LIMITS).pubsub
+export const applyAbsencePenalties = functions.region(REGION).runWith(LIMITS).pubsub
   .schedule('every 15 minutes')
   .onRun(async () => {
     const now     = admin.firestore.Timestamp.now()

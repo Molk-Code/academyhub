@@ -602,9 +602,12 @@
         }
       )
 
+      // room_slots: the public copy of room_bookings (room, time, first name)
+      // that onRoomBookingWritten keeps in step; room_bookings needs sign-in
       onSnapshot(
-        query(collection(db, 'room_bookings'), where('date', '==', today)),
-        snap => { bookings = snap.docs.map(d => ({ id: d.id, ...d.data() })); render() }
+        query(collection(db, 'room_slots'), where('date', '==', today)),
+        snap => { bookings = snap.docs.map(d => ({ id: d.id, ...d.data() })); render() },
+        err => { console.error('room_slots listener failed', err) }
       )
     }
 

@@ -1,27 +1,20 @@
 import { useSchool } from '@/contexts/SchoolContext'
-import { hasFeature, type Feature } from '@/lib/features'
+import { hasFeature, resolveFeature, type Feature } from '@/lib/features'
 
 export { type Feature }
 
 export function useFeature(feature: Feature): boolean {
-  const { features, isBeta, tier } = useSchool()
-
-  // Per-feature override always wins (admin can force-show or force-hide a feature)
-  if (features[feature] === false) return false
-  if (features[feature] === true) return true
-
-  // Tier is set → enforce it regardless of isBeta
-  if (tier) return hasFeature(tier, feature)
-
-  // No tier configured: beta schools get everything, others get everything too
-  // (null tier = no restriction, for schools not yet assigned a tier)
-  return true
+  const { features, tier, modules } = useSchool()
+  // A per-feature override always wins (admin can force-show or force-hide a
+  // feature); then modules when the school has them, else its legacy tier
+  // (no tier = no restriction)
+  return resolveFeature({ tier, modules, features }, feature)
 }
 
 export function useTier() {
-  const { tier } = useSchool()
+  const { tier, modules } = useSchool()
   return {
     tier: tier ?? null,
-    hasFeature: (f: Feature) => hasFeature(tier, f),
+    hasFeature: (f: Feature) => hasFeature({ tier, modules }, f),
   }
 }

@@ -1,7 +1,7 @@
 import { useSchool } from '@/contexts/SchoolContext'
-import type { ProductType } from '@/lib/features'
+import { deriveProductType, type ProductType } from '@/lib/features'
 
 export function useProductType(): ProductType {
-  const school = useSchool()
-  return school.productType ?? 'education'
+  const { productType, tier, modules } = useSchool()
+  return deriveProductType({ productType, tier, modules })
 }

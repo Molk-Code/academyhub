@@ -3,7 +3,7 @@ import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { SCHOOL_ID } from '@/lib/school'
 import type { SchoolTier } from '@/types'
-import type { ProductType } from '@/lib/features'
+import type { ProductType, ModuleFlags } from '@/lib/features'
 
 export type CurrencyCode = 'SEK' | 'EUR' | 'USD'
 
@@ -20,7 +20,9 @@ interface SchoolConfig {
   storageQuotaGB: number | undefined
   storageUsedBytes: number | undefined
   currency: CurrencyCode
-  productType: ProductType
+  productType: ProductType | null
+  /** Absent on legacy schools — then tier decides */
+  modules: ModuleFlags | null
 }
 
 const defaultConfig: SchoolConfig = {
@@ -36,7 +38,8 @@ const defaultConfig: SchoolConfig = {
   storageQuotaGB: undefined,
   storageUsedBytes: undefined,
   currency: 'SEK',
-  productType: 'education',
+  productType: null,
+  modules: null,
 }
 
 const SchoolContext = createContext<SchoolConfig>(defaultConfig)

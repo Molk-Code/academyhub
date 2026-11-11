@@ -1003,6 +1003,8 @@ export interface SchoolDoc {
   storageUsedBytes?: number
   roomDisplayUrl?: string
   productType?: 'education' | 'rental'
+  /** Sellable modules; absent on legacy schools (tier decides) */
+  modules?: { rentalInventory: boolean; production: boolean; academy: boolean }
   shopPassword?: string
 }
 

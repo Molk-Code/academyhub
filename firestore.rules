@@ -926,6 +926,13 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
     }
 
+    // ── Contact requests (public contact form) ───────────────────────────────
+
+    match /contact_requests/{id} {
+      allow read, update, delete: if isAdmin();
+      allow create: if false; // written only by the submitContactRequest function
+    }
+
     // ── Bug reports ───────────────────────────────────────────────────────────
 
     match /bug_reports/{reportId} {

@@ -112,6 +112,8 @@ const BugReportsPage    = lazy(() => import('@/pages/admin/BugReports'))
 const ClientErrorsPage  = lazy(() => import('@/pages/admin/ClientErrors'))
 const AdminVideoLab     = lazy(() => import('@/pages/admin/VideoLab'))
 const ExperienceLevels  = lazy(() => import('@/pages/admin/ExperienceLevels'))
+const ContactRequests   = lazy(() => import('@/pages/admin/ContactRequests'))
+const Contact           = lazy(() => import('@/pages/Contact'))
 
 // ── Equipment lazy ──────────────────────────────────────────────────────────
 const EquipmentBookingPage = lazy(() => import('@/pages/equipment/EquipmentBookingPage'))
@@ -248,6 +250,7 @@ export default function App() {
             <Route path="/admin/gdpr"               element={<GdprDashboard />} />
             <Route path="/admin/bug-reports"        element={<BugReportsPage />} />
             <Route path="/admin/client-errors"      element={<ClientErrorsPage />} />
+            <Route path="/admin/contact-requests"   element={<ContactRequests />} />
             <Route path="/admin/experience-levels" element={<ExperienceLevels />} />
             <Route path="/admin/equipment"           element={<FeatureGate feature="equipment" redirectTo="/admin/users"><AdminEquipmentPage /></FeatureGate>} />
             <Route path="/admin/inventory"           element={<FeatureGate feature="inventory" redirectTo="/admin/users"><InventoryPage /></FeatureGate>} />
@@ -260,6 +263,7 @@ export default function App() {
           <Route path="/room-display" element={<RoomDisplay />} />
           <Route path="/qr-display"   element={<QrDisplay />} />
           <Route path="/privacy"      element={<PrivacyPolicy />} />
+          <Route path="/contact"      element={<Contact />} />
           <Route path="/superadmin"   element={<SuperAdmin />} />
           <Route path="/upgrade"      element={<UpgradePage />} />
           <Route path="/shop"         element={<PublicShopPage />} />

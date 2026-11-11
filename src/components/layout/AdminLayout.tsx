@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import {
   Users, GraduationCap, Eye, LogOut, ArrowLeftRight, Clock,
   CalendarCheck, MessageSquare, BookOpen, Share2, BookMarked, Film, Menu, X,
-  UtensilsCrossed, Car, Mail, SlidersHorizontal, ChevronDown, CircleDot, Tv, Shield, Package, ArchiveRestore, ClipboardList, BarChart2, RefreshCw, ArrowDown, Bug as BugIcon,
+  UtensilsCrossed, Car, Mail, SlidersHorizontal, ChevronDown, CircleDot, Tv, Shield, Package, ArchiveRestore, ClipboardList, BarChart2, RefreshCw, ArrowDown, Bug as BugIcon, Inbox,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
@@ -16,6 +16,7 @@ import firePng from '@/assets/fire.png'
 import { useBookingBadge, useBookingBadgeDetail } from '@/hooks/useBookingBadge'
 import { useChatUnreadCount } from '@/hooks/useChatUnread'
 import { useBugReportBadge } from '@/hooks/useBugReportBadge'
+import { useContactRequestBadge } from '@/hooks/useContactRequestBadge'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { useAppBadge } from '@/hooks/useAppBadge'
 import NotificationPermissionBanner from '@/components/NotificationPermissionBanner'
@@ -71,6 +72,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/admin/nav-settings', icon: SlidersHorizontal, label: 'Nav Settings' },
       { to: '/admin/gdpr',         icon: Shield,           label: 'GDPR'         },
       { to: '/admin/bug-reports',  icon: BugIcon,          label: 'Bug Reports', showBadge: true },
+      { to: '/admin/contact-requests', icon: Inbox,        label: 'Contact Requests', showBadge: true },
     ],
   },
 ]
@@ -146,6 +148,7 @@ export default function AdminLayout() {
   const bookingBadge   = useBookingBadge()
   const bookingDetail  = useBookingBadgeDetail()
   const bugReportBadge = useBugReportBadge()
+  const contactBadge   = useContactRequestBadge()
   const totalBadge     = chatUnread + bookingBadge + bugReportBadge
   useAppBadge(totalBadge)
 
@@ -234,7 +237,7 @@ export default function AdminLayout() {
               <div className="space-y-0.5 mb-1">
                 {visibleItems.map(({ to, icon: Icon, label, showBadge, showUnread }) => {
                   const badgeCount = showBadge
-                    ? (to === '/admin/food-box-orders' ? bookingDetail.food : to === '/admin/equipment' ? bookingDetail.equipment : to === '/admin/bug-reports' ? bugReportBadge : bookingDetail.van)
+                    ? (to === '/admin/food-box-orders' ? bookingDetail.food : to === '/admin/equipment' ? bookingDetail.equipment : to === '/admin/bug-reports' ? bugReportBadge : to === '/admin/contact-requests' ? contactBadge : bookingDetail.van)
                     : showUnread ? chatUnread : 0
                   return (
                     <NavLink

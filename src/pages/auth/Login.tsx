@@ -4,11 +4,13 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
-import { Film, Eye, EyeOff, AlertCircle, ArrowLeft } from 'lucide-react'
+import { Eye, EyeOff, AlertCircle, ArrowLeft } from 'lucide-react'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
+import LegalFooter from '@/components/LegalFooter'
+import firePng from '@/assets/fire.png'
 
 const schema = z.object({
   email:    z.string().email('Enter a valid email'),
@@ -104,9 +106,7 @@ export default function Login() {
       >
         <div className="bg-zinc-900 rounded-3xl shadow-2xl p-8">
           <div className="flex flex-col items-center mb-8">
-            <div className="w-14 h-14 bg-brand-600 rounded-2xl flex items-center justify-center mb-3 shadow-lg shadow-brand-200">
-              <Film className="w-7 h-7 text-white" />
-            </div>
+            <img src={firePng} alt="CineForge" className="w-14 h-14 object-contain mb-3" />
             <h1 className="text-2xl font-bold text-zinc-100">{shortName}</h1>
             <p className="text-sm text-zinc-500 mt-1">Filmmaking Education Platform</p>
           </div>
@@ -233,11 +233,7 @@ export default function Login() {
               No account yet? Your teacher will send you an invite link.
             </p>
           )}
-          <p className="text-center text-xs text-zinc-600 mt-3">
-            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-400 transition-colors">
-              Privacy Policy
-            </a>
-          </p>
+          <LegalFooter />
         </div>
       </motion.div>
     </div>

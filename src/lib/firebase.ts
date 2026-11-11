@@ -1,8 +1,8 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
-import { getStorage } from 'firebase/storage'
-import { getFunctions } from 'firebase/functions'
+import { getAuth, setPersistence, browserLocalPersistence, connectAuthEmulator } from 'firebase/auth'
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
+import { getStorage, connectStorageEmulator } from 'firebase/storage'
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions'
 import { getPerformance } from 'firebase/performance'
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check'
 
@@ -37,6 +37,15 @@ export const storage   = getStorage(app)
 export const FUNCTIONS_REGION: string = import.meta.env.VITE_FUNCTIONS_REGION || 'us-central1'
 export const functions = getFunctions(app, FUNCTIONS_REGION)
 export const perf      = getPerformance(app)
+
+// Local testing only (`vite --mode emulator`, see .env.emulator): talk to the
+// Firebase emulators instead of a real project. Never set in real builds.
+if (import.meta.env.VITE_USE_EMULATORS === 'true') {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
+  connectFirestoreEmulator(db, '127.0.0.1', 8080)
+  connectStorageEmulator(storage, '127.0.0.1', 9199)
+  connectFunctionsEmulator(functions, '127.0.0.1', 5001)
+}
 
 // Persist auth across browser sessions (survives tab/window close)
 setPersistence(auth, browserLocalPersistence).catch(() => {})

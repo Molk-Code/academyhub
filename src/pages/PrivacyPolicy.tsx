@@ -1,7 +1,11 @@
 import { Link } from 'react-router-dom'
 import { Shield } from 'lucide-react'
+import { LEGAL, legal } from '@/config/legal'
+import { ProviderDetails } from '@/components/LegalFooter'
 
 export default function PrivacyPolicy() {
+  const privacyEmail = legal('privacyContactEmail')
+  const contactMonths = LEGAL.contactRetentionMonths
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-200">
       <div className="max-w-3xl mx-auto px-6 py-12">
@@ -79,6 +83,7 @@ export default function PrivacyPolicy() {
                     ['Development plans (NOPRA)', '1 year after course end'],
                     ['Push notification tokens', 'Cleaned automatically when device is no longer active'],
                     ['Deletion logs', '5 years (legal obligation)'],
+                    ['Contact form messages', `${contactMonths} months (longer only while on legal hold)`],
                   ].map(([type, period]) => (
                     <tr key={type}>
                       <td className="py-2 pr-6">{type}</td>
@@ -121,11 +126,43 @@ export default function PrivacyPolicy() {
             </p>
           </section>
 
+          {/* Wording drafted with the contact form — to be reviewed by the
+              provider or the school's data protection officer */}
           <section>
-            <h2 className="text-lg font-semibold text-white mb-3">8. Contact and complaints</h2>
+            <h2 className="text-lg font-semibold text-white mb-3">8. The public contact form</h2>
+            <div className="space-y-3 text-zinc-300">
+              <p>
+                Anyone, including people without an account, can write to us through the contact form linked from the
+                login page.
+              </p>
+              <p><strong>What is stored:</strong> your name, email address, organisation (if given), the subject you
+              choose, your message, your browser's user-agent string, and a one-way salted hash of your IP address.
+              The IP address itself is never stored; the hash is used only to limit how many messages can be sent from
+              one connection.</p>
+              <p><strong>Purpose:</strong> to read and answer your message, and to protect the form against abuse.</p>
+              <p><strong>Legal basis:</strong> our legitimate interest in answering enquiries and keeping the service
+              secure (GDPR Art. 6.1f), or steps taken at your request before entering into an agreement
+              (GDPR Art. 6.1b), for example when a school asks about using {LEGAL.appName}.</p>
+              <p><strong>Who sees it:</strong> administrators of {LEGAL.appName}. Your message is also forwarded by
+              email to our contact address so it can be answered.</p>
+              <p><strong>How long:</strong> messages are deleted automatically {contactMonths} months after they
+              arrive. A message is kept longer only if it is placed on legal hold because of an ongoing legal
+              matter, and only for as long as that matter requires.</p>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-semibold text-white mb-3">9. Contact and complaints</h2>
             <p className="text-zinc-300">
               For questions or requests about your personal data, contact your school administrator.
             </p>
+            {privacyEmail && (
+              <p className="mt-2 text-zinc-300">
+                For questions about the contact form or about {LEGAL.appName} as a service, email{' '}
+                <a href={`mailto:${privacyEmail}`} className="text-brand-400 hover:underline">{privacyEmail}</a>.
+              </p>
+            )}
+            <ProviderDetails className="mt-3 text-sm" />
             <p className="mt-2 text-zinc-300">
               If you believe your data is being processed unlawfully, you have the right to lodge a complaint with
               the Swedish supervisory authority:{' '}

@@ -67,13 +67,13 @@ export async function requireMember(context: functions.https.CallableContext): P
 }
 
 // Fixed-window rate limit per user and action, e.g. allow(uid, 'pdf', 10) =
-// at most 10 per minute. Returns false when over the limit.
-export async function allow(uid: string, key: string, perMinute: number): Promise<boolean> {
+// at most 10 per minute (or per windowMs). Returns false when over the limit.
+export async function allow(uid: string, key: string, perMinute: number, windowMs = 60_000): Promise<boolean> {
   const ref = db.collection('rate_limits').doc(`${uid}_${key}`)
   return db.runTransaction(async tx => {
     const s = (await tx.get(ref)).data() as { n: number; t: number } | undefined
     const now = Date.now()
-    if (s && now - s.t < 60_000) {
+    if (s && now - s.t < windowMs) {
       if (s.n >= perMinute) return false
       tx.set(ref, { n: s.n + 1, t: s.t })
     } else {

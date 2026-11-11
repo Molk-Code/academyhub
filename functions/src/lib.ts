@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin'
 import * as functions from 'firebase-functions/v1'
+import { defineString } from 'firebase-functions/params'
 import { Resend } from 'resend'
 import * as PDFDocumentLib from 'pdfkit'
 export const PDFDocument = PDFDocumentLib as unknown as typeof import('pdfkit')
@@ -9,9 +10,10 @@ export const db = admin.firestore()
 
 export { admin, functions }
 
-// Region every function deploys to. Unset (production) keeps us-central1; the
-// EU project sets FUNCTIONS_REGION in functions/.env.cineforge-eu.
-export const REGION = process.env.FUNCTIONS_REGION ?? 'us-central1'
+// Region every function deploys to. A param, not process.env: the CLI reads
+// regions before it loads .env files. Set per project in
+// functions/.env.<projectId> (us-central1 for production, europe-west1 for EU).
+export const REGION = defineString('FUNCTIONS_REGION', { default: 'us-central1' })
 
 // Site that password-reset and invite links send users back to. Unset
 // (production) keeps today's URL; set it to the custom domain at cutover.

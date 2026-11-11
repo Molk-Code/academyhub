@@ -96,6 +96,27 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/schools/molkom).data.get('productType', null) == 'rental';
     }
 
+    // ── Modules ───────────────────────────────────────────────────────────────
+    // schools/molkom.modules = { academy, production, rentalInventory }, set by
+    // the superadmin. Absent (every legacy school) → every module on, so the
+    // tier checks above keep deciding exactly as before. Added as an extra
+    // condition on the collections of each module, with no admin bypass.
+    // Same document as schoolTier(), so where both run it is one read.
+
+    function moduleOn(flag) {
+      let modules = get(/databases/$(database)/documents/schools/molkom).data.get('modules', null);
+      return modules == null || modules.get(flag, false) == true;
+    }
+
+    // settings/{docId} also matches the module-owned settings documents —
+    // overlapping matches are OR'ed, so the generic block has to gate them too
+    function settingsModuleOn(docId) {
+      return docId in ['booking', 'semester'] ? moduleOn('academy')
+        : docId == 'production' ? moduleOn('production')
+        : docId in ['equipment_gtin', 'inventory_stats_resets'] ? moduleOn('rentalInventory')
+        : true;
+    }
+
     // ── Users ─────────────────────────────────────────────────────────────────
 
     function validNewUser(d) {
@@ -169,22 +190,22 @@ service cloud.firestore {
     // ── Subjects ──────────────────────────────────────────────────────────────
 
     match /subjects/{subjectId} {
-      allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow read: if (isSignedIn()) && moduleOn('academy');
+      allow write: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     // ── Lessons ───────────────────────────────────────────────────────────────
 
     match /lessons/{lessonId} {
-      allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow read: if (isSignedIn()) && moduleOn('academy');
+      allow write: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     // ── Assignments ───────────────────────────────────────────────────────────
 
     match /assignments/{assignmentId} {
-      allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow read: if (isSignedIn()) && moduleOn('academy');
+      allow write: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     // ── Tests — students CANNOT read correctAnswer fields directly ────────────
@@ -192,8 +213,8 @@ service cloud.firestore {
     // strips correct answers before returning them.
 
     match /tests/{testId} {
-      allow read: if isTeacherOrAdmin();
-      allow write: if isTeacherOrAdmin();
+      allow read: if (isTeacherOrAdmin()) && moduleOn('academy');
+      allow write: if (isTeacherOrAdmin()) && moduleOn('academy');
       // Students: no direct read access
     }
 
@@ -201,58 +222,58 @@ service cloud.firestore {
     // students can read the step list directly; submitChecklist (Cloud
     // Function) still validates/writes the submission itself.
     match /checklists/{checklistId} {
-      allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow read: if (isSignedIn()) && moduleOn('academy');
+      allow write: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     // ── Submissions ───────────────────────────────────────────────────────────
 
     match /submissions/{submissionId} {
       // Students can read their own; teachers/admins can read all
-      allow read: if isTeacherOrAdmin()
-        || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow read: if (isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid)) && moduleOn('academy');
       // Students can create/update their own draft submissions
-      allow create: if isStudent()
+      allow create: if (isStudent()
         && request.resource.data.studentId == request.auth.uid
-        && request.resource.data.status in ['draft', 'submitted'];
-      allow update: if isStudent()
+        && request.resource.data.status in ['draft', 'submitted']) && moduleOn('academy');
+      allow update: if (isStudent()
         && resource.data.studentId == request.auth.uid
         && resource.data.status == 'draft'
         && !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['score', 'passed', 'pointsAwarded', 'gradedBy', 'gradedAt']);
+            .hasAny(['score', 'passed', 'pointsAwarded', 'gradedBy', 'gradedAt'])) && moduleOn('academy');
       // Grading goes through Cloud Functions only
-      allow delete: if false;
+      allow delete: if (false) && moduleOn('academy');
     }
 
     // ── Points log — append-only, Cloud Functions only ────────────────────────
 
     match /points_log/{logId} {
-      allow read: if isTeacherOrAdmin()
-        || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow read: if (isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid)) && moduleOn('academy');
       // Only Cloud Functions write points; no client writes allowed
-      allow write: if false;
+      allow write: if (false) && moduleOn('academy');
     }
 
     // ── Prizes ────────────────────────────────────────────────────────────────
 
     match /prizes/{prizeId} {
-      allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow read: if (isSignedIn()) && moduleOn('academy');
+      allow write: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     // ── Prize claims ──────────────────────────────────────────────────────────
 
     match /prize_claims/{claimId} {
-      allow read: if isTeacherOrAdmin()
-        || (isStudent() && resource.data.studentId == request.auth.uid);
-      allow write: if false; // processRedemption Cloud Function only
+      allow read: if (isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid)) && moduleOn('academy');
+      allow write: if (false) && moduleOn('academy'); // processRedemption Cloud Function only
     }
 
     // ── Progress (denormalized summary per student) ───────────────────────────
 
     match /progress/{studentId} {
-      allow read: if isSelf(studentId) || isTeacherOrAdmin();
-      allow write: if false; // updateProgress Cloud Function only
+      allow read: if (isSelf(studentId) || isTeacherOrAdmin()) && moduleOn('academy');
+      allow write: if (false) && moduleOn('academy'); // updateProgress Cloud Function only
     }
 
     // ── Invitations ───────────────────────────────────────────────────────────
@@ -286,50 +307,54 @@ service cloud.firestore {
     // unauthenticated iPad room display (semester dates bound room availability).
 
     match /settings/{docId} {
-      allow read: if isSignedIn() || docId in ['booking', 'semester'];
-      allow write: if isAdmin();
+      allow get: if (isSignedIn() || docId in ['booking', 'semester']) && settingsModuleOn(docId);
+      // A list can't be checked per document: allowed only while every module
+      // that owns a settings doc is on (always, for legacy schools)
+      allow list: if (isSignedIn() || docId in ['booking', 'semester'])
+        && moduleOn('academy') && moduleOn('production') && moduleOn('rentalInventory');
+      allow write: if (isAdmin()) && settingsModuleOn(docId);
     }
 
     match /settings/production {
-      allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow read: if (isSignedIn()) && moduleOn('production');
+      allow write: if (isTeacherOrAdmin()) && moduleOn('production');
     }
 
     // Counter for EAN-14 equipment numbers, bumped when staff print a label
     match /settings/equipment_gtin {
-      allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow read: if (isSignedIn()) && moduleOn('rentalInventory');
+      allow write: if (isTeacherOrAdmin()) && moduleOn('rentalInventory');
     }
 
     match /settings/inventory_stats_resets {
-      allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow read: if (isSignedIn()) && moduleOn('rentalInventory');
+      allow write: if (isTeacherOrAdmin()) && moduleOn('rentalInventory');
     }
 
     // ── Subject teachers (subcollection) ─────────────────────────────────────
 
     match /subjects/{subjectId}/teachers/{teacherId} {
-      allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow read: if (isSignedIn()) && moduleOn('academy');
+      allow write: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     // ── Lesson Blocks ─────────────────────────────────────────────────────────
 
     match /lessonCategories/{categoryId} {
-      allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow read: if (isSignedIn()) && moduleOn('academy');
+      allow write: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     match /lessonBlocks/{blockId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read: if (isSignedIn()) && moduleOn('academy');
+      allow write: if (isAdmin()) && moduleOn('academy');
     }
 
     // ── Classrooms ────────────────────────────────────────────────────────────
 
     match /classrooms/{classroomId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read: if (isSignedIn()) && moduleOn('academy');
+      allow write: if (isAdmin()) && moduleOn('academy');
     }
 
     // ── Attendance sessions ───────────────────────────────────────────────────
@@ -337,67 +362,67 @@ service cloud.firestore {
     // Holds the live check-in token — staff only. Displays read the token from
     // qr_display_devices/{id}/live/{displayKey} instead.
     match /attendance_sessions/{sessionId} {
-      allow read: if isTeacherOrAdmin();
-      allow write: if isTeacherOrAdmin();
+      allow read: if (isTeacherOrAdmin()) && moduleOn('academy');
+      allow write: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     // ── QR Display Devices ────────────────────────────────────────────────────
 
     match /qr_display_devices/{deviceId} {
-      allow read: if true; // public — display devices are unauthenticated (name/state only)
-      allow create, delete: if isAdmin();
+      allow read: if (true) && moduleOn('academy'); // public — display devices are unauthenticated (name/state only)
+      allow create, delete: if (isAdmin()) && moduleOn('academy');
       // teachers write session state; admins manage device config. The token itself
       // never goes on this public doc.
-      allow update: if isTeacherOrAdmin() && request.resource.data.get('activeToken', null) == null;
+      allow update: if (isTeacherOrAdmin() && request.resource.data.get('activeToken', null) == null) && moduleOn('academy');
 
       // The display's secret link key — staff need it to publish the token
       match /private/{docId} {
-        allow read: if isTeacherOrAdmin();
-        allow write: if isAdmin();
+        allow read: if (isTeacherOrAdmin()) && moduleOn('academy');
+        allow write: if (isAdmin()) && moduleOn('academy');
       }
       // Live token, stored under the secret key: readable only by whoever has
       // the display link (get by exact id, never listed)
       match /live/{displayKey} {
-        allow get: if true;
-        allow list: if false;
-        allow write: if isTeacherOrAdmin();
+        allow get: if (true) && moduleOn('academy');
+        allow list: if (false) && moduleOn('academy');
+        allow write: if (isTeacherOrAdmin()) && moduleOn('academy');
       }
     }
 
     // ── Lesson attendance (subcollection) ────────────────────────────────────
     // Writes go through checkInAttendance Cloud Function (Admin SDK) only.
     match /lessons/{lessonId}/attendance/{studentId} {
-      allow read: if isSelf(studentId) || isTeacherOrAdmin();
-      allow write: if false;
+      allow read: if (isSelf(studentId) || isTeacherOrAdmin()) && moduleOn('academy');
+      allow write: if (false) && moduleOn('academy');
     }
 
     // ── Room booking ──────────────────────────────────────────────────────────
     // rooms and time_blocks are publicly readable for the iPad display page.
 
     match /rooms/{roomId} {
-      allow read: if true;
-      allow write: if isStaff();
+      allow read: if (true) && moduleOn('academy');
+      allow write: if (isStaff()) && moduleOn('academy');
     }
 
     match /time_blocks/{blockId} {
-      allow read: if true;
-      allow write: if isStaff();
+      allow read: if (true) && moduleOn('academy');
+      allow write: if (isStaff()) && moduleOn('academy');
     }
 
     // Public, reduced copy for the signed-out room display — written by the
     // onRoomBookingWritten function only (room, time, first name)
     match /room_slots/{slotId} {
-      allow read: if true;
-      allow write: if false;
+      allow read: if (true) && moduleOn('academy');
+      allow write: if (false) && moduleOn('academy');
     }
 
     match /room_bookings/{bookingId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn()
-        && request.resource.data.studentId == request.auth.uid;
-      allow delete: if isStaff()
-        || (isSignedIn() && resource.data.studentId == request.auth.uid);
-      allow update: if false;
+      allow read: if (isSignedIn()) && moduleOn('academy');
+      allow create: if (isSignedIn()
+        && request.resource.data.studentId == request.auth.uid) && moduleOn('academy');
+      allow delete: if (isStaff()
+        || (isSignedIn() && resource.data.studentId == request.auth.uid)) && moduleOn('academy');
+      allow update: if (false) && moduleOn('academy');
     }
 
     // ── Chat ─────────────────────────────────────────────────────────────────
@@ -464,63 +489,63 @@ service cloud.firestore {
 
     match /production_teams/{teamId} {
       allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow write: if (isTeacherOrAdmin()) && moduleOn('production');
     }
 
     // ── Videos ───────────────────────────────────────────────────────────────
 
     match /videos/{videoId} {
-      allow read: if isSignedIn();
+      allow read: if (isSignedIn()) && moduleOn('academy');
       // Students create their own; teachers/admins can update (grade/review)
-      allow create: if isStudent()
-        && request.resource.data.uploaderId == request.auth.uid;
-      allow update: if isTeacherOrAdmin()
+      allow create: if (isStudent()
+        && request.resource.data.uploaderId == request.auth.uid) && moduleOn('academy');
+      allow update: if (isTeacherOrAdmin()
         || (isStudent() && resource.data.uploaderId == request.auth.uid
             && !request.resource.data.diff(resource.data).affectedKeys()
-                .hasAny(['reviewStatus', 'grade', 'gradedBy', 'gradedAt', 'feedback']));
-      allow delete: if isTeacherOrAdmin();
+                .hasAny(['reviewStatus', 'grade', 'gradedBy', 'gradedAt', 'feedback']))) && moduleOn('academy');
+      allow delete: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     match /video_comments/{videoId}/comments/{commentId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn()
-        && request.resource.data.userId == request.auth.uid;
-      allow delete: if isSignedIn()
-        && (resource.data.userId == request.auth.uid || isTeacherOrAdmin());
-      allow update: if false;
+      allow read: if (isSignedIn()) && moduleOn('academy');
+      allow create: if (isSignedIn()
+        && request.resource.data.userId == request.auth.uid) && moduleOn('academy');
+      allow delete: if (isSignedIn()
+        && (resource.data.userId == request.auth.uid || isTeacherOrAdmin())) && moduleOn('academy');
+      allow update: if (false) && moduleOn('academy');
     }
 
     // ── Absence Reports ───────────────────────────────────────────────────────
 
     match /absence_reports/{reportId} {
-      allow get: if isTeacherOrAdmin()
-        || (isStudent() && resource.data.studentId == request.auth.uid);
-      allow list: if isTeacherOrAdmin()
-        || (isStudent() && resource.data.studentId == request.auth.uid);
-      allow create: if (isStudent() && request.resource.data.studentId == request.auth.uid)
-        || isTeacherOrAdmin();
-      allow update: if isTeacherOrAdmin();
-      allow delete: if isTeacherOrAdmin()
-        || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow get: if (isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid)) && moduleOn('academy');
+      allow list: if (isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid)) && moduleOn('academy');
+      allow create: if ((isStudent() && request.resource.data.studentId == request.auth.uid)
+        || isTeacherOrAdmin()) && moduleOn('academy');
+      allow update: if (isTeacherOrAdmin()) && moduleOn('academy');
+      allow delete: if (isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid)) && moduleOn('academy');
     }
 
     // ── Video Lab (Beta) ─────────────────────────────────────────────────────
 
     match /video_lab/{videoId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.uploaderId == request.auth.uid;
-      allow update: if isTeacherOrAdmin()
-        || (isStudent() && resource.data.uploaderId == request.auth.uid);
-      allow delete: if isTeacherOrAdmin()
-        || (isStudent() && resource.data.uploaderId == request.auth.uid);
+      allow read: if (isSignedIn()) && moduleOn('academy');
+      allow create: if (isSignedIn() && request.resource.data.uploaderId == request.auth.uid) && moduleOn('academy');
+      allow update: if (isTeacherOrAdmin()
+        || (isStudent() && resource.data.uploaderId == request.auth.uid)) && moduleOn('academy');
+      allow delete: if (isTeacherOrAdmin()
+        || (isStudent() && resource.data.uploaderId == request.auth.uid)) && moduleOn('academy');
 
       match /comments/{commentId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn()
-          && request.resource.data.userId == request.auth.uid;
-        allow delete: if isSignedIn()
-          && (resource.data.userId == request.auth.uid || isTeacherOrAdmin());
-        allow update: if false;
+        allow read: if (isSignedIn()) && moduleOn('academy');
+        allow create: if (isSignedIn()
+          && request.resource.data.userId == request.auth.uid) && moduleOn('academy');
+        allow delete: if (isSignedIn()
+          && (resource.data.userId == request.auth.uid || isTeacherOrAdmin())) && moduleOn('academy');
+        allow update: if (false) && moduleOn('academy');
       }
     }
 
@@ -544,32 +569,32 @@ service cloud.firestore {
     // ── Vehicles ─────────────────────────────────────────────────────────────
 
     match /vehicles/{vehicleId} {
-      allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow read: if (isSignedIn()) && moduleOn('academy');
+      allow write: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     // ── Food Box Orders ───────────────────────────────────────────────────────
 
     match /food_box_orders/{orderId} {
-      allow read: if isTeacherOrAdmin()
-        || (isStudent() && resource.data.studentId == request.auth.uid);
-      allow create: if isStudent()
+      allow read: if (isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid)) && moduleOn('academy');
+      allow create: if (isStudent()
         && request.resource.data.studentId == request.auth.uid
-        && request.resource.data.status == 'pending';
-      allow update: if isTeacherOrAdmin();
-      allow delete: if isTeacherOrAdmin();
+        && request.resource.data.status == 'pending') && moduleOn('academy');
+      allow update: if (isTeacherOrAdmin()) && moduleOn('academy');
+      allow delete: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     // ── Minivan Bookings ──────────────────────────────────────────────────────
 
     match /minivan_bookings/{bookingId} {
-      allow read: if isTeacherOrAdmin()
-        || (isStudent() && resource.data.studentId == request.auth.uid);
-      allow create: if isStudent()
+      allow read: if (isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid)) && moduleOn('academy');
+      allow create: if (isStudent()
         && request.resource.data.studentId == request.auth.uid
-        && request.resource.data.status == 'pending';
-      allow update: if isTeacherOrAdmin();
-      allow delete: if isTeacherOrAdmin();
+        && request.resource.data.status == 'pending') && moduleOn('academy');
+      allow update: if (isTeacherOrAdmin()) && moduleOn('academy');
+      allow delete: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     // ── Email Config ──────────────────────────────────────────────────────────
@@ -582,22 +607,22 @@ service cloud.firestore {
     // ── Equipment Booking System ───────────────────────────────────────────────
 
     match /equipment_categories/{catId} {
-      allow read: if (isSignedIn() && (isAdmin() || tierHasFeature('equipment')))
-        || isRentalMode();
-      allow write: if isAdmin();
+      allow read: if ((isSignedIn() && (isAdmin() || tierHasFeature('equipment')))
+        || isRentalMode()) && moduleOn('rentalInventory');
+      allow write: if (isAdmin()) && moduleOn('rentalInventory');
     }
 
     match /equipment/{itemId} {
-      allow read: if (isSignedIn() && (isAdmin() || tierHasFeature('equipment')))
-        || isRentalMode();
-      allow write: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'));
+      allow read: if ((isSignedIn() && (isAdmin() || tierHasFeature('equipment')))
+        || isRentalMode()) && moduleOn('rentalInventory');
+      allow write: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))) && moduleOn('rentalInventory');
     }
 
     match /equipment_bookings/{bookingId} {
-      allow read: if (isAdmin() || tierHasFeature('equipment'))
-        && (isTeacherOrAdmin() || (isSignedIn() && resource.data.studentId == request.auth.uid));
+      allow read: if ((isAdmin() || tierHasFeature('equipment'))
+        && (isTeacherOrAdmin() || (isSignedIn() && resource.data.studentId == request.auth.uid))) && moduleOn('rentalInventory');
       // New bookings start pending, without decisions or project links (staff/functions set those)
-      allow create: if request.resource.data.status == 'pending'
+      allow create: if (request.resource.data.status == 'pending'
         && !request.resource.data.keys().hasAny(['categoryDecisions', 'setUpCategories', 'linkedProjectIds', 'linkedProjectId'])
         && (
           (isSignedIn() && tierHasFeature('equipment')
@@ -605,115 +630,115 @@ service cloud.firestore {
           || (isRentalMode() && request.resource.data.get('guestEmail', '') != ''
               && request.resource.data.get('isGuest', false) == true
               && request.resource.data.get('studentId', '') == '')
-        );
-      allow update: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))
+        )) && moduleOn('rentalInventory');
+      allow update: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))
         || (isSignedIn() && resource.data.studentId == request.auth.uid
             && resource.data.status in ['pending', 'confirmed']
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
-            && request.resource.data.status == 'cancelled');
-      allow delete: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'));
+            && request.resource.data.status == 'cancelled')) && moduleOn('rentalInventory');
+      allow delete: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))) && moduleOn('rentalInventory');
 
       match /messages/{messageId} {
         function bookingStudentId() {
           return get(/databases/$(database)/documents/equipment_bookings/$(bookingId)).data.studentId;
         }
-        allow read: if (isAdmin() || tierHasFeature('equipment'))
-          && (isTeacherOrAdmin() || (isSignedIn() && bookingStudentId() == request.auth.uid));
-        allow create: if (isAdmin() || tierHasFeature('equipment'))
+        allow read: if ((isAdmin() || tierHasFeature('equipment'))
+          && (isTeacherOrAdmin() || (isSignedIn() && bookingStudentId() == request.auth.uid))) && moduleOn('rentalInventory');
+        allow create: if ((isAdmin() || tierHasFeature('equipment'))
           && request.resource.data.senderId == request.auth.uid
           && (
             (isTeacherOrAdmin() && request.resource.data.senderRole == 'staff')
             || (isSignedIn() && bookingStudentId() == request.auth.uid && request.resource.data.senderRole == 'student')
-          );
+          )) && moduleOn('rentalInventory');
       }
     }
 
     match /inventory_projects/{projectId} {
-      allow read: if isSignedIn() && (isAdmin() || tierHasFeature('inventory'));
-      allow write: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('inventory'));
+      allow read: if (isSignedIn() && (isAdmin() || tierHasFeature('inventory'))) && moduleOn('rentalInventory');
+      allow write: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('inventory'))) && moduleOn('rentalInventory');
 
       match /items/{itemId} {
-        allow read: if isSignedIn() && (isAdmin() || tierHasFeature('inventory'));
-        allow write: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('inventory'));
+        allow read: if (isSignedIn() && (isAdmin() || tierHasFeature('inventory'))) && moduleOn('rentalInventory');
+        allow write: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('inventory'))) && moduleOn('rentalInventory');
       }
 
       // "This unit is out" markers used by the scanners (checkoutScan)
       match /unit_out/{lockId} {
-        allow read, write: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('inventory'));
+        allow read, write: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('inventory'))) && moduleOn('rentalInventory');
       }
 
       // Contract e-signatures — written only by the signEquipmentContract
       // function (server-captured evidence), never edited. Borrowers see their own.
       match /signatures/{sigId} {
-        allow read: if isTeacherOrAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
-        allow write: if false;
+        allow read: if (isTeacherOrAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid)) && moduleOn('rentalInventory');
+        allow write: if (false) && moduleOn('rentalInventory');
       }
     }
 
     // Collection group rule required for collectionGroup('items') queries
     match /{path=**}/items/{itemId} {
-      allow read: if isSignedIn();
+      allow read: if (isSignedIn()) && moduleOn('rentalInventory');
     }
 
     // Collection-group reads of subject teachers (subject list instructors,
     // avatar sync in Profile, guest-teacher lookups). Mirrors the read rule on
     // subjects/{subjectId}/teachers; writes still go through that rule.
     match /{path=**}/teachers/{teacherId} {
-      allow read: if isSignedIn();
+      allow read: if (isSignedIn()) && moduleOn('academy');
     }
 
     match /inventory_presets/{presetId} {
-      allow read: if isSignedIn() && (isAdmin() || tierHasFeature('inventory'));
-      allow write: if isTeacherOrAdmin() && (isAdmin() || tierHasFeature('inventory'));
+      allow read: if (isSignedIn() && (isAdmin() || tierHasFeature('inventory'))) && moduleOn('rentalInventory');
+      allow write: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('inventory'))) && moduleOn('rentalInventory');
     }
 
     // ── Scan sessions (cross-device QR scanning) ──────────────────────────────
 
     match /scan_sessions/{sessionId} {
-      allow read: if isSignedIn();
-      allow create: if isTeacherOrAdmin();
-      allow update: if isTeacherOrAdmin();
+      allow read: if (isSignedIn()) && moduleOn('rentalInventory');
+      allow create: if (isTeacherOrAdmin()) && moduleOn('rentalInventory');
+      allow update: if (isTeacherOrAdmin()) && moduleOn('rentalInventory');
 
       match /checkins/{checkinId} {
-        allow read: if isSignedIn();
-        allow create: if isTeacherOrAdmin(); // staff phones write check-in signals
+        allow read: if (isSignedIn()) && moduleOn('rentalInventory');
+        allow create: if (isTeacherOrAdmin()) && moduleOn('rentalInventory'); // staff phones write check-in signals
       }
     }
 
     // ── Individual Development Plans (NOPRA) ──────────────────────────────────
 
     match /development_plans/{studentId} {
-      allow read: if isSelf(studentId) || isTeacherOrAdmin();
-      allow write: if isSelf(studentId);
+      allow read: if (isSelf(studentId) || isTeacherOrAdmin()) && moduleOn('academy');
+      allow write: if (isSelf(studentId)) && moduleOn('academy');
     }
 
     // ── Plan comments (teacher → student feedback) ────────────────────────────
 
     match /plan_comments/{commentId} {
-      allow read: if isTeacherOrAdmin()
-        || (isStudent() && resource.data.studentId == request.auth.uid);
-      allow create: if isTeacherOrAdmin()
-        && request.resource.data.teacherId == request.auth.uid;
-      allow delete: if isTeacherOrAdmin();
-      allow update: if false;
+      allow read: if (isTeacherOrAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid)) && moduleOn('academy');
+      allow create: if (isTeacherOrAdmin()
+        && request.resource.data.teacherId == request.auth.uid) && moduleOn('academy');
+      allow delete: if (isTeacherOrAdmin()) && moduleOn('academy');
+      allow update: if (false) && moduleOn('academy');
     }
 
     // ── Semester Events (Annual Wheel) ────────────────────────────────────────
 
     match /semester_events/{eventId} {
-      allow read: if isTeacherOrAdmin();
-      allow write: if isAdmin();
+      allow read: if (isTeacherOrAdmin()) && moduleOn('academy');
+      allow write: if (isAdmin()) && moduleOn('academy');
     }
 
     match /semester_categories/{catId} {
-      allow read: if isTeacherOrAdmin();
-      allow write: if isAdmin();
+      allow read: if (isTeacherOrAdmin()) && moduleOn('academy');
+      allow write: if (isAdmin()) && moduleOn('academy');
     }
 
     // ── Teacher Notebook ─────────────────────────────────────────────────
 
     match /teacher_notes/{noteId} {
-      allow read, write: if isTeacherOrAdmin();
+      allow read, write: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     // ── GDPR deletion log — append by admins, read by admins ─────────────
@@ -760,39 +785,39 @@ service cloud.firestore {
     // ── Team Resources ────────────────────────────────────────────────────────
 
     match /resource_folders/{folderId} {
-      allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow read: if (isSignedIn()) && moduleOn('academy');
+      allow write: if (isTeacherOrAdmin()) && moduleOn('academy');
       // Students can create folders scoped to their own cohort (class resources)
-      allow create: if isStudent()
+      allow create: if (isStudent()
         && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.cohortId != null;
+        && request.resource.data.cohortId != null) && moduleOn('academy');
     }
 
     match /team_resources/{resourceId} {
-      allow read: if isSignedIn();
+      allow read: if (isSignedIn()) && moduleOn('academy');
       // Teachers/admins can create any resource; students can only create class resources (cohortId != null)
-      allow create: if isTeacherOrAdmin()
-        && request.resource.data.createdBy == request.auth.uid;
-      allow create: if isStudent()
+      allow create: if (isTeacherOrAdmin()
+        && request.resource.data.createdBy == request.auth.uid) && moduleOn('academy');
+      allow create: if (isStudent()
         && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.cohortId != null;
-      allow update, delete: if isTeacherOrAdmin();
+        && request.resource.data.cohortId != null) && moduleOn('academy');
+      allow update, delete: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     // ── Teacher Assessments (strengths / developments per student) ───────────
 
     match /teacher_assessments/{studentId} {
       // Students can read their own; teachers/admins can read all
-      allow read: if isSelf(studentId) || isTeacherOrAdmin();
+      allow read: if (isSelf(studentId) || isTeacherOrAdmin()) && moduleOn('academy');
       // Only teachers/admins can write assessments
-      allow write: if isTeacherOrAdmin();
+      allow write: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     // ── Crew Roles (admin-managed, student-readable) ──────────────────────────
 
     match /crew_roles/{roleId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read: if (isSignedIn()) && (moduleOn('production') || moduleOn('rentalInventory'));
+      allow write: if (isAdmin()) && moduleOn('production');
     }
 
     // ── Production Planning ───────────────────────────────────────────────────
@@ -811,12 +836,12 @@ service cloud.firestore {
           || (prodData().viewerIds != null && request.auth.uid in prodData().viewerIds);
       }
 
-      allow read:   if isSignedIn() && (isAdmin() || tierHasFeature('production')) && canReadProd();
-      allow create: if isSignedIn() && tierHasFeature('production')
-        && request.resource.data.createdBy == request.auth.uid;
-      allow update: if isSignedIn() && (isAdmin() || tierHasFeature('production')) && canEditProd();
-      allow delete: if isSignedIn() && (isAdmin() || tierHasFeature('production'))
-        && (prodData().createdBy == request.auth.uid || isTeacherOrAdmin());
+      allow read: if (isSignedIn() && (isAdmin() || tierHasFeature('production')) && canReadProd()) && moduleOn('production');
+      allow create: if (isSignedIn() && tierHasFeature('production')
+        && request.resource.data.createdBy == request.auth.uid) && moduleOn('production');
+      allow update: if (isSignedIn() && (isAdmin() || tierHasFeature('production')) && canEditProd()) && moduleOn('production');
+      allow delete: if (isSignedIn() && (isAdmin() || tierHasFeature('production'))
+        && (prodData().createdBy == request.auth.uid || isTeacherOrAdmin())) && moduleOn('production');
 
       // Every subcollection (cast, crew, budget, shotlog, …) follows the
       // production's own read/edit access
@@ -836,27 +861,27 @@ service cloud.firestore {
             || request.auth.token.get('cohortId', '') in p.get('sharedCohortIds', [])
             || request.auth.uid in p.get('viewerIds', []);
         }
-        allow read: if isSignedIn() && canReadSub();
-        allow write: if isSignedIn() && canEditSub();
+        allow read: if (isSignedIn() && canReadSub()) && moduleOn('production');
+        allow write: if (isSignedIn() && canEditSub()) && moduleOn('production');
       }
     }
 
     // ── Master Production Period ──────────────────────────────────────────────
 
     match /production_periods/{periodId} {
-      allow read: if isSignedIn();
-      allow create: if isTeacherOrAdmin();
-      allow update: if isTeacherOrAdmin();
-      allow delete: if isTeacherOrAdmin();
+      allow read: if (isSignedIn()) && moduleOn('production');
+      allow create: if (isTeacherOrAdmin()) && moduleOn('production');
+      allow update: if (isTeacherOrAdmin()) && moduleOn('production');
+      allow delete: if (isTeacherOrAdmin()) && moduleOn('production');
 
       match /allocations/{allocationId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn()
-          && request.resource.data.createdBy == request.auth.uid;
-        allow update: if isSignedIn()
-          && (resource.data.createdBy == request.auth.uid || isTeacherOrAdmin());
-        allow delete: if isSignedIn()
-          && (resource.data.createdBy == request.auth.uid || isTeacherOrAdmin());
+        allow read: if (isSignedIn()) && moduleOn('production');
+        allow create: if (isSignedIn()
+          && request.resource.data.createdBy == request.auth.uid) && moduleOn('production');
+        allow update: if (isSignedIn()
+          && (resource.data.createdBy == request.auth.uid || isTeacherOrAdmin())) && moduleOn('production');
+        allow delete: if (isSignedIn()
+          && (resource.data.createdBy == request.auth.uid || isTeacherOrAdmin())) && moduleOn('production');
       }
     }
 
@@ -864,15 +889,15 @@ service cloud.firestore {
 
     match /todos/{todoId} {
       // Ownership check rather than isStudent() — custom claims may not be set
-      allow read: if isSignedIn() && (
+      allow read: if (isSignedIn() && (
         isTeacherOrAdmin() || resource.data.studentId == request.auth.uid
-      );
-      allow create: if isSignedIn()
-        && request.resource.data.studentId == request.auth.uid;
-      allow update: if isSignedIn()
-        && resource.data.studentId == request.auth.uid;
-      allow delete: if isSignedIn()
-        && resource.data.studentId == request.auth.uid;
+      )) && moduleOn('academy');
+      allow create: if (isSignedIn()
+        && request.resource.data.studentId == request.auth.uid) && moduleOn('academy');
+      allow update: if (isSignedIn()
+        && resource.data.studentId == request.auth.uid) && moduleOn('academy');
+      allow delete: if (isSignedIn()
+        && resource.data.studentId == request.auth.uid) && moduleOn('academy');
     }
 
     // ── Schools ───────────────────────────────────────────────────────────────
@@ -909,13 +934,13 @@ service cloud.firestore {
     // ── Guest Teacher Library ─────────────────────────────────────────────────
 
     match /guest_teachers/{teacherId} {
-      allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow read: if (isSignedIn()) && moduleOn('academy');
+      allow write: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     match /guest_teacher_bookings/{bookingId} {
-      allow read: if isSignedIn();
-      allow write: if isTeacherOrAdmin();
+      allow read: if (isSignedIn()) && moduleOn('academy');
+      allow write: if (isTeacherOrAdmin()) && moduleOn('academy');
     }
 
     // ── Notification inbox ────────────────────────────────────────────────────

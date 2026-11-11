@@ -23,6 +23,8 @@ interface SchoolConfig {
   productType: ProductType | null
   /** Absent on legacy schools — then tier decides */
   modules: ModuleFlags | null
+  /** Public rental shop for signed-out visitors (module-based schools) */
+  publicShop: boolean | null
 }
 
 const defaultConfig: SchoolConfig = {
@@ -40,6 +42,7 @@ const defaultConfig: SchoolConfig = {
   currency: 'SEK',
   productType: null,
   modules: null,
+  publicShop: null,
 }
 
 const SchoolContext = createContext<SchoolConfig>(defaultConfig)

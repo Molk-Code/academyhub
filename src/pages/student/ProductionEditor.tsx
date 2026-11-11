@@ -27,6 +27,7 @@ import { PropsTab }      from './production/PropsTab'
 import ShotLogTab        from '@/components/production/ShotLogTab'
 import { BudgetTab }     from '@/components/production/BudgetTab'
 import { exportXLS } from './productionGlobalExport'
+import { useFeature } from '@/hooks/useFeature'
 
 type Tab = 'script' | 'breakdown' | 'crew' | 'cast' | 'shots' | 'locations' | 'costume' | 'makeup' | 'props' | 'schedule' | 'shotlog' | 'budget'
 
@@ -193,6 +194,7 @@ function CollaboratorRow({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function ProductionEditor() {
+  const canBookEquipment = useFeature('equipment')
   const { id } = useParams<{ id: string }>()
   const { profile } = useAuth()
   const navigate = useNavigate()
@@ -900,12 +902,15 @@ export default function ProductionEditor() {
                 <span className="text-2xl">✅</span>
                 <div>
                   <p className="font-semibold text-white">Production plan complete!</p>
-                  <p className="text-sm text-gray-400">You can now book equipment for this production.</p>
+                  {canBookEquipment && <p className="text-sm text-gray-400">You can now book equipment for this production.</p>}
                 </div>
               </div>
-              <a href="/booking/equipment" className="bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
-                Book Equipment →
-              </a>
+              {/* Equipment links only when Rental & Inventory is part of the plan */}
+              {canBookEquipment && (
+                <a href="/booking/equipment" className="bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
+                  Book Equipment →
+                </a>
+              )}
             </div>
           )}
           {TABS.map(t => (

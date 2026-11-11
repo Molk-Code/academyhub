@@ -159,3 +159,63 @@ export function deriveProductType(school: FeatureSource & { productType?: Produc
   if (m && m.rentalInventory && !m.production && !m.academy) return 'rental'
   return 'education'
 }
+
+/**
+ * Whether signed-out visitors may use the public rental shop (/shop).
+ * Module-based schools: the publicShop flag, off unless switched on.
+ * Legacy schools: exactly as before — open only in rental mode.
+ */
+export function publicShopOpen(school: FeatureSource & { productType?: ProductType | null; publicShop?: boolean | null }): boolean {
+  if (school.modules) return school.modules.rentalInventory === true && school.publicShop === true
+  return school.productType === 'rental'
+}
+
+/** The legacy tier closest to a set of modules, for screens still reading `tier` (null: none matches) */
+export function tierFromModules(m: ModuleFlags): SchoolTier | null {
+  if (m.academy && m.production && m.rentalInventory) return 'studio'
+  if (m.academy && !m.production && !m.rentalInventory) return 'academy'
+  if (m.rentalInventory && !m.academy && !m.production) return 'rental'
+  return null
+}
+
+// Which module owns each collection (top-level name) — the same table as
+// firestore.rules. Collections not listed are core. Used to skip queries
+// the rules would refuse when a school has a module off.
+const ACADEMY_COLLECTIONS = `lessons lessonCategories lessonBlocks classrooms subjects assignments tests submissions
+  checklists progress points_log development_plans plan_comments teacher_assessments teacher_notes todos
+  semester_events semester_categories prizes prize_claims resource_folders team_resources videos video_lab
+  video_comments guest_teachers guest_teacher_bookings attendance_sessions absence_reports qr_display_devices
+  rooms room_bookings room_slots time_blocks vehicles minivan_bookings food_box_orders`.split(/\s+/)
+const PRODUCTION_COLLECTIONS = ['productions', 'production_periods']
+const RENTAL_COLLECTIONS = `equipment equipment_categories equipment_bookings inventory_presets inventory_projects
+  scan_sessions`.split(/\s+/)
+
+export const COLLECTION_MODULE: Record<string, ModuleId> = Object.fromEntries([
+  ...ACADEMY_COLLECTIONS.map(c => [c, 'academy']),
+  ...PRODUCTION_COLLECTIONS.map(c => [c, 'production']),
+  ...RENTAL_COLLECTIONS.map(c => [c, 'rental_inventory']),
+]) as Record<string, ModuleId>
+
+const SETTINGS_MODULE: Record<string, ModuleId> = {
+  booking: 'academy', semester: 'academy', production: 'production',
+  equipment_gtin: 'rental_inventory', inventory_stats_resets: 'rental_inventory',
+}
+
+/**
+ * Whether a client may read this path under the school's modules (mirrors
+ * the rules). Legacy schools (no modules): always. `docId` matters only for
+ * settings/{docId}.
+ */
+export function collectionAllowed(modules: ModuleFlags | null | undefined, collectionPath: string, docId?: string | null): boolean {
+  if (!modules) return true
+  const segments = collectionPath.split('/').filter(Boolean)
+  const top = segments[0]
+  if (top === 'crew_roles') return modules.production || modules.rentalInventory
+  if (top === 'settings') {
+    const id = segments[1] ?? docId
+    if (!id) return modules.academy && modules.production && modules.rentalInventory
+    return SETTINGS_MODULE[id] ? isModuleOn(modules, SETTINGS_MODULE[id]) : true
+  }
+  const module = COLLECTION_MODULE[top]
+  return !module || isModuleOn(modules, module)
+}

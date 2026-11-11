@@ -22,9 +22,12 @@ const accounts = [
   { uid: 'emu-student', email: 'student@example.test', displayName: 'Emulator Student', role: 'student' },
 ]
 
+// The deployment's school, configured like production today: legacy tier, no modules
+await db.collection('schools').doc('molkom').set({ name: 'Molkom (emulator)', shortName: 'Molkom', tier: 'studio', productType: 'education', isBeta: true, maxStudents: 100 })
+
 for (const a of accounts) {
   await auth.deleteUser(a.uid).catch(() => {})
-  await auth.createUser({ uid: a.uid, email: a.email, password: PASSWORD, displayName: a.displayName })
+  await auth.createUser({ uid: a.uid, email: a.email, password: PASSWORD, displayName: a.displayName, emailVerified: true })
   await auth.setCustomUserClaims(a.uid, { role: a.role, roles: [a.role] })
   await db.collection('users').doc(a.uid).set({
     uid: a.uid, email: a.email, displayName: a.displayName, role: a.role, roles: [a.role],

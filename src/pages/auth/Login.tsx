@@ -12,6 +12,7 @@ import { useSchool } from '@/contexts/SchoolContext'
 import LegalFooter from '@/components/LegalFooter'
 import firePng from '@/assets/fire.png'
 import { usePublicConfig } from '@/lib/publicConfig'
+import { publicShopOpen } from '@/lib/features'
 
 const schema = z.object({
   email:    z.string().email('Enter a valid email'),
@@ -22,7 +23,8 @@ type FormData = z.infer<typeof schema>
 
 export default function Login() {
   const { signIn, user, role, loading } = useAuth()
-  const { shortName } = useSchool()
+  const { shortName, modules, productType, publicShop } = useSchool()
+  const shopOpen = publicShopOpen({ modules, productType, publicShop })
   // Login page profile (public_config/main); without one, the built-in look
   const { config: profile, loading: profileLoading } = usePublicConfig()
   const displayName = profile?.shortName || profile?.name || shortName
@@ -254,7 +256,7 @@ export default function Login() {
               )}
             </div>
           )}
-          {!showForgotPw && profile?.frontDoor === 'rental_inventory' && (
+          {!showForgotPw && profile?.frontDoor === 'rental_inventory' && shopOpen && (
             <a
               href="/shop"
               className="mt-6 flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-white/10 text-sm text-zinc-200 hover:bg-white/5 transition-colors"

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import {
   TIER_FEATURES, MODULE_FEATURES, hasFeature, resolveFeature, modulesFromTier, deriveProductType, effectiveModules,
-  type Feature, type SchoolTier,
+  publicShopOpen, tierFromModules, COLLECTION_MODULE, collectionAllowed,
+  type Feature, type SchoolTier, type ModuleId,
 } from './features'
 
 // Frozen copy of the tier model and useFeature logic as they were before
@@ -103,5 +105,63 @@ describe('product type', () => {
     expect(deriveProductType({})).toBe('education')
     expect(deriveProductType({ modules: { rentalInventory: true, production: false, academy: false } })).toBe('rental')
     expect(deriveProductType({ modules: { rentalInventory: true, production: true, academy: false } })).toBe('education')
+  })
+})
+
+describe('public shop', () => {
+  it('legacy schools: open exactly when it was — rental mode only', () => {
+    expect(publicShopOpen({ tier: 'studio', productType: 'education' })).toBe(false)
+    expect(publicShopOpen({ tier: 'rental', productType: 'rental' })).toBe(true)
+    expect(publicShopOpen({ tier: 'studio', productType: 'education', publicShop: true })).toBe(false)
+  })
+  it('module-based schools: off unless switched on, and only with Rental & Inventory', () => {
+    const rental = { rentalInventory: true, production: false, academy: false }
+    expect(publicShopOpen({ modules: rental })).toBe(false)
+    expect(publicShopOpen({ modules: rental, publicShop: true })).toBe(true)
+    expect(publicShopOpen({ modules: { ...rental, rentalInventory: false }, publicShop: true })).toBe(false)
+  })
+})
+
+describe('tierFromModules', () => {
+  it('maps the module sets that have a legacy tier', () => {
+    expect(tierFromModules({ academy: true, production: true, rentalInventory: true })).toBe('studio')
+    expect(tierFromModules({ academy: true, production: false, rentalInventory: false })).toBe('academy')
+    expect(tierFromModules({ academy: false, production: false, rentalInventory: true })).toBe('rental')
+    expect(tierFromModules({ academy: false, production: true, rentalInventory: false })).toBeNull()
+  })
+})
+
+describe('collection → module table', () => {
+  // Top-level collections and the module their rules require, read from firestore.rules
+  const rules = readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf-8')
+  const FLAG: Record<string, ModuleId> = { academy: 'academy', production: 'production', rentalInventory: 'rental_inventory' }
+  const fromRules: Record<string, ModuleId> = {}
+  for (const block of rules.split(/\n    match \//).slice(1)) {
+    const name = block.match(/^([a-zA-Z_]+)\/\{/)?.[1]
+    if (!name || name === 'settings' || name === 'crew_roles' || name === 'production_teams') continue
+    // The whole first allow statement (they can span lines) up to its ';'
+    const first = block.match(/\n\s+allow [^;]*;/)?.[0] ?? ''
+    const flag = first.match(/moduleOn\('([a-zA-Z]+)'\)/)?.[1]
+    if (flag) fromRules[name] = FLAG[flag]
+  }
+
+  it('matches the moduleOn() gates in firestore.rules', () => {
+    expect(Object.keys(fromRules).length).toBeGreaterThan(40)
+    expect(COLLECTION_MODULE).toEqual(fromRules)
+  })
+
+  it('lets legacy schools read everything and blocks off modules', () => {
+    expect(collectionAllowed(null, 'productions')).toBe(true)
+    const prodOff = { academy: true, production: false, rentalInventory: true }
+    expect(collectionAllowed(prodOff, 'productions')).toBe(false)
+    expect(collectionAllowed(prodOff, 'productions/p1/scenes')).toBe(false)
+    expect(collectionAllowed(prodOff, 'lessons')).toBe(true)
+    expect(collectionAllowed(prodOff, 'users')).toBe(true)
+    expect(collectionAllowed(prodOff, 'production_teams')).toBe(true)
+    expect(collectionAllowed(prodOff, 'crew_roles')).toBe(true)
+    expect(collectionAllowed({ ...prodOff, rentalInventory: false }, 'crew_roles')).toBe(false)
+    expect(collectionAllowed(prodOff, 'settings', 'production')).toBe(false)
+    expect(collectionAllowed(prodOff, 'settings', 'nav_visibility')).toBe(true)
+    expect(collectionAllowed(prodOff, 'settings')).toBe(false)
   })
 })

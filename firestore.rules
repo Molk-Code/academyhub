@@ -92,9 +92,6 @@ service cloud.firestore {
              false;
     }
 
-    function isRentalMode() {
-      return get(/databases/$(database)/documents/schools/molkom).data.get('productType', null) == 'rental';
-    }
 
     // ── Modules ───────────────────────────────────────────────────────────────
     // schools/molkom.modules = { academy, production, rentalInventory }, set by
@@ -106,6 +103,16 @@ service cloud.firestore {
     function moduleOn(flag) {
       let modules = get(/databases/$(database)/documents/schools/molkom).data.get('modules', null);
       return modules == null || modules.get(flag, false) == true;
+    }
+
+    // Public rental shop (/shop) for signed-out visitors. Legacy schools: open
+    // exactly when it was (rental mode). Module-based schools: the publicShop
+    // flag — off unless switched on — and only with Rental & Inventory.
+    function publicShopOpen() {
+      let school = get(/databases/$(database)/documents/schools/molkom).data;
+      return school.get('modules', null) == null
+        ? school.get('productType', null) == 'rental'
+        : school.get('publicShop', false) == true && school.modules.get('rentalInventory', false) == true;
     }
 
     // settings/{docId} also matches the module-owned settings documents —
@@ -608,13 +615,13 @@ service cloud.firestore {
 
     match /equipment_categories/{catId} {
       allow read: if ((isSignedIn() && (isAdmin() || tierHasFeature('equipment')))
-        || isRentalMode()) && moduleOn('rentalInventory');
+        || publicShopOpen()) && moduleOn('rentalInventory');
       allow write: if (isAdmin()) && moduleOn('rentalInventory');
     }
 
     match /equipment/{itemId} {
       allow read: if ((isSignedIn() && (isAdmin() || tierHasFeature('equipment')))
-        || isRentalMode()) && moduleOn('rentalInventory');
+        || publicShopOpen()) && moduleOn('rentalInventory');
       allow write: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))) && moduleOn('rentalInventory');
     }
 
@@ -627,7 +634,7 @@ service cloud.firestore {
         && (
           (isSignedIn() && tierHasFeature('equipment')
             && request.resource.data.studentId == request.auth.uid)
-          || (isRentalMode() && request.resource.data.get('guestEmail', '') != ''
+          || (publicShopOpen() && request.resource.data.get('guestEmail', '') != ''
               && request.resource.data.get('isGuest', false) == true
               && request.resource.data.get('studentId', '') == '')
         )) && moduleOn('rentalInventory');
@@ -949,6 +956,13 @@ service cloud.firestore {
       allow read:   if isSignedIn() && resource.data.uid == request.auth.uid;
       allow update: if isSignedIn() && resource.data.uid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+    }
+
+    // ── School audit log (updateSchoolModules writes it via the Admin SDK) ───
+
+    match /school_audit/{entryId} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
     }
 
     // ── Login page profile (public, read before sign-in) ─────────────────────

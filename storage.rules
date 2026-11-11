@@ -60,6 +60,13 @@ service firebase.storage {
     }
 
     // ── User avatars ──────────────────────────────────────────────────────
+    // Login page logos — written only by the uploadSchoolLogo function,
+    // public because the login page shows them before sign-in
+    match /branding/{fileName} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /avatars/{userId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && request.auth.uid == userId

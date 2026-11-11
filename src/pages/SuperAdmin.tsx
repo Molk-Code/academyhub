@@ -6,12 +6,16 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCollection } from '@/hooks/useFirestore'
 import type { SchoolDoc, SchoolStatus, SchoolTier, UserDoc, ProductionDoc, EquipmentDoc } from '@/types'
 import { format } from 'date-fns'
+import SchoolModulesPanel from '@/pages/superadmin/SchoolModulesPanel'
 import {
   Building2, Users, Clapperboard, Boxes, Plus, X, ChevronDown, ChevronUp,
   ExternalLink, CheckCircle2, Loader2, AlertCircle,
 } from 'lucide-react'
 
-const SUPER_ADMIN_EMAILS = ['fredrik.fridlund@gmail.com']
+// Who may open this page (the rules and functions check again server-side).
+// VITE_SUPERADMIN_EMAILS (comma-separated) overrides, e.g. for the emulator.
+const SUPER_ADMIN_EMAILS = (import.meta.env.VITE_SUPERADMIN_EMAILS as string | undefined)?.split(',').map(e => e.trim()).filter(Boolean)
+  ?? ['fredrik.fridlund@gmail.com']
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -150,26 +154,6 @@ function SchoolRow({ school }: { school: SchoolDoc }) {
                   </select>
                 </div>
 
-                <div>
-                  <label className="label">Tier / Product</label>
-                  <select
-                    value={tier}
-                    onChange={async e => {
-                      const t = e.target.value as SchoolTier
-                      setLocalTier(t)
-                      await patch('tier', t)
-                      await patch('productType', t === 'rental' ? 'rental' : 'education')
-                    }}
-                    className="input w-full"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <option value="studio">Studio</option>
-                    <option value="academy">Academy</option>
-                    <option value="campus">Campus</option>
-                    <option value="rental">CineRental</option>
-                  </select>
-                </div>
-
                 <div className="flex items-center justify-between">
                   <span className="label mb-0">Beta access</span>
                   <button
@@ -179,24 +163,6 @@ function SchoolRow({ school }: { school: SchoolDoc }) {
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${school.isBeta ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
-                </div>
-
-                <div>
-                  <label className="label">Storage limit (GB)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={1}
-                    defaultValue={school.storageQuotaGB ?? ''}
-                    placeholder="Unlimited"
-                    className="input w-full"
-                    onClick={e => e.stopPropagation()}
-                    onBlur={e => {
-                      const val = e.target.value === '' ? null : Number(e.target.value)
-                      patch('storageQuotaGB', val)
-                    }}
-                  />
-                  <p className="text-xs text-zinc-500 mt-1">Leave blank for unlimited</p>
                 </div>
 
                 <div>
@@ -267,6 +233,11 @@ function SchoolRow({ school }: { school: SchoolDoc }) {
                 </div>
               </div>
 
+            </div>
+
+            {/* Modules, plan limits and login page profile — saved through updateSchoolModules */}
+            <div className="mt-8 pt-6 border-t border-white/10 max-w-3xl">
+              <SchoolModulesPanel school={school} />
             </div>
           </td>
         </tr>

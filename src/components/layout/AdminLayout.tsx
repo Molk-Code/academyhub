@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
 import { useFeature, useTier } from '@/hooks/useFeature'
 import { useProductType } from '@/hooks/useProductType'
+import { useModuleGate } from '@/hooks/useModules'
 import { cn } from '@/lib/utils'
 import Avatar from '@/components/common/Avatar'
 import firePng from '@/assets/fire.png'
@@ -132,6 +133,8 @@ export default function AdminLayout() {
   const canBooking          = useFeature('booking')
   const canVehicles         = useFeature('vehicles')
   const canFoodBox          = useFeature('food_box')
+  const academyGate         = useModuleGate('academy')
+  const productionGate      = useModuleGate('production')
   const { tier }            = useTier()
   const productType         = useProductType()
   const navigate = useNavigate()
@@ -186,6 +189,11 @@ export default function AdminLayout() {
       '/admin/bookings':          canBooking,
       '/admin/minivan':           canVehicles,
       '/admin/food-box-orders':   canFoodBox,
+      // No feature gate before modules: hidden only for schools with explicit modules
+      '/admin/lessons':           academyGate,
+      '/admin/semester-events':   academyGate,
+      '/admin/experience-levels': academyGate,
+      '/admin/production-roles':  productionGate,
     }
 
     // Rental mode: show only equipment-related nav items

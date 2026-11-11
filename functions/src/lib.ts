@@ -19,6 +19,10 @@ export const REGION = defineString('FUNCTIONS_REGION', { default: 'us-central1' 
 // (production) keeps today's URL; set it to the custom domain at cutover.
 export const APP_URL = process.env.APP_URL ?? 'https://academy-hub-c252f.web.app'
 
+// The one school this deployment serves (schools/{SCHOOL_ID}); set per
+// customer in functions/.env.<projectId>
+export const SCHOOL_ID = process.env.SCHOOL_ID || 'molkom'
+
 export function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
 }

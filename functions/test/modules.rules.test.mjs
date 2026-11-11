@@ -165,3 +165,42 @@ test('shared collections: team reads stay core; crew roles readable with Product
   await seed(modules(true, false, false))
   assert.equal(await call('GET', `${DOCS}/crew_roles/x1`, WHO.student), 403, 'crew roles with both off')
 })
+
+// ── Public shop and audit log ────────────────────────────────────────────────
+
+const shopRequests = async () => ({
+  categories: await call('GET', `${DOCS}/equipment_categories`, null),
+  equipment:  await call('GET', `${DOCS}/equipment/x1`, null),
+  guestBooking: await call('POST', `${DOCS}/equipment_bookings?documentId=guest-1`, null, { fields: {
+    status: str('pending'), guestEmail: str('guest@example.org'), isGuest: { booleanValue: true }, studentId: str(''),
+  } }),
+})
+
+test('public shop: legacy schools exactly as before — open only in rental mode', async () => {
+  await seed(LEGACY)
+  assert.deepEqual(Object.values(await shopRequests()), [403, 403, 403], 'education school: closed')
+  await seed({ tier: str('rental'), productType: str('rental') })
+  assert.deepEqual(await shopRequests(), { categories: 200, equipment: 200, guestBooking: 200 }, 'rental mode: open')
+})
+
+test('public shop: module-based schools are closed until publicShop is switched on', async () => {
+  const rentalOnly = modules(false, false, true)
+  await seed(rentalOnly)
+  assert.deepEqual(Object.values(await shopRequests()), [403, 403, 403], 'default: closed')
+  await seed({ ...rentalOnly, publicShop: { booleanValue: true } })
+  assert.deepEqual(await shopRequests(), { categories: 200, equipment: 200, guestBooking: 200 }, 'switched on: open')
+  await seed({ ...modules(true, true, false), publicShop: { booleanValue: true } })
+  assert.deepEqual(Object.values(await shopRequests()), [403, 403, 403], 'flag without Rental & Inventory: closed')
+})
+
+test('school_audit: readable only by the superadmin, writable by nobody', async () => {
+  await seed(LEGACY)
+  await owner('PATCH', 'school_audit/a1', { fields: { schoolId: str('molkom') } })
+  const superadmin = readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf-8').match(/email in \['([^']+)'/)[1]
+  const su = (() => { const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url'); const t = Math.floor(Date.now() / 1000)
+    return `${b64({ alg: 'none', typ: 'JWT' })}.${b64({ iss: `https://securetoken.google.com/${PROJECT}`, aud: PROJECT, sub: 'su', user_id: 'su', iat: t, exp: t + 3600, auth_time: t, role: 'admin', email: superadmin, email_verified: true, firebase: { sign_in_provider: 'password' } })}.` })()
+  assert.equal(await call('GET', `${DOCS}/school_audit/a1`, su), 200, 'superadmin read')
+  assert.equal(await call('GET', `${DOCS}/school_audit/a1`, WHO.admin), 403, 'school admin read')
+  assert.equal(await call('GET', `${DOCS}/school_audit/a1`, null), 403, 'signed-out read')
+  assert.equal(await call('PATCH', `${DOCS}/school_audit/a1?updateMask.fieldPaths=schoolId`, su, { fields: { schoolId: str('x') } }), 403, 'superadmin write')
+})

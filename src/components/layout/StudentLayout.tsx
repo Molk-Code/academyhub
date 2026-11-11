@@ -20,7 +20,8 @@ import { useChatUnreadCount } from '@/hooks/useChatUnread'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { useBookingBadge } from '@/hooks/useBookingBadge'
 import { useCalendarInviteBadge } from '@/hooks/useCalendarInviteBadge'
-import type { Feature } from '@/lib/features'
+import type { Feature, ModuleId } from '@/lib/features'
+import { useModuleGate } from '@/hooks/useModules'
 import { useAppBadge } from '@/hooks/useAppBadge'
 import { usePwaInstall } from '@/hooks/usePwaInstall'
 import firePng from '@/assets/fire.png'
@@ -42,12 +43,14 @@ interface NavItem {
   showCalendarBadge?: boolean
   featureId?: string
   tierFeature?: Feature
+  /** Module-owned screen that had no feature gate: hidden only for schools with explicit modules */
+  module?: ModuleId
   end?: boolean
 }
 
 const PRIMARY_NAV: NavItem[] = [
   { to: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard',   featureId: 'dashboard'                                                        },
-  { to: '/checkin',     icon: QrCode,          label: 'Check In',    featureId: 'checkin'                                                          },
+  { to: '/checkin',     icon: QrCode,          label: 'Check In',    featureId: 'checkin',                                  module: 'academy'          },
   { to: '/calendar',    icon: Calendar,        label: 'Calendar',    featureId: 'calendar',    showCalendarBadge: true, tierFeature: 'calendar'    },
   { to: '/my-plan',     icon: ListChecks,      label: 'To-Do List',  featureId: 'myPlan',                               tierFeature: 'development_plan' },
   { to: '/chat',        icon: MessageSquare,   label: 'Chat',        featureId: 'chat',        showUnread: true,        tierFeature: 'chat'        },
@@ -147,6 +150,10 @@ export default function StudentLayout() {
   const canFaq          = useFeature('faq')
   const videoLabSchool  = canVideoLab
 
+  // Screens with no feature gate before modules: hidden only for schools with explicit modules
+  const academyGate = useModuleGate('academy')
+  const rentalGate   = useModuleGate('rental_inventory')
+  const bookingsGate = academyGate || rentalGate
   const tierFeatureMap: Record<string, boolean> = {
     calendar: canCalendar,
     development_plan: canDevPlan,
@@ -227,6 +234,7 @@ export default function StudentLayout() {
     () => PRIMARY_NAV.filter(item => {
       if (item.featureId && navVis?.student?.[item.featureId] === false) return false
       if (item.tierFeature && tierFeatureMap[item.tierFeature] === false) return false
+      if (item.module && !academyGate && item.module === 'academy') return false
       return true
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -291,8 +299,8 @@ export default function StudentLayout() {
         {primaryNav.filter(item => item.to !== '/bug-reports').map(item => <NavItem key={item.to} {...item} onNavigate={onNavigate} />)}
 
         {/* Subjects — standalone, always visible */}
-        {vis?.['subjects'] !== false && <NavItem to="/subjects" icon={BookOpen} label="Subjects" onNavigate={onNavigate} />}
-        {vis?.['guestTeacherList'] !== false && <NavItem to="/guest-teachers" icon={UserRound} label="Guest Teachers" onNavigate={onNavigate} />}
+        {academyGate && vis?.['subjects'] !== false && <NavItem to="/subjects" icon={BookOpen} label="Subjects" onNavigate={onNavigate} />}
+        {academyGate && vis?.['guestTeacherList'] !== false && <NavItem to="/guest-teachers" icon={UserRound} label="Guest Teachers" onNavigate={onNavigate} />}
 
         {/* Create group — only render if at least one item is visible */}
         {(canProduction && vis?.['production'] !== false) || (canVideoLab && videoLabEnabled) ? (
@@ -322,9 +330,9 @@ export default function StudentLayout() {
         ) : null}
 
         {/* Booking group — only render if at least one item is visible */}
-        {(vis?.['myBookings'] !== false) || (canBooking && vis?.['roomBooking'] !== false) || (canEquipment && vis?.['equipment'] !== false) || (canVehicles && vis?.['vehicle'] !== false) || (canFoodBox && vis?.['foodBox'] !== false) ? (
+        {(bookingsGate && vis?.['myBookings'] !== false) || (canBooking && vis?.['roomBooking'] !== false) || (canEquipment && vis?.['equipment'] !== false) || (canVehicles && vis?.['vehicle'] !== false) || (canFoodBox && vis?.['foodBox'] !== false) ? (
           <SidebarGroup label="Booking" icon="📦" defaultOpen={false}>
-            {vis?.['myBookings'] !== false && <NavItem to="/my-bookings"       icon={ClipboardCheck} label="My Bookings"  showBooking onNavigate={onNavigate} />}
+            {bookingsGate && vis?.['myBookings'] !== false && <NavItem to="/my-bookings"       icon={ClipboardCheck} label="My Bookings"  showBooking onNavigate={onNavigate} />}
             {canBooking   && vis?.['roomBooking'] !== false && <NavItem to="/booking"           icon={DoorOpen}       label="Room Booking" end onNavigate={onNavigate} />}
             {canEquipment && vis?.['equipment'] !== false && <NavItem to="/booking/equipment" icon={Package}         label="Rental House" onNavigate={onNavigate} />}
             {canVehicles  && vis?.['vehicle']   !== false && <NavItem to="/vehicles"          icon={Car}             label="Vehicles"     onNavigate={onNavigate} />}
@@ -627,7 +635,7 @@ export default function StudentLayout() {
         <div className={cn('h-16 flex justify-around items-center px-1', navVisLoading && 'opacity-0 pointer-events-none')}>
           {navVis?.student?.['dashboard'] !== false && <BottomTab to="/dashboard" icon={LayoutDashboard} label="Home" />}
           {navVis?.student?.['calendar']  !== false && <BottomTab to="/calendar"  icon={Calendar}        label="Calendar" badge={calendarBadge} />}
-          {navVis?.student?.['checkin']   !== false && <BottomTab to="/checkin"   icon={QrCode}          label="Check In" />}
+          {academyGate && navVis?.student?.['checkin']   !== false && <BottomTab to="/checkin"   icon={QrCode}          label="Check In" />}
           {navVis?.student?.['chat']      !== false && <BottomTab to="/chat"      icon={MessageSquare}   label="Chat" badge={chatUnread} />}
           {navVis?.student?.['profile']   !== false && <BottomTab to="/profile"   icon={User}            label="Profile" />}
         </div>

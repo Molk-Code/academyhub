@@ -23,6 +23,7 @@ import SchoolSignup from '@/pages/SchoolSignup'
 import NotificationInit from '@/components/NotificationInit'
 import BugReportHighlighter from '@/components/BugReportHighlighter'
 import FeatureGate from '@/components/FeatureGate'
+import ModuleGate, { PublicShopGate } from '@/components/ModuleGate'
 import NavVisibilityGate from '@/components/NavVisibilityGate'
 import UpgradePage from '@/pages/UpgradePage'
 
@@ -146,11 +147,11 @@ export default function App() {
           <Route element={<RoleRoute role={['student', 'admin']} skeleton={<StudentLayoutSkeleton />}><StudentLayout /></RoleRoute>}>
             <Route path="/dashboard" element={<StudentDashboard />} />
             <Route path="/calendar"  element={<StudentCalendar />} />
-            <Route path="/subjects"     element={<SubjectList />} />
-            <Route path="/subjects/:id" element={<StudentSubjectDetail />} />
-            <Route path="/guest-teachers" element={<StudentGuestTeachers />} />
+            <Route path="/subjects"     element={<ModuleGate module="academy"><SubjectList /></ModuleGate>} />
+            <Route path="/subjects/:id" element={<ModuleGate module="academy"><StudentSubjectDetail /></ModuleGate>} />
+            <Route path="/guest-teachers" element={<ModuleGate module="academy"><StudentGuestTeachers /></ModuleGate>} />
             <Route path="/prizes"    element={<FeatureGate feature="prizes"><Prizes /></FeatureGate>} />
-            <Route path="/checkin"              element={<CheckIn />} />
+            <Route path="/checkin"              element={<ModuleGate module="academy"><CheckIn /></ModuleGate>} />
             <Route path="/assignments"           element={<StudentAssignments />} />
             <Route path="/profile"               element={<Profile />} />
             <Route path="/assignments/:id"       element={<AssignmentDetail />} />
@@ -159,7 +160,7 @@ export default function App() {
             <Route path="/room-booking" element={<RoomBooking standalone />} />
             <Route path="/booking"           element={<FeatureGate feature="booking"><Booking /></FeatureGate>} />
             <Route path="/booking/equipment" element={<FeatureGate feature="equipment"><EquipmentBookingPage /></FeatureGate>} />
-            <Route path="/my-bookings"       element={<MyBookings />} />
+            <Route path="/my-bookings"       element={<ModuleGate module={["academy", "rental_inventory"]}><MyBookings /></ModuleGate>} />
             <Route path="/resources"    element={<FeatureGate feature="resources"><StudentResources /></FeatureGate>} />
             <Route path="/chat"         element={<NavVisibilityGate featureId="chat" role="student" redirectTo="/dashboard"><ChatPage /></NavVisibilityGate>} />
             <Route path="/production"            element={<FeatureGate feature="production"><StudentProduction /></FeatureGate>} />
@@ -181,12 +182,12 @@ export default function App() {
           {/* ── Teacher ─────────────────────────────────────────────────── */}
           <Route element={<RoleRoute role={['teacher', 'admin']}><TeacherLayout /></RoleRoute>}>
             <Route path="/teacher"                   element={<TeacherDashboard />} />
-            <Route path="/teacher/students"          element={<Students />} />
-            <Route path="/teacher/students/:uid"     element={<StudentDetail />} />
+            <Route path="/teacher/students"          element={<ModuleGate module="academy"><Students /></ModuleGate>} />
+            <Route path="/teacher/students/:uid"     element={<ModuleGate module="academy"><StudentDetail /></ModuleGate>} />
             <Route path="/teacher/lessons"           element={<Lessons />} />
             <Route path="/teacher/lessons/new"       element={<LessonBuilder />} />
-            <Route path="/teacher/subjects"          element={<SubjectManager />} />
-            <Route path="/teacher/subjects/:id"      element={<SubjectDetail />} />
+            <Route path="/teacher/subjects"          element={<ModuleGate module="academy"><SubjectManager /></ModuleGate>} />
+            <Route path="/teacher/subjects/:id"      element={<ModuleGate module="academy"><SubjectDetail /></ModuleGate>} />
             <Route path="/teacher/lessons/:id/edit"  element={<LessonBuilder />} />
             <Route path="/teacher/tests"                       element={<TestList />} />
             <Route path="/teacher/tests/new"                   element={<TestBuilder />} />
@@ -211,15 +212,15 @@ export default function App() {
             <Route path="/teacher/video-lab"          element={<FeatureGate feature="video_lab" redirectTo="/teacher"><TeacherVideoLab /></FeatureGate>} />
             <Route path="/teacher/video-lab/:id"      element={<FeatureGate feature="video_lab" redirectTo="/teacher"><VideoLabPlayer /></FeatureGate>} />
             <Route path="/teacher/guide"                      element={<StudentGuide />} />
-            <Route path="/teacher/students/:uid/plan"         element={<StudentPlan />} />
+            <Route path="/teacher/students/:uid/plan"         element={<ModuleGate module="academy"><StudentPlan /></ModuleGate>} />
             <Route path="/teacher/semester-wheel"             element={<FeatureGate feature="semester" redirectTo="/teacher"><SemesterWheel /></FeatureGate>} />
             <Route path="/teacher/production-period"          element={<TeacherProductionPeriod />} />
             <Route path="/teacher/inventory"                  element={<FeatureGate feature="inventory" redirectTo="/teacher"><InventoryPage /></FeatureGate>} />
             <Route path="/teacher/equipment-requests"         element={<FeatureGate feature="equipment" redirectTo="/teacher"><EquipmentRequests /></FeatureGate>} />
-            <Route path="/teacher/notebook"                   element={<Notebook />} />
-            <Route path="/teacher/guest-teachers"            element={<GuestTeacherBank />} />
+            <Route path="/teacher/notebook"                   element={<ModuleGate module="academy"><Notebook /></ModuleGate>} />
+            <Route path="/teacher/guest-teachers"            element={<ModuleGate module="academy"><GuestTeacherBank /></ModuleGate>} />
             <Route path="/teacher/bug-reports"               element={<MyBugReports />} />
-            <Route path="/teacher/my-bookings"               element={<MyBookings />} />
+            <Route path="/teacher/my-bookings"               element={<ModuleGate module={["academy", "rental_inventory"]}><MyBookings /></ModuleGate>} />
             <Route path="/teacher/booking/equipment"         element={<FeatureGate feature="equipment" redirectTo="/teacher"><EquipmentBookingPage /></FeatureGate>} />
           </Route>
 
@@ -236,7 +237,7 @@ export default function App() {
             <Route path="/admin/minivan"       element={<MinivanBookings />} />
             <Route path="/admin/email-config"  element={<EmailConfig />} />
             <Route path="/admin/preview"       element={<StudentPreview />} />
-            <Route path="/admin/lessons"        element={<LessonCategories />} />
+            <Route path="/admin/lessons"        element={<ModuleGate module="academy"><LessonCategories /></ModuleGate>} />
             <Route path="/admin/chat"          element={<ChatPage />} />
             <Route path="/admin/sharepoint"    element={<SharePointSettings />} />
             <Route path="/admin/calendar-sync" element={<OfficeCalendarSync />} />
@@ -244,29 +245,29 @@ export default function App() {
             <Route path="/admin/video-lab"     element={<AdminVideoLab />} />
             <Route path="/admin/video-lab/:id" element={<VideoLabPlayer />} />
             <Route path="/admin/nav-settings"       element={<NavSettings />} />
-            <Route path="/admin/production-roles"   element={<ProductionRoles />} />
-            <Route path="/admin/semester-events"    element={<SemesterEvents />} />
+            <Route path="/admin/production-roles"   element={<ModuleGate module="production"><ProductionRoles /></ModuleGate>} />
+            <Route path="/admin/semester-events"    element={<ModuleGate module="academy"><SemesterEvents /></ModuleGate>} />
             <Route path="/admin/qr-devices"         element={<FeatureGate feature="checkin_devices" redirectTo="/admin/users"><QrDevices /></FeatureGate>} />
             <Route path="/admin/gdpr"               element={<GdprDashboard />} />
             <Route path="/admin/bug-reports"        element={<BugReportsPage />} />
             <Route path="/admin/client-errors"      element={<ClientErrorsPage />} />
             <Route path="/admin/contact-requests"   element={<ContactRequests />} />
-            <Route path="/admin/experience-levels" element={<ExperienceLevels />} />
+            <Route path="/admin/experience-levels" element={<ModuleGate module="academy"><ExperienceLevels /></ModuleGate>} />
             <Route path="/admin/equipment"           element={<FeatureGate feature="equipment" redirectTo="/admin/users"><AdminEquipmentPage /></FeatureGate>} />
             <Route path="/admin/inventory"           element={<FeatureGate feature="inventory" redirectTo="/admin/users"><InventoryPage /></FeatureGate>} />
           </Route>
 
           {/* ── Equipment scanner (auth required, no layout) ─────────────── */}
-          <Route path="/scan/:sessionId" element={<ScanPage />} />
+          <Route path="/scan/:sessionId" element={<ModuleGate module="rental_inventory"><ScanPage /></ModuleGate>} />
 
           {/* ── Public display (no auth) ────────────────────────────────── */}
-          <Route path="/room-display" element={<RoomDisplay />} />
-          <Route path="/qr-display"   element={<QrDisplay />} />
+          <Route path="/room-display" element={<ModuleGate module="academy"><RoomDisplay /></ModuleGate>} />
+          <Route path="/qr-display"   element={<ModuleGate module="academy"><QrDisplay /></ModuleGate>} />
           <Route path="/privacy"      element={<PrivacyPolicy />} />
           <Route path="/contact"      element={<Contact />} />
           <Route path="/superadmin"   element={<SuperAdmin />} />
           <Route path="/upgrade"      element={<UpgradePage />} />
-          <Route path="/shop"         element={<PublicShopPage />} />
+          <Route path="/shop"         element={<PublicShopGate><PublicShopPage /></PublicShopGate>} />
 
           {/* ── Fallback ────────────────────────────────────────────────── */}
           <Route path="*" element={<Navigate to="/login" replace />} />

@@ -1005,6 +1005,10 @@ export interface SchoolDoc {
   productType?: 'education' | 'rental'
   /** Sellable modules; absent on legacy schools (tier decides) */
   modules?: { rentalInventory: boolean; production: boolean; academy: boolean }
+  /** Public rental shop open to signed-out visitors (module-based schools; default off) */
+  publicShop?: boolean
+  /** Plan name shown in the superadmin */
+  planName?: string
   shopPassword?: string
 }
 

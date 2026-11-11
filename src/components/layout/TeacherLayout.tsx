@@ -10,7 +10,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
 import { useFeature } from '@/hooks/useFeature'
-import type { Feature } from '@/lib/features'
+import { isModuleOn, type Feature, type ModuleId } from '@/lib/features'
 import { useDocument } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
 import Avatar from '@/components/common/Avatar'
@@ -33,6 +33,8 @@ interface NavItem {
   label: string
   featureId?: string
   tierFeature?: Feature
+  /** Module-owned screen that had no feature gate: hidden only for schools with explicit modules */
+  module?: ModuleId | ModuleId[]
   showUnread?: boolean
   showBooking?: boolean
   showCalendarBadge?: boolean
@@ -42,23 +44,23 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: '/teacher',               icon: LayoutDashboard, label: 'Dashboard',      exact: true },
-  { to: '/teacher/students',      icon: Users,           label: 'Students',       featureId: 'students'                                      },
+  { to: '/teacher/students',      icon: Users,           label: 'Students',       featureId: 'students', module: 'academy'                                      },
   { to: '/teacher/lessons',       icon: CalendarDays,    label: 'Calendar',       featureId: 'calendar',     showCalendarBadge: true, tierFeature: 'lessons'   },
   { to: '/teacher/assignments',   icon: ClipboardList,   label: 'Assignments',    featureId: 'assignments',                           tierFeature: 'assignments' },
-  { to: '/teacher/notebook',      icon: BookMarked,      label: 'Notebook',       featureId: 'notebook'                                      },
+  { to: '/teacher/notebook',      icon: BookMarked,      label: 'Notebook',       featureId: 'notebook', module: 'academy'                                      },
   { to: '/teacher/gradebook',     icon: BookMarked,      label: 'Grade Book',     featureId: 'gradebook',                             tierFeature: 'lessons'   },
-  { to: '/teacher/subjects',      icon: BookOpen,        label: 'Subjects',       featureId: 'subjects'                                      },
+  { to: '/teacher/subjects',      icon: BookOpen,        label: 'Subjects',       featureId: 'subjects', module: 'academy'                                      },
   { to: '/teacher/prizes',        icon: Gift,            label: 'Prizes',         featureId: 'prizes',                                tierFeature: 'prizes'    },
   { to: '/teacher/room-bookings', icon: DoorOpen,        label: 'Room Bookings',  featureId: 'roomBooking',  showBooking: true,       tierFeature: 'booking'   },
-  { to: '/teacher/booking/equipment', icon: Package,     label: 'Rental House',   featureId: 'equipment',                             tierFeature: 'equipment' },
-  { to: '/teacher/my-bookings',   icon: ClipboardCheck,  label: 'My Bookings',    featureId: 'myBookings'                                    },
+  { to: '/teacher/booking/equipment', icon: Package,     label: 'Rental House',   featureId: 'equipment',                             tierFeature: 'equipment', module: 'rental_inventory' },
+  { to: '/teacher/my-bookings',   icon: ClipboardCheck,  label: 'My Bookings',    featureId: 'myBookings', module: ['academy', 'rental_inventory']                                    },
   { to: '/teacher/chat',          icon: MessageSquare,   label: 'Chat',           featureId: 'chat',         showUnread: true,        tierFeature: 'chat'      },
   { to: '/teacher/production',    icon: Clapperboard,    label: 'Production',     featureId: 'production',                            tierFeature: 'production' },
   { to: '/teacher/resources',     icon: BookMarked,      label: 'Resources',      featureId: 'resources',                             tierFeature: 'resources' },
   { to: '/teacher/videos',        icon: Video,           label: 'Videos',         featureId: 'videos',                                tierFeature: 'video_lab' },
   { to: '/teacher/guide',         icon: BookOpen,        label: 'School Guide',   featureId: 'guide',                                 tierFeature: 'faq'       },
   { to: '/teacher/semester-wheel',    icon: CircleDot,   label: 'Semester Wheel',      featureId: 'semesterWheel',                         tierFeature: 'semester'  },
-  { to: '/teacher/guest-teachers',    icon: UserRound,   label: 'Guest Teacher Library', featureId: 'guestTeachers'                                               },
+  { to: '/teacher/guest-teachers',    icon: UserRound,   label: 'Guest Teacher Library', featureId: 'guestTeachers', module: 'academy'                                               },
   { to: '/teacher/bug-reports',       icon: Bug,         label: 'Bug Reports',    featureId: 'bugReports'                                    },
 ]
 
@@ -109,6 +111,7 @@ export default function TeacherLayout() {
   const canSemester        = useFeature('semester')
   const canFaq             = useFeature('faq')
 
+  const { modules: schoolModules } = useSchool()
   const tierMap: Record<string, boolean> = {
     production: canProduction,
     prizes:     canPrizes,
@@ -134,11 +137,12 @@ export default function TeacherLayout() {
     () => NAV.filter(item => {
       if (item.featureId && navVis?.teacher?.[item.featureId] === false) return false
       if (item.tierFeature && tierMap[item.tierFeature] === false) return false
+      if (item.module && schoolModules && !(Array.isArray(item.module) ? item.module : [item.module]).some(m => isModuleOn(schoolModules, m))) return false
       return true
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [navVis, canProduction, canPrizes, canBooking, canChat, canResources,
-     canAssignments, canLessons, videoLabEnabled, canSemester, canFaq],
+     canAssignments, canLessons, videoLabEnabled, canSemester, canFaq, schoolModules],
   )
 
   const isChatPage  = pathname.endsWith('/chat')

@@ -34,7 +34,7 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className="text-lg font-semibold text-white mb-3">2. What data we collect</h2>
             <ul className="list-disc pl-5 space-y-1.5 text-zinc-300">
-              <li><strong>Account data:</strong> name, email address, profile photo, phone number, school email</li>
+              <li><strong>Account data:</strong> name, email address, profile photo, school email</li>
               <li><strong>Attendance records:</strong> lesson check-ins, absence reports, attendance timestamps</li>
               <li><strong>Academic activity:</strong> assignment submissions, test results, points and level history</li>
               <li><strong>Chat messages:</strong> messages sent in group channels and direct messages</li>
@@ -105,7 +105,7 @@ export default function PrivacyPolicy() {
             <h2 className="text-lg font-semibold text-white mb-3">6. Your rights under GDPR</h2>
             <div className="space-y-3 text-zinc-300">
               <p><strong>Right of access:</strong> You can download all your personal data from your profile page using the "Download My Data" button.</p>
-              <p><strong>Right to rectification:</strong> You can update your name, photo, phone number, and email in your profile at any time.</p>
+              <p><strong>Right to rectification:</strong> You can update your name, photo, and email in your profile at any time.</p>
               <p><strong>Right to erasure ("right to be forgotten"):</strong> You can permanently delete your account and associated data from your profile page. Attendance records will be anonymised rather than deleted, as the school has a legitimate interest in maintaining attendance statistics.</p>
               <p><strong>Right to data portability:</strong> Your data export is in JSON format, which is machine-readable and portable.</p>
               <p><strong>Right to object:</strong> Contact your school administrator to raise objections to specific uses of your data.</p>

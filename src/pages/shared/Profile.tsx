@@ -227,7 +227,6 @@ export default function Profile() {
   const { data: assessment }  = useDocument<TeacherAssessment>('teacher_assessments', isStudent ? (profile?.uid ?? '') : '')
 
   const [name,       setName]       = useState(profile?.displayName ?? '')
-  const [phone,      setPhone]      = useState(profile?.phoneNumber ?? '')
   const [email,      setEmail]      = useState(profile?.email ?? '')
   const [bio,        setBio]        = useState((profile as any)?.bio ?? '')
   const [portfolio,  setPortfolio]  = useState((profile as any)?.portfolioUrl ?? '')
@@ -291,7 +290,6 @@ export default function Profile() {
       }
       const update: Record<string, string> = {
         displayName: name.trim(),
-        phoneNumber: phone.trim(),
         email: newEmail || profile.email,
       }
       if (isTeacherOrAdmin) {
@@ -511,10 +509,6 @@ export default function Profile() {
           <label className="label">Email</label>
           <input type="email" value={email} onChange={e => { setEmail(e.target.value); setSaved(false); setEmailError(null) }} className="input" placeholder="your@email.com" />
           {emailError && <p className="text-xs text-red-400 mt-1">{emailError}</p>}
-        </div>
-        <div>
-          <label className="label">Phone number</label>
-          <input type="tel" value={phone} onChange={e => { setPhone(e.target.value); setSaved(false) }} className="input" placeholder="+46 70 000 00 00" />
         </div>
         {isTeacherOrAdmin && (
           <>

@@ -128,7 +128,7 @@ service cloud.firestore {
       // class, points, active/disabled state or anything else privileged
       allow update: if isSelf(userId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'displayName', 'phoneNumber', 'schoolEmail', 'email', 'avatarUrl',
+          'displayName', 'schoolEmail', 'email', 'avatarUrl',
           'bio', 'portfolioUrl', 'calendarColor', 'hasSeenWelcome',
           'gdprConsent', 'privacyAcceptedAt', 'lastReadAt',
         ])

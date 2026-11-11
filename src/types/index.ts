@@ -114,7 +114,6 @@ export interface UserDoc {
   bio?: string
   portfolioUrl?: string
   fcmTokens?: string[]
-  phoneNumber?: string
   schoolEmail?: string
   calendarColor?: string
   disabled?: boolean

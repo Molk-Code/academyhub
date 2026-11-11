@@ -5,13 +5,13 @@ import { uploadWithQuota } from '@/lib/uploadWithQuota'
 import { shrinkImageToLimit, MAX_AVATAR_BYTES } from '@/lib/imageCompress'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn, initials, avatarColor } from '@/lib/utils'
-import { Camera, Loader2, CheckCircle2, User, Phone, Mail } from 'lucide-react'
+import { Camera, Loader2, CheckCircle2, User, Mail } from 'lucide-react'
 import firePng from '@/assets/fire.png'
 
 export default function CompleteProfileGate({ children }: { children: React.ReactNode }) {
   const { profile, refreshProfile } = useAuth()
 
-  const isComplete = !!(profile?.avatarUrl && profile?.phoneNumber?.trim() && profile?.schoolEmail?.trim())
+  const isComplete = !!(profile?.avatarUrl && profile?.schoolEmail?.trim())
   if (!profile || isComplete) return <>{children}</>
 
   return (
@@ -27,7 +27,6 @@ function ProfileCompleteOverlay() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [name,         setName]         = useState(profile?.displayName ?? '')
-  const [phone,        setPhone]        = useState(profile?.phoneNumber ?? '')
   const [schoolEmail,  setSchoolEmail]  = useState(profile?.schoolEmail ?? '')
   const [avatarFile,   setAvatarFile]   = useState<File | null>(null)
   const [preview,      setPreview]      = useState<string | null>(profile?.avatarUrl ?? null)
@@ -65,7 +64,6 @@ function ProfileCompleteOverlay() {
 
       await updateDoc(doc(db, 'users', profile.uid), {
         displayName: name.trim() || profile.displayName,
-        phoneNumber: phone.trim(),
         schoolEmail: schoolEmail.trim(),
         ...(avatarUrl ? { avatarUrl } : {}),
       })
@@ -81,7 +79,7 @@ function ProfileCompleteOverlay() {
   }
 
   const busy = saving || uploading
-  const canSubmit = !busy && name.trim() && phone.trim() && schoolEmail.trim() && (!!avatarFile || !!profile?.avatarUrl)
+  const canSubmit = !busy && name.trim() && schoolEmail.trim() && (!!avatarFile || !!profile?.avatarUrl)
 
   return (
     <div className="fixed inset-0 z-[100] bg-zinc-900/50 flex flex-col items-center justify-center p-4 overflow-y-auto">
@@ -94,7 +92,7 @@ function ProfileCompleteOverlay() {
           </div>
           <h1 className="text-2xl font-bold text-zinc-100">Complete your profile</h1>
           <p className="text-zinc-500 text-sm">
-            Add a photo, confirm your name, and enter your phone number to continue.
+            Add a photo, confirm your name, and enter your school email to continue.
           </p>
         </div>
 
@@ -164,21 +162,6 @@ function ProfileCompleteOverlay() {
               onChange={e => setName(e.target.value)}
               className="input w-full"
               placeholder="Your full name"
-            />
-          </div>
-
-          {/* Phone */}
-          <div>
-            <label className="label flex items-center gap-1.5">
-              <Phone className="w-3.5 h-3.5" /> Phone number *
-            </label>
-            <input
-              required
-              type="tel"
-              value={phone}
-              onChange={e => setPhone(e.target.value)}
-              className="input w-full"
-              placeholder="+46 70 000 00 00"
             />
           </div>
 

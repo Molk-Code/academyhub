@@ -100,12 +100,12 @@ export function CategorySelect({ value, categories, onChange, labelId }: {
     <div ref={rootRef} style={{ position: 'relative' }}>
       <button
         ref={buttonRef} type="button" aria-haspopup="listbox" aria-expanded={open} aria-controls={listId}
-        aria-labelledby={labelId}
+        aria-labelledby={labelId ? `${labelId} ${listId}-value` : undefined}
         onClick={() => (open ? setOpen(false) : show())}
         onKeyDown={e => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); show() } }}
         style={{ ...inp, ...chip(selected), fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}
       >
-        <span>{value || 'Choose category'}</span>
+        <span id={`${listId}-value`}>{value || 'Choose category'}</span>
         <span aria-hidden="true" style={{ fontSize: '.7rem', opacity: .8 }}>▾</span>
       </button>
       {open && (

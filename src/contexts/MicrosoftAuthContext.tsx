@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useCallback } from 'react'
-import { PublicClientApplication, type AccountInfo, InteractionRequiredAuthError } from '@azure/msal-browser'
+// MSAL is large and only SharePoint users need it: loaded on first use
+import type { PublicClientApplication, AccountInfo } from '@azure/msal-browser'
 import { useDocument } from '@/hooks/useFirestore'
 
 export interface SharePointConfigDoc {
@@ -45,6 +46,7 @@ export function MicrosoftAuthProvider({ children }: { children: React.ReactNode 
     if (pcaInitRef.current) return pcaInitRef.current
 
     pcaInitRef.current = (async () => {
+      const { PublicClientApplication } = await import('@azure/msal-browser')
       const pca = new PublicClientApplication({
         auth: {
           clientId: config.clientId,
@@ -93,6 +95,7 @@ export function MicrosoftAuthProvider({ children }: { children: React.ReactNode 
       const result = await pca.acquireTokenSilent({ scopes: GRAPH_SCOPES, account })
       return result.accessToken
     } catch (err) {
+      const { InteractionRequiredAuthError } = await import('@azure/msal-browser')
       if (err instanceof InteractionRequiredAuthError) {
         const result = await pca.acquireTokenPopup({ scopes: GRAPH_SCOPES, account })
         return result.accessToken

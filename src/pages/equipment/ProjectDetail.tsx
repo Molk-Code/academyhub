@@ -591,7 +591,7 @@ export function ProjectDetail({
             </>
           )}
         </div>
-        <button className="secondary-btn" style={{ padding: '.4rem .75rem' }} onClick={() => setEditing(!editing)}>
+        <button className="secondary-btn" style={{ padding: '.4rem .75rem' }} onClick={() => setEditing(!editing)} aria-label={editing ? 'Stop editing project' : 'Edit project'} aria-expanded={editing}>
           <Edit2 size={14} />
         </button>
       </div>

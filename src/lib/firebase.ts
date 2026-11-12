@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth, setPersistence, browserLocalPersistence, connectAuthEmulator } from 'firebase/auth'
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
-import { getStorage, connectStorageEmulator } from 'firebase/storage'
+import type { FirebaseStorage } from 'firebase/storage'
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions'
 import { getPerformance } from 'firebase/performance'
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check'
@@ -32,7 +32,6 @@ if (appCheckKey) {
 
 export const auth      = getAuth(app)
 export const db        = getFirestore(app)
-export const storage   = getStorage(app)
 // Production (no VITE_FUNCTIONS_REGION) stays on us-central1; .env.eu sets europe-west1
 export const FUNCTIONS_REGION: string = import.meta.env.VITE_FUNCTIONS_REGION || 'us-central1'
 export const functions = getFunctions(app, FUNCTIONS_REGION)
@@ -43,8 +42,17 @@ export const perf      = getPerformance(app)
 if (import.meta.env.VITE_USE_EMULATORS === 'true') {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
   connectFirestoreEmulator(db, '127.0.0.1', 8080)
-  connectStorageEmulator(storage, '127.0.0.1', 9199)
   connectFunctionsEmulator(functions, '127.0.0.1', 5001)
+}
+
+// Storage is only needed for uploads: its SDK loads on first use, not with the app
+let storagePromise: Promise<FirebaseStorage> | null = null
+export function getStorageInstance(): Promise<FirebaseStorage> {
+  return storagePromise ??= import('firebase/storage').then(({ getStorage, connectStorageEmulator }) => {
+    const storage = getStorage(app)
+    if (import.meta.env.VITE_USE_EMULATORS === 'true') connectStorageEmulator(storage, '127.0.0.1', 9199)
+    return storage
+  })
 }
 
 // Persist auth across browser sessions (survives tab/window close)

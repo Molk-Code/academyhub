@@ -41,6 +41,15 @@ function firebaseTemplates(): Plugin {
   }
 }
 
+const VENDOR_CHUNKS: [string, RegExp][] = [
+  ['vendor-react',    /^(react|react-dom|scheduler|react-router|react-router-dom|@remix-run\/router)$/],
+  ['vendor-firebase', /^(firebase|@firebase\/.+)$/],
+  ['vendor-editor',   /^@uiw\/.+$/],
+  ['vendor-scanner',  /^@zxing\/.+$/],
+  ['vendor-dnd',      /^@dnd-kit\/.+$/],
+  ['vendor-qr',       /^qrcode\.react$/],
+]
+
 export default defineConfig({
   define: {
     __BUILD_ID__: JSON.stringify(buildId),
@@ -61,14 +70,15 @@ export default defineConfig({
     target: ['safari14', 'ios14', 'chrome87', 'firefox78', 'edge88'],
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-firebase':  ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/functions', 'firebase/storage', 'firebase/messaging'],
-          'vendor-react':     ['react', 'react-dom', 'react-router-dom'],
-          'vendor-editor':    ['@uiw/react-md-editor', 'react-markdown'],
-          'vendor-scanner':   ['@zxing/browser', '@zxing/library'],
-          'vendor-dnd':       ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
-          'vendor-qr':        ['qrcode.react'],
-          'vendor-xlsx':      ['xlsx'],
+        // By package path, not entry list: an entry list also claims the entry's
+        // dependencies, which put react/jsx-runtime in vendor-editor and made
+        // every page download the markdown editor.
+        manualChunks(id) {
+          const m = id.match(/node_modules\/((?:@[^/]+\/)?[^/]+)/)
+          if (!m) return
+          // Loaded on first use (uploads, push setup): keep them out of the up-front chunk
+          if (/node_modules\/@?firebase\/(storage|messaging)\//.test(id)) return
+          return VENDOR_CHUNKS.find(([, re]) => re.test(m[1]))?.[0]
         },
       },
     },

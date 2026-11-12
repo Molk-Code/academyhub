@@ -6,27 +6,29 @@ import { MicrosoftAuthProvider } from '@/contexts/MicrosoftAuthContext'
 import { SchoolProvider } from '@/contexts/SchoolContext'
 import RoleRoute     from '@/components/layout/RoleRoute'
 import RoleRedirect  from '@/components/layout/RoleRedirect'
-import StudentLayout, { StudentLayoutSkeleton } from '@/components/layout/StudentLayout'
-import TeacherLayout from '@/components/layout/TeacherLayout'
-import AdminLayout, { AdminLayoutSkeleton } from '@/components/layout/AdminLayout'
+import { StudentLayoutSkeleton, AdminLayoutSkeleton } from '@/components/layout/LayoutSkeletons'
+import LoadingSpinner from '@/components/common/LoadingSpinner'
 
-// Auth — kept static (critical path, tiny)
-import Login         from '@/pages/auth/Login'
-import AcceptInvite  from '@/pages/auth/AcceptInvite'
+// ── Role layouts: each role downloads only its own shell ─────────────────────
+const StudentLayout = lazy(() => import('@/components/layout/StudentLayout'))
+const TeacherLayout = lazy(() => import('@/components/layout/TeacherLayout'))
+const AdminLayout   = lazy(() => import('@/components/layout/AdminLayout'))
 
-// Public — kept static (no auth loading, tiny)
-import RoomDisplay  from '@/pages/RoomDisplay'
-import QrDisplay    from '@/pages/QrDisplay'
-import PrivacyPolicy from '@/pages/PrivacyPolicy'
-import SuperAdmin from '@/pages/SuperAdmin'
-import SchoolSignup from '@/pages/SchoolSignup'
+// ── Auth and public pages: signed-in users never need them ───────────────────
+const Login         = lazy(() => import('@/pages/auth/Login'))
+const AcceptInvite  = lazy(() => import('@/pages/auth/AcceptInvite'))
+const RoomDisplay   = lazy(() => import('@/pages/RoomDisplay'))
+const QrDisplay     = lazy(() => import('@/pages/QrDisplay'))
+const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'))
+const SuperAdmin    = lazy(() => import('@/pages/SuperAdmin'))
+const SchoolSignup  = lazy(() => import('@/pages/SchoolSignup'))
+const UpgradePage   = lazy(() => import('@/pages/UpgradePage'))
 
 import NotificationInit from '@/components/NotificationInit'
 import BugReportHighlighter from '@/components/BugReportHighlighter'
 import FeatureGate from '@/components/FeatureGate'
 import ModuleGate, { PublicShopGate } from '@/components/ModuleGate'
 import NavVisibilityGate from '@/components/NavVisibilityGate'
-import UpgradePage from '@/pages/UpgradePage'
 
 // ── Shared lazy ─────────────────────────────────────────────────────────────
 const Profile       = lazy(() => import('@/pages/shared/Profile'))
@@ -147,7 +149,7 @@ export default function App() {
           <Route path="/" element={<RoleRedirect />} />
 
           {/* ── Student ─────────────────────────────────────────────────── */}
-          <Route element={<RoleRoute role={['student', 'admin']} skeleton={<StudentLayoutSkeleton />}><StudentLayout /></RoleRoute>}>
+          <Route element={<RoleRoute role={['student', 'admin']} skeleton={<StudentLayoutSkeleton />}><Suspense fallback={<StudentLayoutSkeleton />}><StudentLayout /></Suspense></RoleRoute>}>
             <Route path="/dashboard" element={<StudentDashboard />} />
             <Route path="/calendar"  element={<StudentCalendar />} />
             <Route path="/subjects"     element={<ModuleGate module="academy"><SubjectList /></ModuleGate>} />
@@ -183,7 +185,7 @@ export default function App() {
           </Route>
 
           {/* ── Teacher ─────────────────────────────────────────────────── */}
-          <Route element={<RoleRoute role={['teacher', 'admin']}><TeacherLayout /></RoleRoute>}>
+          <Route element={<RoleRoute role={['teacher', 'admin']}><Suspense fallback={<LoadingSpinner fullScreen />}><TeacherLayout /></Suspense></RoleRoute>}>
             <Route path="/teacher"                   element={<TeacherDashboard />} />
             <Route path="/teacher/students"          element={<ModuleGate module="academy"><Students /></ModuleGate>} />
             <Route path="/teacher/students/:uid"     element={<ModuleGate module="academy"><StudentDetail /></ModuleGate>} />
@@ -228,7 +230,7 @@ export default function App() {
           </Route>
 
           {/* ── Admin ───────────────────────────────────────────────────── */}
-          <Route element={<RoleRoute role="admin" skeleton={<AdminLayoutSkeleton />}><AdminLayout /></RoleRoute>}>
+          <Route element={<RoleRoute role="admin" skeleton={<AdminLayoutSkeleton />}><Suspense fallback={<AdminLayoutSkeleton />}><AdminLayout /></Suspense></RoleRoute>}>
             <Route path="/admin"           element={<Navigate to="/admin/users" replace />} />
             <Route path="/admin/users"         element={<UserManager />} />
             <Route path="/admin/cohorts"       element={<CohortManager />} />

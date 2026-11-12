@@ -94,31 +94,6 @@ function SidebarGroup({ label, icon, defaultOpen = false, children }: {
   )
 }
 
-export function StudentLayoutSkeleton() {
-  return (
-    <div className="flex h-screen" style={{ background: 'var(--bg-primary)' }}>
-      <div className="hidden lg:flex w-64 flex-col flex-shrink-0 border-r" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
-        <div className="h-16 flex items-center gap-3 px-5 border-b" style={{ borderColor: 'var(--border)' }}>
-          <div className="w-8 h-8 rounded-lg bg-brand-500/20 animate-pulse flex-shrink-0" />
-          <div className="h-4 w-24 bg-white/10 rounded animate-pulse" />
-        </div>
-        <div className="flex-1 px-3 py-4 space-y-1">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-10 bg-white/5 rounded-xl animate-pulse" style={{ opacity: 1 - i * 0.1 }} />
-          ))}
-        </div>
-      </div>
-      <div className="flex-1 p-8">
-        <div className="h-8 w-48 bg-white/10 rounded-xl animate-pulse mb-2" />
-        <div className="h-4 w-64 bg-white/5 rounded animate-pulse mb-8" />
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-16 bg-white/5 rounded-xl mb-3 animate-pulse" />
-        ))}
-      </div>
-    </div>
-  )
-}
-
 function StudentContentSkeleton() {
   return (
     <div className="p-8">

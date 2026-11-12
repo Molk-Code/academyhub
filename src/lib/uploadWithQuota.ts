@@ -1,7 +1,12 @@
-import { ref, uploadBytes, uploadBytesResumable, getDownloadURL, getMetadata, deleteObject } from 'firebase/storage'
 import { doc, updateDoc, getDoc, increment } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
-import { storage, db, functions } from '@/lib/firebase'
+import { getStorageInstance, db, functions } from '@/lib/firebase'
+
+// The Storage SDK loads on the first upload, not with the app
+async function storageApi() {
+  const [api, storage] = await Promise.all([import('firebase/storage'), getStorageInstance()])
+  return { ...api, storage }
+}
 import { SCHOOL_ID } from '@/lib/school'
 
 function fmtBytes(b: number): string {
@@ -33,6 +38,7 @@ async function trackUsage(deltaBytes: number) {
 
 export async function uploadWithQuota(file: File, storagePath: string): Promise<string> {
   await assertQuota(file.size)
+  const { ref, uploadBytes, getDownloadURL, storage } = await storageApi()
   const fileRef = ref(storage, storagePath)
   const snap = await uploadBytes(fileRef, file)
   const url = await getDownloadURL(snap.ref)
@@ -47,6 +53,7 @@ export async function uploadResumableWithQuota(
   onProgress?: (pct: number) => void,
 ): Promise<string> {
   await assertQuota(file.size)
+  const { ref, uploadBytesResumable, getDownloadURL, storage } = await storageApi()
   const fileRef = ref(storage, storagePath)
   return new Promise((resolve, reject) => {
     const task = uploadBytesResumable(fileRef, file, metadata as any)
@@ -110,6 +117,7 @@ export async function uploadScreenplayViaFunction(
   const { data } = await upload({ productionId, fileBase64 })
 
   onProgress?.(90)
+  const { ref, getDownloadURL, storage } = await storageApi()
   const url = await getDownloadURL(ref(storage, data.path))
   await trackUsage(file.size)
   onProgress?.(100)
@@ -117,6 +125,7 @@ export async function uploadScreenplayViaFunction(
 }
 
 export async function deleteWithTracking(storagePath: string): Promise<void> {
+  const { ref, getMetadata, deleteObject, storage } = await storageApi()
   const fileRef = ref(storage, storagePath)
   let size = 0
   try {

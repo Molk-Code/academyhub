@@ -1,5 +1,4 @@
 import { getApp } from 'firebase/app'
-import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging'
 import { doc, setDoc, arrayUnion, arrayRemove } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from './firebase'
@@ -11,11 +10,13 @@ const FCM_TOKEN_KEY     = (uid: string) => `fcmTokenOk:${uid}`
 const tokensDoc = (uid: string) => doc(db, 'push_tokens', uid)
 const FCM_TOKEN_VAL_KEY = (uid: string) => `fcmTokenVal:${uid}`
 
+// The Messaging SDK loads when push is first set up, not with the app
 async function getMsg() {
   try {
+    const { getMessaging, getToken, onMessage, isSupported } = await import('firebase/messaging')
     const ok = await isSupported()
     if (!ok) return null
-    return getMessaging(getApp())
+    return { messaging: getMessaging(getApp()), getToken, onMessage }
   } catch {
     return null
   }
@@ -38,10 +39,10 @@ export async function initFCM(uid: string): Promise<string> {
     // Use root scope so iOS PWA push subscriptions work correctly
     const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })
 
-    const messaging = await getMsg()
-    if (!messaging) return 'unsupported'
+    const msg = await getMsg()
+    if (!msg) return 'unsupported'
 
-    const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg })
+    const token = await msg.getToken(msg.messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg })
     if (!token) return 'no-token'
 
     // Replace the old token for this device to prevent duplicate notifications
@@ -74,9 +75,9 @@ type FcmPayload = {
 }
 
 export async function onForegroundMessage(cb: (p: FcmPayload) => void): Promise<() => void> {
-  const messaging = await getMsg()
-  if (!messaging) return () => {}
-  return onMessage(messaging, cb as any)
+  const msg = await getMsg()
+  if (!msg) return () => {}
+  return msg.onMessage(msg.messaging, cb as any)
 }
 
 export async function removeFcmToken(uid: string, token: string): Promise<void> {

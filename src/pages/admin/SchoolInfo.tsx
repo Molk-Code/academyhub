@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { addDoc, updateDoc, deleteDoc, doc, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { SCHOOL_ID } from '@/lib/school'
-import { useCollection, useDocument, orderBy } from '@/hooks/useFirestore'
+import { useCollection, useDocument, orderBy, where } from '@/hooks/useFirestore'
+import { limit } from 'firebase/firestore'
 import { useAllUsers } from '@/hooks/useAllUsers'
 import { useSchool, type CurrencyCode } from '@/contexts/SchoolContext'
 import type { LessonBlockDoc, ClassroomDoc, UserDoc, SemesterSettingsDoc } from '@/types'
@@ -35,6 +36,8 @@ interface RoomEditState {
 
 interface SchoolDayDoc      { id: string; startTime: string; endTime: string }
 interface AttendancePointsDoc { id: string; pointsPerCheckIn: number; absencePenalty?: number }
+interface JobsSettingsDoc { id: string; dryRun?: Record<string, boolean> }
+interface JobRunDoc { id: string; job: string; dryRun: boolean; lessons: number; applied: number; at?: { toDate(): Date } }
 
 const EMPTY_BLOCK: BlockEditState = { id: null, name: '', startTime: '', endTime: '', daysOfWeek: DEFAULT_DAYS }
 const EMPTY_ROOM: RoomEditState   = { id: null, name: '', notes: '' }
@@ -63,6 +66,11 @@ export default function SchoolInfo() {
   const { data: classrooms }         = useCollection<ClassroomDoc>('classrooms', [orderBy('order', 'asc')])
   const { data: schoolDayDoc }       = useDocument<SchoolDayDoc>('settings', 'schoolDay')
   const { data: attendanceDoc }      = useDocument<AttendancePointsDoc>('settings', 'attendance')
+  const { data: jobsDoc }            = useDocument<JobsSettingsDoc>('settings', 'jobs')
+  const { data: penaltyRuns }        = useCollection<JobRunDoc>(
+    'job_runs',
+    [where('job', '==', 'absencePenalties'), orderBy('at', 'desc'), limit(10)],
+  )
   const { data: semesterDoc }        = useDocument<SemesterSettingsDoc>('settings', 'semester')
   const { data: schoolDoc }          = useDocument<{ id: string; name?: string }>('settings', 'school')
   const { data: allUsers }           = useAllUsers()
@@ -238,6 +246,20 @@ export default function SchoolInfo() {
     setApSaved(true)
     setTimeout(() => setApSaved(false), 2000)
   }
+
+  // Test run: the penalty job calculates and records, deducts nothing
+  const penaltyDryRun = jobsDoc?.dryRun?.absencePenalties === true
+  const [dryRunSaving, setDryRunSaving] = useState(false)
+  async function togglePenaltyDryRun() {
+    setDryRunSaving(true)
+    try {
+      await setDoc(doc(db, 'settings', 'jobs'), { dryRun: { absencePenalties: !penaltyDryRun } }, { merge: true })
+    } finally { setDryRunSaving(false) }
+  }
+  const dryRunTotals = penaltyRuns.filter(r => r.dryRun).reduce(
+    (t, r) => ({ lessons: t.lessons + r.lessons, applied: t.applied + r.applied }),
+    { lessons: 0, applied: 0 },
+  )
 
   const sdError = sdStart && sdEnd && sdEnd <= sdStart ? 'The day must end after it starts.' : ''
 
@@ -485,6 +507,32 @@ export default function SchoolInfo() {
             <Check className="w-4 h-4" />
             {apSaved ? 'Saved!' : apSaving ? 'Saving…' : 'Save'}
           </button>
+        </div>
+        <div className="mt-5 pt-4 border-t border-white/5 flex items-start gap-3">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={penaltyDryRun}
+            aria-label="Test run for automatic absence penalties"
+            disabled={dryRunSaving}
+            onClick={togglePenaltyDryRun}
+            className={`relative mt-0.5 inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors duration-200 ${penaltyDryRun ? 'bg-brand-600' : 'bg-zinc-700'}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-zinc-900 shadow transition-transform duration-200 ${penaltyDryRun ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+          <div className="min-w-0">
+            <p className="text-sm text-zinc-200">Test run for automatic absence penalties</p>
+            <p className="text-xs text-zinc-500">
+              Missed lessons are calculated but no points are deducted. Turn it off and lessons from the last 7 days are applied for real.
+            </p>
+            {penaltyDryRun && (
+              <p className="text-xs text-amber-400 mt-1" role="status">
+                {dryRunTotals.lessons === 0
+                  ? 'No finished lessons checked yet. Results appear here after the next lesson ends.'
+                  : `Recent test runs: ${dryRunTotals.applied} penalt${dryRunTotals.applied === 1 ? 'y' : 'ies'} over ${dryRunTotals.lessons} lesson${dryRunTotals.lessons === 1 ? '' : 's'} would have been deducted.`}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import { admin, functions, db, requireTeacherOrAdmin, LIMITS, requireMember, REGION } from './lib'
 import { sendPush, saveNotifications, pushToTeachersAndAdmins, tokensFor } from './notifications-core'
+import { writePoints, isDryRun, recordRun, stockholmDate } from './jobs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // processRedemption — validate and record a prize claim
@@ -344,117 +345,112 @@ export const fulfillClaim = functions.region(REGION).runWith(LIMITS).https.onCal
 
 // ─────────────────────────────────────────────────────────────────────────────
 // applyAbsencePenalties — runs every 15 min; deducts points for students who
-// missed a lesson without reporting absence. Skips lessons already processed.
+// missed a lesson without reporting absence.
+//
+// Safe to run again: each deduction's log id is absence_penalty__{lesson}__{student},
+// so a lesson processed twice (overlapping runs, a retry) deducts once.
+// Dry run (settings/jobs.dryRun.absencePenalties): calculates and records the
+// result in job_runs and deducts nothing. Each lesson is reported once
+// (penaltiesDryRunAt); switch dry run off and the next run applies lessons
+// from the last 7 days for real.
 // ─────────────────────────────────────────────────────────────────────────────
+
+export interface PenaltyInput {
+  lessonId: string
+  lessonEnd: Date
+  lessonDate: string                        // Swedish date of the lesson, YYYY-MM-DD
+  students: { id: string; isActive?: boolean; enrolledAt?: Date | null }[]
+  checkedInIds: Set<string>
+  absences: { studentId: string; type: string; lessonId?: string | null; date: string }[]
+  penalty: number
+}
+
+// Who gets the penalty for one lesson. No I/O, so it is unit-testable.
+export function planAbsencePenalties(p: PenaltyInput): string[] {
+  const excused = new Set(
+    p.absences
+      .filter(a => a.date === p.lessonDate && (a.type === 'full_day' || (a.type === 'lesson' && a.lessonId === p.lessonId)))
+      .map(a => a.studentId),
+  )
+  if (p.penalty === 0) return []
+  return p.students
+    .filter(s => s.isActive !== false)
+    .filter(s => !s.enrolledAt || s.enrolledAt <= p.lessonEnd)   // not yet in the class
+    .filter(s => !p.checkedInIds.has(s.id) && !excused.has(s.id))
+    .map(s => s.id)
+}
+
+export async function runAbsencePenalties(opts: { now?: Date; dryRun?: boolean } = {}) {
+  const now    = admin.firestore.Timestamp.fromDate(opts.now ?? new Date())
+  const dryRun = !!opts.dryRun
+  // Look back up to 7 days to catch any missed windows
+  const cutoff = admin.firestore.Timestamp.fromMillis(now.toMillis() - 7 * 24 * 60 * 60 * 1000)
+
+  const lessonsSnap = await db.collection('lessons')
+    .where('endTime', '>=', cutoff)
+    .where('endTime', '<=', now)
+    .get()
+
+  const settings = (await db.collection('settings').doc('attendance').get()).data() ?? {}
+  const penalty: number = typeof settings.absencePenalty === 'number' ? settings.absencePenalty : -5
+
+  const summary = { dryRun, lessons: 0, applied: 0, skipped: 0, entries: [] as { lessonId: string; studentId: string; points: number }[] }
+
+  for (const lessonDoc of lessonsSnap.docs) {
+    const lesson = lessonDoc.data()
+    if (lesson.penaltiesAppliedAt) continue
+    if (dryRun && lesson.penaltiesDryRunAt) continue   // already reported; a real run still processes it
+    const lessonId = lessonDoc.id
+    const cohortId = lesson.cohortId as string | undefined
+
+    let studentIds: string[] = []
+    if (lesson.requiresPresence !== false && cohortId) {
+      const lessonEnd: Date = (lesson.endTime as admin.firestore.Timestamp).toDate()
+      const lessonDate = stockholmDate(((lesson.startTime ?? lesson.endTime) as admin.firestore.Timestamp).toDate())
+      const [studentsSnap, attendanceSnap, absenceSnap] = await Promise.all([
+        db.collection('users').where('cohortId', '==', cohortId).where('role', '==', 'student').get(),
+        db.collection('lessons').doc(lessonId).collection('attendance').get(),
+        db.collection('absence_reports').where('cohortId', '==', cohortId).where('date', '==', lessonDate).get(),
+      ])
+      studentIds = planAbsencePenalties({
+        lessonId, lessonEnd, lessonDate, penalty,
+        students: studentsSnap.docs.map(d => ({
+          id: d.id,
+          isActive: d.data().isActive,
+          enrolledAt: d.data().enrolledAt?.toDate?.() ?? null,
+        })),
+        checkedInIds: new Set(attendanceSnap.docs.map(d => d.id)),
+        absences: absenceSnap.docs.map(d => d.data() as PenaltyInput['absences'][number]),
+      })
+    }
+
+    const res = await writePoints(studentIds.map(studentId => ({
+      studentId,
+      points: penalty,
+      reason: 'absence_penalty',
+      referenceId: lessonId,
+      extra: { lessonTitle: lesson.title ?? null },
+    })), { dryRun })
+
+    summary.lessons++
+    summary.applied += res.applied.length
+    summary.skipped += res.skipped.length
+    summary.entries.push(...res.applied.map(e => ({ lessonId, studentId: e.studentId, points: e.points })))
+    await lessonDoc.ref.update(dryRun ? { penaltiesDryRunAt: now } : { penaltiesAppliedAt: now })
+  }
+
+  if (summary.lessons > 0) {
+    // Keep the run log small: the entries list only matters for a dry run
+    await recordRun('absencePenalties', dryRun ? summary : { ...summary, entries: summary.entries.slice(0, 50) })
+  }
+  return summary
+}
 
 export const applyAbsencePenalties = functions.region(REGION).runWith(LIMITS).pubsub
   .schedule('every 15 minutes')
   .onRun(async () => {
-    const now     = admin.firestore.Timestamp.now()
-    // Look back up to 7 days to catch any missed windows
-    const cutoff  = admin.firestore.Timestamp.fromMillis(now.toMillis() - 7 * 24 * 60 * 60 * 1000)
-
-    // Lessons that have already ended
-    const lessonsSnap = await db.collection('lessons')
-      .where('endTime', '>=', cutoff)
-      .where('endTime', '<=', now)
-      .get()
-
-    if (lessonsSnap.empty) return
-
-    // Fetch attendance settings once
-    const settingsSnap = await db.collection('settings').doc('attendance').get()
-    const settings = settingsSnap.data() ?? {}
-    const penalty: number = typeof settings.absencePenalty === 'number' ? settings.absencePenalty : -5
-
-    for (const lessonDoc of lessonsSnap.docs) {
-      const lesson = lessonDoc.data()
-
-      // Skip if already processed or doesn't require presence
-      if (lesson.penaltiesAppliedAt) continue
-      if (lesson.requiresPresence === false) {
-        await lessonDoc.ref.update({ penaltiesAppliedAt: now })
-        continue
-      }
-
-      const lessonId = lessonDoc.id
-      const cohortId = lesson.cohortId as string | undefined
-      if (!cohortId) {
-        await lessonDoc.ref.update({ penaltiesAppliedAt: now })
-        continue
-      }
-
-      // All active students in this cohort
-      const studentsSnap = await db.collection('users')
-        .where('cohortId', '==', cohortId)
-        .where('role', '==', 'student')
-        .get()
-
-      if (studentsSnap.empty) {
-        await lessonDoc.ref.update({ penaltiesAppliedAt: now })
-        continue
-      }
-
-      // Who checked in?
-      const attendanceSnap = await db.collection('lessons').doc(lessonId).collection('attendance').get()
-      const checkedInIds = new Set(attendanceSnap.docs.map(d => d.id))
-
-      // Lesson date string for absence matching
-      const lessonDate: Date = (lesson.endTime as admin.firestore.Timestamp).toDate()
-      const dateStr = lessonDate.toISOString().slice(0, 10)
-
-      // Absence reports for this lesson's date in this cohort
-      const absenceSnap = await db.collection('absence_reports')
-        .where('cohortId', '==', cohortId)
-        .where('date', '==', dateStr)
-        .get()
-
-      const absenceByStudent = new Map<string, boolean>()
-      for (const aDoc of absenceSnap.docs) {
-        const a = aDoc.data()
-        const sid: string = a.studentId
-        // Full-day absence counts for any lesson that day
-        if (a.type === 'full_day') {
-          absenceByStudent.set(sid, true)
-        } else if (a.type === 'lesson' && a.lessonId === lessonId) {
-          absenceByStudent.set(sid, true)
-        }
-      }
-
-      // Apply penalty to students who didn't check in and have no absence report
-      const batch = db.batch()
-      let penaltyCount = 0
-
-      for (const studentDoc of studentsSnap.docs) {
-        const uid = studentDoc.id
-        if (checkedInIds.has(uid)) continue       // checked in — no penalty
-        if (absenceByStudent.get(uid)) continue   // reported absence — no penalty
-
-        // Deduct points
-        const userData = studentDoc.data()
-        const currentPoints: number = userData.totalPoints ?? 0
-        batch.update(studentDoc.ref, { totalPoints: currentPoints + penalty })
-
-        // Log the deduction
-        const logRef = db.collection('points_log').doc()
-        batch.set(logRef, {
-          studentId:   uid,
-          delta:       penalty,
-          reason:      'absence_penalty',
-          referenceId: lessonId,
-          lessonTitle: lesson.title ?? null,
-          awardedAt:   now,
-        })
-
-        penaltyCount++
-      }
-
-      // Mark lesson as processed
-      batch.update(lessonDoc.ref, { penaltiesAppliedAt: now })
-
-      await batch.commit()
-      if (penaltyCount > 0) {
-        console.log(`applyAbsencePenalties: lesson ${lessonId} — applied penalty to ${penaltyCount} students`)
-      }
+    const summary = await runAbsencePenalties({ dryRun: await isDryRun('absencePenalties') })
+    if (summary.applied > 0) {
+      console.log(`applyAbsencePenalties: ${summary.dryRun ? '[dry run] would apply' : 'applied'} ${summary.applied} penalties over ${summary.lessons} lessons`)
     }
   })

@@ -268,6 +268,14 @@ service cloud.firestore {
       allow write: if (false) && moduleOn('academy');
     }
 
+    // ── Scheduled job runs (functions/src/jobs.ts) — Cloud Functions only ────
+    // Admins read them to check a dry run; job_marks has no client access.
+
+    match /job_runs/{runId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // ── Prizes ────────────────────────────────────────────────────────────────
 
     match /prizes/{prizeId} {

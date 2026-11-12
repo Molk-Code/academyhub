@@ -1,5 +1,6 @@
 import { admin, functions, db, LIMITS, requireMember, requireAllowed, REGION } from './lib'
 import { sendPush, sendFcmToTokens, pushToTeachersAndAdmins, saveNotifications, tokensFor } from './notifications-core'
+import { claimOnce, stockholmDate, stockholmTime, stockholmDayBounds } from './jobs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // purgeChatMessages — delete messages older than the configured retention window
@@ -48,13 +49,14 @@ export const sendInventoryReturnReminders = functions.region(REGION).runWith(LIM
   .schedule('0 8 * * *')
   .timeZone('Europe/Stockholm')
   .onRun(async () => {
-    const todayStr = new Date().toISOString().slice(0, 10)
+    const todayStr = stockholmDate(new Date())
     const activeStatuses = new Set(['active', 'checked-out'])
 
     async function notify(doc: FirebaseFirestore.QueryDocumentSnapshot, title: string, body: string, tag: string) {
       const project = doc.data()
       const borrowerIds: string[] = project.borrowerIds ?? []
       if (borrowerIds.length === 0) return
+      if (!(await claimOnce(`${tag}__${doc.id}__${todayStr}`))) return   // once a day, even on a retry
       const usersSnaps = await Promise.all(borrowerIds.map(uid => db.collection('users').doc(uid).get()))
       const tokens = await tokensFor(usersSnaps.map(s => s.id))
       const opts = { title, body, url: '/my-bookings' }
@@ -102,7 +104,7 @@ export const sendEquipmentBookingOverdueReminders = functions.region(REGION).run
   .schedule('0 8 * * *')
   .timeZone('Europe/Stockholm')
   .onRun(async () => {
-    const todayStr = new Date().toISOString().slice(0, 10)
+    const todayStr = stockholmDate(new Date())
 
     const overdueSnap = await db.collection('equipment_bookings')
       .where('status', '==', 'checked-out')
@@ -113,6 +115,7 @@ export const sendEquipmentBookingOverdueReminders = functions.region(REGION).run
       const booking = bookingDoc.data()
       if (booking.linkedProjectId) continue  // already covered by the inventory reminder
       if (!booking.studentId) continue
+      if (!(await claimOnce(`equipment-overdue__${bookingDoc.id}__${todayStr}`))) continue
 
       const overdueDays = Math.round((Date.parse(todayStr) - Date.parse(booking.returnDate)) / 86400000)
       const projectName = booking.projectName || 'your booking'
@@ -205,83 +208,76 @@ export const sendEventInviteNotifications = functions.region(REGION).runWith(LIM
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// sendEventReminders — push notification 15 min before calendar events
-// Runs every 5 minutes; sends to events starting in 13–18 min window
+// sendEventReminders — push notification about 15 min before calendar events.
+// Runs every 5 minutes over a 10–20 min window: the windows overlap, so a late
+// or skipped run doesn't lose a reminder, and claimOnce makes sure each event
+// start is announced once. A moved event (new start time) is announced again.
 // ─────────────────────────────────────────────────────────────────────────────
+
+export function reminderWindow(now: Date): { from: Date; to: Date } {
+  return { from: new Date(now.getTime() + 10 * 60_000), to: new Date(now.getTime() + 20 * 60_000) }
+}
+
+export function reminderText(title: string, start: Date, place?: string | null): { title: string; body: string } {
+  return { title: `Upcoming: ${title}`, body: `Starts at ${stockholmTime(start)}${place ? ` · ${place}` : ''}` }
+}
+
+export async function runEventReminders(now = new Date()) {
+  const { from, to } = reminderWindow(now)
+  const fromTs = admin.firestore.Timestamp.fromDate(from)
+  const toTs   = admin.firestore.Timestamp.fromDate(to)
+  let sent = 0
+
+  // ── Lesson events ──────────────────────────────────────────────────────────
+  const lessonsSnap = await db.collection('lessons')
+    .where('startTime', '>=', fromTs)
+    .where('startTime', '<=', toTs)
+    .get()
+
+  for (const lessonDoc of lessonsSnap.docs) {
+    const lesson = lessonDoc.data()
+    const start: Date = (lesson.startTime as admin.firestore.Timestamp).toDate()
+    if (!(await claimOnce(`reminder__lesson__${lessonDoc.id}__${start.getTime()}`))) continue
+    const { title, body } = reminderText(lesson.title ?? 'Lesson', start, lesson.classroom)
+
+    const recipients: string[] = []
+    // All students in this cohort
+    if (lesson.cohortId) {
+      const studentsSnap = await db.collection('users')
+        .where('cohortId', '==', lesson.cohortId)
+        .where('isActive', '==', true)
+        .get()
+      recipients.push(...studentsSnap.docs.map(d => d.id))
+    }
+    // The teacher(s) on this lesson
+    recipients.push(...(lesson.teacherIds ?? []), ...(lesson.teacherId ? [lesson.teacherId] : []))
+
+    const tokens = await tokensFor([...new Set(recipients.filter(Boolean))])
+    await sendFcmToTokens(tokens, title, body)
+    sent++
+  }
+
+  // ── Personal events ────────────────────────────────────────────────────────
+  const personalSnap = await db.collection('personal_events')
+    .where('startTime', '>=', fromTs)
+    .where('startTime', '<=', toTs)
+    .get()
+
+  for (const evDoc of personalSnap.docs) {
+    const ev = evDoc.data()
+    const start: Date = (ev.startTime as admin.firestore.Timestamp).toDate()
+    if (!(await claimOnce(`reminder__personal__${evDoc.id}__${start.getTime()}`))) continue
+    const { title, body } = reminderText(ev.title ?? 'Personal event', start, ev.location)
+    const tokens = await tokensFor([...new Set([ev.userId, ...(ev.inviteeIds ?? [])].filter(Boolean))] as string[])
+    await sendFcmToTokens(tokens, title, body)
+    sent++
+  }
+  return { sent }
+}
 
 export const sendEventReminders = functions.region(REGION).runWith(LIMITS).pubsub
   .schedule('every 5 minutes')
-  .onRun(async () => {
-    const now     = Date.now()
-    const winFrom = new Date(now + 13 * 60 * 1000)  // 13 min from now
-    const winTo   = new Date(now + 18 * 60 * 1000)  // 18 min from now
-
-    const fromTs = admin.firestore.Timestamp.fromDate(winFrom)
-    const toTs   = admin.firestore.Timestamp.fromDate(winTo)
-
-    // ── Lesson events ────────────────────────────────────────────────────────
-    const lessonsSnap = await db.collection('lessons')
-      .where('startTime', '>=', fromTs)
-      .where('startTime', '<=', toTs)
-      .get()
-
-    for (const lessonDoc of lessonsSnap.docs) {
-      const lesson = lessonDoc.data()
-      const startTime: admin.firestore.Timestamp = lesson.startTime
-      const timeStr = startTime.toDate().toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
-      const title   = lesson.title ?? 'Lesson'
-      const notifTitle = `Upcoming: ${title}`
-      const notifBody  = `Starts at ${timeStr}${lesson.classroom ? ` · ${lesson.classroom}` : ''}`
-
-      // Notify all students in this cohort
-      if (lesson.cohortId) {
-        const studentsSnap = await db.collection('users')
-          .where('cohortId', '==', lesson.cohortId)
-          .where('isActive', '==', true)
-          .get()
-        const studentTokens = await tokensFor(studentsSnap.docs.map(d => d.id))
-        await sendFcmToTokens(studentTokens, notifTitle, notifBody)
-      }
-
-      // Notify the teacher(s) on this lesson
-      const teacherIds: string[] = [
-        ...(lesson.teacherIds ?? []),
-        ...(lesson.teacherId ? [lesson.teacherId] : []),
-      ].filter((v, i, a) => v && a.indexOf(v) === i)
-
-      for (const tid of teacherIds) {
-        const tSnap = await db.collection('users').doc(tid).get()
-        const tokens: string[] = (await tokensFor([tSnap.id])) as string[]
-        await sendFcmToTokens(tokens, notifTitle, notifBody)
-      }
-    }
-
-    // ── Personal events ──────────────────────────────────────────────────────
-    const personalSnap = await db.collection('personal_events')
-      .where('startTime', '>=', fromTs)
-      .where('startTime', '<=', toTs)
-      .get()
-
-    for (const evDoc of personalSnap.docs) {
-      const ev = evDoc.data()
-      const startTime: admin.firestore.Timestamp = ev.startTime
-      const timeStr = startTime.toDate().toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
-      const notifTitle = `Upcoming: ${ev.title ?? 'Personal event'}`
-      const notifBody  = `Starts at ${timeStr}${ev.location ? ` · ${ev.location}` : ''}`
-
-      const uSnap  = await db.collection('users').doc(ev.userId).get()
-      const ownerTokens: string[] = (await tokensFor([uSnap.id])) as string[]
-
-      const inviteeIds: string[] = ev.inviteeIds ?? []
-      const inviteeTokens: string[] = []
-      if (inviteeIds.length > 0) {
-        const inviteeSnaps = await Promise.all(inviteeIds.map(uid => db.collection('users').doc(uid).get()))
-        inviteeTokens.push(...(await tokensFor(inviteeSnaps.map(s => s.id))))
-      }
-
-      await sendFcmToTokens([...ownerTokens, ...inviteeTokens], notifTitle, notifBody)
-    }
-  })
+  .onRun(async () => { await runEventReminders() })
 
 // ─────────────────────────────────────────────────────────────────────────────
 // dailyTeacherSummary — Mon–Fri 08:00 morning briefing push to teachers/admins
@@ -292,13 +288,14 @@ export const dailyTeacherSummary = functions.region(REGION).runWith(LIMITS).pubs
   .timeZone('Europe/Stockholm')
   .onRun(async () => {
     const today    = new Date()
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const todayStr = today.toISOString().slice(0, 10)
+    // Today's lessons in Swedish time, midnight to midnight
+    const { start: dayStart, end: tomorrow } = stockholmDayBounds(today)
+    const todayStr = stockholmDate(today)
+    if (!(await claimOnce(`teacher-summary__${todayStr}`))) return null   // once a day, even on a retry
 
     const [lessonsSnap, equipmentSnap, absenceSnap, overdueSnap] = await Promise.all([
       db.collection('lessons')
-        .where('startTime', '>=', admin.firestore.Timestamp.fromDate(today))
+        .where('startTime', '>=', admin.firestore.Timestamp.fromDate(dayStart))
         .where('startTime', '<',  admin.firestore.Timestamp.fromDate(tomorrow))
         .get(),
       db.collection('equipment_bookings').where('status', '==', 'pending').get(),
@@ -314,7 +311,7 @@ export const dailyTeacherSummary = functions.region(REGION).runWith(LIMITS).pubs
 
     if (parts.length === 0) return null
 
-    const dateLabel = new Intl.DateTimeFormat('en-SE', { weekday: 'long', day: 'numeric', month: 'short' }).format(today)
+    const dateLabel = new Intl.DateTimeFormat('en-SE', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'Europe/Stockholm' }).format(today)
     await pushToTeachersAndAdmins(
       `☀️ Good morning — ${dateLabel}`,
       parts.join(' · '),

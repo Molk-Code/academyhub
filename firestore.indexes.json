@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "job_runs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "job", "order": "ASCENDING" },
+        { "fieldPath": "at", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "bug_reports",
       "queryScope": "COLLECTION",
       "fields": [

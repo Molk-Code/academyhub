@@ -1,6 +1,7 @@
 import { admin, functions, db, escapeHtml, sendEmailOrThrow, getEmailConfig, requireTeacherOrAdmin, LIMITS, requireMember, REGION } from './lib'
 import { sendPush, saveNotifications, sendFcmToTokens, tokensFor } from './notifications-core'
 import { checkLevelUp } from './points'
+import { writePoints } from './jobs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // checkInAttendance — validate rotating QR token and record student presence
@@ -66,22 +67,12 @@ export const checkInAttendance = functions.region(REGION).runWith(LIMITS).https.
     })
 
     if (pointsPerCheckIn > 0) {
-      await db.runTransaction(async (tx) => {
-        const logRef = db.collection('points_log').doc()
-        tx.set(logRef, {
-          studentId:   uid,
-          points:      pointsPerCheckIn,
-          reason:      'attendance',
-          referenceId: attendanceRef.id,
-          awardedBy:   null,
-          createdAt:   admin.firestore.FieldValue.serverTimestamp(),
-        })
-        tx.update(db.collection('users').doc(uid), {
-          totalPoints: admin.firestore.FieldValue.increment(pointsPerCheckIn),
-        })
-      })
-      const newTotal = ((await db.collection('users').doc(uid).get()).data()?.totalPoints ?? 0) as number
-      await checkLevelUp(uid, newTotal)
+      // One award per student and lesson, even if the check-in is sent twice
+      const res = await writePoints([{ studentId: uid, points: pointsPerCheckIn, reason: 'attendance', referenceId: lessonId }])
+      if (res.applied.length) {
+        const newTotal = ((await db.collection('users').doc(uid).get()).data()?.totalPoints ?? 0) as number
+        await checkLevelUp(uid, newTotal)
+      }
     }
 
     return { success: true, lessonId, pointsAwarded: pointsPerCheckIn }

@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection } from '@/hooks/useFirestore'
@@ -7,7 +7,7 @@ import type { EquipmentDoc, EquipmentCategory, EquipmentCategoryDoc, CohortDoc }
 import {
   Package, X, Check, AlertTriangle, Loader2, Upload, ToggleRight, ToggleLeft, ChevronLeft, ChevronRight,
 } from 'lucide-react'
-import { uploadEquipmentImage, inp } from './adminEquipmentShared'
+import { uploadEquipmentImage, inp, catColors, catStyle } from './adminEquipmentShared'
 import { equipmentImages } from './ImageGallery'
 
 interface FormState {
@@ -48,6 +48,12 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
     requiresProduction: existing.requiresProduction ?? true,
     isActive: existing.isActive ?? true,
   } : EMPTY_FORM)
+
+  // A new item starts on the first real category, so what the list shows (and its colour) is what gets saved
+  useEffect(() => {
+    if (!existing && categories.length && !categories.some(c => c.name === form.category))
+      setForm(f => ({ ...f, category: categories[0].name as EquipmentCategory }))
+  }, [existing, categories, form.category])
 
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -153,8 +159,9 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
             </div>
             <div>
               <label style={lbl}>Category</label>
-              <select style={inp} value={form.category} onChange={e => set('category', e.target.value as EquipmentCategory)}>
-                {categories.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+              {/* Shown in the category's colour, so a wrong pick stands out before saving */}
+              <select style={{ ...inp, ...catStyle(form.category, categories), fontWeight: 700 }} value={form.category} onChange={e => set('category', e.target.value as EquipmentCategory)}>
+                {categories.map(c => <option key={c.name} value={c.name} style={{ background: '#0e0e16', color: catColors(c.color).text }}>{c.name}</option>)}
               </select>
             </div>
           </div>

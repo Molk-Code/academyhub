@@ -5,6 +5,8 @@ import { ArrowLeft, CheckCircle2, AlertCircle, Mail } from 'lucide-react'
 import { functions } from '@/lib/firebase'
 import { useLegal } from '@/lib/publicConfig'
 import { ProviderDetails } from '@/components/LegalFooter'
+import { usePageMeta } from '@/lib/pageMeta'
+import { LEGAL } from '@/config/legal'
 
 // All UI text in one place so it can be translated (e.g. to Swedish) later
 const TEXT = {
@@ -32,7 +34,7 @@ const TEXT = {
   sendAnother:  'Send another message',
   errorLimit:   'Too many messages right now. Please try again later, or email us directly.',
   errorGeneric: 'Something went wrong. Please try again, or email us directly.',
-  emailFallback: 'Prefer email? Write to',
+  emailFallback: 'You can also write to us at',
 } as const
 
 type Category = keyof typeof TEXT.categories
@@ -40,6 +42,7 @@ type Category = keyof typeof TEXT.categories
 const submitContactRequest = httpsCallable<Record<string, string>, { ok: true }>(functions, 'submitContactRequest')
 
 export default function Contact() {
+  usePageMeta(`${LEGAL.appName} · Contact`, `Contact the team behind ${LEGAL.appName}: school enquiries, support, and legal or trademark questions.`)
   const [form, setForm] = useState({ name: '', email: '', organisation: '', category: 'school_enquiry' as Category, message: '', website: '' })
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
   const [error, setError] = useState('')
@@ -71,7 +74,8 @@ export default function Contact() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-brand-900 to-slate-900 overflow-y-auto flex items-start sm:items-center justify-center px-4 py-8">
       <div className="relative w-full max-w-md">
         <div className="bg-zinc-900 rounded-3xl shadow-2xl p-8">
-          <Link to="/login" className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white transition-colors mb-4">
+          {/* Padding with an equal negative margin: a 44px tap target on phones, same look */}
+          <Link to="/login" className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white transition-colors py-3 -mt-3 mb-1 sm:py-0 sm:mt-0 sm:mb-4">
             <ArrowLeft className="w-4 h-4" /> {TEXT.back}
           </Link>
 
@@ -129,7 +133,7 @@ export default function Contact() {
 
               <p className="text-xs text-zinc-500">
                 {TEXT.consentBefore}
-                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:underline">{TEXT.consentLink}</a>
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:underline inline-block py-3.5 -my-3.5 sm:py-0 sm:my-0">{TEXT.consentLink}</a>
                 {TEXT.consentAfter}
               </p>
 
@@ -147,8 +151,8 @@ export default function Contact() {
           )}
 
           {contactEmail && (
-            <p className="text-xs text-zinc-500 text-center mt-6 flex items-center justify-center gap-1.5">
-              <Mail className="w-3.5 h-3.5" /> {TEXT.emailFallback}{' '}
+            <p className="text-xs text-zinc-500 text-center mt-6 flex flex-wrap items-center justify-center gap-1.5">
+              <Mail className="w-3.5 h-3.5" aria-hidden="true" /> {TEXT.emailFallback}{' '}
               <a href={`mailto:${contactEmail}`} className="text-brand-400 hover:underline">{contactEmail}</a>
             </p>
           )}

@@ -119,6 +119,7 @@ const AdminVideoLab     = lazy(() => import('@/pages/admin/VideoLab'))
 const ExperienceLevels  = lazy(() => import('@/pages/admin/ExperienceLevels'))
 const ContactRequests   = lazy(() => import('@/pages/admin/ContactRequests'))
 const Contact           = lazy(() => import('@/pages/Contact'))
+const NotFound          = lazy(() => import('@/pages/NotFound'))
 
 // ── Equipment lazy ──────────────────────────────────────────────────────────
 const EquipmentBookingPage = lazy(() => import('@/pages/equipment/EquipmentBookingPage'))
@@ -277,7 +278,7 @@ export default function App() {
           <Route path="/shop"         element={<PublicShopGate><PublicShopPage /></PublicShopGate>} />
 
           {/* ── Fallback ────────────────────────────────────────────────── */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
         </Suspense>
       </BrowserRouter>

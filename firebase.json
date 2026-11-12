@@ -9,7 +9,13 @@
         "headers": [
           { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
           { "key": "Pragma", "value": "no-cache" },
-          { "key": "Expires", "value": "0" }
+          { "key": "Expires", "value": "0" },
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "X-Frame-Options", "value": "DENY" },
+          { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+          { "key": "Permissions-Policy", "value": "camera=(self), microphone=(), geolocation=(self)" },
+          { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
+          { "key": "Content-Security-Policy-Report-Only", "value": "default-src 'self'; script-src 'self' https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob: https://res.cloudinary.com https://firebasestorage.googleapis.com https://*.sharepoint.com; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com https://firebaselogging-pa.googleapis.com https://firebaseremoteconfig.googleapis.com https://firebase.googleapis.com https://firebasestorage.googleapis.com https://*.cloudfunctions.net https://api.cloudinary.com https://res.cloudinary.com https://graph.microsoft.com https://login.microsoftonline.com https://*.sharepoint.com https://open.er-api.com https://nominatim.openstreetmap.org https://api.open-meteo.com https://archive-api.open-meteo.com https://api.sunrise-sunset.org; frame-src 'self' blob: https://www.youtube.com https://view.officeapps.live.com https://docs.google.com https://firebasestorage.googleapis.com https://res.cloudinary.com https://*.sharepoint.com https://login.microsoftonline.com https://*.firebaseapp.com; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" }
         ]
       },
       {

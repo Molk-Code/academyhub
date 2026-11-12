@@ -1,12 +1,20 @@
 import { Link } from 'react-router-dom'
 import { Shield } from 'lucide-react'
-import { LEGAL } from '@/config/legal'
+import { LEGAL, publishedSubProcessors } from '@/config/legal'
 import { useLegal } from '@/lib/publicConfig'
 import { ProviderDetails } from '@/components/LegalFooter'
+import { usePageMeta } from '@/lib/pageMeta'
+
+const updated = new Date(`${LEGAL.privacyPolicyUpdated}T12:00:00`)
+  .toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 
 export default function PrivacyPolicy() {
-  const privacyEmail = useLegal()('privacyContactEmail')
+  usePageMeta(`${LEGAL.appName} · Privacy policy`, `How ${LEGAL.appName} handles personal data: what is stored, why, for how long, and who to contact.`)
+  const legal = useLegal()
+  const privacyEmail = legal('privacyContactEmail')
+  const provider = legal('providerName') ?? 'the provider'
   const contactMonths = LEGAL.contactRetentionMonths
+  const subProcessors = publishedSubProcessors()
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-200">
       <div className="max-w-3xl mx-auto px-6 py-12">
@@ -15,7 +23,7 @@ export default function PrivacyPolicy() {
           <Shield className="w-8 h-8 text-brand-400 flex-shrink-0" />
           <div>
             <h1 className="text-3xl font-bold text-white">Privacy Policy</h1>
-            <p className="text-sm text-zinc-500 mt-0.5">CineForge — last updated August 2026</p>
+            <p className="text-sm text-zinc-500 mt-0.5">{LEGAL.appName} — last updated {updated}</p>
           </div>
         </div>
 
@@ -23,17 +31,26 @@ export default function PrivacyPolicy() {
 
           <section>
             <h2 className="text-lg font-semibold text-white mb-3">1. Who we are</h2>
-            <p>
-              CineForge is a digital platform for film school administration operated by your educational institution.
-              Your school acts as the <strong>data controller</strong> — the organisation responsible for how your
-              personal data is collected, stored, and used. Google Firebase (operated by Google Ireland Ltd, Gordon
-              House, Barrow Street, Dublin 4, Ireland) acts as our <strong>data processor</strong>, hosting all data
-              on servers within the European Economic Area.
-            </p>
-            <p className="mt-2">
-              A Data Processing Agreement (DPA) is in place with Google under their standard Firebase Terms of Service,
-              as required by GDPR Article 28.
-            </p>
+            {/* Draft wording on controller and processor roles — for review by
+                whoever handles data protection (docs/privacy-review-notes.md) */}
+            <div className="space-y-3 text-zinc-300">
+              <p>
+                {LEGAL.appName} ({LEGAL.appDomain}) is a platform for running film schools and film and equipment
+                departments. It is provided by <strong>{provider}</strong> (“the provider”).
+              </p>
+              <ProviderDetails className="text-sm" />
+              <p>
+                <strong>When a school or other organisation uses {LEGAL.appName}</strong> for its students and staff,
+                that organisation is the <strong>data controller</strong> for their personal data: it decides what the
+                service is used for and who has access. The provider processes that data on the organisation’s behalf,
+                as its <strong>processor</strong>. This is intended to be covered by a data processing agreement between
+                the organisation and the provider.
+              </p>
+              <p>
+                <strong>For messages sent through the public contact form, and for operating this website,</strong> the
+                provider is the data controller.
+              </p>
+            </div>
           </section>
 
           <section>
@@ -105,6 +122,38 @@ export default function PrivacyPolicy() {
               <li><strong>Other students</strong> — can see your name and profile photo; room bookings show your first name on the public display</li>
               <li><strong>Google Firebase</strong> — processes data as our infrastructure provider; does not use it for advertising</li>
             </ul>
+            {/* Only sub-processors marked verified in src/config/legal.ts are listed */}
+            {subProcessors.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-base font-semibold text-white mb-2">Sub-processors</h3>
+                <p className="text-zinc-300 mb-3">
+                  The provider uses these companies to run {LEGAL.appName}. The list may change; customers will be
+                  informed of changes.
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th scope="col" className="text-left py-2 pr-4 font-semibold text-zinc-300">Company / service</th>
+                        <th scope="col" className="text-left py-2 pr-4 font-semibold text-zinc-300">Purpose</th>
+                        <th scope="col" className="text-left py-2 pr-4 font-semibold text-zinc-300">Processing location</th>
+                        <th scope="col" className="text-left py-2 font-semibold text-zinc-300">Safeguard if data leaves the EEA</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-zinc-400 divide-y divide-white/5">
+                      {subProcessors.map(p => (
+                        <tr key={p.name}>
+                          <td className="py-2 pr-4 text-zinc-300">{p.name}</td>
+                          <td className="py-2 pr-4">{p.purpose}</td>
+                          <td className="py-2 pr-4">{p.location}</td>
+                          <td className="py-2">{p.safeguard}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </section>
 
           <section>
@@ -154,12 +203,15 @@ export default function PrivacyPolicy() {
 
           <section>
             <h2 className="text-lg font-semibold text-white mb-3">9. Contact and complaints</h2>
+            {/* Draft wording — for review (docs/privacy-review-notes.md) */}
             <p className="text-zinc-300">
-              For questions or requests about your personal data, contact your school administrator.
+              <strong>Students and staff:</strong> for questions or requests about your personal data, contact your
+              school’s or organisation’s administrator first. They are responsible for your data in {LEGAL.appName}.
             </p>
             {privacyEmail && (
               <p className="mt-2 text-zinc-300">
-                For questions about the contact form or about {LEGAL.appName} as a service, email{' '}
+                <strong>Contact form and this website:</strong> for questions about messages sent through the contact
+                form or about this website, email {provider} at{' '}
                 <a href={`mailto:${privacyEmail}`} className="text-brand-400 hover:underline">{privacyEmail}</a>.
               </p>
             )}
@@ -181,7 +233,7 @@ export default function PrivacyPolicy() {
         </div>
 
         <div className="mt-12 pt-6 border-t border-white/10 flex items-center justify-between text-xs text-zinc-500">
-          <span>CineForge · GDPR-compliant data handling</span>
+          <span>{LEGAL.appName} · {provider} · last updated {updated}</span>
           <Link to="/login" className="text-brand-400 hover:underline">Back to login</Link>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import { existsSync, readFileSync } from 'fs'
+import { LEGAL } from './src/config/legal'
 
 // scripts/gen-build-id.mjs writes this before `vite build` runs (see
 // firebase.json predeploy) so the id embedded here matches the one later
@@ -9,10 +10,21 @@ import { existsSync, readFileSync } from 'fs'
 // timestamp for local dev, where that predeploy step never runs.
 const buildId = existsSync('.build-id') ? readFileSync('.build-id', 'utf-8').trim() : new Date().toISOString()
 
-// Static pages that need this build's Firebase config. They live in
-// firebase-templates/ with %VITE_*% placeholders, filled from the mode's env
-// (.env for production, .env.eu for --mode eu) and served at the site root.
-const FIREBASE_TEMPLATES = ['firebase-messaging-sw.js', 'display.html']
+// Static files that differ per build. They live in firebase-templates/ with
+// %VITE_*% placeholders, filled from the mode's env (.env for production,
+// .env.eu for --mode eu), and %APP_NAME% from src/config/legal.ts; served at
+// the site root as real files, so the ** -> index.html rewrite never hides them.
+// manifest.webmanifest is served at both paths: /manifest.json is what
+// installed apps already point at.
+const FIREBASE_TEMPLATES: { file: string; from?: string; type: string }[] = [
+  { file: 'firebase-messaging-sw.js', type: 'text/javascript' },
+  { file: 'display.html',             type: 'text/html' },
+  { file: 'display.js',               type: 'text/javascript' },
+  { file: 'robots.txt',               type: 'text/plain' },
+  { file: 'sitemap.xml',              type: 'application/xml' },
+  { file: 'manifest.webmanifest',     type: 'application/manifest+json' },
+  { file: 'manifest.json', from: 'manifest.webmanifest', type: 'application/manifest+json' },
+]
 
 function firebaseTemplates(): Plugin {
   let env: Record<string, string> = {}
@@ -22,21 +34,24 @@ function firebaseTemplates(): Plugin {
         if (!env[key]) throw new Error(`${file}: ${key} is not set for this mode`)
         return env[key]
       })
+      .replace(/%APP_NAME%/g, LEGAL.appName)
   return {
     name: 'firebase-templates',
     configResolved(config) {
       env = loadEnv(config.mode, config.envDir || process.cwd(), 'VITE_')
     },
+    // index.html: the app name from src/config/legal.ts
+    transformIndexHtml: html => html.replace(/%APP_NAME%/g, LEGAL.appName),
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        const file = FIREBASE_TEMPLATES.find(f => req.url?.split('?')[0] === `/${f}`)
-        if (!file) return next()
-        res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : 'text/html')
-        res.end(render(file))
+        const t = FIREBASE_TEMPLATES.find(f => req.url?.split('?')[0] === `/${f.file}`)
+        if (!t) return next()
+        res.setHeader('Content-Type', t.type)
+        res.end(render(t.from ?? t.file))
       })
     },
     generateBundle() {
-      for (const file of FIREBASE_TEMPLATES) this.emitFile({ type: 'asset', fileName: file, source: render(file) })
+      for (const t of FIREBASE_TEMPLATES) this.emitFile({ type: 'asset', fileName: t.file, source: render(t.from ?? t.file) })
     },
   }
 }

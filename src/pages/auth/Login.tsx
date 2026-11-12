@@ -12,6 +12,8 @@ import { useSchool } from '@/contexts/SchoolContext'
 import LegalFooter from '@/components/LegalFooter'
 import firePng from '@/assets/fire.png'
 import { usePublicConfig } from '@/lib/publicConfig'
+import { usePageMeta } from '@/lib/pageMeta'
+import { LEGAL } from '@/config/legal'
 import { publicShopOpen } from '@/lib/features'
 import { readableTextOn } from '@/lib/contrast'
 
@@ -23,6 +25,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export default function Login() {
+  usePageMeta(`${LEGAL.appName} · Sign in`, `Sign in to ${LEGAL.appName}, the platform for film school classes, productions and equipment booking.`)
   const { signIn, user, role, loading } = useAuth()
   const { shortName, modules, productType, publicShop } = useSchool()
   const shopOpen = publicShopOpen({ modules, productType, publicShop })

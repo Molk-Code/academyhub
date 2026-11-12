@@ -10,7 +10,7 @@ import { legal, isPlaceholder, type LegalConfig } from '@/config/legal'
 export type FrontDoor = 'academy' | 'rental_inventory' | 'production'
 
 export type PublicLegal = Partial<Pick<LegalConfig,
-  'providerName' | 'orgNumber' | 'streetAddress' | 'postalCode' | 'city' | 'country' | 'contactEmail' | 'privacyContactEmail'>>
+  'providerName' | 'orgNumber' | 'streetAddress' | 'postalCode' | 'city' | 'country' | 'contactEmail' | 'privacyContactEmail' | 'vatNumber'>>
 
 export interface PublicConfig {
   name?: string

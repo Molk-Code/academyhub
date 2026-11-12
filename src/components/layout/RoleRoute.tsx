@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { UserRole } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import { useNoIndex } from '@/lib/pageMeta'
 
 interface Props {
   role: UserRole | UserRole[]
@@ -12,6 +13,7 @@ interface Props {
 
 export default function RoleRoute({ role, children, skeleton }: Props) {
   const { user, role: userRole, roles: userRoles, loading, refreshToken } = useAuth()
+  useNoIndex()   // signed-in screens are never indexed
 
   // If authenticated but role still null after 6 s, force a token refresh
   // (handles race where Cloud Function sets claims after initial token fetch)

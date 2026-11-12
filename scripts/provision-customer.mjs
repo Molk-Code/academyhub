@@ -83,6 +83,8 @@ VITE_RECAPTCHA_V3_SITE_KEY=
 
 VITE_SCHOOL_ID=${customerId}
 VITE_FUNCTIONS_REGION=${region}
+# Public site address: robots.txt and sitemap.xml
+VITE_SITE_URL=${appUrl}
 `)
 
 if (project) {

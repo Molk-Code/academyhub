@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>%VITE_SITE_URL%/login</loc></url>
+  <url><loc>%VITE_SITE_URL%/contact</loc></url>
+  <url><loc>%VITE_SITE_URL%/privacy</loc></url>
+</urlset>

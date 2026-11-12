@@ -1,0 +1,8 @@
+# Only the public pages are for search engines; everything else needs a sign-in
+User-agent: *
+Allow: /login
+Allow: /contact
+Allow: /privacy
+Disallow: /
+
+Sitemap: %VITE_SITE_URL%/sitemap.xml

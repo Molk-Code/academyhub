@@ -260,7 +260,7 @@ export default function TeacherLayout() {
     <div className="p-3 border-t space-y-1" style={{ borderColor: 'var(--border)' }}>
       {canSwitchToAdmin && (
         <button
-          onClick={() => { navigate('/admin/users'); onNavigate?.() }}
+          onClick={() => { navigate('/admin/dashboard'); onNavigate?.() }}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-zinc-400 hover:text-zinc-100 hover:bg-white/5 transition-all"
         >
           <ArrowLeftRight className="w-4 h-4" />

@@ -221,7 +221,7 @@ export default function AcceptInvite() {
       }
       setDone(true)
       setTimeout(() => {
-        if (role === 'admin')        navigate('/admin/users')
+        if (role === 'admin')        navigate('/admin/dashboard')
         else if (role === 'teacher') navigate('/teacher')
         else                         navigate('/dashboard')
       }, 1500)

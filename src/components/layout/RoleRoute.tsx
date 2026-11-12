@@ -33,7 +33,7 @@ export default function RoleRoute({ role, children, skeleton }: Props) {
   const hasAccess = allowed.includes(userRole) || userRoles.some(r => allowed.includes(r as UserRole))
   if (!hasAccess) {
     if (userRoles.includes('teacher') || userRole === 'teacher') return <Navigate to="/teacher"     replace />
-    if (userRoles.includes('admin')   || userRole === 'admin')   return <Navigate to="/admin/users" replace />
+    if (userRoles.includes('admin')   || userRole === 'admin')   return <Navigate to="/admin/dashboard" replace />
     return <Navigate to="/dashboard" replace />
   }
 

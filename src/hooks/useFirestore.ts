@@ -26,6 +26,7 @@ export function useCollection<T extends { id: string }>(
   const [data,    setData]    = useState<T[]>([])
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState<Error | null>(null)
+  const [attempt, setAttempt] = useState(0)
 
   // A collection of a module the school has switched off: the rules would
   // refuse the query, so don't send it (legacy schools: always allowed)
@@ -56,9 +57,12 @@ export function useCollection<T extends { id: string }>(
 
     return unsub
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collectionPath, enabled, queryKey, allowed])
+  }, [collectionPath, enabled, queryKey, allowed, attempt])
 
-  return { data, loading, error }
+  /** Resubscribe after an error (e.g. a "Try again" button) */
+  const retry = () => { setError(null); setLoading(true); setAttempt(a => a + 1) }
+
+  return { data, loading, error, retry }
 }
 
 // ─── Generic realtime single document hook ───────────────────────────────────

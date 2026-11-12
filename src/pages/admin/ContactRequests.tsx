@@ -6,6 +6,8 @@ import { Inbox, Scale, Reply, Trash2, Circle, CheckCircle2, Ban, Lock, Building2
 import { formatDistanceToNow, format } from 'date-fns'
 import { LEGAL } from '@/config/legal'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import ErrorState from '@/components/common/ErrorState'
+import EmptyState from '@/components/common/EmptyState'
 
 type Status = 'new' | 'answered' | 'spam' | 'legal-hold'
 type Category = 'school_enquiry' | 'support' | 'legal'
@@ -117,7 +119,7 @@ function RequestDetail({ r, onDeleted }: { r: ContactRequestDoc; onDeleted: () =
 }
 
 export default function ContactRequests() {
-  const { data, loading } = useCollection<ContactRequestDoc>('contact_requests', [orderBy('createdAt', 'desc')])
+  const { data, loading, error, retry } = useCollection<ContactRequestDoc>('contact_requests', [orderBy('createdAt', 'desc')])
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   // Legal requests first, then newest first (the query's order)
@@ -139,8 +141,10 @@ export default function ContactRequests() {
         </div>
       </div>
 
-      {requests.length === 0 ? (
-        <p className="text-sm text-zinc-500 card p-6 text-center">No contact requests yet.</p>
+      {error ? (
+        <ErrorState error={error} what="contact requests" onRetry={retry} />
+      ) : requests.length === 0 ? (
+        <EmptyState icon={Inbox} title="No contact requests yet" description="Messages sent from the contact form on the login page will appear here." />
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
           <ul className="space-y-2">

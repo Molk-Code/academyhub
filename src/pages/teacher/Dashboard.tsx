@@ -14,6 +14,7 @@ import Avatar from '@/components/common/Avatar'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import EmptyState from '@/components/common/EmptyState'
 
 function AttendanceCount({ lessonId }: { lessonId: string }) {
   const [count, setCount] = useState(0)
@@ -419,7 +420,7 @@ export default function TeacherDashboard() {
               </Link>
             ))}
             {upcomingLessons.length === 0 && (
-              <p className="text-sm text-zinc-500 text-center py-8">No upcoming lessons scheduled.</p>
+              <EmptyState compact title="No upcoming lessons" description="Lessons you schedule show up here." actionLabel="Open the calendar" actionTo="/teacher/lessons" />
             )}
           </div>
         </div>
@@ -455,7 +456,7 @@ export default function TeacherDashboard() {
             )
           })}
           {upcomingAssignments.length === 0 && (
-            <p className="text-sm text-zinc-500 text-center py-8">No upcoming assignments.</p>
+            <EmptyState compact title="No upcoming assignments" description="Published assignments with a due date show up here." actionLabel="Create an assignment" actionTo="/teacher/assignments" />
           )}
         </div>
       </div>

@@ -312,7 +312,7 @@ function DashboardTodoWidget({ uid, rawTodos }: { uid: string; rawTodos: TodoDoc
 
       {/* Task list */}
       {visible.length === 0 && !adding ? (
-        <p className="text-sm text-zinc-500 text-center py-4">No tasks yet.</p>
+        <EmptyState compact title="No tasks yet" description="Add one to keep track of what's next." actionLabel="Add a task" onAction={() => setAdding(true)} />
       ) : (
         <div className="space-y-2">
           {visible.map(t => {

@@ -54,7 +54,7 @@ function PointsHistorySection({ uid }: { uid: string }) {
   const totalPages = Math.ceil(log.length / PAGE_SIZE)
   const visible = log.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
-  if (!log.length) return <p className="text-sm text-zinc-400">No points history yet.</p>
+  if (!log.length) return <p className="text-sm text-zinc-400" role="status">No points yet — you earn them by attending lessons and handing in assignments.</p>
 
   return (
     <div className="space-y-2">

@@ -11,6 +11,8 @@ export default function LoadingSpinner({ fullScreen, size = 'md', className }: P
 
   const spinner = (
     <div
+      role="status"
+      aria-label="Loading"
       className={cn(
         'rounded-full border-2 border-zinc-700 border-t-brand-500 animate-spin',
         sizes[size],

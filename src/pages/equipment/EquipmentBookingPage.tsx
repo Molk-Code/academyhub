@@ -1106,8 +1106,11 @@ export default function EquipmentBookingPage() {
             {filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <span className="text-4xl block mb-3">📦</span>
-                <p className="text-zinc-300 font-semibold text-sm">No equipment found</p>
-                <p className="text-zinc-500 text-xs mt-1">Try adjusting your search or category filter.</p>
+                <p className="text-zinc-300 font-semibold text-sm">No equipment matches</p>
+                <p className="text-zinc-500 text-xs mt-1">Try another search word or category.</p>
+                {(search || category !== 'ALL') && (
+                  <button type="button" onClick={() => { setSearch(''); setCategory('ALL') }} className="mt-3 text-sm font-medium text-brand-400 hover:text-brand-300">Clear search</button>
+                )}
               </div>
             ) : (
               <div className="product-grid">
@@ -1353,7 +1356,10 @@ export default function EquipmentBookingPage() {
             <button className="back-btn" onClick={() => setView('browse')}>← Back to Equipment</button>
             <h2>My Bookings</h2>
             {myBookings.length === 0 ? (
-              <div className="no-results">You have no bookings yet.</div>
+              <div className="no-results" role="status">
+                <p>No equipment booked yet.</p>
+                <button className="primary-btn" style={{ marginTop: 12 }} onClick={() => setView('browse')}>Book your first item</button>
+              </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {myBookings.map(b => {

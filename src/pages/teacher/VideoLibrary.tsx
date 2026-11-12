@@ -115,7 +115,10 @@ export default function TeacherVideoLibrary() {
       {visible.length === 0 ? (
         <div className="text-center py-16 text-zinc-400">
           <Video className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">No videos match the current filters.</p>
+          <p className="text-sm">No videos match these filters.</p>
+          {(subjectFilter || studentFilter || statusFilter || search) && (
+            <button type="button" onClick={() => { setSubjectFilter(''); setStudentFilter(''); setStatusFilter(''); setSearch('') }} className="mt-3 text-sm font-medium text-brand-400 hover:text-brand-300">Clear filters</button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">

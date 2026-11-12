@@ -10,6 +10,7 @@ import {
   Folder, FolderOpen, ChevronRight, Search, ClipboardList, BookOpen, FolderPlus,
 } from 'lucide-react'
 import { clickable, clickableRow } from '@/lib/a11y'
+import EmptyState from '@/components/common/EmptyState'
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -459,7 +460,7 @@ function LessonAssignmentResources({
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-sm text-zinc-500 py-4 text-center">No resources match your search.</p>
+        <EmptyState compact title={`No resources match “${search}”`} description="Try another word, or clear the search to see everything." actionLabel="Clear search" onAction={() => setSearch('')} />
       ) : (
         <div className="bg-zinc-900 rounded-2xl border border-white/10 overflow-hidden">
           <table className="w-full min-w-[400px]">

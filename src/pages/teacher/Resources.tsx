@@ -303,7 +303,9 @@ function ResourceSection({ cohortId, cohortLabel, allResources, folders, profile
             {folderResources.length === 0 && !editForm ? (
               <div className="bg-slate-800 rounded-2xl p-10 text-center">
                 <FolderOpen className="w-10 h-10 text-zinc-400 mx-auto mb-3" />
-                <p className="text-zinc-400 text-sm">No resources in this folder yet.</p>
+                <p className="text-zinc-300 text-sm font-medium">No resources in this folder yet</p>
+                <p className="text-zinc-400 text-xs mt-1">Add a link or upload a file for your students.</p>
+                <button type="button" onClick={() => setEditForm({ ...EMPTY_FORM, folderId: activeFolderId ?? '' })} className="mt-3 text-sm font-medium text-brand-400 hover:text-brand-300">Add a resource</button>
               </div>
             ) : (
               <div className="space-y-2">

@@ -215,7 +215,7 @@ export function BookingsTab() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="no-results">No bookings found</div>
+        <div className="no-results" role="status">No bookings in this view. Requests students send from Rental House appear here.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {filtered.map(b => {

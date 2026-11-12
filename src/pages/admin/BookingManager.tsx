@@ -96,7 +96,8 @@ export default function BookingManager() {
         {filtered.length === 0 ? (
           <div className="py-16 text-center">
             <CalendarCheck className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-            <p className="text-zinc-400 text-sm">No bookings found for this period.</p>
+            <p className="text-zinc-300 text-sm font-medium">No bookings this week</p>
+            <p className="text-zinc-400 text-xs mt-1">Students book rooms from Booking → Room Booking. Use the arrows to check other weeks.</p>
           </div>
         ) : (
           <table className="w-full">

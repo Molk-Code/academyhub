@@ -7,6 +7,8 @@ import { useCollection, useDocument, orderBy } from '@/hooks/useFirestore'
 import type { FoodBoxOrderDoc, BookingSettingsDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import EmptyState from '@/components/common/EmptyState'
+import ErrorState from '@/components/common/ErrorState'
 
 type FilterStatus = 'all' | FoodBoxOrderDoc['status']
 
@@ -342,7 +344,7 @@ function LeadDaysSetting() {
 }
 
 export default function FoodBoxOrders() {
-  const { data: orders, loading } = useCollection<FoodBoxOrderDoc>('food_box_orders', [
+  const { data: orders, loading, error: loadError, retry } = useCollection<FoodBoxOrderDoc>('food_box_orders', [
     orderBy('createdAt', 'desc'),
   ])
   const [filter, setFilter] = useState<FilterStatus>('all')
@@ -384,8 +386,14 @@ export default function FoodBoxOrders() {
         ))}
       </div>
 
-      {visible.length === 0 ? (
-        <div className="text-center py-16 text-zinc-400">No orders.</div>
+      {loadError ? (
+        <ErrorState error={loadError} what="food box orders" onRetry={retry} />
+      ) : visible.length === 0 ? (
+        <EmptyState
+          title={filter === 'all' ? 'No food box orders yet' : `No ${filter} food box orders`}
+          description={filter === 'all' ? 'Students order from Booking → Food Boxes.' : 'Nothing with this status right now.'}
+          {...(filter !== 'all' ? { actionLabel: 'Show all', onAction: () => setFilter('all') } : {})}
+        />
       ) : (
         <div className="space-y-2">
           {visible.map(order => <OrderRow key={order.id} order={order} />)}

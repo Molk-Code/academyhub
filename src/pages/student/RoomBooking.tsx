@@ -285,7 +285,8 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
         </div>
       ) : sortedRooms.length === 0 ? (
         <div className="bg-zinc-900 rounded-2xl border border-white/10 p-14 text-center">
-          <p className="text-zinc-400 text-sm">No active rooms configured.</p>
+          <p className="text-zinc-300 text-sm font-medium">No rooms are open for booking yet</p>
+          <p className="text-zinc-400 text-xs mt-1">Your school hasn't added bookable rooms. Ask a teacher if you need one.</p>
         </div>
       ) : (
         <div className="bg-zinc-900 rounded-2xl border border-white/10 overflow-x-auto">

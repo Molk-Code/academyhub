@@ -8,6 +8,8 @@ import { useCollection, orderBy } from '@/hooks/useFirestore'
 import type { MinivanBookingDoc, VehicleDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import EmptyState from '@/components/common/EmptyState'
+import ErrorState from '@/components/common/ErrorState'
 
 type FilterStatus = 'all' | MinivanBookingDoc['status']
 
@@ -374,7 +376,7 @@ function VehicleManager() {
 }
 
 export default function MinivanBookings() {
-  const { data: bookings, loading } = useCollection<MinivanBookingDoc>('minivan_bookings', [
+  const { data: bookings, loading, error: loadError, retry } = useCollection<MinivanBookingDoc>('minivan_bookings', [
     orderBy('createdAt', 'desc'),
   ])
   const [filter, setFilter] = useState<FilterStatus>('all')
@@ -416,8 +418,14 @@ export default function MinivanBookings() {
         ))}
       </div>
 
-      {visible.length === 0 ? (
-        <div className="text-center py-16 text-zinc-400">No requests.</div>
+      {loadError ? (
+        <ErrorState error={loadError} what="vehicle requests" onRetry={retry} />
+      ) : visible.length === 0 ? (
+        <EmptyState
+          title={filter === 'all' ? 'No vehicle requests yet' : `No ${filter} vehicle requests`}
+          description={filter === 'all' ? 'Students request a vehicle from Booking → Vehicles.' : 'Nothing with this status right now.'}
+          {...(filter !== 'all' ? { actionLabel: 'Show all', onAction: () => setFilter('all') } : {})}
+        />
       ) : (
         <div className="space-y-2">
           {visible.map(b => <BookingRow key={b.id} b={b} />)}

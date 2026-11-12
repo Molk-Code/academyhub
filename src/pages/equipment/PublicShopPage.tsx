@@ -6,6 +6,7 @@ import { db } from '@/lib/firebase'
 import { SCHOOL_ID } from '@/lib/school'
 import type { EquipmentDoc, EquipmentCategoryDoc } from '@/types'
 import { ShoppingCart, X, Plus, Minus, Package, ChevronRight, CheckCircle2, Search } from 'lucide-react'
+import EmptyState from '@/components/common/EmptyState'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -495,10 +496,12 @@ export default function PublicShopPage() {
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20 text-zinc-500">
-            <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>No equipment found</p>
-          </div>
+          <EmptyState
+            icon={Package}
+            title={searchQuery || selectedCategory !== 'all' ? 'No equipment matches' : 'Nothing available to rent right now'}
+            description={searchQuery || selectedCategory !== 'all' ? 'Try another search word or category.' : 'Check back soon, or contact us about what you need.'}
+            {...(searchQuery || selectedCategory !== 'all' ? { actionLabel: 'Clear search', onAction: () => { setSearchQuery(''); setSelectedCategory('all') } } : {})}
+          />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {filtered.map(item => {

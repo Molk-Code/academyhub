@@ -12,6 +12,8 @@ import type { UserDoc, CohortDoc, ProgressDoc, LessonDoc, AbsenceReportDoc } fro
 import Avatar from '@/components/common/Avatar'
 import XPBar from '@/components/dashboard/XPBar'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import EmptyState from '@/components/common/EmptyState'
+import ErrorState from '@/components/common/ErrorState'
 
 interface AddAbsenceState {
   student: UserDoc
@@ -37,7 +39,7 @@ export default function Students() {
   const [attendanceMap, setAttendanceMap] = useState<Record<string, Set<string>>>({})
 
   const { data: cohorts } = useCollection<CohortDoc>('cohorts')
-  const { data: students, loading } = useCollection<UserDoc>('users', [where('role', '==', 'student')])
+  const { data: students, loading, error: studentsError, retry: retryStudents } = useCollection<UserDoc>('users', [where('role', '==', 'student')])
   const { data: progressDocs } = useCollection<ProgressDoc & { id: string }>('progress')
   const { data: allLessons } = useCollection<LessonDoc>('lessons')
   const { data: absenceReports } = useCollection<AbsenceReportDoc>('absence_reports', [orderBy('reportedAt', 'desc')])
@@ -390,8 +392,11 @@ export default function Students() {
                 </Link>
               )
             })}
-            {filtered.length === 0 && (
-              <p className="col-span-2 text-center text-zinc-400 text-sm py-12">No students found.</p>
+            {studentsError && <div className="col-span-2"><ErrorState compact error={studentsError} what="your students" onRetry={retryStudents} /></div>}
+            {!studentsError && filtered.length === 0 && (
+              <EmptyState compact className="col-span-2" title={search || selectedCohort ? 'No students match' : 'No students in your classes yet'}
+                description={search || selectedCohort ? 'Try another name or class.' : 'Students appear here once an admin adds them to your class or they join with a class invite.'}
+                {...(search || selectedCohort ? { actionLabel: 'Clear search', onAction: () => { setSearch(''); setSelectedCohort('') } } : {})} />
             )}
           </div>
 
@@ -481,8 +486,11 @@ export default function Students() {
                 })}
               </tbody>
             </table>
-            {filtered.length === 0 && (
-              <p className="text-center text-zinc-400 text-sm py-12">No students found.</p>
+            {studentsError && <ErrorState compact error={studentsError} what="your students" onRetry={retryStudents} />}
+            {!studentsError && filtered.length === 0 && (
+              <EmptyState compact title={search || selectedCohort ? 'No students match' : 'No students in your classes yet'}
+                description={search || selectedCohort ? 'Try another name or class.' : 'Students appear here once an admin adds them to your class or they join with a class invite.'}
+                {...(search || selectedCohort ? { actionLabel: 'Clear search', onAction: () => { setSearch(''); setSelectedCohort('') } } : {})} />
             )}
           </div>
         </>

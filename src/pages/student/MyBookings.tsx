@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import EmptyState from '@/components/common/EmptyState'
+import { Link, useLocation } from 'react-router-dom'
 import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -619,10 +620,19 @@ export default function MyBookings() {
       </div>
 
       {nothingToShow ? (
-        <div className="text-center py-16 text-zinc-500">
-          <RotateCcw className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">Nothing booked yet.</p>
-        </div>
+        <EmptyState
+          icon={RotateCcw}
+          title="Nothing booked yet"
+          description="Your equipment, rooms, food boxes and vehicle requests will show up here."
+          action={
+            <div className="flex flex-wrap justify-center gap-2">
+              {showEquipment && <Link to={navRole === 'teacher' ? '/teacher/booking/equipment' : '/booking/equipment'} className="btn-primary text-sm">Book equipment</Link>}
+              {showRooms     && <Link to={navRole === 'teacher' ? '/teacher/room-bookings' : '/booking'} className="btn-secondary text-sm">Book a room</Link>}
+              {showFoodBox && navRole === 'student'  && <Link to="/food-boxes" className="btn-secondary text-sm">Order a food box</Link>}
+              {showVehicles && navRole === 'student' && <Link to="/vehicles" className="btn-secondary text-sm">Request a vehicle</Link>}
+            </div>
+          }
+        />
       ) : (
         <>
           {showEquipment && <BookingRequestsSection bookings={bookingRequests} />}

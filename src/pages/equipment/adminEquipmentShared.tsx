@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect, useId } from 'react'
 import { uploadFile, optimizeImageUrl } from '@/lib/cloudinary'
 import { shrinkImageToLimit } from '@/lib/imageCompress'
 import type { EquipmentCategoryDoc, EquipmentDoc } from '@/types'
@@ -41,6 +41,93 @@ export function catStyle(name: string, cats: EquipmentCategoryDoc[]): React.CSSP
   const found = cats.find(c => c.name === name)
   const c = catColors(found?.color ?? 'zinc')
   return { color: c.text, background: c.bg, border: `1px solid ${c.border}` }
+}
+
+// Category picker that shows every category in its colour. A native <select>
+// can't: macOS draws its option list itself and ignores option colours.
+export function CategorySelect({ value, categories, onChange, labelId }: {
+  value: string; categories: EquipmentCategoryDoc[]; onChange: (name: string) => void; labelId?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(0)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const listId = useId()
+  const selected = categories.find(c => c.name === value)
+
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent) => { if (!rootRef.current?.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', close)
+    listRef.current?.focus()
+    return () => document.removeEventListener('mousedown', close)
+  }, [open])
+
+  function show() {
+    setActive(Math.max(0, categories.findIndex(c => c.name === value)))
+    setOpen(true)
+  }
+  function pick(i: number) {
+    const c = categories[i]
+    if (c) onChange(c.name)
+    setOpen(false)
+    buttonRef.current?.focus()
+  }
+  function onListKey(e: React.KeyboardEvent) {
+    const last = categories.length - 1
+    const keys: Record<string, () => void> = {
+      ArrowDown: () => setActive(a => Math.min(last, a + 1)),
+      ArrowUp:   () => setActive(a => Math.max(0, a - 1)),
+      Home:      () => setActive(0),
+      End:       () => setActive(last),
+      Enter:     () => pick(active),
+      ' ':       () => pick(active),
+      Escape:    () => { setOpen(false); buttonRef.current?.focus() },
+      Tab:       () => setOpen(false),
+    }
+    if (!keys[e.key]) return
+    if (e.key !== 'Tab') e.preventDefault()
+    keys[e.key]()
+  }
+
+  const chip = (c: EquipmentCategoryDoc | undefined): React.CSSProperties => {
+    const col = catColors(c?.color ?? 'zinc')
+    return { color: col.text, background: col.bg, border: `1px solid ${col.border}` }
+  }
+
+  return (
+    <div ref={rootRef} style={{ position: 'relative' }}>
+      <button
+        ref={buttonRef} type="button" aria-haspopup="listbox" aria-expanded={open} aria-controls={listId}
+        aria-labelledby={labelId}
+        onClick={() => (open ? setOpen(false) : show())}
+        onKeyDown={e => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); show() } }}
+        style={{ ...inp, ...chip(selected), fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}
+      >
+        <span>{value || 'Choose category'}</span>
+        <span aria-hidden="true" style={{ fontSize: '.7rem', opacity: .8 }}>▾</span>
+      </button>
+      {open && (
+        <ul
+          ref={listRef} id={listId} role="listbox" tabIndex={-1} aria-labelledby={labelId}
+          aria-activedescendant={`${listId}-${active}`} onKeyDown={onListKey}
+          style={{ position: 'absolute', zIndex: 20, top: 'calc(100% + 4px)', left: 0, right: 0, margin: 0, padding: 6, listStyle: 'none', background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.5)', maxHeight: 280, overflowY: 'auto', outline: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}
+        >
+          {categories.map((c, i) => (
+            <li
+              key={c.name} id={`${listId}-${i}`} role="option" aria-selected={c.name === value}
+              onMouseEnter={() => setActive(i)} onMouseDown={e => e.preventDefault()} onClick={() => pick(i)}
+              style={{ ...chip(c), padding: '7px 10px', borderRadius: 8, fontSize: '.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', outline: i === active ? '2px solid #f0f0f5' : 'none', outlineOffset: -2 }}
+            >
+              {c.name}
+              {c.name === value && <span aria-hidden="true">✓</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
 }
 
 export const BOOKING_STATUSES = ['all', 'pending', 'confirmed', 'checked-out', 'returned', 'denied', 'cancelled'] as const

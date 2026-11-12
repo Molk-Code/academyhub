@@ -7,7 +7,7 @@ import type { EquipmentDoc, EquipmentCategory, EquipmentCategoryDoc, CohortDoc }
 import {
   Package, X, Check, AlertTriangle, Loader2, Upload, ToggleRight, ToggleLeft, ChevronLeft, ChevronRight,
 } from 'lucide-react'
-import { uploadEquipmentImage, inp, catColors, catStyle } from './adminEquipmentShared'
+import { uploadEquipmentImage, inp, CategorySelect } from './adminEquipmentShared'
 import { equipmentImages } from './ImageGallery'
 
 interface FormState {
@@ -160,11 +160,10 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
               <input style={inp} value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Sony FX3" />
             </div>
             <div>
-              <label style={lbl}>Category</label>
+              <label id="item-category-label" style={lbl}>Category</label>
               {/* Shown in the category's colour, so a wrong pick stands out before saving */}
-              <select style={{ ...inp, ...catStyle(form.category, categories), fontWeight: 700 }} value={form.category} onChange={e => set('category', e.target.value as EquipmentCategory)}>
-                {categories.map(c => <option key={c.name} value={c.name} style={{ background: '#0e0e16', color: catColors(c.color).text }}>{c.name}</option>)}
-              </select>
+              <CategorySelect labelId="item-category-label" value={form.category} categories={categories}
+                onChange={name => set('category', name as EquipmentCategory)} />
             </div>
           </div>
 

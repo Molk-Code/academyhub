@@ -548,23 +548,31 @@ export function ProjectDetail({
       <div className="project-detail-header">
         <div style={{ flex: 1 }}>
           {editing ? (
-            <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.5rem' }}>
-              <input
-                className="manual-add-input"
-                value={editName}
-                onChange={e => setEditName(e.target.value)}
-                style={{ flex: 1 }}
-                placeholder="Project name"
-              />
-              <input
-                className="manual-add-input"
-                type="date"
-                value={editReturn}
-                onChange={e => setEditReturn(e.target.value)}
-                style={{ width: 160 }}
-              />
-              <button className="manual-add-btn" onClick={saveEdit}>Save</button>
-              <button className="secondary-btn" style={{ padding: '.4rem .8rem' }} onClick={() => setEditing(false)}>Cancel</button>
+            // Fields wrap onto their own lines on a phone instead of squeezing the date
+            <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '.5rem' }}>
+              <label style={{ flex: '2 1 220px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, fontSize: '.75rem', color: '#8a8aab', fontWeight: 600 }}>
+                Project name
+                <input
+                  className="manual-add-input"
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
+              </label>
+              <label style={{ flex: '1 1 160px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, fontSize: '.75rem', color: '#8a8aab', fontWeight: 600 }}>
+                Return date
+                <input
+                  className="manual-add-input"
+                  type="date"
+                  value={editReturn}
+                  onChange={e => setEditReturn(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', minHeight: 40 }}
+                />
+              </label>
+              <div style={{ display: 'flex', gap: '.5rem', flexBasis: '100%' }}>
+                <button className="manual-add-btn" onClick={saveEdit}>Save</button>
+                <button className="secondary-btn" style={{ padding: '.4rem .8rem' }} onClick={() => setEditing(false)}>Cancel</button>
+              </div>
             </div>
           ) : (
             <>

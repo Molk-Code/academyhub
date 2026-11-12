@@ -13,6 +13,7 @@ school. Nothing here is legal advice.
 | Section 1 "Who we are" | Rewritten. Names the provider. The school or organisation is the **controller** for its users' data, and the provider is its **processor**. The provider is controller for contact-form messages and for running the website. |
 | Section 1 | **Removed:** "A Data Processing Agreement (DPA) is in place with Google under their standard Firebase Terms of Service". See 2.1. |
 | Section 1 | **Removed:** "Google Firebase … hosting all data on servers within the European Economic Area". The database, functions and file storage are in the EU (checked), but Authentication, Hosting, Cloud Messaging and Performance Monitoring are not confirmed (see 3). |
+| Section 4 "How long we keep your data" | **Rewritten** (12 Nov) to match what the app does: the organisation decides; optional automatic deletion of former students (Class Manager → "Delete former students' data", off by default); an organisation's data deleted within 90 days after its agreement ends; backups 30 days (lifecycle rule on `gs://cineforge-eu-backups`). The old "1 year after course end" rows were not carried out by the app. The "Deletion logs: 5 years (legal obligation)" row is replaced: no legal obligation was identified. |
 | Section 5 | New "Sub-processors" table. It shows only entries marked `verified: true` in `legal.ts`. **All are unverified, so no table is shown yet.** |
 | Section 9 "Contact" | Students and staff contact their organisation's administrator first. The provider is contacted via `privacyContactEmail` for contact-form messages and the website; that line is hidden until the address is set. The IMY paragraph is unchanged. |
 | Footer | "GDPR-compliant data handling" replaced with "CineForge · Fredrik Fridlund Cinematography AB · last updated …". |
@@ -54,6 +55,17 @@ school. Nothing here is legal advice.
      (`src/pages/*/Resources.tsx`).
    - SharePoint and OneDrive through Microsoft Graph, in the school's own Microsoft 365
      tenant (`src/lib/graphApi.ts`). The school is already Microsoft's customer for this.
+
+7. **Deletion within 90 days after an agreement ends** is a manual step for the provider
+   at offboarding (export on request, then delete the organisation's data; backups expire
+   after 30 days by themselves). Put the same 90 days in the data processing agreement.
+8. **Deletion records** (`deletion_log`: account id, who deleted it, date, method) have no
+   end date. Decide how long to keep them; the policy says only "kept as proof that the
+   deletion was carried out".
+9. **Automatic deletion of former students** is the school's choice (it is the
+   controller). It's off by default, starts in test-run mode, and erases a student the
+   same way as "delete my account". Schools should note their chosen period in their own
+   records of processing.
 
 ## 3. Sub-processors: how to verify each one
 

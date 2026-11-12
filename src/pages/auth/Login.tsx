@@ -13,6 +13,7 @@ import LegalFooter from '@/components/LegalFooter'
 import firePng from '@/assets/fire.png'
 import { usePublicConfig } from '@/lib/publicConfig'
 import { usePageMeta } from '@/lib/pageMeta'
+import { MODULE_INFO } from '@/config/modules'
 import { LEGAL } from '@/config/legal'
 import { publicShopOpen } from '@/lib/features'
 import { readableTextOn } from '@/lib/contrast'
@@ -122,7 +123,12 @@ export default function Login() {
           <div className={`flex flex-col items-center mb-8 transition-opacity ${profileLoading ? 'opacity-0' : 'opacity-100'}`}>
             <img src={profile?.logoUrl || firePng} alt={displayName} className="w-14 h-14 object-contain mb-3" />
             <h1 className="text-2xl font-bold text-zinc-100">{displayName}</h1>
-            <p className="text-sm text-zinc-500 mt-1">{profile?.tagline || 'Filmmaking Education Platform'}</p>
+            {/* The profile's own tagline, else the one for its front door; none
+                without a profile, rather than film-school wording for every customer */}
+            {(() => {
+              const tagline = profile?.tagline || (profile?.frontDoor ? MODULE_INFO[profile.frontDoor].loginTagline : '')
+              return tagline ? <p className="text-sm text-zinc-500 mt-1">{tagline}</p> : null
+            })()}
           </div>
 
           {!showForgotPw ? (

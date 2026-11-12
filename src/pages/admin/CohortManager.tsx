@@ -11,6 +11,7 @@ import { useCollection, useDocument, where } from '@/hooks/useFirestore'
 import { useCohorts } from '@/lib/queries'
 import RolloverDialog from '@/components/admin/RolloverDialog'
 import CopyPlanDialog from '@/components/calendar/CopyPlanDialog'
+import RetentionSettings from '@/components/admin/RetentionSettings'
 import type { CohortDoc, UserDoc, SemesterSettingsDoc } from '@/types'
 import { shortDate } from '@/lib/utils'
 import { Users, Plus, GraduationCap, Sparkles, CalendarCheck, Archive, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react'
@@ -248,6 +249,8 @@ export default function CohortManager() {
           )}
         </section>
       )}
+
+      <RetentionSettings />
     </div>
   )
 }

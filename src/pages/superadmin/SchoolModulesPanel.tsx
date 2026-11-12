@@ -204,7 +204,8 @@ export default function SchoolModulesPanel({ school }: { school: SchoolDoc }) {
             </div>
             <div className="sm:col-span-2">
               <label className="label">Tagline</label>
-              <input className="input w-full" maxLength={120} value={profile.tagline} onChange={e => setProfileField('tagline', e.target.value)} placeholder="Filmmaking Education Platform" />
+              <input className="input w-full" maxLength={120} value={profile.tagline} onChange={e => setProfileField('tagline', e.target.value)}
+                placeholder={profile.frontDoor ? `${MODULE_INFO[profile.frontDoor as keyof typeof MODULE_INFO].loginTagline} (default for this front door)` : 'None shown without a front door'} />
             </div>
             <div>
               <label className="label">Accent colour</label>

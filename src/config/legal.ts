@@ -23,6 +23,10 @@ export interface LegalConfig {
   appDomain: string
   /** Keep equal to CONTACT_RETENTION_MONTHS in functions/src/contact.ts */
   contactRetentionMonths: number
+  /** An organisation's data is deleted within this many days after its agreement ends */
+  deleteAfterAgreementEndsDays: number
+  /** Daily backups are deleted after this many days (lifecycle rule on the backup bucket) */
+  backupRetentionDays: number
   /** Date shown as "last updated" on the privacy policy (YYYY-MM-DD) */
   privacyPolicyUpdated: string
   subProcessors: SubProcessor[]
@@ -57,6 +61,9 @@ export const LEGAL: LegalConfig = {
   appName:             'CineForge',
   appDomain:           'cineforge.se',
   contactRetentionMonths: 12,
+  deleteAfterAgreementEndsDays: 90,
+  // gs://cineforge-eu-backups has a lifecycle rule deleting objects after 30 days
+  backupRetentionDays: 30,
   privacyPolicyUpdated: '2026-11-12',
   subProcessors: [
     // Locations below were read from the cineforge-eu project on 2026-11-12:

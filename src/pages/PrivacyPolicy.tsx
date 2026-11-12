@@ -82,25 +82,31 @@ export default function PrivacyPolicy() {
 
           <section>
             <h2 className="text-lg font-semibold text-white mb-3">4. How long we keep your data</h2>
+            {/* Draft — for review (docs/privacy-review-notes.md). Describes what
+                the app actually does; the organisation decides for its users. */}
+            <p className="text-zinc-300 mb-3">
+              Your school or organisation decides how long its students’ and staff’s data is kept. It can delete
+              accounts at any time, and it can choose to have former students’ data deleted automatically a set time
+              after their class ends. You can delete your own account from your profile at any time.
+            </p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-white/10">
-                    <th className="text-left py-2 pr-6 font-semibold text-zinc-300">Data type</th>
-                    <th className="text-left py-2 font-semibold text-zinc-300">Retention period</th>
+                    <th scope="col" className="text-left py-2 pr-6 font-semibold text-zinc-300">Data</th>
+                    <th scope="col" className="text-left py-2 font-semibold text-zinc-300">How long it is kept</th>
                   </tr>
                 </thead>
                 <tbody className="text-zinc-400 divide-y divide-white/5">
                   {[
-                    ['Account profile', '1 year after course end'],
-                    ['Attendance records', '1 year after course end'],
-                    ['Assignment submissions & grades', '1 year after course end'],
-                    ['Chat messages', '1 year after course end'],
-                    ['Room bookings', '1 year after course end'],
-                    ['Points log', '1 year after course end'],
-                    ['Development plans (NOPRA)', '1 year after course end'],
-                    ['Push notification tokens', 'Cleaned automatically when device is no longer active'],
-                    ['Deletion logs', '5 years (legal obligation)'],
+                    ['Account, attendance, assignments and grades, bookings, points, development plans',
+                      'While your organisation uses ' + LEGAL.appName + ' and decides to keep it, or until the account is deleted'],
+                    ['Chat messages', 'For the period your organisation sets (until deleted, if it sets none)'],
+                    ['Former students (in a class that has ended)', 'Deleted automatically after the period your organisation sets, if it has turned this on'],
+                    ['Push notification tokens', 'Removed when you sign out or the device stops accepting notifications'],
+                    ['All data of an organisation that stops using ' + LEGAL.appName, `Deleted within ${LEGAL.deleteAfterAgreementEndsDays} days after the agreement ends, unless the organisation first asks for a copy`],
+                    ['Backups', `${LEGAL.backupRetentionDays} days`],
+                    ['Record that an account was deleted (account id and date only)', 'Kept as proof that the deletion was carried out'],
                     ['Contact form messages', `${contactMonths} months (longer only while on legal hold)`],
                   ].map(([type, period]) => (
                     <tr key={type}>

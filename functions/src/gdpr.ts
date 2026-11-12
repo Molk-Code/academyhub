@@ -1,4 +1,5 @@
 import { admin, functions, db, LIMITS, requireMember, withTimeout, requireAllowed, REGION } from './lib'
+import { FieldValue } from 'firebase-admin/firestore'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // dailyFirestoreBackup — export Firestore to Cloud Storage every night at 02:00 Stockholm
@@ -104,6 +105,19 @@ export const deleteUserData = functions.region(REGION).runWith(LIMITS).https.onC
     throw new functions.https.HttpsError('permission-denied', 'You may only delete your own account.')
   }
 
+  try {
+    await eraseUser(uid, { deletedBy: isAdmin ? context.auth!.uid : uid, method: isAdmin ? 'admin-panel' : 'self-service' })
+  } catch (err: any) {
+    throw new functions.https.HttpsError('internal', err?.message ?? String(err))
+  }
+  return { success: true }
+})
+
+// Erase one user: their own records deleted, attendance anonymised, removed
+// from shared chats and invites, avatar and sign-in account deleted, and the
+// erasure logged. Used by deleteUserData and by automatic retention
+// (retention.ts). Throws if the Firestore part fails.
+export async function eraseUser(uid: string, log: { deletedBy: string; method: string }): Promise<void> {
   // BulkWriter auto-chunks unlimited writes (Firestore batches cap at 500).
   const bulk = db.bulkWriter()
   let stage = 'init'
@@ -127,7 +141,7 @@ export const deleteUserData = functions.region(REGION).runWith(LIMITS).https.onC
       db.collection('bug_reports').where('uid', '==', uid),
     ]
     const snaps = await Promise.all(ownedQueries.map(q => q.get().catch(err => {
-      console.warn('deleteUserData: owned query failed', err?.message)
+      console.warn('eraseUser: owned query failed', err?.message)
       return { docs: [] as FirebaseFirestore.QueryDocumentSnapshot[] }
     })))
     for (const snap of snaps) for (const d of snap.docs) bulk.delete(d.ref)
@@ -138,7 +152,7 @@ export const deleteUserData = functions.region(REGION).runWith(LIMITS).https.onC
       const attendanceSnap = await db.collectionGroup('attendance').where('studentId', '==', uid).get()
       for (const d of attendanceSnap.docs) bulk.update(d.ref, { studentName: 'Deleted User' })
     } catch (err: any) {
-      console.warn('deleteUserData: attendance anonymise skipped', err?.message)
+      console.warn('eraseUser: attendance anonymise skipped', err?.message)
     }
 
     // Remove user from personal_events inviteeIds they were invited to
@@ -177,8 +191,8 @@ export const deleteUserData = functions.region(REGION).runWith(LIMITS).https.onC
     stage = 'bulk-close'
     await bulk.close()
   } catch (err: any) {
-    console.error(`deleteUserData failed at stage=${stage}`, err)
-    throw new functions.https.HttpsError('internal', `Delete failed at ${stage}: ${err?.message ?? err}`)
+    console.error(`eraseUser failed at stage=${stage}`, err)
+    throw new Error(`Delete failed at ${stage}: ${err?.message ?? err}`)
   }
 
   // Delete avatar from Storage (best-effort)
@@ -191,23 +205,21 @@ export const deleteUserData = functions.region(REGION).runWith(LIMITS).https.onC
   try {
     await admin.auth().deleteUser(uid)
   } catch (err: any) {
-    console.warn('deleteUserData: auth delete skipped', err?.message)
+    console.warn('eraseUser: auth delete skipped', err?.message)
   }
 
   // Write GDPR deletion log
   try {
     await db.collection('deletion_log').add({
       uid,
-      deletedBy:  isAdmin ? context.auth!.uid : uid,
-      deletedAt:  admin.firestore.FieldValue.serverTimestamp(),
-      method:     isAdmin ? 'admin-panel' : 'self-service',
+      deletedBy:  log.deletedBy,
+      deletedAt:  FieldValue.serverTimestamp(),
+      method:     log.method,
     })
   } catch (err: any) {
-    console.warn('deleteUserData: deletion_log write failed', err?.message)
+    console.warn('eraseUser: deletion_log write failed', err?.message)
   }
-
-  return { success: true }
-})
+}
 
 // ── One-time migration: copy cohorts → classes ───────────────────────────────
 export const migrateCohortsToClasses = functions.region(REGION).runWith(LIMITS).https.onCall(async (_data, context) => {

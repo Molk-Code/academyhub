@@ -65,9 +65,11 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
 
   function set<K extends keyof FormState>(key: K, val: FormState[K]) {
     setForm(f => ({ ...f, [key]: val }))
-    if (key === 'priceExclVat') {
+    // Either price fills in the other (25% VAT); clearing one clears both
+    if (key === 'priceExclVat' || key === 'priceInclVat') {
       const n = parseFloat(val as string)
-      if (!isNaN(n)) setForm(f => ({ ...f, priceExclVat: val as string, priceInclVat: (n * 1.25).toFixed(2) }))
+      const other = isNaN(n) ? '' : (key === 'priceExclVat' ? n * 1.25 : n / 1.25).toFixed(2)
+      setForm(f => ({ ...f, [key === 'priceExclVat' ? 'priceInclVat' : 'priceExclVat']: other }))
     }
   }
 
@@ -203,7 +205,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
               <input style={inp} type="number" min={0} step="0.01" value={form.priceExclVat} onChange={e => set('priceExclVat', e.target.value)} placeholder="0.00" />
             </div>
             <div>
-              <label style={lbl}>Price incl. VAT (kr) — auto 25%</label>
+              <label style={lbl}>Price incl. VAT (kr) — 25% VAT</label>
               <input style={inp} type="number" min={0} step="0.01" value={form.priceInclVat} onChange={e => set('priceInclVat', e.target.value)} placeholder="0.00" />
             </div>
           </div>

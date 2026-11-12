@@ -17,7 +17,11 @@ type AdminTab = 'catalog' | 'bookings' | 'categories'
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function AdminEquipmentPage() {
-  const [tab, setTab] = useState<AdminTab>('catalog')
+  // ?tab=bookings opens a tab directly (the admin dashboard links there)
+  const [tab, setTab] = useState<AdminTab>(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    return t === 'bookings' || t === 'categories' ? t : 'catalog'
+  })
   const { data: bookings } = useCollection<EquipmentBookingDoc>('equipment_bookings')
   const { data: categoriesRaw, loading: catsLoading } = useCollection<EquipmentCategoryDoc>('equipment_categories')
   const { mine: responsibility } = useEquipmentResponsibility()

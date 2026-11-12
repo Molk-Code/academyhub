@@ -104,6 +104,7 @@ const EmailConfig       = lazy(() => import('@/pages/admin/EmailConfig'))
 const LessonCategories  = lazy(() => import('@/pages/admin/LessonCategories'))
 const SharePointSettings = lazy(() => import('@/pages/admin/SharePointSettings'))
 const OfficeCalendarSync = lazy(() => import('@/pages/admin/OfficeCalendarSync'))
+const AdminDashboard     = lazy(() => import('@/pages/admin/AdminDashboard'))
 const GuideEditor       = lazy(() => import('@/pages/admin/GuideEditor'))
 const NavSettings       = lazy(() => import('@/pages/admin/NavSettings'))
 const ProductionRoles   = lazy(() => import('@/pages/admin/ProductionRoles'))
@@ -228,7 +229,8 @@ export default function App() {
 
           {/* ── Admin ───────────────────────────────────────────────────── */}
           <Route element={<RoleRoute role="admin" skeleton={<AdminLayoutSkeleton />}><AdminLayout /></RoleRoute>}>
-            <Route path="/admin"           element={<Navigate to="/admin/users" replace />} />
+            <Route path="/admin"           element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="/admin/dashboard"     element={<AdminDashboard />} />
             <Route path="/admin/users"         element={<UserManager />} />
             <Route path="/admin/cohorts"       element={<CohortManager />} />
             <Route path="/admin/cohorts/:id"   element={<CohortDetail />} />
@@ -249,13 +251,13 @@ export default function App() {
             <Route path="/admin/nav-settings"       element={<NavSettings />} />
             <Route path="/admin/production-roles"   element={<ProductionRoles />} />
             <Route path="/admin/semester-events"    element={<SemesterEvents />} />
-            <Route path="/admin/qr-devices"         element={<FeatureGate feature="checkin_devices" redirectTo="/admin/users"><QrDevices /></FeatureGate>} />
+            <Route path="/admin/qr-devices"         element={<FeatureGate feature="checkin_devices" redirectTo="/admin/dashboard"><QrDevices /></FeatureGate>} />
             <Route path="/admin/gdpr"               element={<GdprDashboard />} />
             <Route path="/admin/bug-reports"        element={<BugReportsPage />} />
             <Route path="/admin/client-errors"      element={<ClientErrorsPage />} />
             <Route path="/admin/experience-levels" element={<ExperienceLevels />} />
-            <Route path="/admin/equipment"           element={<FeatureGate feature="equipment" redirectTo="/admin/users"><AdminEquipmentPage /></FeatureGate>} />
-            <Route path="/admin/inventory"           element={<FeatureGate feature="inventory" redirectTo="/admin/users"><InventoryPage /></FeatureGate>} />
+            <Route path="/admin/equipment"           element={<FeatureGate feature="equipment" redirectTo="/admin/dashboard"><AdminEquipmentPage /></FeatureGate>} />
+            <Route path="/admin/inventory"           element={<FeatureGate feature="inventory" redirectTo="/admin/dashboard"><InventoryPage /></FeatureGate>} />
           </Route>
 
           {/* ── Equipment scanner (auth required, no layout) ─────────────── */}

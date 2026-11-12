@@ -4,7 +4,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions'
 import { db } from '@/lib/firebase'
 import { uploadWithQuota, deleteWithTracking } from '@/lib/uploadWithQuota'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
-import type { GuestTeacherDoc, GuestTeacherBookingDoc, GuestTeacherDocument, LessonDoc, SyncedEventDoc } from '@/types'
+import type { GuestTeacherDoc, GuestTeacherBookingDoc, GuestTeacherDocument, LessonDoc } from '@/types'
 import {
   Plus, Pencil, Trash2, FileUp, X, UserRound, Search, ExternalLink,
   MapPin, Calendar, Clock, Mail, FileText, Eye, Download, LayoutGrid, List,
@@ -14,6 +14,7 @@ import { useCurrency } from '@/hooks/useCurrency'
 import { format, isToday, isTomorrow, startOfDay } from 'date-fns'
 import { nanoid } from 'nanoid'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import { useVisibleEvents } from '@/lib/queries'
 
 type SortKey = 'name' | 'price' | 'booked'
 type ViewMode = 'cards' | 'list'
@@ -35,7 +36,7 @@ export default function GuestTeacherBank() {
   const { data: guests, loading } = useCollection<GuestTeacherDoc>('guest_teachers')
   const { data: bookings }        = useCollection<GuestTeacherBookingDoc>('guest_teacher_bookings')
   const { data: lessons }         = useCollection<LessonDoc>('lessons', [orderBy('startTime', 'asc')])
-  const { data: syncedEvents }    = useCollection<SyncedEventDoc>('synced_events')
+  const { data: syncedEvents }    = useVisibleEvents({ cohortId: null, everyClass: true })
   const { symbol: currencySymbol } = useCurrency()
 
   const [sortKey, setSortKey]         = useState<SortKey>('name')

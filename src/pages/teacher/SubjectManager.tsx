@@ -5,7 +5,7 @@ import { format } from 'date-fns'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument } from '@/hooks/useFirestore'
-import type { SubjectDoc, LessonDoc, SyncedEventDoc, AssignmentDoc, SubjectTeacherDoc, SemesterSettingsDoc } from '@/types'
+import type { SubjectDoc, LessonDoc, AssignmentDoc, SubjectTeacherDoc, SemesterSettingsDoc } from '@/types'
 import {
   Plus, Pencil, Trash2, BookOpen, X, Check, ChevronRight, GripVertical, ImagePlus, Loader2, RotateCcw,
   ArrowRight, Search, LayoutGrid, List, UserCheck, AlertTriangle, Info,
@@ -18,6 +18,7 @@ import SubjectCover   from '@/components/subjects/SubjectCover'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import EmptyState     from '@/components/common/EmptyState'
 import EmojiPicker    from '@/components/common/EmojiPicker'
+import { useVisibleEvents } from '@/lib/queries'
 
 const COLOR_OPTIONS = [
   { label: 'Indigo',  value: 'bg-indigo-500'  },
@@ -96,7 +97,7 @@ export default function SubjectManager() {
 
   // Curriculum taught so far — topics covered by past lessons/synced events in any class
   const { data: lessons }      = useCollection<LessonDoc>('lessons')
-  const { data: syncedEvents } = useCollection<SyncedEventDoc>('synced_events')
+  const { data: syncedEvents } = useVisibleEvents({ cohortId: null, everyClass: true })
   const { data: assignments }  = useCollection<AssignmentDoc>('assignments')
   const { data: semester }     = useDocument<SemesterSettingsDoc>('settings', 'semester')
 

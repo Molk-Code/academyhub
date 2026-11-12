@@ -10,6 +10,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { cn } from '@/lib/utils'
 import { Plus, Film, Clock, Globe, Lock, X, Users, CalendarRange, Trash2 } from 'lucide-react'
 import StudentProductionPeriod from '@/pages/student/ProductionPeriod'
+import { useViewCohortId } from '@/lib/queries'
 
 function EditCustomProjectModal({ production, canEdit, canDelete, onClose }: {
   production: ProductionDoc
@@ -122,11 +123,11 @@ function relTime(ts: any): string {
 }
 
 export default function StudentProduction() {
-  const { profile, role, cohortId: ctxCohortId, previewCohortId, loading: authLoading } = useAuth()
+  const { profile, role, previewCohortId, loading: authLoading } = useAuth()
   const noClassMessage = role === 'student'
     ? "You're not in a class yet — ask your teacher to add you, then you can create a production."
     : 'No class selected — switch to Student Preview for a class to create a production.'
-  const cohortId = ctxCohortId ?? previewCohortId ?? profile?.cohortId ?? null
+  const cohortId = useViewCohortId()
   const navigate = useNavigate()
   const [showNew,         setShowNew]         = useState(false)
   const [newTitle,        setNewTitle]        = useState('')

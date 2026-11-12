@@ -8,8 +8,9 @@ import type { EventInput } from '@fullcalendar/core'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
 import { useAllUsers } from '@/hooks/useAllUsers'
+import { useViewCohortId, useCohortLessons, useVisibleEvents, useInvitableUserGroups, filterGroups } from '@/lib/queries'
 import { toDate, cn, initials, avatarColor } from '@/lib/utils'
-import type { LessonDoc, AssignmentDoc, SubjectDoc, SemesterSettingsDoc, LessonCategoryDoc, CohortDoc, PersonalEventDoc, UserDoc, SyncedEventDoc, GuestTeacherDoc } from '@/types'
+import type { AssignmentDoc, SubjectDoc, SemesterSettingsDoc, LessonCategoryDoc, CohortDoc, PersonalEventDoc, GuestTeacherDoc } from '@/types'
 import { addDoc, collection, serverTimestamp, Timestamp, updateDoc, deleteDoc, doc } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
@@ -316,20 +317,15 @@ export default function StudentCalendar() {
     }
   }, [])
 
-  const { profile, role, roles, cohortId: ctxCohortId, previewCohortId } = useAuth()
+  const { profile, role, roles, previewCohortId } = useAuth()
   const isStaff = roles.some(r => r === 'teacher' || r === 'admin') || (role ?? profile?.role) === 'teacher' || (role ?? profile?.role) === 'admin'
-  const cohortId = ctxCohortId ?? previewCohortId ?? profile?.cohortId ?? null
+  const cohortId = useViewCohortId()
   const { data: schoolDay } = useDocument<SchoolDayDoc>('settings', 'schoolDay')
   const slotMin    = schoolDay?.startTime ? `${schoolDay.startTime}:00` : '07:00:00'
   const slotMax    = schoolDay?.endTime   ? `${schoolDay.endTime}:00`   : '22:00:00'
   const scrollTime = schoolDay?.startTime ? `${schoolDay.startTime}:00` : '07:00:00'
 
-  const { data: lessons } = useCollection<LessonDoc>(
-    'lessons',
-    cohortId ? [where('cohortId', '==', cohortId)] : [],
-    !!cohortId,
-    cohortId ?? '',
-  )
+  const { data: lessons } = useCohortLessons(cohortId)
 
   const { data: assignments } = useCollection<AssignmentDoc>(
     'assignments',
@@ -364,52 +360,14 @@ export default function StudentCalendar() {
   // Teachers/admins see all synced events; students see only their cohort + "all".
   // Preview mode (previewCohortId set) narrows staff to the previewed cohort so it matches
   // what the student would see.
-  const showAllSynced = isStaff && !previewCohortId
-  const { data: syncedEvents } = useCollection<SyncedEventDoc>(
-    'synced_events',
-    showAllSynced ? [] : cohortId ? [where('cohortId', 'in', [cohortId, 'all'])] : [where('cohortId', '==', 'all')],
-    true,
-    showAllSynced ? '__staff__' : cohortId ?? 'none',
-  )
+  const { data: syncedEvents } = useVisibleEvents({ cohortId, everyClass: isStaff && !previewCohortId })
 
   const { data: allUsers } = useAllUsers()
   const { data: guestTeachers } = useCollection<GuestTeacherDoc>('guest_teachers')
-  // Group duplicate docs by displayName, collecting all their IDs — ensures profile.uid always matches
-  const invitableGroups = useMemo(() => {
-    type Group = { repId: string; allIds: string[]; displayName: string; roles: string[] }
-    const groups: Group[] = []
-    const byName = new Map<string, Group>()
-    for (const u of allUsers) {
-      if (u.id === profile?.uid || u.uid === profile?.uid) continue
-      if (u.isActive === false) continue
-      const allRoles = u.roles ?? [u.role]
-      if (!allRoles.some(r => r === 'student' || r === 'teacher')) continue
-      const name = u.displayName?.trim()
-      if (!name) continue
-      const key = name.toLowerCase()
-      const existing = byName.get(key)
-      if (existing) {
-        if (!existing.allIds.includes(u.id)) existing.allIds.push(u.id)
-      } else {
-        const g: Group = { repId: u.id, allIds: [u.id], displayName: name, roles: allRoles }
-        groups.push(g)
-        byName.set(key, g)
-      }
-    }
-    return groups
-  }, [allUsers, profile?.uid])
-  const filteredGroups = useMemo(
-    () => inviteeSearch.trim()
-      ? invitableGroups.filter(g => g.displayName.toLowerCase().includes(inviteeSearch.toLowerCase()))
-      : invitableGroups,
-    [invitableGroups, inviteeSearch],
-  )
-  const filteredEditGroups = useMemo(
-    () => editInviteeSearch.trim()
-      ? invitableGroups.filter(g => g.displayName.toLowerCase().includes(editInviteeSearch.toLowerCase()))
-      : invitableGroups,
-    [invitableGroups, editInviteeSearch],
-  )
+  // One entry per person, even with duplicate user docs — ensures profile.uid always matches
+  const invitableGroups = useInvitableUserGroups(profile?.uid)
+  const filteredGroups = useMemo(() => filterGroups(invitableGroups, inviteeSearch), [invitableGroups, inviteeSearch])
+  const filteredEditGroups = useMemo(() => filterGroups(invitableGroups, editInviteeSearch), [invitableGroups, editInviteeSearch])
 
   const subjectMap = useMemo(
     () => Object.fromEntries(subjects.map(s => [s.id, s])),

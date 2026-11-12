@@ -9,10 +9,11 @@ import { cn } from '@/lib/utils'
 import type { AssignmentDoc, SubjectDoc, SubmissionDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import EmptyState from '@/components/common/EmptyState'
+import { useViewCohortId } from '@/lib/queries'
 
 export default function StudentAssignments() {
-  const { profile, cohortId: ctxCohortId, previewCohortId } = useAuth()
-  const cohortId = ctxCohortId ?? previewCohortId ?? profile?.cohortId ?? null
+  const { profile } = useAuth()
+  const cohortId = useViewCohortId()
 
   const { data: rawAssignments, loading } = useCollection<AssignmentDoc>(
     'assignments',

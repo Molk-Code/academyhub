@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom'
 import { collectionGroup, getDocs } from 'firebase/firestore'
 import { UserRound, Globe, BookOpen } from 'lucide-react'
 import { db } from '@/lib/firebase'
-import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
 import type { CohortDoc, GuestTeacherDoc, SubjectDoc, SubjectTeacherDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import { useViewCohortId } from '@/lib/queries'
 
 const PANEL = 'rounded-2xl bg-zinc-900 border border-white/[0.06] shadow-xl'
 
@@ -24,8 +24,7 @@ interface GuestEntry {
 // Every guest teacher added to the student's subjects, one card per person
 // (the same guest on several subjects is listed once, with all subjects).
 export default function GuestTeachers() {
-  const { cohortId, previewCohortId } = useAuth()
-  const effectiveCohortId = previewCohortId ?? cohortId
+  const effectiveCohortId = useViewCohortId()
   const { data: cohort } = useDocument<CohortDoc>('cohorts', effectiveCohortId ?? undefined)
   const { data: allSubjects, loading: subjectsLoading } = useCollection<SubjectDoc>('subjects')
   // Library profiles fill in bio/photo/portfolio a subject entry may lack

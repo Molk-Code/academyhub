@@ -10,11 +10,12 @@ import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where } from '@/hooks/useFirestore'
 import { toDate, cn } from '@/lib/utils'
-import type { SubjectDoc, AssignmentDoc, LessonDoc, SyncedEventDoc, CohortDoc, SubmissionDoc, SubjectTeacherDoc, SemesterSettingsDoc } from '@/types'
+import type { SubjectDoc, AssignmentDoc, CohortDoc, SubmissionDoc, SubjectTeacherDoc, SemesterSettingsDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import SubjectCover   from '@/components/subjects/SubjectCover'
 import { SubjectThumb } from '@/components/dashboard/UpcomingCard'
 import { nextSubjectSession } from '@/lib/nextSession'
+import { useViewCohortId, useCohortLessons, useVisibleEvents } from '@/lib/queries'
 
 type Status = 'in-progress' | 'completed' | 'not-started'
 type Filter = 'all' | Status
@@ -54,8 +55,8 @@ const CHIP_TEXT: Record<Chip['tone'], string> = {
 }
 
 export default function SubjectList() {
-  const { profile, cohortId, previewCohortId } = useAuth()
-  const effectiveCohortId = previewCohortId ?? cohortId
+  const { profile } = useAuth()
+  const effectiveCohortId = useViewCohortId()
 
   const { data: cohort } = useDocument<CohortDoc>('cohorts', effectiveCohortId ?? undefined)
   const { data: semester } = useDocument<SemesterSettingsDoc>('settings', 'semester')
@@ -70,21 +71,11 @@ export default function SubjectList() {
     !!effectiveCohortId,
   )
 
-  const { data: lessons } = useCollection<LessonDoc>(
-    'lessons',
-    effectiveCohortId ? [where('cohortId', '==', effectiveCohortId)] : [],
-    !!effectiveCohortId,
-    effectiveCohortId ?? '',
-  )
+  const { data: lessons } = useCohortLessons(effectiveCohortId)
 
   // A curriculum topic can also be covered by a synced Outlook event (e.g. a
   // guest teacher's session), not just a native lesson.
-  const { data: syncedEvents } = useCollection<SyncedEventDoc>(
-    'synced_events',
-    effectiveCohortId ? [where('cohortId', 'in', [effectiveCohortId, 'all'])] : [],
-    !!effectiveCohortId,
-    `synced-${effectiveCohortId ?? ''}`,
-  )
+  const { data: syncedEvents } = useVisibleEvents({ cohortId: effectiveCohortId, requireCohort: true })
 
   const { data: submissions } = useCollection<SubmissionDoc>(
     'submissions',

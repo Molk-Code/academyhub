@@ -6,10 +6,11 @@ import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, where as collectionWhere, orderBy } from '@/hooks/useFirestore'
-import type { LessonDoc, AbsenceReportDoc, CohortDoc, PointsLogDoc } from '@/types'
+import type { AbsenceReportDoc, CohortDoc, PointsLogDoc } from '@/types'
 import { CheckCircle2, AlertCircle, AlertTriangle, Trash2, Check, TrendingUp, Star, QrCode } from 'lucide-react'
 import { format, isAfter, isBefore, startOfDay } from 'date-fns'
 import { useAttendanceStats } from '@/hooks/useAttendanceStats'
+import { useViewCohortId, useCohortLessons } from '@/lib/queries'
 
 type Phase = 'idle' | 'loading' | 'success' | 'error'
 
@@ -18,8 +19,8 @@ function todayStr() {
 }
 
 export default function CheckIn() {
-  const { profile, cohortId, previewCohortId } = useAuth()
-  const effectiveCohortId = previewCohortId ?? cohortId
+  const { profile } = useAuth()
+  const effectiveCohortId = useViewCohortId()
 
   const [phase,         setPhase]         = useState<Phase>('idle')
   const [scannerActive, setScannerActive] = useState(false)
@@ -42,12 +43,7 @@ export default function CheckIn() {
   )
 
   // Lessons on the selected absence date (for specific lesson mode)
-  const { data: allLessons } = useCollection<LessonDoc>(
-    'lessons',
-    effectiveCohortId ? [collectionWhere('cohortId', '==', effectiveCohortId)] : [],
-    !!effectiveCohortId,
-    effectiveCohortId ?? '',
-  )
+  const { data: allLessons } = useCohortLessons(effectiveCohortId)
 
   // Cohort data for year start / end (absence rate calculation)
   const { data: cohorts } = useCollection<CohortDoc>('cohorts')

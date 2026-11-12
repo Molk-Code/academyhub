@@ -8,6 +8,7 @@ import { useCollection, useDocument, where } from '@/hooks/useFirestore'
 import type { RoomDoc, RoomBookingDoc, RoomAvailabilityWindow, BookingSettingsDoc, SemesterSettingsDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import { useViewCohortId } from '@/lib/queries'
 
 interface TimeSlot { startTime: string; endTime: string }
 
@@ -44,8 +45,8 @@ function isRoomAvailableForSlot(
 }
 
 export default function RoomBooking({ standalone = false }: { standalone?: boolean }) {
-  const { profile, cohortId, previewCohortId } = useAuth()
-  const effectiveCohortId = previewCohortId ?? cohortId
+  const { profile } = useAuth()
+  const effectiveCohortId = useViewCohortId()
 
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedDayIdx, setSelectedDayIdx] = useState<number>(() => {

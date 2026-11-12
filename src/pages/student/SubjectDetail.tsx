@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { format, isPast } from 'date-fns'
 import { useDocument, useCollection, orderBy, where } from '@/hooks/useFirestore'
 import { useAuth } from '@/contexts/AuthContext'
-import type { SubjectDoc, SubjectTeacherDoc, LessonDoc, SyncedEventDoc, VideoLabDoc, AbsenceReportDoc, AssignmentDoc, SubmissionDoc } from '@/types'
+import type { SubjectDoc, SubjectTeacherDoc, VideoLabDoc, AbsenceReportDoc, AssignmentDoc, SubmissionDoc } from '@/types'
 import { thumbnailUrl } from '@/lib/cloudinary'
 import { toDate, cn } from '@/lib/utils'
 import { nextSubjectSession } from '@/lib/nextSession'
@@ -16,6 +16,7 @@ import SharePointBrowser from '@/components/sharepoint/SharePointBrowser'
 import { useMicrosoftAuth } from '@/contexts/MicrosoftAuthContext'
 import Breadcrumb from '@/components/common/Breadcrumb'
 import SubjectCover from '@/components/subjects/SubjectCover'
+import { useViewCohortId, useCohortLessons, useVisibleEvents } from '@/lib/queries'
 
 type Status = 'in-progress' | 'completed' | 'not-started'
 const STATUS_BADGE: Record<Status, { label: string; cls: string }> = {
@@ -40,8 +41,8 @@ const PANEL = 'rounded-2xl bg-zinc-900 border border-white/[0.06] shadow-xl'
 export default function StudentSubjectDetail() {
   const { isConfigured: sharePointConfigured } = useMicrosoftAuth()
   const { id } = useParams<{ id: string }>()
-  const { cohortId, previewCohortId, profile } = useAuth()
-  const effectiveCohortId = previewCohortId ?? cohortId
+  const { profile } = useAuth()
+  const effectiveCohortId = useViewCohortId()
   const { data: subject, loading } = useDocument<SubjectDoc>('subjects', id)
   const { data: teachers } = useCollection<SubjectTeacherDoc>(
     `subjects/${id}/teachers`,
@@ -49,22 +50,12 @@ export default function StudentSubjectDetail() {
     !!id,
     id ?? '',
   )
-  const { data: lessons } = useCollection<LessonDoc>(
-    'lessons',
-    effectiveCohortId && id ? [where('cohortId', '==', effectiveCohortId), where('subjectId', '==', id)] : [],
-    !!(effectiveCohortId && id),
-    `${effectiveCohortId}-${id}`,
-  )
+  const { data: lessons } = useCohortLessons(effectiveCohortId, { subjectId: id })
   // A curriculum topic can also be covered by a synced Outlook event (e.g. a
   // guest teacher's session), not just a native lesson — scoped to this
   // student's own class (or "all") so a shared subject's other-cohort
   // sessions never mark a topic complete here.
-  const { data: syncedEvents } = useCollection<SyncedEventDoc>(
-    'synced_events',
-    id && effectiveCohortId ? [where('subjectId', '==', id), where('cohortId', 'in', [effectiveCohortId, 'all'])] : [],
-    !!(id && effectiveCohortId),
-    `synced-${id}-${effectiveCohortId}`,
-  )
+  const { data: syncedEvents } = useVisibleEvents({ cohortId: effectiveCohortId, requireCohort: true, subjectId: id })
   const { data: subjectVideos } = useCollection<VideoLabDoc>(
     'video_lab',
     id ? [where('subjectId', '==', id), orderBy('createdAt', 'desc')] : [],

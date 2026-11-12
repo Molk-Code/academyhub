@@ -19,6 +19,7 @@ import { SectionHeader, SectionLink, ShortcutPill, LessonSlateCard } from '@/com
 import LoadingSpinner   from '@/components/common/LoadingSpinner'
 import EmptyState       from '@/components/common/EmptyState'
 import Avatar           from '@/components/common/Avatar'
+import { useViewCohortId, useCohortLessons } from '@/lib/queries'
 
 interface PointsLogEntry { id: string; studentId: string; points: number; reason: string; createdAt: any }
 
@@ -347,8 +348,8 @@ function DashboardTodoWidget({ uid, rawTodos }: { uid: string; rawTodos: TodoDoc
 }
 
 export default function StudentDashboard() {
-  const { profile, cohortId: ctxCohortId, previewCohortId } = useAuth()
-  const cohortId = ctxCohortId ?? previewCohortId ?? profile?.cohortId ?? null
+  const { profile } = useAuth()
+  const cohortId = useViewCohortId()
   const { data: navVis } = useDocument<{ id: string; student: Record<string, boolean> }>('settings', 'nav_visibility')
 
   const { data: progress, loading: progressLoading } = useMyProgress()
@@ -356,16 +357,7 @@ export default function StudentDashboard() {
   const now = new Date()
 
   // Upcoming lessons — no compound orderBy to avoid composite index requirement
-  const { data: rawLessons } = useCollection<LessonDoc>(
-    'lessons',
-    cohortId ? [where('cohortId', '==', cohortId)] : [],
-    !!cohortId,
-    cohortId ?? '',
-  )
-  const lessons = useMemo(
-    () => [...rawLessons].sort((a, b) => (a.startTime?.toMillis?.() ?? 0) - (b.startTime?.toMillis?.() ?? 0)),
-    [rawLessons],
-  )
+  const { data: lessons } = useCohortLessons(cohortId)
 
   // Assignments — no compound orderBy
   const { data: rawAssignments } = useCollection<AssignmentDoc>(

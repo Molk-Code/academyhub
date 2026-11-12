@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { clickable, clickableRow } from '@/lib/a11y'
 import EmptyState from '@/components/common/EmptyState'
+import { useViewCohortId, useCohortLessons } from '@/lib/queries'
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -523,8 +524,8 @@ function LessonAssignmentResources({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function StudentResources() {
-  const { cohortId: ctxCohortId, previewCohortId, profile } = useAuth()
-  const cohortId = ctxCohortId ?? previewCohortId ?? profile?.cohortId ?? null
+  const { profile } = useAuth()
+  const cohortId = useViewCohortId()
 
   const [activeTab, setActiveTab] = useState<'class' | 'course'>('class')
   const [preview,   setPreview]   = useState<{ url: string; type: string; title: string; sourceName: string } | null>(null)
@@ -538,12 +539,7 @@ export default function StudentResources() {
     !!cohortId,
     cohortId ?? '',
   )
-  const { data: lessons } = useCollection<LessonDoc>(
-    'lessons',
-    cohortId ? [where('cohortId', '==', cohortId)] : [],
-    !!cohortId,
-    cohortId ?? '',
-  )
+  const { data: lessons } = useCohortLessons(cohortId)
 
   return (
     <div className="space-y-6">

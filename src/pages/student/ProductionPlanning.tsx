@@ -7,6 +7,7 @@ import { useCollection, where } from '@/hooks/useFirestore'
 import type { ProductionDoc } from '@/types'
 import { Plus, Film, Clock, Users, Lock, Globe, X } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import { useViewCohortId } from '@/lib/queries'
 
 function relTime(ts: any): string {
   if (!ts?.toDate) return ''
@@ -48,8 +49,8 @@ function ProductionCard({ prod, onClick }: { prod: ProductionDoc; onClick: () =>
 }
 
 export default function ProductionPlanning() {
-  const { profile, cohortId: ctxCohortId, previewCohortId } = useAuth()
-  const cohortId = ctxCohortId ?? previewCohortId ?? profile?.cohortId ?? null
+  const { profile } = useAuth()
+  const cohortId = useViewCohortId()
   const navigate = useNavigate()
   const [showNew, setShowNew] = useState(false)
   const [newTitle, setNewTitle] = useState('')

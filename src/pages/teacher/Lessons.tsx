@@ -5,7 +5,7 @@ import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
-import { useAllUsers } from '@/hooks/useAllUsers'
+import { useVisibleEvents, useInvitableUserGroups, filterGroups, cohortToggleAllows } from '@/lib/queries'
 import { shortDate, timeStr, toDate } from '@/lib/utils'
 import type { LessonDoc, SubjectDoc, CohortDoc, LessonBlockDoc, SemesterSettingsDoc, LessonCategoryDoc, UserDoc, PersonalEventDoc, SyncedEventDoc, GuestTeacherDoc, GuestTeacherBookingDoc } from '@/types'
 import { Plus, Pencil, Trash2, CalendarDays, LayoutGrid, X, QrCode, Circle, SlidersHorizontal, ChevronDown, Check, MapPin, Download } from 'lucide-react'
@@ -361,45 +361,12 @@ export default function Lessons() {
   )
 
   // Office 365 synced events — teachers see all cohorts
-  const { data: syncedEvents } = useCollection<SyncedEventDoc>('synced_events', [])
+  const { data: syncedEvents } = useVisibleEvents({ cohortId: null, everyClass: true })
 
-  // All users for invitee picker
-  const { data: allUsers } = useAllUsers()
-  const invitableGroups = useMemo(() => {
-    type Group = { repId: string; allIds: string[]; displayName: string; roles: string[] }
-    const groups: Group[] = []
-    const byName = new Map<string, Group>()
-    for (const u of allUsers) {
-      if (u.id === profile?.uid || u.uid === profile?.uid) continue
-      if (u.isActive === false) continue
-      const allRoles = u.roles ?? [u.role]
-      if (!allRoles.some(r => r === 'student' || r === 'teacher')) continue
-      const name = u.displayName?.trim()
-      if (!name) continue
-      const key = name.toLowerCase()
-      const existing = byName.get(key)
-      if (existing) {
-        if (!existing.allIds.includes(u.id)) existing.allIds.push(u.id)
-      } else {
-        const g: Group = { repId: u.id, allIds: [u.id], displayName: name, roles: allRoles }
-        groups.push(g)
-        byName.set(key, g)
-      }
-    }
-    return groups
-  }, [allUsers, profile?.uid])
-  const filteredGroups = useMemo(
-    () => inviteeSearch.trim()
-      ? invitableGroups.filter(g => g.displayName.toLowerCase().includes(inviteeSearch.toLowerCase()))
-      : invitableGroups,
-    [invitableGroups, inviteeSearch],
-  )
-  const filteredEditGroups = useMemo(
-    () => editInviteeSearch.trim()
-      ? invitableGroups.filter(g => g.displayName.toLowerCase().includes(editInviteeSearch.toLowerCase()))
-      : invitableGroups,
-    [invitableGroups, editInviteeSearch],
-  )
+  // All users for invitee picker, one entry per person
+  const invitableGroups = useInvitableUserGroups(profile?.uid)
+  const filteredGroups = useMemo(() => filterGroups(invitableGroups, inviteeSearch), [invitableGroups, inviteeSearch])
+  const filteredEditGroups = useMemo(() => filterGroups(invitableGroups, editInviteeSearch), [invitableGroups, editInviteeSearch])
 
   const slotMin    = schoolDay?.startTime ? `${schoolDay.startTime}:00` : '07:00:00'
   const slotMax    = schoolDay?.endTime   ? `${schoolDay.endTime}:00`   : '22:00:00'
@@ -594,17 +561,13 @@ export default function Lessons() {
 
   // Filtered lesson events (by cohort toggle)
   const filteredLessonEvents = useMemo(
-    () => lessonEvents.filter(e => activeCohortIds[e.extendedProps?.cohortId] !== false),
+    () => lessonEvents.filter(e => cohortToggleAllows(e.extendedProps?.cohortId, activeCohortIds)),
     [lessonEvents, activeCohortIds],
   )
 
   // Synced Outlook events respect the same cohort toggle. Events tagged "all" (shared) always show.
   const filteredSyncedEventInputs = useMemo(
-    () => syncedEventInputs.filter(e => {
-      const cid = e.extendedProps?.cohortId
-      if (cid === 'all' || !cid) return true
-      return activeCohortIds[cid] !== false
-    }),
+    () => syncedEventInputs.filter(e => cohortToggleAllows(e.extendedProps?.cohortId, activeCohortIds)),
     [syncedEventInputs, activeCohortIds],
   )
 

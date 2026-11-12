@@ -4,7 +4,7 @@ import { doc, updateDoc, addDoc, deleteDoc, collection, serverTimestamp } from '
 import { db } from '@/lib/firebase'
 import { uploadWithQuota, deleteWithTracking } from '@/lib/uploadWithQuota'
 import { useDocument, useCollection, orderBy, where } from '@/hooks/useFirestore'
-import type { SubjectDoc, CurriculumItem, SubjectResource, SubjectTeacherDoc, UserDoc, LessonDoc, SyncedEventDoc, VideoLabDoc, AbsenceReportDoc, GuestTeacherDoc, GuestTeacherBookingDoc, AssignmentDoc } from '@/types'
+import type { SubjectDoc, CurriculumItem, SubjectResource, SubjectTeacherDoc, UserDoc, LessonDoc, VideoLabDoc, AbsenceReportDoc, GuestTeacherDoc, GuestTeacherBookingDoc, AssignmentDoc } from '@/types'
 import { thumbnailUrl } from '@/lib/cloudinary'
 import {
   ArrowLeft, Plus, Pencil, Trash2, Check, X,
@@ -19,6 +19,7 @@ import { subjectSessions } from '@/lib/nextSession'
 import { format } from 'date-fns'
 import { nanoid } from 'nanoid'
 import { cn, initials, avatarColor, toDate } from '@/lib/utils'
+import { useVisibleEvents } from '@/lib/queries'
 
 // Shared surface for tiles and panels, matching the subject overview cards
 const PANEL = 'rounded-2xl bg-zinc-900 border border-white/[0.06] shadow-xl'
@@ -56,12 +57,7 @@ export default function SubjectDetail() {
   // Curriculum topics can also be covered by a synced Outlook event (e.g. a
   // guest teacher's session), not just a native lesson — both must count
   // toward "completed".
-  const { data: syncedEvents } = useCollection<SyncedEventDoc>(
-    'synced_events',
-    [where('subjectId', '==', id ?? '')],
-    !!id,
-    `synced-${id ?? ''}`,
-  )
+  const { data: syncedEvents } = useVisibleEvents({ cohortId: null, everyClass: true, subjectId: id })
   const { data: subjectVideos } = useCollection<VideoLabDoc>(
     'video_lab',
     id ? [where('subjectId', '==', id), orderBy('createdAt', 'desc')] : [],

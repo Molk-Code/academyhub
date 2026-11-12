@@ -134,6 +134,10 @@ export interface CohortDoc {
   semesterSem2StartDate?: string  // "YYYY-MM-DD" — Semester 2 start
   semesterSem2EndDate?: string    // "YYYY-MM-DD" — Semester 2 end
   color?: string
+  archived?: boolean              // ended (class rollover): kept for history, hidden from pickers
+  archivedAt?: Timestamp
+  nextCohortId?: string           // the class its students moved on to
+  previousCohortId?: string       // the class this one continued from
 }
 
 export interface ClassInviteDoc {

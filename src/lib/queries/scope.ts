@@ -89,3 +89,12 @@ export function filterGroups(groups: UserGroup[], search: string): UserGroup[] {
   return q ? groups.filter(g => g.displayName.toLowerCase().includes(q)) : groups
 }
 
+
+// Classes: archived ones (ended, see class rollover) stay readable for history
+// but are never offered for new work
+export const isArchivedCohort = (c: { archived?: boolean }) => c.archived === true
+
+export function sortCohorts<T extends { name: string; archived?: boolean }>(cohorts: T[]): { active: T[]; all: T[] } {
+  const all = [...cohorts].sort((a, b) => a.name.localeCompare(b.name, 'sv'))
+  return { active: all.filter(c => !isArchivedCohort(c)), all }
+}

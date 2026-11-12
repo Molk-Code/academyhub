@@ -10,10 +10,10 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
 import { useFeature } from '@/hooks/useFeature'
-import { useDocument, useCollection, where, orderBy } from '@/hooks/useFirestore'
+import { useDocument, useCollection, where } from '@/hooks/useFirestore'
 import { doc, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { NotificationDoc, CohortDoc } from '@/types'
+import type { NotificationDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import Avatar from '@/components/common/Avatar'
 import { useChatUnreadCount } from '@/hooks/useChatUnread'
@@ -33,6 +33,7 @@ import OfflineBanner from '@/components/OfflineBanner'
 import NotificationInbox from '@/components/NotificationInbox'
 import BugReportButton from '@/components/BugReportButton'
 import InstallPrompt from '@/components/InstallPrompt'
+import { useCohorts } from '@/lib/queries'
 
 interface NavItem {
   to: string
@@ -155,7 +156,7 @@ export default function StudentLayout() {
   // selected, cohort-scoped data (like synced Outlook events) falls back to
   // showing everything across every class, which isn't what a real student
   // would ever see — so default to the first class the moment we land here.
-  const { data: previewCohorts } = useCollection<CohortDoc>('cohorts', [], isAdminPreview)
+  const { data: previewCohorts } = useCohorts({ enabled: isAdminPreview })
   useEffect(() => {
     if (isAdminPreview && !previewCohortId && previewCohorts.length > 0) {
       setPreviewCohortId(previewCohorts[0].id)

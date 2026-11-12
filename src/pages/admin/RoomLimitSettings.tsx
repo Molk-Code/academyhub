@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { doc, setDoc } from 'firebase/firestore'
 import { Settings2, Pencil, Check, X } from 'lucide-react'
 import { db } from '@/lib/firebase'
-import { useCollection } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
-import type { BookingSettingsDoc, CohortDoc, RoomBookingLimit } from '@/types'
+import type { BookingSettingsDoc, RoomBookingLimit } from '@/types'
+import { useCohorts } from '@/lib/queries'
 
 type Period = RoomBookingLimit['period']
 interface Row { max: string; period: Period }
@@ -20,7 +20,7 @@ const label = (l: RoomBookingLimit) => (l.max !== null ? `${l.max} / ${l.period}
 
 // Max room bookings per student: one default rule, optionally overridden per class.
 export default function RoomLimitSettings({ settings }: { settings: BookingSettingsDoc | null }) {
-  const { data: cohorts } = useCollection<CohortDoc>('cohorts')
+  const { data: cohorts } = useCohorts()
   const sortedCohorts = [...cohorts].sort((a, b) => a.name.localeCompare(b.name, 'sv'))
 
   const defaultLimit: RoomBookingLimit = {

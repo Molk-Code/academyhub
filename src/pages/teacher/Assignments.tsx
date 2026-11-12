@@ -3,11 +3,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Search, Pencil, Trash2, Eye, EyeOff, ClipboardList, ListTodo } from 'lucide-react'
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { useCollection, where } from '@/hooks/useFirestore'
+import { useCollection } from '@/hooks/useFirestore'
 import { shortDate } from '@/lib/utils'
-import type { AssignmentDoc, SubjectDoc, CohortDoc, TestDoc, ChecklistDoc } from '@/types'
+import type { AssignmentDoc, SubjectDoc, TestDoc, ChecklistDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { cn } from '@/lib/utils'
+import { useCohorts } from '@/lib/queries'
 
 export default function Assignments() {
   const navigate = useNavigate()
@@ -15,7 +16,7 @@ export default function Assignments() {
 
   const { data: assignments, loading } = useCollection<AssignmentDoc>('assignments')
   const { data: subjects }             = useCollection<SubjectDoc>('subjects')
-  const { data: cohorts }              = useCollection<CohortDoc>('cohorts')
+  const { all: cohorts } = useCohorts()   // past results: archived classes too
   // Tests and checklists each store their actual content in a sibling
   // collection keyed by assignmentId, with their own edit routes keyed on
   // THEIR OWN doc id — not the assignment id — so the generic edit link

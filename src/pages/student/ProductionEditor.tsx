@@ -10,7 +10,7 @@ import { uploadScreenplayViaFunction } from '@/lib/uploadWithQuota'
 import { useAuth } from '@/contexts/AuthContext'
 import { useDocument, useCollection, where, orderBy } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
-import type { ProductionDoc, UserDoc, ProductionFeedbackDoc, ProductionTeamDoc, ProductionSceneDoc, ProductionCastDoc, ProductionShotDoc, ProductionShootingDayDoc, ProductionCrewAssignmentDoc, ProductionLocationDoc, ProductionPeriodDoc, ProductionCostumeDoc, ProductionMakeupDoc, ProductionPropsDoc, CohortDoc } from '@/types'
+import type { ProductionDoc, UserDoc, ProductionFeedbackDoc, ProductionTeamDoc, ProductionSceneDoc, ProductionCastDoc, ProductionShotDoc, ProductionShootingDayDoc, ProductionCrewAssignmentDoc, ProductionLocationDoc, ProductionPeriodDoc, ProductionCostumeDoc, ProductionMakeupDoc, ProductionPropsDoc } from '@/types'
 import { ArrowLeft, Users, Globe, Trash2, MessageSquare, X, Send, ChevronDown, Download, FileSpreadsheet, UserPlus, Eye, Loader2, FileText, Upload, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react'
 import { parseScreenplayPDF, type ParsedScene } from '@/lib/parseScreenplay'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
@@ -28,6 +28,7 @@ import ShotLogTab        from '@/components/production/ShotLogTab'
 import { BudgetTab }     from '@/components/production/BudgetTab'
 import { exportXLS } from './productionGlobalExport'
 import { useFeature } from '@/hooks/useFeature'
+import { useCohorts } from '@/lib/queries'
 
 type Tab = 'script' | 'breakdown' | 'crew' | 'cast' | 'shots' | 'locations' | 'costume' | 'makeup' | 'props' | 'schedule' | 'shotlog' | 'budget'
 
@@ -246,7 +247,7 @@ export default function ProductionEditor() {
     production?.cohortId ?? '',
   )
 
-  const { data: allCohorts } = useCollection<CohortDoc>('cohorts', [orderBy('name', 'asc')])
+  const { data: allCohorts, cohortOf } = useCohorts()
 
   // Data for exports
   const { data: scenes } = useCollection<ProductionSceneDoc>(
@@ -728,7 +729,7 @@ export default function ProductionEditor() {
                       {(production.sharedCohortIds ?? []).length > 0 && (
                         <div className="space-y-1">
                           {(production.sharedCohortIds ?? []).map(cid => {
-                            const cohort = allCohorts.find(c => c.id === cid)
+                            const cohort = cohortOf(cid)
                             return (
                               <div key={cid} className="flex items-center gap-2 bg-emerald-950/20 border border-emerald-900/30 rounded-lg px-2.5 py-1.5">
                                 <span className="text-xs text-emerald-300 flex-1">{cohort?.name ?? 'Unknown class'}</span>

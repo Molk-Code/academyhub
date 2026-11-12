@@ -3,10 +3,7 @@ import { collection, updateDoc, doc, getDocs, onSnapshot } from 'firebase/firest
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy, where } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
-import type {
-  ProductionPeriodDoc, PeriodAllocationDoc, ProductionDoc, UserDoc, CohortDoc,
-  ProductionShootingDayDoc, ProductionCrewAssignmentDoc, CrewRoleDoc, EquipmentDoc, EquipmentBookingDoc,
-} from '@/types'
+import type { ProductionPeriodDoc, PeriodAllocationDoc, ProductionDoc, UserDoc, ProductionShootingDayDoc, ProductionCrewAssignmentDoc, CrewRoleDoc, EquipmentDoc, EquipmentBookingDoc } from '@/types'
 import { CalendarRange, Plus, Pencil, Trash2 } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { PeriodCallSheetLoader } from '@/components/production/PeriodCallSheetLoader'
@@ -15,6 +12,7 @@ import { PeriodForm } from './PeriodForm'
 import { MasterCalendar } from './MasterCalendar'
 import { CrewView } from './CrewView'
 import { BudgetOverview } from './BudgetOverview'
+import { useCohorts } from '@/lib/queries'
 
 // ── Teacher page ──────────────────────────────────────────────────────────────
 
@@ -23,7 +21,7 @@ const ALL_PERIODS_ID = '__all__'
 export default function TeacherProductionPeriod({
   embedded = false, cohortId: cohortIdProp,
 }: { embedded?: boolean; cohortId?: string }) {
-  const { data: cohorts } = useCollection<CohortDoc>('cohorts', [orderBy('name', 'asc')])
+  const { data: cohorts, cohortOf } = useCohorts()
   const [internalCohortId, setInternalCohortId] = useState('')
   const cohortId = embedded ? (cohortIdProp ?? '') : internalCohortId
   const setCohortId = embedded ? (() => {}) : setInternalCohortId
@@ -250,7 +248,7 @@ export default function TeacherProductionPeriod({
                 className="bg-zinc-800 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-brand-500/30">
                 {periods.map(p => (
                   <option key={p.id} value={p.id}>
-                    {p.title}{!cohortId ? ` — ${cohorts.find(c => c.id === p.cohortId)?.name ?? ''}` : ''}
+                    {p.title}{!cohortId ? ` — ${cohortOf(p.cohortId)?.name ?? ''}` : ''}
                   </option>
                 ))}
                 {periods.length > 1 && (

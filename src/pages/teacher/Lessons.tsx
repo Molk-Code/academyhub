@@ -5,10 +5,10 @@ import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
-import { useVisibleEvents, useInvitableUserGroups, filterGroups, cohortToggleAllows } from '@/lib/queries'
+import { useVisibleEvents, useInvitableUserGroups, filterGroups, cohortToggleAllows, useCohorts } from '@/lib/queries'
 import { shortDate, timeStr, toDate } from '@/lib/utils'
-import type { LessonDoc, SubjectDoc, CohortDoc, LessonBlockDoc, SemesterSettingsDoc, LessonCategoryDoc, UserDoc, PersonalEventDoc, SyncedEventDoc, GuestTeacherDoc, GuestTeacherBookingDoc } from '@/types'
-import { Plus, Pencil, Trash2, CalendarDays, LayoutGrid, X, QrCode, Circle, SlidersHorizontal, ChevronDown, Check, MapPin, Download, RefreshCw } from 'lucide-react'
+import type { LessonDoc, SubjectDoc, LessonBlockDoc, SemesterSettingsDoc, LessonCategoryDoc, UserDoc, PersonalEventDoc, SyncedEventDoc, GuestTeacherDoc, GuestTeacherBookingDoc } from '@/types'
+import { Plus, Pencil, Trash2, CalendarDays, LayoutGrid, X, QrCode, Circle, SlidersHorizontal, ChevronDown, Check, MapPin, Download, RefreshCw, Copy } from 'lucide-react'
 import { markCalendarInvitesSeen } from '@/hooks/useCalendarInviteBadge'
 import AnnualPlanWheel from '@/components/calendar/AnnualPlanWheel'
 import CurriculumOptions from '@/components/subjects/CurriculumOptions'
@@ -23,6 +23,7 @@ import interactionPlugin from '@fullcalendar/interaction'
 import type { EventInput } from '@fullcalendar/core'
 import CalendarFilterChips from '@/components/calendar/CalendarFilterChips'
 import ImportIcsDialog from '@/components/calendar/ImportIcsDialog'
+import CopyPlanDialog from '@/components/calendar/CopyPlanDialog'
 import { useCalendarFilters } from '@/lib/calendarFilters'
 
 // ── Semester marker helper ────────────────────────────────────────────────────
@@ -217,6 +218,7 @@ export default function Lessons() {
   const [viewingInvitedEvent, setViewingInvitedEvent] = useState<PersonalEventDoc | null>(null)
   const [pdfPickerOpen, setPdfPickerOpen] = useState(false)
   const [icsOpen, setIcsOpen] = useState(false)
+  const [copyPlanOpen, setCopyPlanOpen] = useState(false)
   const calendarRef     = useRef<FullCalendar>(null)
   // Desktop: FullCalendar grid (default — scheduling/ghost blocks live there) or the day timeline
   const [desktopView, setDesktopView] = useState<'timeline' | 'grid'>(() => {
@@ -318,7 +320,7 @@ export default function Lessons() {
   )
 
   const { data: subjects  } = useCollection<SubjectDoc>('subjects')
-  const { data: cohorts   } = useCollection<CohortDoc>('cohorts')
+  const { data: cohorts, all: allCohorts } = useCohorts()
   const { data: blocks      } = useCollection<LessonBlockDoc>('lessonBlocks', [orderBy('order', 'asc')])
   const { data: schoolDay   } = useDocument<SchoolDayDoc>('settings', 'schoolDay')
   const { data: semesterDoc } = useDocument<SemesterSettingsDoc>('settings', 'semester')
@@ -375,7 +377,7 @@ export default function Lessons() {
   const scrollTime = schoolDay?.startTime ? `${schoolDay.startTime}:00` : '07:00:00'
 
   const subjectMap = useMemo(() => Object.fromEntries(subjects.map(s => [s.id, s])), [subjects])
-  const cohortMap  = useMemo(() => Object.fromEntries(cohorts.map(c => [c.id, c])),  [cohorts])
+  const cohortMap  = useMemo(() => Object.fromEntries(allCohorts.map(c => [c.id, c])),  [cohorts])
 
   const myCalendarColor = (profile as any)?.calendarColor ?? '#86bbd8'
 
@@ -1115,6 +1117,13 @@ export default function Lessons() {
           >
             <RefreshCw className="w-4 h-4" /> Sync Outlook (.ics)
           </button>
+          <button
+            onClick={() => setCopyPlanOpen(true)}
+            className="btn-secondary py-2"
+            title="Copy lessons and assignments from another class, e.g. last year's"
+          >
+            <Copy className="w-4 h-4" /> Copy last year's plan
+          </button>
           <Link to="/teacher/lessons/new" className="btn-primary py-2">
             <Plus className="w-4 h-4" /> New Lesson
           </Link>
@@ -1122,6 +1131,7 @@ export default function Lessons() {
       </div>
 
       {icsOpen && <ImportIcsDialog onClose={() => setIcsOpen(false)} />}
+      {copyPlanOpen && <CopyPlanDialog onClose={() => setCopyPlanOpen(false)} />}
 
       {/* ── Filters panel ────────────────────────────────────────────────── */}
       {showFilters && (

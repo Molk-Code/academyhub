@@ -4,12 +4,13 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
-import type { ChatChannelDoc, CohortDoc, UserDoc, UserRole, ProductionTeamDoc } from '@/types'
+import type { ChatChannelDoc, UserDoc, UserRole, ProductionTeamDoc } from '@/types'
 import {
   Hash, Plus, Trash2, X, Lock, Globe, UserPlus, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import Avatar from '@/components/common/Avatar'
 import { cn } from '@/lib/utils'
+import { useCohorts } from '@/lib/queries'
 
 export function ChannelSettingsModal({
   channel,
@@ -34,7 +35,7 @@ export function ChannelSettingsModal({
   const [showAddList,       setShowAddList]       = useState(false)
 
   const { data: allUsers }   = useCollection<UserDoc>('users', [orderBy('displayName', 'asc')])
-  const { data: allCohorts } = useCollection<CohortDoc>('cohorts', [orderBy('name', 'asc')])
+  const { data: allCohorts } = useCohorts()
   const { data: allTeams }   = useCollection<ProductionTeamDoc>('production_teams')
 
   const nonAdminUsers = allUsers.filter(u => {

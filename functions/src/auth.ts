@@ -121,17 +121,24 @@ export const sendInviteEmail = functions
       throw new functions.https.HttpsError('permission-denied', 'Admin only.')
     }
 
-    const { email, role, cohortId, appUrl } = data as {
+    const { email, role, cohortId, appUrl, displayName, expiresInDays } = data as {
       email: string
       role: string
       cohortId?: string | null
       appUrl: string
+      displayName?: string     // prefills the name on the sign-up page (CSV invites)
+      expiresInDays?: number   // default 7
     }
     if (!email) throw new functions.https.HttpsError('invalid-argument', 'email required.')
+    if (role && role !== 'student' && role !== 'teacher') {
+      throw new functions.https.HttpsError('invalid-argument', 'Invite students or teachers; make admins from the user list.')
+    }
+    const days = Math.min(60, Math.max(1, Math.round(Number(expiresInDays) || 7)))
 
-    const expiresAt = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+    const expiresAt = admin.firestore.Timestamp.fromDate(new Date(Date.now() + days * 24 * 60 * 60 * 1000))
     const ref = await db.collection('invitations').add({
-      email,
+      email:     String(email).trim().toLowerCase(),
+      ...(displayName?.trim() ? { displayName: displayName.trim().slice(0, 80) } : {}),
       role:      role ?? 'student',
       cohortId:  cohortId ?? null,
       used:      false,
@@ -156,7 +163,7 @@ export const sendInviteEmail = functions
             <h2 style="margin-bottom:8px">You've been invited</h2>
             <p style="color:#555;margin-bottom:24px">
               You have been invited to join ${escapeHtml(fromName)} as a <strong>${escapeHtml(role)}</strong>.
-              Click the button below to create your account. This link expires in 7 days.
+              Click the button below to create your account. This link expires in ${days} days.
             </p>
             <a href="${inviteUrl}"
                style="display:inline-block;background:#f97316;color:white;text-decoration:none;

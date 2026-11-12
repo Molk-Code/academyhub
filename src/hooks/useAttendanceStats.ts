@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { isAfter, isBefore, startOfDay, format } from 'date-fns'
 import { useCollection, where } from '@/hooks/useFirestore'
-import type { LessonDoc, PointsLogDoc, CohortDoc } from '@/types'
+import type { LessonDoc, PointsLogDoc } from '@/types'
+import { useCohorts } from '@/lib/queries'
 
 export interface AttendanceLessonRow {
   id: string
@@ -31,7 +32,7 @@ export function useAttendanceStats(
     cohortId ? [where('cohortId', '==', cohortId)] : [],
     !!cohortId,
   )
-  const { data: cohorts } = useCollection<CohortDoc>('cohorts')
+  const { all: cohorts } = useCohorts()
   const { data: checkIns } = useCollection<PointsLogDoc>(
     'points_log',
     uid ? [where('studentId', '==', uid), where('reason', '==', 'attendance')] : [],

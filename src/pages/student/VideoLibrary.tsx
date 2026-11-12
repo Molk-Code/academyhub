@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useMicrosoftAuth } from '@/contexts/MicrosoftAuthContext'
 import { useCollection, where, orderBy } from '@/hooks/useFirestore'
 import { uploadFile, getItemThumbnail } from '@/lib/graphApi'
-import type { VideoDoc, SubjectDoc, CohortDoc } from '@/types'
+import type { VideoDoc, SubjectDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { clickable } from '@/lib/a11y'
@@ -27,7 +27,6 @@ export default function StudentVideoLibrary() {
   const { config, isConfigured, isMsSignedIn, signInWithMicrosoft, getAccessToken } = useMicrosoftAuth()
 
   const { data: subjects }  = useCollection<SubjectDoc>('subjects')
-  const { data: cohortDoc } = useCollection<CohortDoc>('cohorts', cohortId ? [where('id', '==', cohortId)] : [], !!cohortId)
   const { data: myVideos, loading } = useCollection<VideoDoc>(
     'videos',
     profile ? [where('studentId', '==', profile.uid), orderBy('createdAt', 'desc')] : [],

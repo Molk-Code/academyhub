@@ -8,12 +8,13 @@ import { db, functions } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
 import { toDate } from '@/lib/utils'
-import type { UserDoc, CohortDoc, ProgressDoc, LessonDoc, AbsenceReportDoc } from '@/types'
+import type { UserDoc, ProgressDoc, LessonDoc, AbsenceReportDoc } from '@/types'
 import Avatar from '@/components/common/Avatar'
 import XPBar from '@/components/dashboard/XPBar'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import EmptyState from '@/components/common/EmptyState'
 import ErrorState from '@/components/common/ErrorState'
+import { useCohorts } from '@/lib/queries'
 
 interface AddAbsenceState {
   student: UserDoc
@@ -38,7 +39,7 @@ export default function Students() {
 
   const [attendanceMap, setAttendanceMap] = useState<Record<string, Set<string>>>({})
 
-  const { data: cohorts } = useCollection<CohortDoc>('cohorts')
+  const { data: cohorts, cohortOf } = useCohorts()
   const { data: students, loading, error: studentsError, retry: retryStudents } = useCollection<UserDoc>('users', [where('role', '==', 'student')])
   const { data: progressDocs } = useCollection<ProgressDoc & { id: string }>('progress')
   const { data: allLessons } = useCollection<LessonDoc>('lessons')
@@ -248,7 +249,7 @@ export default function Students() {
     const byCohort: Record<string, { name: string; rows: AbsenceReportDoc[] }> = {}
     for (const r of source) {
       if (!byCohort[r.cohortId]) {
-        const cohortName = cohorts.find(c => c.id === r.cohortId)?.name ?? r.cohortId
+        const cohortName = cohortOf(r.cohortId)?.name ?? r.cohortId
         byCohort[r.cohortId] = { name: cohortName, rows: [] }
       }
       byCohort[r.cohortId].rows.push(r)
@@ -349,7 +350,7 @@ export default function Students() {
           <div className="grid grid-cols-2 gap-3 sm:hidden">
             {filtered.map(student => {
               const progress    = progressMap[student.uid]
-              const cohort      = cohorts.find(c => c.id === student.cohortId)
+              const cohort      = cohortOf(student.cohortId)
               const todayLesson = student.cohortId ? latestLessonByCohort[student.cohortId] : undefined
               const attendees   = todayLesson ? attendanceMap[todayLesson.id] : undefined
               const isPresent   = attendees !== undefined ? attendees.has(student.uid) : undefined
@@ -419,7 +420,7 @@ export default function Students() {
               <tbody className="divide-y divide-white/5">
                 {filtered.map(student => {
                   const progress    = progressMap[student.uid]
-                  const cohort      = cohorts.find(c => c.id === student.cohortId)
+                  const cohort      = cohortOf(student.cohortId)
                   const todayLesson = student.cohortId ? latestLessonByCohort[student.cohortId] : undefined
                   const attendees   = todayLesson ? attendanceMap[todayLesson.id] : undefined
                   const isPresent   = attendees !== undefined ? attendees.has(student.uid) : undefined
@@ -677,7 +678,7 @@ export default function Students() {
                 <Avatar uid={addAbsence.student.uid} name={addAbsence.student.displayName} size="sm" />
                 <div>
                   <p className="text-sm font-medium text-zinc-100">{addAbsence.student.displayName}</p>
-                  <p className="text-xs text-zinc-500">{cohorts.find(c => c.id === addAbsence.student.cohortId)?.name ?? '—'}</p>
+                  <p className="text-xs text-zinc-500">{cohortOf(addAbsence.student.cohortId)?.name ?? '—'}</p>
                 </div>
               </div>
 

@@ -5,9 +5,10 @@ import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection, where } from '@/hooks/useFirestore'
 import { shortDate } from '@/lib/utils'
-import type { TestDoc, AssignmentDoc, SubjectDoc, CohortDoc } from '@/types'
+import type { TestDoc, AssignmentDoc, SubjectDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { cn } from '@/lib/utils'
+import { useCohorts } from '@/lib/queries'
 
 export default function TestList() {
   const navigate = useNavigate()
@@ -16,7 +17,7 @@ export default function TestList() {
   const { data: tests,    loading }  = useCollection<TestDoc>('tests')
   const { data: assignments }        = useCollection<AssignmentDoc>('assignments', [where('type', '==', 'test')])
   const { data: subjects }           = useCollection<SubjectDoc>('subjects')
-  const { data: cohorts }            = useCollection<CohortDoc>('cohorts')
+  const { all: cohorts } = useCohorts()   // past results: archived classes too
 
   const assignmentMap = useMemo(() => Object.fromEntries(assignments.map(a => [a.id, a])), [assignments])
   const subjectMap    = useMemo(() => Object.fromEntries(subjects.map(s => [s.id, s])), [subjects])

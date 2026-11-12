@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { format } from 'date-fns'
+import { useCohorts } from '@/lib/queries'
 
 // Functions host of the project this build talks to; falls back to production
 const PROJECT_ID = import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined
@@ -122,7 +123,7 @@ function SyncCard({ sync, cohorts }: { sync: OfficeCalendarSyncDoc; cohorts: Coh
 
   const cohortLabel = sync.cohortId === 'all'
     ? 'All cohorts'
-    : cohorts.find(c => c.id === sync.cohortId)?.name ?? '— pick a cohort —'
+    : cohorts.find(c => c.id === sync.cohortId)?.name ?? '— pick a cohort —'   // an archived class needs a new target
 
   return (
     <div className={cn('bg-zinc-900 border rounded-2xl overflow-hidden', health.stale ? 'border-amber-500/40' : 'border-white/10')}>
@@ -264,7 +265,7 @@ function SyncCard({ sync, cohorts }: { sync: OfficeCalendarSyncDoc; cohorts: Coh
 export default function OfficeCalendarSync() {
   const { profile } = useAuth()
   const { data: syncs, loading } = useCollection<OfficeCalendarSyncDoc>('office_calendar_syncs')
-  const { data: cohorts } = useCollection<CohortDoc>('cohorts')
+  const { data: cohorts } = useCohorts()
   const [creating, setCreating] = useState(false)
 
   async function createSync() {

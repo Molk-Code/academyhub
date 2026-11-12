@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { UserDoc } from '@/types'
-import { resolveViewCohortId, cohortToggleAllows, syncedEventScope, groupUsersByName, filterGroups } from './scope'
+import { resolveViewCohortId, cohortToggleAllows, syncedEventScope, groupUsersByName, filterGroups, sortCohorts } from './scope'
 
 describe('resolveViewCohortId', () => {
   it('an admin previewing a class sees that class, even with a class of their own', () => {
@@ -65,6 +65,14 @@ describe('groupUsersByName', () => {
   })
 })
 
+describe('sortCohorts', () => {
+  it('by name; archived classes only in `all`', () => {
+    const r = sortCohorts([{ name: 'Ö-klass' }, { name: 'Film 2025', archived: true }, { name: 'Ljud' }, { name: 'Film 2026' }])
+    expect(r.active.map(c => c.name)).toEqual(['Film 2026', 'Ljud', 'Ö-klass'])
+    expect(r.all.map(c => c.name)).toEqual(['Film 2025', 'Film 2026', 'Ljud', 'Ö-klass'])
+  })
+})
+
 // Pages must use this layer rather than rebuild its rules. A match here means
 // a page went back to its own copy: use the hook from '@/lib/queries' instead.
 describe('pages use the query layer', () => {
@@ -84,6 +92,9 @@ describe('pages use the query layer', () => {
   })
   it('Outlook events: useVisibleEvents', () => {
     expect(offenders(/useCollection<SyncedEventDoc>|useCollection\(\s*'synced_events'/)).toEqual([])
+  })
+  it('class lists: useCohorts (keeps archived classes out of pickers)', () => {
+    expect(offenders(/useCollection<CohortDoc>\('cohorts'\s*[,)]/)).toEqual([])
   })
   it('duplicate users: groupUsersByName / useInvitableUserGroups', () => {
     expect(offenders(/repId: u\.id/)).toEqual([])

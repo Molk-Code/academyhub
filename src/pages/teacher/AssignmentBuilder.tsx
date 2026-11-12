@@ -11,9 +11,10 @@ import { db } from '@/lib/firebase'
 import { uploadWithQuota } from '@/lib/uploadWithQuota'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection } from '@/hooks/useFirestore'
-import type { SubjectDoc, CohortDoc, AssignmentDoc } from '@/types'
+import type { SubjectDoc, AssignmentDoc } from '@/types'
 import { Plus, Trash2, Link2, Video, FileText, Upload, Loader2 } from 'lucide-react'
 import { useEffect } from 'react'
+import { useCohorts } from '@/lib/queries'
 
 const resourceSchema = z.object({
   type:        z.enum(['file', 'video', 'link', 'youtube']),
@@ -44,7 +45,7 @@ export default function AssignmentBuilder() {
   const [uploading, setUploading] = useState(false)
 
   const { data: subjects } = useCollection<SubjectDoc>('subjects')
-  const { data: cohorts  } = useCollection<CohortDoc>('cohorts')
+  const { data: cohorts } = useCohorts()
 
   const { register, handleSubmit, control, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),

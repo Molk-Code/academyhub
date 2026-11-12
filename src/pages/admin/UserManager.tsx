@@ -7,15 +7,17 @@ import { sendPasswordResetEmail, sendSignInLinkToEmail } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
-import { useCollection, where } from '@/hooks/useFirestore'
+import { useCollection } from '@/hooks/useFirestore'
 import { useAllUsers } from '@/hooks/useAllUsers'
-import type { UserDoc, CohortDoc, ClassInviteDoc } from '@/types'
+import CsvInvite from '@/components/admin/CsvInvite'
+import type { UserDoc, ClassInviteDoc } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { Copy, Check, UserPlus, UserX, UserCheck, Mail, ShieldCheck, Trash2, KeyRound, X, Users, ClipboardCopy, ChevronDown, ChevronUp, RotateCcw, Link, QrCode, Download, Ban, Trophy } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
 import Avatar from '@/components/common/Avatar'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { cn } from '@/lib/utils'
+import { useCohorts } from '@/lib/queries'
 
 const schema = z.object({
   email:    z.string().email('Valid email required'),
@@ -74,7 +76,7 @@ export default function UserManager() {
 
   const { profile } = useAuth()
   const { data: users,       loading } = useAllUsers()
-  const { data: cohorts }              = useCollection<CohortDoc>('cohorts')
+  const { data: cohorts, cohortOf } = useCohorts()
   const { data: invitations }          = useCollection<Invitation>('invitations')
   const { data: classInvites }         = useCollection<ClassInviteDoc>('classInvites')
   const qrCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -234,7 +236,7 @@ export default function UserManager() {
     if (existing) return
     setQrLoading(true)
     try {
-      const cohort = cohorts.find(c => c.id === cohortId)
+      const cohort = cohortOf(cohortId)
       await addDoc(collection(db, 'classInvites'), {
         cohortId,
         cohortName: cohort?.name ?? '',
@@ -254,7 +256,7 @@ export default function UserManager() {
     setQrLoading(true)
     try {
       await updateDoc(doc(db, 'classInvites', oldInviteId), { active: false })
-      const cohort = cohorts.find(c => c.id === cohortId)
+      const cohort = cohortOf(cohortId)
       await addDoc(collection(db, 'classInvites'), {
         cohortId,
         cohortName: cohort?.name ?? '',
@@ -359,7 +361,7 @@ export default function UserManager() {
     await Promise.all([...selectedIds].map(uid =>
       updateDoc(doc(db, 'users', uid), { cohortId: assignCohort }),
     ))
-    const cohortName = cohorts.find(c => c.id === assignCohort)?.name ?? 'class'
+    const cohortName = cohortOf(assignCohort)?.name ?? 'class'
     setAssignedMsg(`${selectedIds.size} user${selectedIds.size !== 1 ? 's' : ''} assigned to ${cohortName}`)
     setTimeout(() => setAssignedMsg(''), 3000)
     clearAll()
@@ -549,6 +551,12 @@ export default function UserManager() {
         )}
       </div>
 
+      <CsvInvite
+        cohorts={cohorts}
+        existingEmails={new Set(users.map(u => (u.email ?? '').toLowerCase()).filter(Boolean))}
+        pendingEmails={new Set(activeInvites.map(i => i.email.toLowerCase()))}
+      />
+
       {/* Class invite QR codes — one reusable, multi-scan QR per class */}
       {cohorts.length > 0 && (
         <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 space-y-4 shadow-sm">
@@ -572,7 +580,7 @@ export default function UserManager() {
 
       {/* Class QR modal */}
       {qrOpen && qrCohortId && (() => {
-        const cohort = cohorts.find(c => c.id === qrCohortId)
+        const cohort = cohortOf(qrCohortId)
         const invite = classInvites.find(ci => ci.cohortId === qrCohortId && ci.active)
         const url = invite ? `${window.location.origin}/accept-invite?class=${invite.id}` : ''
         return (

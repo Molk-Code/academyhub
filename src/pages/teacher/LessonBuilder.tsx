@@ -9,11 +9,12 @@ import {
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, orderBy, where } from '@/hooks/useFirestore'
-import type { SubjectDoc, CohortDoc, LessonBlockDoc, ClassroomDoc, UserDoc, LessonCategoryDoc, CurriculumItem, GuestTeacherDoc, GuestTeacherBookingDoc } from '@/types'
+import type { SubjectDoc, LessonBlockDoc, ClassroomDoc, UserDoc, LessonCategoryDoc, CurriculumItem, GuestTeacherDoc, GuestTeacherBookingDoc } from '@/types'
 import { Link2, Trash2, Video, FileText } from 'lucide-react'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import CurriculumOptions from '@/components/subjects/CurriculumOptions'
 import EmojiPicker    from '@/components/common/EmojiPicker'
+import { useCohorts } from '@/lib/queries'
 
 // ── Classroom combobox ────────────────────────────────────────────────────────
 
@@ -152,7 +153,7 @@ export default function LessonBuilder() {
   const [coveredCurriculumIds, setCoveredCurriculumIds] = useState<string[]>([])
 
   const { data: subjects    } = useCollection<SubjectDoc>('subjects')
-  const { data: cohorts     } = useCollection<CohortDoc>('cohorts')
+  const { data: cohorts, cohortOf } = useCohorts()
   const { data: lcategories } = useCollection<LessonCategoryDoc>('lessonCategories', [orderBy('order', 'asc')])
   const { data: blocks     } = useCollection<LessonBlockDoc>('lessonBlocks', [orderBy('order', 'asc')])
   const { data: classrooms } = useCollection<ClassroomDoc>('classrooms', [orderBy('order', 'asc')])
@@ -200,7 +201,7 @@ export default function LessonBuilder() {
   // Only offer subjects that actually belong to this class's program year —
   // matches the filter the Subjects menu itself uses.
   const selectedCohort = useMemo(
-    () => cohorts.find(c => c.id === selectedCohortId) ?? null,
+    () => cohortOf(selectedCohortId) ?? null,
     [cohorts, selectedCohortId],
   )
   const availableSubjects = useMemo(

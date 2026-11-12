@@ -10,6 +10,7 @@ import {
   Folder, FolderOpen, ChevronRight, Users, GraduationCap,
 } from 'lucide-react'
 import { clickable } from '@/lib/a11y'
+import { sortCohorts } from '@/lib/queries'
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -394,12 +395,13 @@ export default function TeacherResources() {
   const { data: allResources } = useCollection<TeamResourceDoc>('team_resources')
   const { data: folders }      = useCollection<ResourceFolderDoc>('resource_folders')
   // Admins see all cohorts; teachers only see their own via teacherIds
-  const { data: allCohorts }   = useCollection<CohortDoc>(
+  const { data: allCohortsRaw } = useCollection<CohortDoc>(
     'cohorts',
     isAdmin || !profile ? [] : [where('teacherIds', 'array-contains', profile.uid)],
     !!profile,
     isAdmin ? 'all' : (profile?.uid ?? ''),
   )
+  const allCohorts = useMemo(() => sortCohorts(allCohortsRaw).active, [allCohortsRaw])   // ended classes left out
 
   // Default to first cohort
   const cohortId = selectedCohortId || allCohorts[0]?.id || null

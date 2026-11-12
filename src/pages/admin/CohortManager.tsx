@@ -5,11 +5,15 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { parseISO } from 'date-fns'
 import { collection, addDoc, Timestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { httpsCallable } from 'firebase/functions'
+import { db, functions } from '@/lib/firebase'
 import { useCollection, useDocument, where } from '@/hooks/useFirestore'
+import { useCohorts } from '@/lib/queries'
+import RolloverDialog from '@/components/admin/RolloverDialog'
+import CopyPlanDialog from '@/components/calendar/CopyPlanDialog'
 import type { CohortDoc, UserDoc, SemesterSettingsDoc } from '@/types'
 import { shortDate } from '@/lib/utils'
-import { Users, Plus, GraduationCap, Sparkles } from 'lucide-react'
+import { Users, Plus, GraduationCap, Sparkles, CalendarCheck, Archive, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react'
 
 const schema = z.object({
   name:        z.string().min(2, 'Name required'),
@@ -24,7 +28,12 @@ export default function CohortManager() {
   const [showForm, setShowForm] = useState(false)
   const [saving,   setSaving]   = useState(false)
 
-  const { data: cohorts  } = useCollection<CohortDoc>('cohorts')
+  const { data: cohorts, all: allCohorts } = useCohorts()
+  const archived = allCohorts.filter(c => c.archived)
+  const [rollover, setRollover] = useState<CohortDoc | null>(null)
+  const [copyPlanTo, setCopyPlanTo] = useState<string | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
+  const [restoring, setRestoring] = useState<string | null>(null)
   const { data: teachers } = useCollection<UserDoc>('users', [where('role', 'in', ['teacher', 'admin'])])
   const { data: students } = useCollection<UserDoc>('users', [where('role', '==', 'student')])
   const { data: semesterDoc } = useDocument<SemesterSettingsDoc>('settings', 'semester')
@@ -54,12 +63,29 @@ export default function CohortManager() {
     setSaving(false)
   }
 
+  async function restore(c: CohortDoc) {
+    if (!confirm(`Restore ${c.name}? It shows up in class pickers again. Students who moved to another class stay there.`)) return
+    setRestoring(c.id)
+    try { await httpsCallable(functions, 'restoreClass')({ cohortId: c.id }) }
+    catch (e: any) { alert(e?.message ?? 'Restore failed') }
+    finally { setRestoring(null) }
+  }
+
   return (
     <div className="space-y-8">
+      {rollover && (
+        <RolloverDialog
+          cohort={rollover}
+          students={students.filter(s => s.cohortId === rollover.id)}
+          onClose={() => setRollover(null)}
+          onCopyPlan={id => { setRollover(null); setCopyPlanTo(id) }}
+        />
+      )}
+      {copyPlanTo && <CopyPlanDialog toCohortId={copyPlanTo} onClose={() => setCopyPlanTo(null)} />}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="page-title">Class Manager</h1>
-          <p className="text-zinc-400 text-sm mt-1">Organise students into year groups and assign teachers.</p>
+          <p className="text-zinc-400 text-sm mt-1">Organise students into year groups and assign teachers. At the end of the school year, use <b>End of year</b> on each class.</p>
         </div>
         <button onClick={() => setShowForm(v => !v)} className="btn-primary py-2.5">
           <Plus className="w-4 h-4" /> New Class
@@ -133,6 +159,13 @@ export default function CohortManager() {
                     {cohortStudents.length}
                   </div>
                   <button
+                    onClick={() => setRollover(cohort)}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-white/15 text-zinc-300 hover:bg-white/10 transition-colors font-medium flex items-center gap-1 whitespace-nowrap"
+                    title="Archive the class and move its students on to next year's class"
+                  >
+                    <CalendarCheck className="w-3.5 h-3.5" aria-hidden="true" /> End of year
+                  </button>
+                  <button
                     onClick={() => navigate(`/admin/cohorts/${cohort.id}`)}
                     className="text-xs px-3 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-500 transition-colors font-medium"
                   >
@@ -184,6 +217,37 @@ export default function CohortManager() {
           <div className="col-span-2 text-center py-12 text-zinc-500 text-sm">No classes yet. Create one above.</div>
         )}
       </div>
+
+      {archived.length > 0 && (
+        <section className="space-y-3">
+          <button onClick={() => setShowArchived(v => !v)} aria-expanded={showArchived}
+            className="flex items-center gap-2 text-sm font-semibold text-zinc-400 hover:text-zinc-200">
+            <Archive className="w-4 h-4" aria-hidden="true" /> Archived classes ({archived.length})
+            {showArchived ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+          {showArchived && (
+            <ul className="divide-y divide-white/5 rounded-2xl border border-white/10 bg-zinc-900">
+              {archived.map(c => (
+                <li key={c.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-zinc-200">{c.name}</p>
+                    <p className="text-[11px] text-zinc-500">
+                      Year {c.programYear} · {c.studentIds?.length ?? 0} students
+                      {c.archivedAt && ` · archived ${c.archivedAt.toDate().toLocaleDateString('sv-SE')}`}
+                      {c.nextCohortId && ` · continued in ${allCohorts.find(n => n.id === c.nextCohortId)?.name ?? 'another class'}`}
+                    </p>
+                  </div>
+                  <button onClick={() => navigate(`/admin/cohorts/${c.id}`)} className="text-xs text-zinc-400 hover:text-zinc-200">View</button>
+                  <button onClick={() => restore(c)} disabled={restoring === c.id}
+                    className="text-xs text-zinc-400 hover:text-zinc-200 flex items-center gap-1 disabled:opacity-50">
+                    <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Restore
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
     </div>
   )
 }

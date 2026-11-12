@@ -3,14 +3,15 @@ import { Link } from 'react-router-dom'
 import { Video, Play, CheckCircle2, Clock, Search, Filter, AlertCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import { useCollection, where, orderBy } from '@/hooks/useFirestore'
-import type { VideoDoc, SubjectDoc, CohortDoc, UserDoc } from '@/types'
+import type { VideoDoc, SubjectDoc, UserDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import Avatar from '@/components/common/Avatar'
+import { useCohorts } from '@/lib/queries'
 
 export default function TeacherVideoLibrary() {
   const { data: subjects } = useCollection<SubjectDoc>('subjects')
-  const { data: cohorts }  = useCollection<CohortDoc>('cohorts', [orderBy('name', 'asc')])
+  const { data: cohorts } = useCohorts()
   const { data: students } = useCollection<UserDoc>('users', [where('role', '==', 'student')])
   const { data: allVideos, loading } = useCollection<VideoDoc>('videos', [orderBy('createdAt', 'desc')])
 

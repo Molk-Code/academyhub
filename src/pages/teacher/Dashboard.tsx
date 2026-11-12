@@ -15,6 +15,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import EmptyState from '@/components/common/EmptyState'
+import { sortCohorts } from '@/lib/queries'
 
 function AttendanceCount({ lessonId }: { lessonId: string }) {
   const [count, setCount] = useState(0)
@@ -83,12 +84,13 @@ export default function TeacherDashboard() {
   const now = new Date()
 
   // Admins see all cohorts; teachers only see their own
-  const { data: cohorts, loading: cohortsLoading } = useCollection<CohortDoc>(
+  const { data: cohortsRaw, loading: cohortsLoading } = useCollection<CohortDoc>(
     'cohorts',
     isAdmin || !profile ? [] : [where('teacherIds', 'array-contains', profile.uid)],
     !!profile,
     isAdmin ? 'all' : (profile?.uid ?? ''),
   )
+  const cohorts = useMemo(() => sortCohorts(cohortsRaw).active, [cohortsRaw])   // ended classes left out
 
   // Students in those cohorts
   const { data: students } = useCollection<UserDoc>(

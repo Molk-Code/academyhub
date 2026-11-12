@@ -19,14 +19,15 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
-import { useCollection, where } from '@/hooks/useFirestore'
-import type { SubjectDoc, CohortDoc, TestDoc, Question } from '@/types'
+import { useCollection } from '@/hooks/useFirestore'
+import type { SubjectDoc, TestDoc, Question } from '@/types'
 import {
   Plus, Trash2, GripVertical, CheckCircle2, Check,
   AlignLeft, ListChecks, ToggleLeft, Square, ArrowUpDown, Star,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useEffect } from 'react'
+import { useCohorts } from '@/lib/queries'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -396,7 +397,7 @@ export default function TestBuilder() {
   const [assignmentId, setAssignmentId] = useState<string | null>(null)
 
   const { data: subjects } = useCollection<SubjectDoc>('subjects')
-  const { data: cohorts }  = useCollection<CohortDoc>('cohorts')
+  const { data: cohorts } = useCohorts()
 
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm<TestFormData>({
     resolver: zodResolver(schema),

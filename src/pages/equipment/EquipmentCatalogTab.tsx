@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { deleteDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useCollection } from '@/hooks/useFirestore'
-import type { EquipmentDoc, EquipmentCategoryDoc, CohortDoc } from '@/types'
+import type { EquipmentDoc, EquipmentCategoryDoc } from '@/types'
 import {
   Search, X, Plus, Package, QrCode, Barcode, Pencil, Trash2, Loader2, AlertTriangle,
   LayoutGrid, Camera, Wrench, Lightbulb, Mic, MapPin, BookOpen, type LucideIcon,
@@ -13,6 +13,7 @@ import { ItemForm } from './EquipmentItemForm'
 import { QRModal } from './EquipmentQRModal'
 import { BarcodeModal } from './EquipmentBarcodeModal'
 import { clickable } from '@/lib/a11y'
+import { useCohorts } from '@/lib/queries'
 
 // Known categories get a matching icon; anything custom (e.g. a school's own
 // added category) falls back to a generic package icon.
@@ -30,7 +31,7 @@ function categoryIcon(name: string): LucideIcon {
 
 export function CatalogTab({ categories, pricingEnabled }: { categories: EquipmentCategoryDoc[]; pricingEnabled: boolean }) {
   const { data: equipmentRaw } = useCollection<EquipmentDoc>('equipment')
-  const { data: cohorts } = useCollection<CohortDoc>('cohorts')
+  const { all: cohorts } = useCohorts()
   const equipment = useMemo(
     () => [...equipmentRaw].sort((a, b) => a.name.localeCompare(b.name)),
     [equipmentRaw],

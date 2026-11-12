@@ -5,14 +5,15 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
-import { useCollection, where, orderBy } from '@/hooks/useFirestore'
+import { useCollection, where } from '@/hooks/useFirestore'
 import { useAllUsers } from '@/hooks/useAllUsers'
-import type { CohortDoc, UserDoc, ProductionTeamDoc, Commandment, ChatChannelDoc, ProductionDoc } from '@/types'
+import type { UserDoc, ProductionTeamDoc, Commandment, ChatChannelDoc, ProductionDoc } from '@/types'
 import { Plus, Trash2, Check, X, Pencil, Users, Clapperboard, Film, Clock, Globe, Lock, CalendarRange, ArrowLeft } from 'lucide-react'
 import TeacherProductionPeriod from '@/pages/teacher/ProductionPeriod'
 import { cn } from '@/lib/utils'
 import { nanoid } from 'nanoid'
 import Avatar from '@/components/common/Avatar'
+import { useCohorts } from '@/lib/queries'
 
 const TEAM_COLORS = [
   '#ef4444','#f97316','#eab308','#22c55e',
@@ -36,7 +37,7 @@ type Tab = 'crews' | 'period' | 'productions'
 export default function TeacherProduction() {
   const { profile } = useAuth()
   const navigate = useNavigate()
-  const { data: cohorts } = useCollection<CohortDoc>('cohorts', [orderBy('name', 'asc')])
+  const { data: cohorts, cohortOf } = useCohorts()
   const [cohortId, setCohortId] = useState('')
   const [tab, setTab] = useState<Tab>('crews')
 
@@ -299,7 +300,7 @@ export default function TeacherProduction() {
               /* Single-class browse */
               <div>
                 <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <Users className="w-3.5 h-3.5" /> {cohorts.find(c => c.id === cohortId)?.name}
+                  <Users className="w-3.5 h-3.5" /> {cohortOf(cohortId)?.name}
                   <span className="font-normal normal-case text-zinc-600">{teams.length} crew{teams.length !== 1 ? 's' : ''}</span>
                   <button
                     onClick={() => openCrewManager(cohortId, null)}
@@ -646,7 +647,7 @@ export default function TeacherProduction() {
                     </div>
                     {prod.cohortId && (
                       <span className="text-[10px] text-zinc-600 font-mono truncate max-w-[120px]">
-                        {cohorts.find(c => c.id === prod.cohortId)?.name ?? prod.cohortId}
+                        {cohortOf(prod.cohortId)?.name ?? prod.cohortId}
                       </span>
                     )}
                   </div>

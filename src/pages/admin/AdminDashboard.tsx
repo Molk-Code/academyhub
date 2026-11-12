@@ -13,9 +13,8 @@ import { useAllUsers } from '@/hooks/useAllUsers'
 import { useCalendarSyncAlert } from '@/hooks/useCalendarSyncAlert'
 import { cn } from '@/lib/utils'
 import { localDate, equipmentOut, pickupsToday, daysOverdue } from '@/lib/adminDashboard'
-import type {
-  EquipmentBookingDoc, InventoryProjectDoc, FoodBoxOrderDoc, MinivanBookingDoc, LessonDoc, AbsenceReportDoc, CohortDoc,
-} from '@/types'
+import type { EquipmentBookingDoc, InventoryProjectDoc, FoodBoxOrderDoc, MinivanBookingDoc, LessonDoc, AbsenceReportDoc } from '@/types'
+import { useCohorts } from '@/lib/queries'
 
 interface BugReport { id: string; status: string; description: string; displayName: string; page: string; createdAt?: Timestamp }
 interface ContactRequest { id: string; status: string; name: string; organisation: string | null; message: string; createdAt?: Timestamp }
@@ -99,7 +98,7 @@ export default function AdminDashboard() {
     where('startTime', '<', Timestamp.fromDate(dayEnd)),
   ], academy, today)
   const { data: absences } = useCollection<AbsenceReportDoc>('absence_reports', [where('date', '==', today)], academy, today)
-  const { data: cohorts } = useCollection<CohortDoc>('cohorts', [], academy)
+  const { data: cohorts } = useCohorts({ enabled: academy })
   const { data: users } = useAllUsers()
   const silentSyncs = useCalendarSyncAlert(academy)
 

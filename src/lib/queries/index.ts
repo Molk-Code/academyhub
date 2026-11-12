@@ -4,5 +4,6 @@
 // one place. queries.test.ts checks that pages don't drift back.
 export * from './scope'
 export * from './cohort'
+export * from './cohorts'
 export * from './events'
 export * from './users'

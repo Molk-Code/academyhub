@@ -6,11 +6,11 @@ import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, where as collectionWhere, orderBy } from '@/hooks/useFirestore'
-import type { AbsenceReportDoc, CohortDoc, PointsLogDoc } from '@/types'
+import type { AbsenceReportDoc, PointsLogDoc } from '@/types'
 import { CheckCircle2, AlertCircle, AlertTriangle, Trash2, Check, TrendingUp, Star, QrCode } from 'lucide-react'
 import { format, isAfter, isBefore, startOfDay } from 'date-fns'
 import { useAttendanceStats } from '@/hooks/useAttendanceStats'
-import { useViewCohortId, useCohortLessons } from '@/lib/queries'
+import { useViewCohortId, useCohortLessons, useCohorts } from '@/lib/queries'
 
 type Phase = 'idle' | 'loading' | 'success' | 'error'
 
@@ -46,7 +46,7 @@ export default function CheckIn() {
   const { data: allLessons } = useCohortLessons(effectiveCohortId)
 
   // Cohort data for year start / end (absence rate calculation)
-  const { data: cohorts } = useCollection<CohortDoc>('cohorts')
+  const { all: cohorts } = useCohorts()
   const myCohort = useMemo(
     () => cohorts.find(c => c.id === effectiveCohortId) ?? null,
     [cohorts, effectiveCohortId],

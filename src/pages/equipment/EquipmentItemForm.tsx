@@ -3,12 +3,13 @@ import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/fi
 import { db } from '@/lib/firebase'
 import { useCollection } from '@/hooks/useFirestore'
 import { optimizeImageUrl } from '@/lib/cloudinary'
-import type { EquipmentDoc, EquipmentCategory, EquipmentCategoryDoc, CohortDoc } from '@/types'
+import type { EquipmentDoc, EquipmentCategory, EquipmentCategoryDoc } from '@/types'
 import {
   Package, X, Check, AlertTriangle, Loader2, Upload, ToggleRight, ToggleLeft, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { uploadEquipmentImage, inp, CategorySelect } from './adminEquipmentShared'
 import { equipmentImages } from './ImageGallery'
+import { useCohorts } from '@/lib/queries'
 
 interface FormState {
   name: string; category: EquipmentCategory; description: string; notes: string
@@ -27,7 +28,7 @@ const EMPTY_FORM: FormState = {
 const lbl: React.CSSProperties = { fontSize: '.75rem', color: '#8a8aab', fontWeight: 600, display: 'block', marginBottom: 4 }
 
 export function ItemForm({ existing, onClose, categories }: { existing: EquipmentDoc | null; onClose: () => void; categories: EquipmentCategoryDoc[] }) {
-  const { data: cohorts } = useCollection<CohortDoc>('cohorts')
+  const { data: cohorts } = useCohorts()
   const sortedCohorts = useMemo(() => [...cohorts].sort((a, b) => a.name.localeCompare(b.name)), [cohorts])
   const { data: catalog } = useCollection<EquipmentDoc>('equipment')
   const catalogById = useMemo(() => new Map(catalog.map(e => [e.id, e])), [catalog])

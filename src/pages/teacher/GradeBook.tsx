@@ -5,12 +5,13 @@ import { functions } from '@/lib/firebase'
 import { useCollection, where, orderBy } from '@/hooks/useFirestore'
 import { useAuth } from '@/contexts/AuthContext'
 import { fullDateTime } from '@/lib/utils'
-import type { SubmissionDoc, UserDoc, AssignmentDoc, CohortDoc } from '@/types'
+import type { SubmissionDoc, UserDoc, AssignmentDoc } from '@/types'
 import Avatar from '@/components/common/Avatar'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import EmptyState from '@/components/common/EmptyState'
 import DeleteSubmissionButton from '@/components/assignments/DeleteSubmissionButton'
 import { ClipboardCheck, CheckCircle2 } from 'lucide-react'
+import { useCohorts } from '@/lib/queries'
 
 interface GradePayload {
   submissionId: string
@@ -35,7 +36,7 @@ export default function GradeBook() {
     'submissions',
     [where('status', 'in', ['submitted', 'graded']), orderBy('submittedAt', 'asc')],
   )
-  const { data: cohorts } = useCollection<CohortDoc>('cohorts')
+  const { all: cohorts } = useCohorts()   // past results: archived classes too
   const { data: students } = useCollection<UserDoc>('users', [where('role', '==', 'student')])
   const { data: assignments } = useCollection<AssignmentDoc>('assignments')
 

@@ -8,9 +8,9 @@ import type { EventInput } from '@fullcalendar/core'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore'
 import { useAllUsers } from '@/hooks/useAllUsers'
-import { useViewCohortId, useCohortLessons, useVisibleEvents, useInvitableUserGroups, filterGroups } from '@/lib/queries'
+import { useViewCohortId, useCohortLessons, useVisibleEvents, useInvitableUserGroups, filterGroups, useCohorts } from '@/lib/queries'
 import { toDate, cn, initials, avatarColor } from '@/lib/utils'
-import type { AssignmentDoc, SubjectDoc, SemesterSettingsDoc, LessonCategoryDoc, CohortDoc, PersonalEventDoc, GuestTeacherDoc } from '@/types'
+import type { AssignmentDoc, SubjectDoc, SemesterSettingsDoc, LessonCategoryDoc, PersonalEventDoc, GuestTeacherDoc } from '@/types'
 import { addDoc, collection, serverTimestamp, Timestamp, updateDoc, deleteDoc, doc } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/lib/firebase'
@@ -341,7 +341,7 @@ export default function StudentCalendar() {
   )
   const { data: categories }  = useCollection<LessonCategoryDoc>('lessonCategories', [orderBy('order', 'asc')])
   const { data: semesterDoc } = useDocument<SemesterSettingsDoc>('settings', 'semester')
-  const { data: cohorts }     = useCollection<CohortDoc>('cohorts')
+  const { all: cohorts } = useCohorts()
   const myCohort = useMemo(() => cohorts.find(c => c.id === cohortId) ?? null, [cohorts, cohortId])
 
   const { data: myPersonalEvents } = useCollection<PersonalEventDoc>(

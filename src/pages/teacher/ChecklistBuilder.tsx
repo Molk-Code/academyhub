@@ -20,8 +20,9 @@ import {
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection } from '@/hooks/useFirestore'
-import type { SubjectDoc, CohortDoc, ChecklistItem } from '@/types'
+import type { SubjectDoc, ChecklistItem } from '@/types'
 import { Plus, Trash2, GripVertical, ListTodo } from 'lucide-react'
+import { useCohorts } from '@/lib/queries'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ export default function ChecklistBuilder() {
   const [assignmentId, setAssignmentId] = useState<string | null>(null)
 
   const { data: subjects } = useCollection<SubjectDoc>('subjects')
-  const { data: cohorts }  = useCollection<CohortDoc>('cohorts')
+  const { data: cohorts } = useCohorts()
 
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm<ChecklistFormData>({
     resolver: zodResolver(schema),

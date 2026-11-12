@@ -5,14 +5,15 @@ import { Eye, BookOpen, CalendarDays, Users, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, where } from '@/hooks/useFirestore'
 import { shortDate, timeStr, toDate } from '@/lib/utils'
-import type { CohortDoc, LessonDoc, AssignmentDoc, SubjectDoc, UserDoc } from '@/types'
+import type { LessonDoc, AssignmentDoc, SubjectDoc, UserDoc } from '@/types'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import { useCohorts } from '@/lib/queries'
 
 export default function StudentPreview() {
   const [selectedId, setSelectedId] = useState<string>('')
   const { setPreviewCohortId } = useAuth()
 
-  const { data: cohorts,  loading: cohortsLoading } = useCollection<CohortDoc>('cohorts')
+  const { data: cohorts, cohortOf, loading: cohortsLoading } = useCohorts()
   const { data: subjects }                           = useCollection<SubjectDoc>('subjects')
   const { data: students }                           = useCollection<UserDoc>('users', [where('role', '==', 'student')])
 
@@ -40,7 +41,7 @@ export default function StudentPreview() {
     cohortId,
   )
 
-  const selectedCohort = cohorts.find(c => c.id === cohortId)
+  const selectedCohort = cohortOf(cohortId)
 
   const subjectMap = useMemo(
     () => Object.fromEntries(subjects.map(s => [s.id, s])),

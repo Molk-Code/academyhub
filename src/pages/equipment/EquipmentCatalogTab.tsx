@@ -12,6 +12,7 @@ import { InfoModal } from './EquipmentInfoModal'
 import { ItemForm } from './EquipmentItemForm'
 import { QRModal } from './EquipmentQRModal'
 import { BarcodeModal } from './EquipmentBarcodeModal'
+import { clickable } from '@/lib/a11y'
 
 // Known categories get a matching icon; anything custom (e.g. a school's own
 // added category) falls back to a generic package icon.
@@ -115,7 +116,7 @@ export function CatalogTab({ categories, pricingEnabled }: { categories: Equipme
               style={{ opacity: item.isActive ? 1 : 0.55, position: 'relative' }}
             >
               {/* Admin hover overlay */}
-              <div className="product-image" style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setInfoItem(item)}>
+              <div {...clickable} className="product-image" style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setInfoItem(item)}>
                 <EquipmentImg
                   url={item.imageUrl}
                   name={item.name}

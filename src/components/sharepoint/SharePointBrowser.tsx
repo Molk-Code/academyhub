@@ -11,6 +11,7 @@ import {
   fileIcon, formatBytes, type DriveItem,
 } from '@/lib/graphApi'
 import { cn } from '@/lib/utils'
+import { clickable } from '@/lib/a11y'
 
 interface Props {
   subPath: string      // relative to config.basePath, e.g. "subjects/abc123"
@@ -270,7 +271,7 @@ export default function SharePointBrowser({ subPath, canDelete = false, canUploa
               </button>
             </>
           )}
-          <button
+          <button aria-label="Refresh"
             onClick={load}
             className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
             title="Refresh"
@@ -370,14 +371,14 @@ export default function SharePointBrowser({ subPath, canDelete = false, canUploa
             <span className="text-3xl">📂</span>
             <p>No files yet</p>
             {canUpload && (
-              <button onClick={openFilePicker} className="text-brand-600 hover:text-brand-700 text-xs font-medium">
+              <button onClick={openFilePicker} className="text-brand-600 hover:text-brand-400 text-xs font-medium">
                 Upload the first file
               </button>
             )}
           </div>
         ) : (
           items.map(item => (
-            <div
+            <div {...clickable}
               key={item.id}
               className={cn(
                 'flex items-center gap-3 px-4 py-2.5 hover:bg-white/5/80 transition-colors group',
@@ -409,7 +410,7 @@ export default function SharePointBrowser({ subPath, canDelete = false, canUploa
                     target="_blank"
                     rel="noreferrer"
                     download={item.name}
-                    className="p-1.5 rounded-lg text-zinc-400 hover:text-brand-600 hover:bg-zinc-800 transition-colors"
+                    className="p-1.5 rounded-lg text-zinc-400 hover:text-brand-400 hover:bg-zinc-800 transition-colors"
                     title="Download"
                   >
                     <Download className="w-3.5 h-3.5" />
@@ -420,7 +421,7 @@ export default function SharePointBrowser({ subPath, canDelete = false, canUploa
                     href={item.webUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="p-1.5 rounded-lg text-zinc-400 hover:text-brand-600 hover:bg-zinc-800 transition-colors"
+                    className="p-1.5 rounded-lg text-zinc-400 hover:text-brand-400 hover:bg-zinc-800 transition-colors"
                     title="Open in SharePoint"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
@@ -430,7 +431,7 @@ export default function SharePointBrowser({ subPath, canDelete = false, canUploa
                   <button
                     onClick={() => handleDelete(item)}
                     disabled={deleting === item.id}
-                    className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-500 hover:bg-rose-50 transition-colors disabled:opacity-40"
+                    className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors disabled:opacity-40"
                     title="Delete"
                   >
                     {deleting === item.id

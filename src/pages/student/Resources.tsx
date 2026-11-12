@@ -9,6 +9,7 @@ import {
   X, Eye, AlertCircle, Plus,
   Folder, FolderOpen, ChevronRight, Search, ClipboardList, BookOpen, FolderPlus,
 } from 'lucide-react'
+import { clickable, clickableRow } from '@/lib/a11y'
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -356,7 +357,7 @@ function ResourceSection({ cohortId, allResources, folders, profile, canAdd, pre
                 {folderResources.map(r => {
                   const canPreview = detectMode(r.type, r.url) !== 'link'
                   return (
-                    <div
+                    <div {...clickable}
                       key={r.id}
                       className="bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-zinc-800/80 transition-colors"
                       onClick={() => setPreview({ url: r.url, type: r.type, title: r.title, sourceName: activeFolder?.name ?? '' })}
@@ -474,7 +475,7 @@ function LessonAssignmentResources({
               {filtered.map(r => {
                 const canPreview = detectMode(r.type, r.url) !== 'link'
                 return (
-                  <tr key={r.key} className="hover:bg-white/5 transition-colors cursor-pointer" onClick={() => setPreview({ url: r.url, type: r.type, title: r.title, sourceName: r.sourceName })}>
+                  <tr {...clickableRow} key={r.key} className="hover:bg-white/5 transition-colors cursor-pointer" onClick={() => setPreview({ url: r.url, type: r.type, title: r.title, sourceName: r.sourceName })}>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2.5">
                         {typeIcon(r.type)}

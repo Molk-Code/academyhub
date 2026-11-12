@@ -149,7 +149,7 @@ export default function TimeBlockManager() {
                           className={cn(
                             'text-xs font-medium px-1.5 py-0.5 rounded',
                             block.days.includes(d)
-                              ? 'bg-brand-100 text-brand-700'
+                              ? 'bg-brand-100 text-brand-800'
                               : 'bg-zinc-800 text-zinc-300',
                           )}
                         >
@@ -168,7 +168,7 @@ export default function TimeBlockManager() {
                       </button>
                       <button
                         onClick={() => setDeleteId(block.id)}
-                        className="p-1.5 text-zinc-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                        className="p-1.5 text-zinc-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>

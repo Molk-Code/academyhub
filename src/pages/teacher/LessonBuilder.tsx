@@ -61,7 +61,7 @@ function ClassroomPicker({
               key={c.id}
               type="button"
               onMouseDown={() => { onChange(c.name); setOpen(false) }}
-              className="w-full text-left px-3 py-2.5 text-sm text-zinc-300 hover:bg-brand-50 hover:text-brand-700 transition-colors flex items-center gap-2"
+              className="w-full text-left px-3 py-2.5 text-sm text-zinc-300 hover:bg-brand-500/10 hover:text-brand-400 transition-colors flex items-center gap-2"
             >
               <span className="font-medium">{c.name}</span>
               {c.notes && <span className="text-xs text-zinc-400 truncate">{c.notes}</span>}
@@ -447,7 +447,7 @@ export default function LessonBuilder() {
                     key={b.id}
                     type="button"
                     onClick={() => { setValue('startTime', b.startTime); setValue('endTime', b.endTime) }}
-                    className="px-3 py-1.5 rounded-lg border border-white/15 text-xs font-medium text-zinc-300 hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700 transition-colors"
+                    className="px-3 py-1.5 rounded-lg border border-white/15 text-xs font-medium text-zinc-300 hover:border-brand-400 hover:bg-brand-500/10 hover:text-brand-400 transition-colors"
                   >
                     {b.name} · {b.startTime}–{b.endTime}
                   </button>
@@ -520,7 +520,7 @@ export default function LessonBuilder() {
                     className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
                       active
                         ? 'bg-brand-600 border-brand-600 text-white'
-                        : 'bg-zinc-900 border-white/15 text-zinc-400 hover:border-brand-400 hover:text-brand-700'
+                        : 'bg-zinc-900 border-white/15 text-zinc-400 hover:border-brand-400 hover:text-brand-400'
                     }`}
                   >
                     {t.displayName}
@@ -549,7 +549,7 @@ export default function LessonBuilder() {
                         className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
                           active
                             ? 'bg-brand-600 border-brand-600 text-white'
-                            : 'bg-zinc-900 border-white/15 text-zinc-400 hover:border-brand-400 hover:text-brand-700'
+                            : 'bg-zinc-900 border-white/15 text-zinc-400 hover:border-brand-400 hover:text-brand-400'
                         }`}
                       >
                         {g.name}

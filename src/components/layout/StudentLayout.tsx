@@ -380,7 +380,7 @@ export default function StudentLayout() {
         {navVis?.student?.['profile'] === false ? (
           <div className="flex items-center justify-between px-3 py-2 gap-3">
             <p className="text-xs text-zinc-500 truncate">{profile?.email}</p>
-            <button
+            <button aria-label="Sign out"
               onClick={handleSignOut}
               className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-colors flex-shrink-0"
               title="Sign out"
@@ -467,6 +467,7 @@ export default function StudentLayout() {
   return (
     <CompleteProfileGate>
     <>
+      <a href="#main-content" className="skip-link">Skip to main content</a>
     <div className="flex flex-col lg:flex-row" style={{ height: '100dvh', background: 'var(--bg-primary)' }}>
       <OfflineBanner />
 
@@ -483,7 +484,7 @@ export default function StudentLayout() {
           <div className="flex items-center gap-1">
             <BugReportButton />
             <NotificationInbox />
-            <button
+            <button aria-label="Open menu" aria-expanded={drawerOpen}
               onClick={() => setDrawerOpen(true)}
               className="p-2 rounded-xl text-zinc-400 hover:bg-white/10 transition-colors"
             >
@@ -509,7 +510,7 @@ export default function StudentLayout() {
                   {schoolName && <p className="text-[9px] text-zinc-500 tracking-tight mt-[3px] leading-none whitespace-nowrap overflow-hidden text-ellipsis">{schoolName}</p>}
                 </div>
               </Link>
-              <button
+              <button aria-label="Close menu"
                 onClick={() => setDrawerOpen(false)}
                 className="p-1.5 rounded-xl text-zinc-400 hover:bg-white/10 transition-colors"
               >
@@ -546,6 +547,8 @@ export default function StudentLayout() {
       {/* ── Content column: main + bottom nav ────────────────────────────── */}
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
       <main
+        id="main-content"
+        tabIndex={-1}
         ref={mainRef}
         style={{ '--header-h': '4rem' } as React.CSSProperties}
         className={cn(

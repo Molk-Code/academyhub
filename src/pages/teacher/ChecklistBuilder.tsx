@@ -69,7 +69,7 @@ function ItemRow({
 
   return (
     <div ref={setNodeRef} style={style} className="flex items-center gap-2 bg-zinc-900 border border-white/10 rounded-xl px-3 py-2">
-      <button
+      <button aria-label="Drag to reorder"
         type="button"
         {...attributes}
         {...listeners}
@@ -318,7 +318,7 @@ export default function ChecklistBuilder() {
           <button
             type="button"
             onClick={addItem}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-400 bg-zinc-900/50 hover:bg-brand-50 hover:text-brand-700 border border-dashed border-white/10 hover:border-brand-200 rounded-xl transition-all"
+            className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-400 bg-zinc-900/50 hover:bg-brand-500/10 hover:text-brand-400 border border-dashed border-white/10 hover:border-brand-200 rounded-xl transition-all"
           >
             <Plus className="w-4 h-4" /> Add step
           </button>

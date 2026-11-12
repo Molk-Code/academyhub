@@ -25,10 +25,13 @@ function genSecret(): string {
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: () => void; label?: string }) {
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
       onClick={onChange}
       className={cn(
         'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none',
@@ -135,7 +138,7 @@ function SyncCard({ sync, cohorts }: { sync: OfficeCalendarSyncDoc; cohorts: Coh
             )}
           </p>
         </div>
-        <Toggle checked={sync.enabled} onChange={toggleEnabled} />
+        <Toggle checked={sync.enabled} onChange={toggleEnabled} label="Sync enabled" />
         <button
           onClick={() => setExpanded(v => !v)}
           className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-white/10 transition-colors"

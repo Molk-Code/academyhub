@@ -17,6 +17,7 @@ import { ImageGallery, equipmentImages } from './ImageGallery'
 import './molkom.css'
 import { BookingPartsSummary, ProductionLink } from '@/components/equipment/BookingPartsPanel'
 import { bookingParts } from '@/lib/bookingParts'
+import { clickable } from '@/lib/a11y'
 
 const INFO_LABEL: React.CSSProperties = { fontSize: '.7rem', fontWeight: 700, color: '#6a6a80', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }
 const INFO_TEXT: React.CSSProperties = { fontSize: '.88rem', color: '#c0c0d5', lineHeight: 1.5, whiteSpace: 'pre-line', margin: 0 }
@@ -145,7 +146,7 @@ function BookingMessageThread({ bookingId }: { bookingId: string }) {
           placeholder="Reply…"
           style={{ flex: 1, fontSize: '.76rem', background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 8, padding: '6px 10px', color: '#f0f0f5' }}
         />
-        <button
+        <button aria-label="Send"
           disabled={sending || !text.trim()}
           onClick={send}
           style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(59,130,246,.15)', border: '1px solid rgba(59,130,246,.3)', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: sending || !text.trim() ? 0.5 : 1 }}
@@ -466,7 +467,7 @@ export default function EquipmentBookingPage() {
             : needsProduction && !selectedProductionId ? 'Select a production first' : null
           return (
             <div key={acc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 8, background: '#12121a', border: `1px solid ${inCart ? 'rgba(242,100,25,.45)' : '#2a2a3a'}`, borderRadius: 12 }}>
-              <div
+              <div {...clickable}
                 onClick={() => setModalItem(acc)}
                 style={{ width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: 'hidden', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                 className="accessory-thumb"
@@ -720,7 +721,7 @@ export default function EquipmentBookingPage() {
       </header>
 
       {/* Cart overlay */}
-      <div className={`cart-overlay${cartOpen ? ' open' : ''}`} onClick={() => setCartOpen(false)} />
+      <div {...clickable} className={`cart-overlay${cartOpen ? ' open' : ''}`} onClick={() => setCartOpen(false)} />
       <div className={`cart-drawer${cartOpen ? ' open' : ''}`}>
         <div className="cart-header">
           <h2><ShoppingCart size={18} /> Cart ({cartCount})</h2>
@@ -1121,7 +1122,7 @@ export default function EquipmentBookingPage() {
                   return (
                     <div className={`product-card${inCart ? ' card-added' : ''}`} key={item.id}
                       style={{ opacity: locked || budgetBlocked ? 0.55 : 1 }}>
-                      <div className="product-image" onClick={() => setModalItem(item)}>
+                      <div {...clickable} className="product-image" onClick={() => setModalItem(item)}>
                         <EquipmentImg
                           url={item.imageUrl}
                           name={item.name}
@@ -1138,7 +1139,7 @@ export default function EquipmentBookingPage() {
                         )}
                       </div>
                       <div className="product-info">
-                        <div className="product-name" onClick={() => setModalItem(item)} style={{ cursor: 'pointer' }}>{item.name}</div>
+                        <div {...clickable} className="product-name" onClick={() => setModalItem(item)} style={{ cursor: 'pointer' }}>{item.name}</div>
                         {locked
                           ? <div style={{ fontSize: '.7rem', color: '#f59e0b', fontWeight: 600 }}>Not available for your class</div>
                           : outOfStock

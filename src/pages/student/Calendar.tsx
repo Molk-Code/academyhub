@@ -1415,7 +1415,7 @@ export default function StudentCalendar() {
             <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
               <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Edit Event</p>
               <div className="flex items-center gap-1">
-                <button onClick={deleteEditEvent} disabled={savingEdit} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-500 transition-colors disabled:opacity-40">
+                <button aria-label="Delete" onClick={deleteEditEvent} disabled={savingEdit} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-500 transition-colors disabled:opacity-40">
                   <Trash2 className="w-4 h-4" />
                 </button>
                 <button onClick={closeEditEvent} className="p-1.5 rounded-lg hover:bg-white/5" style={{ color: 'var(--text-muted)' }}>

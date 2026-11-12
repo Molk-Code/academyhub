@@ -133,8 +133,8 @@ function AttendanceSection({ uid, cohortId, enrolledAt }: { uid: string; cohortI
       <div className="grid grid-cols-3 gap-3">
         {[
           { value: rate !== null ? `${rate}%` : '—', label: 'Rate',     cls: 'bg-zinc-900/50 text-zinc-200'    },
-          { value: attended,                          label: 'Attended', cls: 'bg-emerald-950/40 text-emerald-700' },
-          { value: absent,                            label: 'Absences', cls: 'bg-rose-950/40 text-rose-700'    },
+          { value: attended,                          label: 'Attended', cls: 'bg-emerald-950/40 text-emerald-400' },
+          { value: absent,                            label: 'Absences', cls: 'bg-rose-950/40 text-rose-400'    },
         ].map(({ value, label, cls }) => (
           <div key={label} className={cn('rounded-xl p-3 text-center', cls.split(' ')[0])}>
             <p className={cn('text-xl font-bold', cls.split(' ')[1])}>{value}</p>
@@ -348,7 +348,8 @@ export default function Profile() {
             type="button"
             disabled={uploading}
             onClick={() => fileInputRef.current?.click()}
-            className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+            aria-label="Change profile photo"
+            className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity cursor-pointer"
           >
             {uploading ? <Loader2 className="w-6 h-6 text-white animate-spin" /> : <Camera className="w-6 h-6 text-white" />}
           </button>
@@ -363,13 +364,13 @@ export default function Profile() {
           {isStudent && cohort ? (
             <p className="text-sm text-zinc-500 mt-0.5">{cohort.name} · Year {cohort.programYear}</p>
           ) : (
-            <span className="inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 capitalize">{profile.role}</span>
+            <span className="inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-100 text-brand-800 capitalize">{profile.role}</span>
           )}
           <button
             type="button"
             disabled={uploading}
             onClick={() => fileInputRef.current?.click()}
-            className="block text-sm text-brand-600 hover:text-brand-700 font-medium mt-1.5 disabled:opacity-50"
+            className="block text-sm text-brand-600 hover:text-brand-400 font-medium mt-1.5 disabled:opacity-50"
           >
             {uploading ? 'Uploading…' : 'Change photo'}
           </button>
@@ -543,6 +544,8 @@ export default function Profile() {
             <button
               key={hex}
               type="button"
+              aria-label={`Calendar colour ${hex}`}
+              aria-pressed={((profile as any)?.calendarColor ?? '#86bbd8') === hex}
               onClick={async () => {
                 if (!profile) return
                 await updateDoc(doc(db, 'users', profile.uid), { calendarColor: hex })

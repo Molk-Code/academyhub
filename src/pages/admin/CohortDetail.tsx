@@ -93,7 +93,7 @@ function UserPicker({
                 type="button"
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => { onAdd(u); setQuery(''); setOpen(false) }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-brand-50 transition-colors text-left"
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-brand-500/10 transition-colors text-left"
               >
                 <div className={cn(
                   'w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0',
@@ -352,9 +352,9 @@ export default function CohortDetail() {
               <p className="text-xs font-medium text-zinc-500 w-20">Semester 1</p>
               {cohort.semesterStartDate ? (
                 <div className="flex items-center gap-2 text-sm font-medium text-zinc-300">
-                  <span className="bg-brand-50 text-brand-700 border border-brand-100 rounded-lg px-3 py-1.5">{cohort.semesterStartDate}</span>
+                  <span className="bg-brand-50 text-brand-800 border border-brand-100 rounded-lg px-3 py-1.5">{cohort.semesterStartDate}</span>
                   <span className="text-zinc-400">→</span>
-                  <span className="bg-brand-50 text-brand-700 border border-brand-100 rounded-lg px-3 py-1.5">{cohort.semesterEndDate}</span>
+                  <span className="bg-brand-50 text-brand-800 border border-brand-100 rounded-lg px-3 py-1.5">{cohort.semesterEndDate}</span>
                 </div>
               ) : (
                 <span className="text-sm text-zinc-400">No override set</span>
@@ -365,9 +365,9 @@ export default function CohortDetail() {
                 <p className="text-xs font-medium text-zinc-500 w-20">Semester 2</p>
                 {cohort.semesterSem2StartDate ? (
                   <div className="flex items-center gap-2 text-sm font-medium text-zinc-300">
-                    <span className="bg-brand-50 text-brand-700 border border-brand-100 rounded-lg px-3 py-1.5">{cohort.semesterSem2StartDate}</span>
+                    <span className="bg-brand-50 text-brand-800 border border-brand-100 rounded-lg px-3 py-1.5">{cohort.semesterSem2StartDate}</span>
                     <span className="text-zinc-400">→</span>
-                    <span className="bg-brand-50 text-brand-700 border border-brand-100 rounded-lg px-3 py-1.5">{cohort.semesterSem2EndDate}</span>
+                    <span className="bg-brand-50 text-brand-800 border border-brand-100 rounded-lg px-3 py-1.5">{cohort.semesterSem2EndDate}</span>
                   </div>
                 ) : (
                   <span className="text-sm text-zinc-400">Not set</span>
@@ -493,7 +493,7 @@ export default function CohortDetail() {
                 </button>
                 <button
                   onClick={() => deleteInvite(inv.id)}
-                  className="p-1.5 text-zinc-400 hover:text-rose-600 transition-colors"
+                  className="p-1.5 text-zinc-400 hover:text-rose-400 transition-colors"
                   title="Delete invite"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -544,7 +544,7 @@ export default function CohortDetail() {
                     <td className="px-4 py-3">
                       <button
                         onClick={() => removeStudent(student)}
-                        className="p-1.5 text-zinc-300 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100"
+                        className="p-1.5 text-zinc-300 hover:text-rose-400 transition-colors opacity-0 group-hover:opacity-100"
                         title="Remove from class"
                       >
                         <UserX className="w-4 h-4" />
@@ -594,7 +594,7 @@ export default function CohortDetail() {
                     <td className="px-4 py-3">
                       <button
                         onClick={() => removeTeacher(teacher)}
-                        className="p-1.5 text-zinc-300 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100"
+                        className="p-1.5 text-zinc-300 hover:text-rose-400 transition-colors opacity-0 group-hover:opacity-100"
                         title="Remove from class"
                       >
                         <UserX className="w-4 h-4" />

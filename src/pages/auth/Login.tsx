@@ -13,6 +13,7 @@ import LegalFooter from '@/components/LegalFooter'
 import firePng from '@/assets/fire.png'
 import { usePublicConfig } from '@/lib/publicConfig'
 import { publicShopOpen } from '@/lib/features'
+import { readableTextOn } from '@/lib/contrast'
 
 const schema = z.object({
   email:    z.string().email('Enter a valid email'),
@@ -151,6 +152,8 @@ export default function Login() {
                     />
                     <button
                       type="button"
+                      aria-label={showPw ? 'Hide password' : 'Show password'}
+                      aria-pressed={showPw}
                       onClick={() => setShowPw(v => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-300"
                     >
@@ -171,7 +174,7 @@ export default function Login() {
                   type="submit"
                   disabled={isSubmitting}
                   className="btn-primary w-full py-3 text-base mt-2"
-                  style={accent ? { backgroundColor: accent } : undefined}
+                  style={accent ? { backgroundColor: accent, color: readableTextOn(accent) } : undefined}
                 >
                   {isSubmitting ? 'Signing in…' : 'Sign in'}
                 </button>

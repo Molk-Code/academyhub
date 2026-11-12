@@ -32,7 +32,7 @@ export default function EmojiPicker({ value, onChange }: Props) {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="w-11 h-11 rounded-xl border border-white/15 bg-zinc-900 hover:border-brand-400 hover:bg-brand-50 transition-colors flex items-center justify-center text-xl shadow-sm"
+        className="w-11 h-11 rounded-xl border border-white/15 bg-zinc-900 hover:border-brand-400 hover:bg-brand-500/10 transition-colors flex items-center justify-center text-xl shadow-sm"
         title="Pick emoji"
       >
         {value || <Smile className="w-5 h-5 text-zinc-400" />}

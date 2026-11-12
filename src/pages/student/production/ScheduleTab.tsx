@@ -80,8 +80,8 @@ function LocationMoveCard({ move, canEdit, onEdit, onDelete }: {
       {!move.note && <span className="flex-1" />}
       {canEdit && (
         <div className="flex items-center gap-1 opacity-0 group-hover/move:opacity-100 transition-opacity">
-          <button onClick={onEdit}   className="p-1 text-amber-600 hover:text-amber-300 transition-colors rounded"><Clock className="w-3 h-3" /></button>
-          <button onClick={onDelete} className="p-1 text-amber-700 hover:text-rose-400 transition-colors rounded"><X className="w-3 h-3" /></button>
+          <button aria-label="Edit time" onClick={onEdit}   className="p-1 text-amber-600 hover:text-amber-300 transition-colors rounded"><Clock className="w-3 h-3" /></button>
+          <button onClick={onDelete} className="p-1 text-amber-400 hover:text-rose-400 transition-colors rounded"><X className="w-3 h-3" /></button>
         </div>
       )}
     </div>
@@ -110,7 +110,7 @@ function MoveForm({ initialMinutes = '', initialNote = '', onSave, onCancel }: {
         placeholder="Note (optional, e.g. to Trollhättan)…" value={note} onChange={e => setNote(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') onCancel() }}
       />
-      <button onClick={submit}   className="p-1.5 text-emerald-400 hover:text-emerald-300 transition-colors"><Check className="w-3.5 h-3.5" /></button>
+      <button aria-label="Save" onClick={submit}   className="p-1.5 text-emerald-400 hover:text-emerald-300 transition-colors"><Check className="w-3.5 h-3.5" /></button>
       <button onClick={onCancel} className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors"><X className="w-3.5 h-3.5" /></button>
     </div>
   )

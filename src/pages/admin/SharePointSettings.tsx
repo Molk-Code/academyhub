@@ -100,8 +100,8 @@ export default function SharePointSettings() {
 
       {/* Setup guide */}
       <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 space-y-2">
-        <p className="text-sm font-semibold text-blue-800">Setup guide</p>
-        <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+        <p className="text-sm font-semibold text-blue-400">Setup guide</p>
+        <ol className="text-xs text-blue-400 space-y-1 list-decimal list-inside">
           <li>In <a href="https://portal.azure.com" target="_blank" rel="noreferrer" className="underline">Azure Portal</a> → App registrations → New registration</li>
           <li>Set redirect URI: <code className="bg-blue-100 px-1 rounded">{window.location.origin}</code> (type: Single-page application)</li>
           <li>Under API permissions → Add → Microsoft Graph → Delegated → <code className="bg-blue-100 px-1 rounded">Files.ReadWrite.All</code> and <code className="bg-blue-100 px-1 rounded">Sites.ReadWrite.All</code></li>

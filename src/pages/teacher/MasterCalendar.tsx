@@ -5,6 +5,7 @@ import { AlertTriangle } from 'lucide-react'
 import { eachDayOfInterval, format, isToday, parseISO } from 'date-fns'
 import { useCollection, orderBy, where } from '@/hooks/useFirestore'
 import { buildColorMap, buildConflicts } from './productionPeriodShared'
+import { clickable } from '@/lib/a11y'
 
 export function MasterCalendar({ period, productions, allocations, students, cohortId, onCellClick, onToggleWorkingDay }: {
   period: ProductionPeriodDoc
@@ -70,7 +71,7 @@ export function MasterCalendar({ period, productions, allocations, students, coh
             const wday = !period.workingDays.includes(ds)
             const today = isToday(date)
             return (
-              <div key={ds}
+              <div {...clickable} key={ds}
                 onClick={() => onToggleWorkingDay(ds)}
                 title={wday ? 'Click to mark as working day' : 'Click to mark as non-shooting day'}
                 className={cn(
@@ -165,7 +166,7 @@ function ProductionRow({ prod, dates, period, allocMap, colorMap, onCellClick, C
         const today = isToday(date)
         const alloc = allocMap[prod.id]?.[ds]
         return (
-          <div key={ds}
+          <div {...clickable} key={ds}
             onClick={() => alloc && onCellClick(ds, prod)}
             className={cn(
               COL_W, 'flex-shrink-0 border-r border-white/5 last:border-r-0 min-h-[3rem] p-1 transition-colors',

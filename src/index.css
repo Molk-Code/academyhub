@@ -12,7 +12,9 @@
   --bg-hover:      #31353c;
   --text-primary:   #dfe2eb;
   --text-secondary: #e1bfb5;
-  --text-muted:     #8b909b;
+  --text-muted:     #979ca7;
+  /* Form field edges: ≥3:1 against the field and the card (WCAG 1.4.11) */
+  --border-input:  #6f737a;
   --brand:         #ff6b35;
   --brand-dim:     #390c00;
   --accent:        #b4c5ff;
@@ -75,7 +77,8 @@
   }
 
   .btn-primary {
-    @apply btn bg-brand-500 text-white hover:bg-brand-600 focus:ring-brand-500 active:scale-95 shadow-ember-sm;
+    /* Dark text: white on brand orange is 2.8:1, #10141a is 6.5:1 (WCAG 1.4.3) */
+    @apply btn bg-brand-500 text-[#10141a] hover:bg-brand-600 focus:ring-brand-500 active:scale-95 shadow-ember-sm;
   }
   .btn-primary:disabled {
     box-shadow: none;
@@ -116,13 +119,13 @@
 
   .input {
     background: var(--bg-elevated);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-input);
     color: var(--text-primary);
     @apply w-full px-3.5 py-2.5 rounded-xl text-sm focus:outline-none transition-shadow;
     --tw-placeholder-color: #8b909b;
   }
   .input::placeholder {
-    color: #8b909b;
+    color: #8c919b;
   }
   .input:focus {
     border-color: var(--brand);
@@ -185,7 +188,7 @@ select.input-dark {
   @apply w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none transition-shadow;
   color: var(--text-primary);
   background-color: var(--bg-elevated);
-  border-color: var(--border);
+  border-color: var(--border-input);
 }
 select.input-dark:focus {
   border-color: var(--brand);
@@ -242,7 +245,7 @@ select.input-dark:focus {
 .fc .fc-button-active, .fc .fc-button-primary:not(:disabled).fc-button-active {
   background: var(--brand) !important;
   border-color: var(--brand) !important;
-  color: white !important;
+  color: #10141a !important; /* white on brand orange is 2.8:1 */
 }
 .fc .fc-button-primary:disabled {
   background: var(--bg-elevated) !important;
@@ -334,3 +337,51 @@ select.input-dark:focus {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #31353c; border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: #5d626c; }
+
+/* ── Accessibility baseline (WCAG 2.1 AA / EN 301 549) ─────────────────────
+   Global so every screen gets it, including the many that set
+   focus:outline-none or older colour classes. */
+
+/* Visible keyboard focus everywhere (2.4.7). :focus-visible = keyboard only,
+   so mouse clicks look as before. Brand orange is ≥5:1 on every surface. */
+:focus-visible {
+  outline: 2px solid var(--brand) !important;
+  outline-offset: 2px !important;
+}
+
+/* Skip link — first thing a keyboard user reaches (2.4.1) */
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 1000;
+  padding: 0.5rem 0.875rem;
+  border-radius: 0.75rem;
+  background: var(--brand);
+  color: #10141a;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transform: translateY(-200%);
+}
+.skip-link:focus { transform: none; }
+
+/* Contrast floor (1.4.3): error reds and white-on-orange used directly in
+   components. Dark theme only, so these never sit on a light surface. */
+@layer utilities {
+  .text-rose-500, .text-rose-600 { color: #fb7185; }   /* rose-400: ≥5.3:1 */
+  .text-red-500,  .text-red-600  { color: #f87171; }   /* red-400:  ≥5.2:1 */
+  .bg-brand-500.text-white, .bg-brand-600.text-white,
+  .bg-orange-500.text-white, .bg-orange-600.text-white { color: #10141a; }
+  /* Grey text on raised zinc-700 chips/badges: lift to zinc-400 (≥6:1) */
+  .bg-zinc-700.text-zinc-500, .bg-zinc-700.text-zinc-600 { color: #a9aeb8; }
+}
+
+/* Respect "reduce motion" (2.3.3) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

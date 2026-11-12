@@ -139,7 +139,7 @@ function ProfileCompleteOverlay() {
                 type="button"
                 disabled={uploading}
                 onClick={() => fileInputRef.current?.click()}
-                className="text-sm text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
+                className="text-sm text-brand-600 hover:text-brand-400 font-medium disabled:opacity-50"
               >
                 {preview ? 'Change photo' : 'Upload profile photo *'}
               </button>

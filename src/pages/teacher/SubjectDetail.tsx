@@ -692,7 +692,7 @@ export default function SubjectDetail() {
                     {/* Always visible on touch screens; hover-revealed on desktop */}
                     <div className="flex flex-col md:flex-row gap-1 md:px-4 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                       {completed && (
-                        <button onClick={() => showAbsentsForItem(item)} className="p-2 md:p-1.5 text-zinc-400 hover:text-amber-600 transition-colors" title="See who was absent">
+                        <button onClick={() => showAbsentsForItem(item)} className="p-2 md:p-1.5 text-zinc-400 hover:text-amber-400 transition-colors" title="See who was absent">
                           <Users className="w-4 h-4 md:w-3.5 md:h-3.5" />
                         </button>
                       )}
@@ -790,7 +790,7 @@ export default function SubjectDetail() {
                   ? <Link2 className="w-4 h-4 text-brand-500 flex-shrink-0" />
                   : <FileText className="w-4 h-4 text-amber-500 flex-shrink-0" />
                 }
-                <a href={res.url} target="_blank" rel="noopener noreferrer" className="flex-1 text-sm font-medium text-zinc-200 hover:text-brand-600 transition-colors flex items-center gap-1.5 min-w-0">
+                <a href={res.url} target="_blank" rel="noopener noreferrer" className="flex-1 text-sm font-medium text-zinc-200 hover:text-brand-400 transition-colors flex items-center gap-1.5 min-w-0">
                   <span className="truncate">{res.title}</span>
                   <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 opacity-50" />
                 </a>

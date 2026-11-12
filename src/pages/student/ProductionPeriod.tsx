@@ -18,6 +18,7 @@ import {
 import { eachDayOfInterval, format, isToday, isWeekend, parseISO } from 'date-fns'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { PeriodCallSheetLoader } from '@/components/production/PeriodCallSheetLoader'
+import { clickable } from '@/lib/a11y'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -343,7 +344,7 @@ function MasterCalendar({
             const wday  = !period.workingDays.includes(ds)
             const today = isToday(date)
             return (
-              <div
+              <div {...clickable}
                 key={ds}
                 onClick={() => isTeacher && onToggleWorkingDay?.(ds)}
                 className={cn(
@@ -383,7 +384,7 @@ function MasterCalendar({
                 const canE  = canEditProduction(prod.id)
 
                 return (
-                  <div
+                  <div {...clickable}
                     key={ds}
                     onClick={() => (canE || alloc) && onCellClick(ds, prod)}
                     className={cn(

@@ -177,7 +177,7 @@ function ReportCard({ report }: { report: BugReportDoc }) {
           </div>
           <p className="text-sm text-zinc-100 leading-snug line-clamp-2">{report.description}</p>
           <p className="text-xs text-zinc-500 mt-1">
-            {report.displayName} <span className="text-zinc-700">·</span> {report.role}
+            {report.displayName} <span className="text-zinc-500">·</span> {report.role}
           </p>
         </div>
         <ChevronDown className={`w-4 h-4 text-zinc-500 flex-shrink-0 mt-0.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />

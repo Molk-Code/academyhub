@@ -545,7 +545,7 @@ export default function ShotLogTab({ productionId, productionTitle, scenes, shot
                             <span className="text-xs text-zinc-500 flex-1 truncate">{take.notes}</span>
                           ) : null}
                           {canEdit && idx === takes.length - 1 && takes.length > 1 && (
-                            <button onClick={() => removeTake(shot)} className="text-zinc-700 hover:text-red-400 text-xs ml-1 flex-shrink-0">✕</button>
+                            <button onClick={() => removeTake(shot)} className="text-zinc-500 hover:text-red-400 text-xs ml-1 flex-shrink-0">✕</button>
                           )}
                         </div>
                       ))}

@@ -12,6 +12,7 @@ import { uploadFile, getItemThumbnail } from '@/lib/graphApi'
 import type { VideoDoc, SubjectDoc, CohortDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import { clickable } from '@/lib/a11y'
 
 interface UploadEntry {
   file: File
@@ -163,7 +164,7 @@ export default function StudentVideoLibrary() {
                 </div>
               </div>
 
-              <div
+              <div {...clickable}
                 {...getRootProps()}
                 className={cn(
                   'border-2 border-dashed rounded-2xl p-8 text-center transition-all',

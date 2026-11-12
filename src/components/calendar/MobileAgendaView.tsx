@@ -284,7 +284,7 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
           'flex-1 flex flex-col items-center rounded-xl transition-all mx-0.5',
           compact ? 'py-1' : 'py-1.5',
           sel
-            ? 'bg-brand-500 text-white shadow-[0_0_18px_rgba(255,107,53,0.65)] scale-105 z-10'
+            ? 'bg-brand-500 text-[#10141a] shadow-[0_0_18px_rgba(255,107,53,0.65)] scale-105 z-10'
             : weekend ? 'bg-zinc-950/40 hover:bg-zinc-800' : 'bg-zinc-950/70 hover:bg-zinc-800',
         )}
       >
@@ -296,11 +296,11 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
         <span className={cn(
           'font-semibold leading-tight',
           compact ? 'text-[13px]' : 'text-[15px] mt-0.5',
-          sel ? 'text-white font-bold' : tod ? 'text-brand-400' : weekend ? 'text-zinc-500' : 'text-zinc-100',
+          sel ? 'text-[#10141a] font-bold' : tod ? 'text-brand-400' : weekend ? 'text-zinc-500' : 'text-zinc-100',
         )}>
           {format(day, 'd')}
         </span>
-        <span className={cn('w-1.5 h-1.5 mt-0.5 rounded-full', sel ? 'bg-white' : hasDot ? (tod ? 'bg-brand-500' : 'bg-zinc-500') : 'bg-transparent')} />
+        <span className={cn('w-1.5 h-1.5 mt-0.5 rounded-full', sel ? 'bg-[#10141a]' : hasDot ? (tod ? 'bg-brand-500' : 'bg-zinc-500') : 'bg-transparent')} />
       </button>
     )
   }

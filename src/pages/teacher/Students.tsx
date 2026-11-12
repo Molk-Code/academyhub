@@ -464,7 +464,7 @@ export default function Students() {
                           <button
                             onClick={() => openAddAbsence(student)}
                             title="Log absence"
-                            className="p-1.5 text-zinc-400 hover:text-amber-600 transition-colors rounded-lg hover:bg-amber-500/10"
+                            className="p-1.5 text-zinc-400 hover:text-amber-400 transition-colors rounded-lg hover:bg-amber-500/10"
                           >
                             <CalendarPlus className="w-4 h-4" />
                           </button>
@@ -523,7 +523,7 @@ export default function Students() {
                   </div>
                   <button
                     onClick={() => clearLessonGroup(group.lessonId)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-rose-400 hover:text-rose-600 hover:bg-rose-500/10 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-rose-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" /> Clear
                   </button>
@@ -543,7 +543,7 @@ export default function Students() {
                       {r.status === 'pending' && (
                         <button
                           onClick={() => markReviewed(r.id)}
-                          className="p-1.5 text-zinc-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-500/10 transition-colors"
+                          className="p-1.5 text-zinc-400 hover:text-emerald-400 rounded-lg hover:bg-emerald-500/10 transition-colors"
                         >
                           <Check className="w-4 h-4" />
                         </button>
@@ -627,7 +627,7 @@ export default function Students() {
                             <button
                               onClick={() => markReviewed(r.id)}
                               title="Mark as reviewed"
-                              className="p-1.5 text-zinc-400 hover:text-emerald-600 transition-colors rounded-lg hover:bg-emerald-500/10"
+                              className="p-1.5 text-zinc-400 hover:text-emerald-400 transition-colors rounded-lg hover:bg-emerald-500/10"
                             >
                               <Check className="w-4 h-4" />
                             </button>

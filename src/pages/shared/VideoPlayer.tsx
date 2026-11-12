@@ -19,6 +19,7 @@ import type { VideoDoc, VideoCommentDoc } from '@/types'
 import Avatar from '@/components/common/Avatar'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import { cn } from '@/lib/utils'
+import { clickable } from '@/lib/a11y'
 
 function formatTime(s: number): string {
   if (!isFinite(s) || s < 0) return '0:00'
@@ -97,7 +98,7 @@ function VideoControls({
   return (
     <div className="bg-slate-900 px-4 py-3 space-y-2">
       {/* Progress bar */}
-      <div
+      <div {...clickable}
         ref={progressRef}
         className="relative h-2 bg-zinc-700 rounded-full cursor-pointer group"
         onClick={handleProgressClick}
@@ -349,7 +350,7 @@ export default function VideoPlayer() {
           </p>
         </div>
         {video.reviewStatus === 'reviewed' && (
-          <span className="flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-800/50">
+          <span className="flex items-center gap-1 text-xs font-medium text-emerald-400 bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-800/50">
             <CheckCircle2 className="w-3.5 h-3.5" /> Reviewed
             {video.grade !== null && <> · {video.grade}/100</>}
           </span>
@@ -466,7 +467,7 @@ export default function VideoPlayer() {
               </div>
             ) : (
               comments.map(c => (
-                <div
+                <div {...clickable}
                   key={c.id}
                   className="px-4 py-3 hover:bg-white/5 group cursor-pointer transition-colors"
                   onClick={() => {
@@ -527,7 +528,7 @@ export default function VideoPlayer() {
                 placeholder="Add a comment…"
                 className="flex-1 text-sm bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2 outline-none focus:border-brand-400 transition-colors"
               />
-              <button
+              <button aria-label="Send"
                 onClick={addComment}
                 disabled={!commentInput.trim() || submitting}
                 className={cn(

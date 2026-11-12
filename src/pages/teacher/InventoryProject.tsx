@@ -358,7 +358,7 @@ export default function InventoryProject() {
   if (!project) {
     return (
       <div className="text-center py-20">
-        <Package className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
+        <Package className="w-12 h-12 text-zinc-500 mx-auto mb-4" />
         <p className="text-zinc-400">Project not found.</p>
         <button onClick={() => navigate('/teacher/inventory')} className="mt-4 text-orange-400 hover:text-orange-300 text-sm">
           ← Back to inventory
@@ -463,7 +463,7 @@ export default function InventoryProject() {
             />
             {!scannerActive && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-                <Scan className="w-10 h-10 text-zinc-700" />
+                <Scan className="w-10 h-10 text-zinc-500" />
                 <p className="text-xs text-zinc-500">Scanner off</p>
               </div>
             )}
@@ -598,7 +598,7 @@ export default function InventoryProject() {
 
         {items.length === 0 ? (
           <div className="p-10 text-center">
-            <Package className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
+            <Package className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
             <p className="text-zinc-500 text-sm">No items yet. Scan or add manually.</p>
           </div>
         ) : (

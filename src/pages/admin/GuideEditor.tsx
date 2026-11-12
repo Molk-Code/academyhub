@@ -228,7 +228,7 @@ function SectionsPanel({ sections, profile }: { sections: GuideSectionDoc[]; pro
             <>
               <EmojiPicker value={editForm.icon} onChange={icon => setEditForm(f => ({ ...f, icon }))} />
               <input autoFocus value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} onKeyDown={e => e.key === 'Enter' && saveEdit(s.id)} className="input flex-1 py-1.5" />
-              <button onClick={() => saveEdit(s.id)} className="p-1.5 text-emerald-500 hover:text-emerald-600"><Check className="w-4 h-4" /></button>
+              <button onClick={() => saveEdit(s.id)} className="p-1.5 text-emerald-500 hover:text-emerald-400"><Check className="w-4 h-4" /></button>
               <button onClick={() => setEditingId(null)} className="p-1.5 text-zinc-400 hover:text-zinc-400"><X className="w-4 h-4" /></button>
             </>
           ) : (
@@ -251,11 +251,11 @@ function SectionsPanel({ sections, profile }: { sections: GuideSectionDoc[]; pro
         <div className="bg-zinc-900 rounded-2xl border border-brand-200 p-4 flex items-center gap-3">
           <EmojiPicker value={form.icon} onChange={icon => setForm(f => ({ ...f, icon }))} />
           <input autoFocus value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} onKeyDown={e => e.key === 'Enter' && addSection()} className="input flex-1 py-1.5" placeholder="Section title…" />
-          <button onClick={addSection} disabled={!form.title.trim()} className="p-1.5 text-emerald-500 hover:text-emerald-600"><Check className="w-4 h-4" /></button>
+          <button aria-label="Add section" onClick={addSection} disabled={!form.title.trim()} className="p-1.5 text-emerald-500 hover:text-emerald-400"><Check className="w-4 h-4" /></button>
           <button onClick={() => setAdding(false)} className="p-1.5 text-zinc-400 hover:text-zinc-400"><X className="w-4 h-4" /></button>
         </div>
       ) : (
-        <button onClick={() => setAdding(true)} className="w-full rounded-2xl border-2 border-dashed border-white/10 p-3 text-sm text-zinc-400 hover:border-brand-300 hover:text-brand-600 transition-all flex items-center justify-center gap-2">
+        <button onClick={() => setAdding(true)} className="w-full rounded-2xl border-2 border-dashed border-white/10 p-3 text-sm text-zinc-400 hover:border-brand-300 hover:text-brand-400 transition-all flex items-center justify-center gap-2">
           <Plus className="w-4 h-4" /> Add section
         </button>
       )}
@@ -421,7 +421,7 @@ function ArticlesPanel({ sections, articles }: { sections: GuideSectionDoc[]; ar
                   <FolderInput className="w-4 h-4" />
                 </button>
                 <button onClick={() => togglePublished(a)} className={cn('p-1.5 rounded-lg', a.isPublished ? 'text-emerald-500' : 'text-zinc-300')}>{a.isPublished ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
-                <button onClick={() => { setEditingId(a.id); setEditTitle(a.title); setEditContent(a.content) }} className="p-1.5 text-zinc-400 hover:text-brand-600"><Pencil className="w-3.5 h-3.5" /></button>
+                <button onClick={() => { setEditingId(a.id); setEditTitle(a.title); setEditContent(a.content) }} className="p-1.5 text-zinc-400 hover:text-brand-400"><Pencil className="w-3.5 h-3.5" /></button>
                 <button onClick={() => deleteArticle(a.id)} className="p-1.5 text-zinc-400 hover:text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
             </div>
@@ -430,11 +430,11 @@ function ArticlesPanel({ sections, articles }: { sections: GuideSectionDoc[]; ar
           {adding ? (
             <div className="bg-zinc-900 rounded-2xl border border-brand-200 p-4 flex items-center gap-3">
               <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && addArticle()} className="input flex-1 py-1.5" placeholder="Article title…" />
-              <button onClick={addArticle} disabled={!newTitle.trim()} className="p-1.5 text-emerald-500 hover:text-emerald-600"><Check className="w-4 h-4" /></button>
+              <button aria-label="Add article" onClick={addArticle} disabled={!newTitle.trim()} className="p-1.5 text-emerald-500 hover:text-emerald-400"><Check className="w-4 h-4" /></button>
               <button onClick={() => setAdding(false)} className="p-1.5 text-zinc-400"><X className="w-4 h-4" /></button>
             </div>
           ) : (
-            <button onClick={() => setAdding(true)} className="w-full rounded-2xl border-2 border-dashed border-white/10 p-3 text-sm text-zinc-400 hover:border-brand-300 hover:text-brand-600 transition-all flex items-center justify-center gap-2">
+            <button onClick={() => setAdding(true)} className="w-full rounded-2xl border-2 border-dashed border-white/10 p-3 text-sm text-zinc-400 hover:border-brand-300 hover:text-brand-400 transition-all flex items-center justify-center gap-2">
               <Plus className="w-4 h-4" /> Add article
             </button>
           )}
@@ -499,7 +499,7 @@ function ContactsPanel({ contacts }: { contacts: GuideContactDoc[] }) {
                 </div>
               </div>
               <div className="flex gap-1 flex-shrink-0">
-                <button onClick={() => { setEditingId(c.id); setForm({ name: c.name, role: c.role, phone: c.phone ?? '', email: c.email ?? '' }) }} className="p-1.5 text-zinc-400 hover:text-brand-600"><Pencil className="w-3.5 h-3.5" /></button>
+                <button onClick={() => { setEditingId(c.id); setForm({ name: c.name, role: c.role, phone: c.phone ?? '', email: c.email ?? '' }) }} className="p-1.5 text-zinc-400 hover:text-brand-400"><Pencil className="w-3.5 h-3.5" /></button>
                 <button onClick={() => deleteContact(c.id)} className="p-1.5 text-zinc-400 hover:text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
             </div>
@@ -510,7 +510,7 @@ function ContactsPanel({ contacts }: { contacts: GuideContactDoc[] }) {
       {adding ? (
         contactFormJsx(addContact, () => { setAdding(false); setForm(emptyForm) })
       ) : (
-        <button onClick={() => setAdding(true)} className="w-full rounded-2xl border-2 border-dashed border-white/10 p-3 text-sm text-zinc-400 hover:border-brand-300 hover:text-brand-600 transition-all flex items-center justify-center gap-2">
+        <button onClick={() => setAdding(true)} className="w-full rounded-2xl border-2 border-dashed border-white/10 p-3 text-sm text-zinc-400 hover:border-brand-300 hover:text-brand-400 transition-all flex items-center justify-center gap-2">
           <Plus className="w-4 h-4" /> Add contact
         </button>
       )}

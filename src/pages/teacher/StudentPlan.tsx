@@ -18,11 +18,11 @@ interface StepDef {
 }
 
 const STEPS: StepDef[] = [
-  { key: 'situation',  abbrev: 'N', label: 'Now',        colors: { bg: 'bg-blue-500',    light: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200'    } },
-  { key: 'goal',       abbrev: 'O', label: 'Objective',  colors: { bg: 'bg-indigo-500',  light: 'bg-indigo-50',  text: 'text-indigo-700',  border: 'border-indigo-200'  } },
+  { key: 'situation',  abbrev: 'N', label: 'Now',        colors: { bg: 'bg-blue-500',    light: 'bg-blue-50',    text: 'text-blue-400',    border: 'border-blue-200'    } },
+  { key: 'goal',       abbrev: 'O', label: 'Objective',  colors: { bg: 'bg-indigo-500',  light: 'bg-indigo-50',  text: 'text-indigo-400',  border: 'border-indigo-200'  } },
   { key: 'obstacles',  abbrev: 'P', label: 'Problems',   colors: { bg: 'bg-amber-500',   light: 'bg-amber-950/40',   text: 'text-amber-300',   border: 'border-amber-800/50'   } },
   { key: 'resources',  abbrev: 'R', label: 'Resources',  colors: { bg: 'bg-emerald-500', light: 'bg-emerald-950/40', text: 'text-emerald-300', border: 'border-emerald-800/50' } },
-  { key: 'action',     abbrev: 'A', label: 'Actions',    colors: { bg: 'bg-brand-500',   light: 'bg-brand-50',   text: 'text-brand-700',   border: 'border-brand-200'   } },
+  { key: 'action',     abbrev: 'A', label: 'Actions',    colors: { bg: 'bg-brand-500',   light: 'bg-brand-50',   text: 'text-brand-400',   border: 'border-brand-200'   } },
   { key: 'evaluation', abbrev: 'E', label: 'Evaluation', colors: { bg: 'bg-rose-500',    light: 'bg-rose-950/40',    text: 'text-rose-300',    border: 'border-rose-800/50'    } },
 ]
 

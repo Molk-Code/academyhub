@@ -340,7 +340,7 @@ export default function TeacherDashboard() {
                 <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-zinc-100 truncate">{r.studentName}</p>
-                  <p className="text-xs text-amber-700">
+                  <p className="text-xs text-amber-400">
                     {r.type === 'full_day' ? 'Full day' : `Lesson: ${r.lessonTitle ?? '—'}`}
                   </p>
                   {r.reason && <p className="text-xs text-zinc-400 mt-0.5 line-clamp-1">{r.reason}</p>}

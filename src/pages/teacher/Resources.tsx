@@ -9,6 +9,7 @@ import {
   X, Eye, AlertCircle, Plus, Pencil, Trash2,
   Folder, FolderOpen, ChevronRight, Users, GraduationCap,
 } from 'lucide-react'
+import { clickable } from '@/lib/a11y'
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -260,7 +261,7 @@ function ResourceSection({ cohortId, cohortLabel, allResources, folders, profile
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {sortedFolders.map(f => (
-                  <div key={f.id} className="group bg-slate-800 border border-slate-700 rounded-2xl p-4 cursor-pointer hover:border-brand-500 hover:bg-slate-700/80 transition-all" onClick={() => { setActiveFolderId(f.id); setEditForm(null) }}>
+                  <div {...clickable} key={f.id} className="group bg-slate-800 border border-slate-700 rounded-2xl p-4 cursor-pointer hover:border-brand-500 hover:bg-slate-700/80 transition-all" onClick={() => { setActiveFolderId(f.id); setEditForm(null) }}>
                     <div className="flex items-start justify-between mb-2">
                       <span className="text-2xl">{f.emoji}</span>
                       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>

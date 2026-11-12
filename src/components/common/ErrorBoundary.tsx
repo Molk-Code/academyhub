@@ -43,7 +43,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             <p className="text-gray-400 mb-2 text-sm">
               An unexpected error occurred. Try refreshing the page.
             </p>
-            <p className="text-gray-600 text-xs mb-8 font-mono bg-white/5 rounded-xl px-4 py-3">
+            <p className="text-zinc-500 text-xs mb-8 font-mono bg-white/5 rounded-xl px-4 py-3">
               {this.state.error?.message ?? 'Unknown error'}
             </p>
             <div className="flex gap-3 justify-center">

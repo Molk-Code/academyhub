@@ -73,7 +73,7 @@ function WindowRow({
             </button>
           ))}
         </div>
-        <button
+        <button aria-label="Delete"
           type="button"
           onClick={onRemove}
           className="p-1.5 text-zinc-300 hover:text-rose-500 transition-colors flex-shrink-0"
@@ -337,7 +337,7 @@ export default function RoomManager() {
                         </button>
                         <button
                           onClick={() => setDeleteId(room.id)}
-                          className="p-1.5 text-zinc-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                          className="p-1.5 text-zinc-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

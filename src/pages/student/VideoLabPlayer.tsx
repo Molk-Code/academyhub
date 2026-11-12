@@ -133,7 +133,7 @@ export default function VideoLabPlayer() {
                 className="input flex-1 text-sm"
                 placeholder="What's happening at this moment in the video?"
               />
-              <button
+              <button aria-label="Send"
                 onClick={postComment}
                 disabled={!commentText.trim() || posting}
                 className="btn-primary py-2 px-4 text-sm gap-1.5"
@@ -168,7 +168,7 @@ export default function VideoLabPlayer() {
                     <button
                       onClick={() => seekTo(c.timestampSeconds)}
                       title={`Jump to ${formatTime(c.timestampSeconds)}`}
-                      className="font-mono text-xs bg-brand-50 text-brand-700 px-2 py-0.5 rounded-full hover:bg-brand-100 transition-colors"
+                      className="font-mono text-xs bg-brand-50 text-brand-800 px-2 py-0.5 rounded-full hover:bg-brand-100 transition-colors"
                     >
                       ▶ {formatTime(c.timestampSeconds)}
                     </button>

@@ -100,14 +100,14 @@ export default function AdminVideoLab() {
                           href={videoUrl(video.cloudinaryPublicId)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-1.5 text-zinc-400 hover:text-brand-600 transition-colors rounded-lg hover:bg-brand-50"
+                          className="p-1.5 text-zinc-400 hover:text-brand-400 transition-colors rounded-lg hover:bg-brand-500/10"
                           title="Open video"
                         >
                           <ExternalLink className="w-4 h-4" />
                         </a>
                         <button
                           onClick={() => deleteVideo(video.id)}
-                          className="p-1.5 text-zinc-400 hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-50"
+                          className="p-1.5 text-zinc-400 hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-500/10"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

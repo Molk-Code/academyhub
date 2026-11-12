@@ -202,7 +202,7 @@ export default function LessonBlocks() {
                 return (
                   <button key={day.value} type="button" onClick={() => toggleDay(day.value)}
                     className={`w-12 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                      active ? 'bg-brand-600 border-brand-600 text-white' : 'bg-zinc-900 border-white/10 text-zinc-500 hover:border-brand-400 hover:text-brand-600'
+                      active ? 'bg-brand-600 border-brand-600 text-white' : 'bg-zinc-900 border-white/10 text-zinc-500 hover:border-brand-400 hover:text-brand-400'
                     }`}>
                     {day.label}
                   </button>

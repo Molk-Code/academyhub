@@ -188,7 +188,7 @@ export default function ExperienceLevels() {
           </div>
         ) : !showAdd && (
           <div className="bg-zinc-900 border border-white/10 rounded-2xl px-5 py-10 text-center">
-            <Trophy className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
+            <Trophy className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
             <p className="text-zinc-500 text-sm">No levels yet. Add your first one above.</p>
           </div>
         )}

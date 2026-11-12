@@ -104,7 +104,7 @@ function SortableShotCard({ shot, canEdit, get, setLocal, save, deleteShot, hand
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           {canEdit && (
-            <button type="button" {...attributes} {...listeners}
+            <button aria-label="Drag to reorder" type="button" {...attributes} {...listeners}
               className="p-1 -ml-1 text-zinc-600 hover:text-zinc-300 cursor-grab active:cursor-grabbing touch-none">
               <GripVertical className="w-3.5 h-3.5" />
             </button>
@@ -171,7 +171,7 @@ function SortableShotRow({ shot, canEdit, get, setLocal, save, deleteShot, handl
     <tr ref={setNodeRef} style={style} className="group hover:bg-white/3 transition-colors bg-zinc-900">
       <td className="pl-2 py-2 w-6">
         {canEdit && (
-          <button type="button" {...attributes} {...listeners}
+          <button aria-label="Drag to reorder" type="button" {...attributes} {...listeners}
             className="p-1 text-zinc-600 hover:text-zinc-300 cursor-grab active:cursor-grabbing touch-none">
             <GripVertical className="w-3.5 h-3.5" />
           </button>

@@ -11,6 +11,7 @@ import type { DevelopmentPlan, PlanComment, TodoDoc, NopraStepKey, TodoCategory,
 import {
   DndContext,
   DragOverlay,
+  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
@@ -20,6 +21,7 @@ import {
 } from '@dnd-kit/core'
 import {
   SortableContext,
+  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
   arrayMove,
@@ -95,7 +97,7 @@ function SortableTodoItem({
       style={style}
       className="flex items-center gap-2 bg-zinc-900 border border-white/10 rounded-xl px-3 py-2.5 group"
     >
-      <button
+      <button aria-label="Drag to reorder"
         {...attributes}
         {...listeners}
         className="text-zinc-300 hover:text-zinc-500 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none"
@@ -111,9 +113,9 @@ function SortableTodoItem({
       <span className={`flex-1 text-sm text-zinc-200 ${fading ? 'line-through text-zinc-400' : ''}`}>
         {todo.title}
       </span>
-      <button
+      <button aria-label="Delete"
         onClick={onDelete}
-        className="opacity-0 group-hover:opacity-100 p-1 text-zinc-400 hover:text-rose-600 transition-all flex-shrink-0"
+        className="opacity-0 group-hover:opacity-100 p-1 text-zinc-400 hover:text-rose-400 transition-all flex-shrink-0"
       >
         <Trash2 className="w-3.5 h-3.5" />
       </button>
@@ -351,7 +353,11 @@ function TodoTab() {
     [localTodos],
   )
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  // Keyboard too (WCAG 2.1.1): focus the handle, Space to lift, arrows to move, Space to drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   function findContainer(id: string): TodoCategory | null {
     if (urgentItems.find(i => i.id === id)) return 'urgent'

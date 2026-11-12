@@ -194,7 +194,7 @@ export default function TestTake() {
                   className={cn(
                     'w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all',
                     selected
-                      ? 'border-brand-600 bg-brand-50 text-brand-700'
+                      ? 'border-brand-600 bg-brand-50 text-brand-800'
                       : 'border-white/10 hover:border-white/15 text-zinc-300',
                   )}
                 >
@@ -226,7 +226,7 @@ export default function TestTake() {
                   className={cn(
                     'w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all',
                     selected
-                      ? 'border-brand-600 bg-brand-50 text-brand-700'
+                      ? 'border-brand-600 bg-brand-50 text-brand-800'
                       : 'border-white/10 hover:border-white/15 text-zinc-300',
                   )}
                 >

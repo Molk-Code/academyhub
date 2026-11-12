@@ -7,6 +7,7 @@ import { useCollection } from '@/hooks/useFirestore'
 import type { InventoryProjectDoc } from '@/types'
 import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import { clickable } from '@/lib/a11y'
 
 function today(): string {
   return new Date().toISOString().split('T')[0]
@@ -101,7 +102,7 @@ export default function InventoryDashboard() {
         <h2 className="text-sm font-semibold text-zinc-300">Active Projects</h2>
         {activeProjects.length === 0 ? (
           <div className="bg-zinc-900 rounded-2xl border border-white/8 p-10 text-center">
-            <Package className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
+            <Package className="w-10 h-10 text-zinc-500 mx-auto mb-3" />
             <p className="text-zinc-400 text-sm">No active projects yet.</p>
             <button
               onClick={() => navigate('/teacher/inventory/create')}
@@ -117,7 +118,7 @@ export default function InventoryDashboard() {
             const isConfirming = confirmDeleteId === project.id
             const isDeleting   = deletingId === project.id
             return (
-              <div
+              <div {...clickable}
                 key={project.id}
                 className="group w-full text-left bg-zinc-900 hover:bg-zinc-800/70 rounded-2xl border border-white/8 p-4 transition-colors cursor-pointer"
                 onClick={() => navigate(`/teacher/inventory/project/${project.id}`)}
@@ -193,7 +194,7 @@ export default function InventoryDashboard() {
                 const isConfirming = confirmDeleteId === project.id
                 const isDeleting   = deletingId === project.id
                 return (
-                  <div
+                  <div {...clickable}
                     key={project.id}
                     className="group w-full text-left bg-zinc-900/60 hover:bg-zinc-800/50 rounded-xl border border-white/6 p-4 transition-colors opacity-60 hover:opacity-80 cursor-pointer"
                     onClick={() => navigate(`/teacher/inventory/project/${project.id}`)}

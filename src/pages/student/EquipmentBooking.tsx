@@ -113,7 +113,7 @@ function EquipmentCard({ item, cartQty, isYear2, onAdd, onRemove }: {
         {/* Cart controls */}
         {cartQty > 0 ? (
           <div className="flex items-center gap-2">
-            <button
+            <button aria-label="Decrease quantity"
               onClick={onRemove}
               className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
             >
@@ -288,7 +288,7 @@ function CheckoutForm({ items, profile, cohortId, onSuccess, onBack }: {
   return (
     <div className="max-w-lg mx-auto space-y-5">
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="text-zinc-500 hover:text-zinc-200 transition-colors">
+        <button aria-label="Back" onClick={onBack} className="text-zinc-500 hover:text-zinc-200 transition-colors">
           <ChevronRight className="w-4 h-4 rotate-180" />
         </button>
         <h2 className="text-lg font-bold text-zinc-100">Checkout</h2>

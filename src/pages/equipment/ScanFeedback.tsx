@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Check, Package } from 'lucide-react'
+import { clickable } from '@/lib/a11y'
 
 export const SCAN_FLASH_MS = 1000
 
@@ -71,7 +72,7 @@ export interface NotInProjectData {
 // Check-in of something that isn't checked out in this project.
 export function NotInProjectModal({ data, onClose }: { data: NotInProjectData; onClose: () => void }) {
   return (
-    <div
+    <div {...clickable}
       onClick={onClose}
       style={{ position: 'fixed', inset: 0, zIndex: 1001, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
     >

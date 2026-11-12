@@ -139,7 +139,7 @@ function QuestionCard({
     <div ref={setNodeRef} style={style} className="bg-zinc-900 rounded-2xl border border-white/10 shadow-sm overflow-hidden">
       {/* Card header */}
       <div className="flex items-center gap-3 px-4 py-3 bg-zinc-900/50 border-b border-white/8">
-        <button
+        <button aria-label="Drag to reorder"
           type="button"
           {...attributes}
           {...listeners}
@@ -216,7 +216,7 @@ function QuestionCard({
             <button
               type="button"
               onClick={addOption}
-              className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-brand-600 mt-1 transition-colors"
+              className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-brand-400 mt-1 transition-colors"
             >
               <Plus className="w-3.5 h-3.5" /> Add option
             </button>
@@ -261,7 +261,7 @@ function QuestionCard({
             <button
               type="button"
               onClick={addOption}
-              className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-brand-600 mt-1 transition-colors"
+              className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-brand-400 mt-1 transition-colors"
             >
               <Plus className="w-3.5 h-3.5" /> Add option
             </button>
@@ -328,7 +328,7 @@ function QuestionCard({
                 )}
               </div>
             ))}
-            <button type="button" onClick={addOption} className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-brand-600 mt-1 transition-colors">
+            <button type="button" onClick={addOption} className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-brand-400 mt-1 transition-colors">
               <Plus className="w-3.5 h-3.5" /> Add item
             </button>
             <p className="text-xs text-zinc-500">Students will see items in shuffled order and drag them into the correct sequence.</p>
@@ -702,7 +702,7 @@ export default function TestBuilder() {
                   key={type}
                   type="button"
                   onClick={() => addQuestion(type)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-400 bg-zinc-900/50 hover:bg-brand-50 hover:text-brand-700 border border-white/10 hover:border-brand-200 rounded-xl transition-all"
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-400 bg-zinc-900/50 hover:bg-brand-500/10 hover:text-brand-400 border border-white/10 hover:border-brand-200 rounded-xl transition-all"
                 >
                   <Icon className="w-4 h-4" />
                   {label}

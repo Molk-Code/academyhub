@@ -57,7 +57,7 @@ export default function BookingManager() {
 
       {/* Filters */}
       <div className="flex items-center gap-3">
-        <button
+        <button aria-label="Previous week"
           onClick={() => setWeekOffset(w => w - 1)}
           className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors"
         >
@@ -66,7 +66,7 @@ export default function BookingManager() {
         <span className="text-sm font-medium text-zinc-300 min-w-[180px] text-center">
           {format(weekStart, 'd MMM')} – {format(addDays(weekStart, 6), 'd MMM yyyy')}
         </span>
-        <button
+        <button aria-label="Next week"
           onClick={() => setWeekOffset(w => w + 1)}
           className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors"
         >
@@ -75,7 +75,7 @@ export default function BookingManager() {
         {weekOffset !== 0 && (
           <button
             onClick={() => setWeekOffset(0)}
-            className="text-sm text-brand-600 hover:text-brand-800 px-3 py-2 rounded-lg hover:bg-brand-50 transition-colors"
+            className="text-sm text-brand-600 hover:text-brand-800 px-3 py-2 rounded-lg hover:bg-brand-500/10 transition-colors"
           >
             This week
           </button>
@@ -140,7 +140,7 @@ export default function BookingManager() {
                       <button
                         onClick={() => cancelBooking(booking.id)}
                         disabled={deleting === booking.id}
-                        className="p-1.5 text-zinc-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                        className="p-1.5 text-zinc-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
                         title="Cancel booking"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

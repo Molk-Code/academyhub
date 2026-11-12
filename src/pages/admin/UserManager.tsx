@@ -390,6 +390,9 @@ export default function UserManager() {
           </div>
         </div>
         <button
+          role="switch"
+          aria-checked={!!showLeaderboard}
+          aria-label="Show points leaderboard"
           onClick={toggleLeaderboard}
           className={cn(
             'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none',
@@ -676,7 +679,7 @@ export default function UserManager() {
                           </button>
                           <button
                             onClick={() => deleteInvite(inv.id)}
-                            className="p-1.5 text-zinc-400 hover:text-rose-600 transition-colors flex-shrink-0"
+                            className="p-1.5 text-zinc-400 hover:text-rose-400 transition-colors flex-shrink-0"
                             title="Delete invite"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -722,6 +725,7 @@ export default function UserManager() {
               type="checkbox"
               checked={selectedIds.has(user.id)}
               onChange={() => toggleSelect(user.id)}
+              aria-label={`Select ${user.displayName ?? user.email ?? 'user'}`}
               className="w-4 h-4 rounded accent-orange-500 flex-shrink-0 cursor-pointer"
             />
             <Avatar uid={user.id} name={user.displayName} avatarUrl={user.avatarUrl} size="sm" />
@@ -755,7 +759,7 @@ export default function UserManager() {
                     title={(user.roles ?? [user.role]).includes(user.role === 'admin' ? 'teacher' : 'admin')
                       ? `Remove ${user.role === 'admin' ? 'teacher' : 'admin'} role`
                       : `Also ${user.role === 'admin' ? 'teacher' : 'admin'}`}
-                    className="p-0.5 text-zinc-400 hover:text-brand-600 transition-colors"
+                    className="p-0.5 text-zinc-400 hover:text-brand-400 transition-colors"
                   >
                     <ShieldCheck className="w-3 h-3" />
                   </button>
@@ -768,7 +772,7 @@ export default function UserManager() {
                   <button onClick={() => restoreUser(user)} className="p-2 text-zinc-400 hover:text-emerald-500 transition-colors rounded-lg hover:bg-white/5" title="Restore account">
                     <RotateCcw className="w-4 h-4" />
                   </button>
-                  <button onClick={() => permanentlyDeleteUser(user)} className="p-2 text-zinc-400 hover:text-rose-600 transition-colors rounded-lg hover:bg-white/5" title="Permanently delete account and all data">
+                  <button onClick={() => permanentlyDeleteUser(user)} className="p-2 text-zinc-400 hover:text-rose-400 transition-colors rounded-lg hover:bg-white/5" title="Permanently delete account and all data">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </>
@@ -783,7 +787,7 @@ export default function UserManager() {
                   <button onClick={() => disableUser(user)} className="p-2 text-zinc-400 hover:text-amber-500 transition-colors rounded-lg hover:bg-white/5" title="Deactivate account (reversible)">
                     <UserX className="w-4 h-4" />
                   </button>
-                  <button onClick={() => permanentlyDeleteUser(user)} className="p-2 text-zinc-400 hover:text-rose-600 transition-colors rounded-lg hover:bg-white/5" title="Permanently delete account and all data">
+                  <button onClick={() => permanentlyDeleteUser(user)} className="p-2 text-zinc-400 hover:text-rose-400 transition-colors rounded-lg hover:bg-white/5" title="Permanently delete account and all data">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </>

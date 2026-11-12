@@ -48,7 +48,7 @@ export default function NotificationPermissionBanner() {
       <div className="flex items-center gap-3 bg-emerald-600 text-white px-4 py-2 text-sm">
         <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
         <span className="flex-1 text-xs">Push notifications active on this device.</span>
-        <button onClick={dismiss} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
+        <button onClick={dismiss} aria-label="Dismiss" className="p-1 hover:bg-white/20 rounded-lg transition-colors">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -60,7 +60,7 @@ export default function NotificationPermissionBanner() {
       <div className="flex items-center gap-3 bg-slate-600 text-white px-4 py-2 text-sm">
         <BellOff className="w-4 h-4 flex-shrink-0" />
         <span className="flex-1 text-xs">Notifications blocked. Enable them in your browser/device settings, then reload.</span>
-        <button onClick={dismiss} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
+        <button onClick={dismiss} aria-label="Dismiss" className="p-1 hover:bg-white/20 rounded-lg transition-colors">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -72,10 +72,10 @@ export default function NotificationPermissionBanner() {
       <div className="flex items-center gap-3 bg-rose-600 text-white px-4 py-2 text-sm">
         <AlertCircle className="w-4 h-4 flex-shrink-0" />
         <span className="flex-1 text-xs">Push setup failed: {errorMsg}. Try reloading.</span>
-        <button onClick={enable} className="bg-zinc-900 text-rose-700 font-semibold text-xs px-3 py-1 rounded-lg hover:bg-rose-50 flex-shrink-0">
+        <button onClick={enable} className="bg-zinc-900 text-rose-400 font-semibold text-xs px-3 py-1 rounded-lg hover:bg-rose-500/10 flex-shrink-0">
           Retry
         </button>
-        <button onClick={dismiss} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
+        <button onClick={dismiss} aria-label="Dismiss" className="p-1 hover:bg-white/20 rounded-lg transition-colors">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -90,11 +90,11 @@ export default function NotificationPermissionBanner() {
       <button
         onClick={enable}
         disabled={status === 'asking'}
-        className="bg-zinc-900 text-brand-700 font-semibold text-xs px-3 py-1 rounded-lg hover:bg-brand-50 transition-colors disabled:opacity-60 flex-shrink-0"
+        className="bg-zinc-900 text-brand-400 font-semibold text-xs px-3 py-1 rounded-lg hover:bg-brand-500/10 transition-colors disabled:opacity-60 flex-shrink-0"
       >
         {status === 'asking' ? 'Enabling…' : 'Enable'}
       </button>
-      <button onClick={dismiss} className="p-1 hover:bg-white/20 rounded-lg transition-colors flex-shrink-0">
+      <button onClick={dismiss} aria-label="Dismiss" className="p-1 hover:bg-white/20 rounded-lg transition-colors flex-shrink-0">
         <X className="w-4 h-4" />
       </button>
     </div>

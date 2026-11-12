@@ -9,6 +9,7 @@ import { calcRentalDays, billableDays } from '@/lib/productionBudget'
 import { isDueThisWeek } from './inventoryShared'
 import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, UserDoc, CohortDoc } from '@/types'
 import './molkom.css'
+import { clickableRow } from '@/lib/a11y'
 
 type Item = InventoryItemDoc & { projectId: string }
 
@@ -397,7 +398,7 @@ function ProjectsTab({
       p.status === 'returned'     ? '#60a5fa' : '#6b7280'
 
     return (
-      <tr style={{ borderBottom: '1px solid #1a1a25', cursor: 'pointer' }} onClick={() => onOpenProject(p.id)}>
+      <tr {...clickableRow} style={{ borderBottom: '1px solid #1a1a25', cursor: 'pointer' }} onClick={() => onOpenProject(p.id)}>
         <td style={{ padding: '.5rem .75rem', color: '#f97316', fontWeight: 600 }}>{p.name}</td>
         <td style={{ padding: '.5rem .75rem', color: '#6a6a80', fontSize: '.78rem' }}>{(p.borrowers ?? []).slice(0, 3).join(', ')}{(p.borrowers?.length ?? 0) > 3 ? ` +${p.borrowers!.length - 3}` : ''}</td>
         <td style={{ padding: '.5rem .75rem', color: '#6a6a80', fontSize: '.75rem', whiteSpace: 'nowrap' }}>{formatRange(p.checkoutDate, p.returnDate)}</td>

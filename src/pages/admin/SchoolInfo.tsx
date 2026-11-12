@@ -639,7 +639,7 @@ export default function SchoolInfo() {
                         setCopiedRoomId(room.id)
                         setTimeout(() => setCopiedRoomId(null), 2000)
                       }}
-                      className="p-2 text-zinc-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                      className="p-2 text-zinc-400 hover:text-brand-400 hover:bg-brand-500/10 rounded-lg transition-colors"
                       title="Copy iPad display URL"
                     >
                       {copiedRoomId === room.id ? <Check className="w-4 h-4 text-emerald-500" /> : <Link2 className="w-4 h-4" />}

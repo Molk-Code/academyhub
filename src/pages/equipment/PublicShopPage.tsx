@@ -511,7 +511,7 @@ export default function PublicShopPage() {
                       <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <Package className="w-10 h-10 text-zinc-700" />
+                        <Package className="w-10 h-10 text-zinc-500" />
                       </div>
                     )}
                   </div>

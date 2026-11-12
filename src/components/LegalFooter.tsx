@@ -34,7 +34,7 @@ export default function LegalFooter() {
     <footer className="mt-6 text-center space-y-3">
       <nav className="flex items-center justify-center gap-4 text-xs text-zinc-500">
         <Link to="/contact" className="hover:text-zinc-300 transition-colors">Contact</Link>
-        <span aria-hidden className="text-zinc-700">·</span>
+        <span aria-hidden className="text-zinc-500">·</span>
         <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-300 transition-colors">Privacy policy</a>
       </nav>
       <ProviderDetails />

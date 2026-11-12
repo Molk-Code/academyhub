@@ -10,6 +10,7 @@ import { effectiveModules, publicShopOpen, tierFromModules, MODULE_FLAG, MODULE_
 import type { PublicConfig, FrontDoor } from '@/lib/publicConfig'
 import type { SchoolDoc } from '@/types'
 import { format } from 'date-fns'
+import { contrastRatio, readableTextOn } from '@/lib/contrast'
 
 type ProfileForm = Required<Pick<PublicConfig, 'name' | 'shortName' | 'tagline' | 'primaryColor' | 'logoUrl'>> & { frontDoor: FrontDoor | '' }
 
@@ -35,10 +36,13 @@ function warningsFor(m: ModuleFlags): string[] {
   return w
 }
 
-function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+function Toggle({ on, onChange, disabled, label }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label?: string }) {
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
       disabled={disabled}
       onClick={e => { e.stopPropagation(); onChange(!on) }}
       className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-40 ${on ? 'bg-brand-500' : 'bg-zinc-700'}`}
@@ -140,7 +144,7 @@ export default function SchoolModulesPanel({ school }: { school: SchoolDoc }) {
                 </p>
                 <p className="text-xs text-zinc-500">{MODULE_INFO[id].tagline}</p>
               </div>
-              <Toggle on={modules[flag]} onChange={v => setModule(flag, v)} />
+              <Toggle on={modules[flag]} onChange={v => setModule(flag, v)} label={MODULE_INFO[id].name} />
             </div>
           )
         })}
@@ -149,7 +153,7 @@ export default function SchoolModulesPanel({ school }: { school: SchoolDoc }) {
             <p className="text-sm text-zinc-100">Public rental shop</p>
             <p className="text-xs text-zinc-500">Signed-out visitors can browse equipment and send booking requests at /shop. Off by default.</p>
           </div>
-          <Toggle on={modules.rentalInventory && publicShop} onChange={setPublicShop} disabled={!modules.rentalInventory} />
+          <Toggle on={modules.rentalInventory && publicShop} onChange={setPublicShop} disabled={!modules.rentalInventory} label="Public rental shop" />
         </div>
         {warnings.length > 0 && (
           <ul className="space-y-1.5">
@@ -208,6 +212,14 @@ export default function SchoolModulesPanel({ school }: { school: SchoolDoc }) {
                 <input type="color" className="h-10 w-12 rounded-lg bg-transparent border border-white/10" value={profile.primaryColor || '#ff6b35'} onChange={e => setProfileField('primaryColor', e.target.value)} />
                 <input className="input w-full font-mono" maxLength={7} value={profile.primaryColor} onChange={e => setProfileField('primaryColor', e.target.value)} placeholder="#ff6b35" />
               </div>
+              {/^#[0-9a-fA-F]{6}$/.test(profile.primaryColor) && (() => {
+                // Button text is picked automatically; still flag colours that read poorly on the dark page
+                const onPage = contrastRatio(profile.primaryColor, '#1c2026')
+                const onButton = contrastRatio(readableTextOn(profile.primaryColor), profile.primaryColor)
+                return onPage < 3 || onButton < 4.5
+                  ? <p className="text-xs text-amber-300 mt-1">Low contrast (button text {onButton.toFixed(1)}:1, on page {onPage.toFixed(1)}:1) — pick a lighter or more saturated colour.</p>
+                  : <p className="text-xs text-zinc-500 mt-1">Contrast OK (button text {onButton.toFixed(1)}:1).</p>
+              })()}
             </div>
             <div>
               <label className="label">Front door</label>

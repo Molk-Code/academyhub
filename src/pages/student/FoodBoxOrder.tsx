@@ -91,7 +91,7 @@ function StudentInput({
         <button
           type="button"
           onClick={add}
-          className="flex items-center gap-1 px-3 py-2 rounded-xl border border-white/10 bg-zinc-900 text-sm text-brand-600 font-medium hover:bg-brand-50 transition-colors"
+          className="flex items-center gap-1 px-3 py-2 rounded-xl border border-white/10 bg-zinc-900 text-sm text-brand-600 font-medium hover:bg-brand-500/10 transition-colors"
         >
           <Plus className="w-4 h-4" /> Add
         </button>
@@ -102,7 +102,7 @@ function StudentInput({
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {selected.map(name => (
-            <span key={name} className="flex items-center gap-1 bg-brand-50 text-brand-700 text-xs font-medium px-2.5 py-1 rounded-full border border-brand-100">
+            <span key={name} className="flex items-center gap-1 bg-brand-50 text-brand-800 text-xs font-medium px-2.5 py-1 rounded-full border border-brand-100">
               {name}
               <button type="button" onClick={() => onChange(selected.filter(n => n !== name))} className="hover:text-brand-900">
                 <X className="w-3 h-3" />
@@ -203,7 +203,7 @@ setSubmitting(true)
       </div>
 
       {status === 'error' && (
-        <div className="flex items-center gap-2 bg-rose-950/40 border border-rose-800/50 rounded-xl px-4 py-3 text-rose-700 text-sm">
+        <div className="flex items-center gap-2 bg-rose-950/40 border border-rose-800/50 rounded-xl px-4 py-3 text-rose-400 text-sm">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           {errorMsg}
         </div>

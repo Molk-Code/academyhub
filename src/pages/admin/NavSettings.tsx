@@ -60,10 +60,13 @@ const FEATURES: Feature[] = [
 
 // ── Toggle ─────────────────────────────────────────────────────────────────────
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: () => void; label?: string }) {
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
       onClick={onChange}
       className={cn(
         'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none',
@@ -278,7 +281,7 @@ export default function NavSettings() {
                 {/* Teacher toggle */}
                 <div className="flex justify-center">
                   {feature.teacher
-                    ? <Toggle checked={teacherOn} onChange={() => toggle('teacher', feature.id)} />
+                    ? <Toggle checked={teacherOn} onChange={() => toggle('teacher', feature.id)} label={`${feature.label} for teachers`} />
                     : <span className="text-zinc-300 text-sm">—</span>
                   }
                 </div>
@@ -286,7 +289,7 @@ export default function NavSettings() {
                 {/* Student toggle */}
                 <div className="flex justify-center">
                   {feature.student
-                    ? <Toggle checked={studentOn} onChange={() => toggle('student', feature.id)} />
+                    ? <Toggle checked={studentOn} onChange={() => toggle('student', feature.id)} label={`${feature.label} for students`} />
                     : <span className="text-zinc-300 text-sm">—</span>
                   }
                 </div>

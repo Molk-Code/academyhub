@@ -263,7 +263,7 @@ export default function TeacherProductionPeriod({
                     className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors rounded-lg hover:bg-white/5">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={handleDeletePeriod}
+                  <button aria-label="Delete" onClick={handleDeletePeriod}
                     className="p-1.5 text-zinc-500 hover:text-rose-400 transition-colors rounded-lg hover:bg-white/5">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

@@ -79,7 +79,7 @@ function StudentEquipmentWidget({ uid }: { uid: string }) {
         <h2 className="section-title flex items-center gap-2">
           <Package className="w-4 h-4 text-brand-400" /> My Equipment
         </h2>
-        <Link to="/booking/equipment" className="text-sm text-brand-600 hover:text-brand-700 font-medium flex items-center gap-0.5">
+        <Link to="/booking/equipment" className="text-sm text-brand-600 hover:text-brand-400 font-medium flex items-center gap-0.5">
           View all <ChevronRight className="w-4 h-4" />
         </Link>
       </div>
@@ -280,7 +280,7 @@ function DashboardTodoWidget({ uid, rawTodos }: { uid: string; rawTodos: TodoDoc
         <h2 className="section-title flex items-center gap-2">
           <ListChecks className="w-4 h-4 text-zinc-400" /> To-Do
         </h2>
-        <Link to="/my-plan" className="text-sm text-brand-600 hover:text-brand-700 font-medium flex items-center gap-0.5">
+        <Link to="/my-plan" className="text-sm text-brand-600 hover:text-brand-400 font-medium flex items-center gap-0.5">
           All tasks <ChevronRight className="w-4 h-4" />
         </Link>
       </div>
@@ -797,7 +797,7 @@ export default function StudentDashboard() {
               <h2 className="section-title flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-amber-500" /> My Points
               </h2>
-              <Link to="/prizes" className="text-sm text-brand-600 hover:text-brand-700 font-medium flex items-center gap-0.5">
+              <Link to="/prizes" className="text-sm text-brand-600 hover:text-brand-400 font-medium flex items-center gap-0.5">
                 Prizes <ArrowRight className="w-4 h-4" />
               </Link>
             </div>

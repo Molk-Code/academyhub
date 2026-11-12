@@ -19,6 +19,7 @@ import { EquipmentImg, today, isOverdue, isDueThisWeek, formatDate, overdueDays,
 import { EquipmentPicker } from './EquipmentPicker'
 import { ProjectDetail } from './ProjectDetail'
 import './molkom.css'
+import { clickable } from '@/lib/a11y'
 
 type InvTab = 'dashboard' | 'all-projects' | 'statistics' | 'presets'
 
@@ -53,7 +54,7 @@ function ProjectCard({
     project.status === 'returned' ? 'status-returned' : 'status-archived'
 
   return (
-    <div className="project-card" onClick={onClick}>
+    <div {...clickable} className="project-card" onClick={onClick}>
       <div className="project-card-header">
         <Package size={16} />
         <span style={{ fontSize: '.75rem', fontWeight: 600, color: '#a0a0b5' }}>Project</span>

@@ -471,7 +471,7 @@ export default function TeacherProduction() {
                     </div>
                   </div>
                 ) : (
-                  <button onClick={() => { setTeamPanel('new'); setTeamError(null) }} className="w-full rounded-2xl border-2 border-dashed border-white/10 p-4 text-sm text-zinc-400 hover:border-brand-300 hover:text-brand-600 transition-all flex items-center justify-center gap-2">
+                  <button onClick={() => { setTeamPanel('new'); setTeamError(null) }} className="w-full rounded-2xl border-2 border-dashed border-white/10 p-4 text-sm text-zinc-400 hover:border-brand-300 hover:text-brand-400 transition-all flex items-center justify-center gap-2">
                     <Plus className="w-4 h-4" /> New crew
                   </button>
                 )}
@@ -553,7 +553,7 @@ export default function TeacherProduction() {
                         />
                         <div className="flex justify-end gap-2">
                           <button onClick={() => setCmdAdding(false)} className="p-2 text-zinc-400 hover:text-zinc-300 transition-colors"><X className="w-4 h-4" /></button>
-                          <button onClick={saveCommandment} disabled={savingCmd || !cmdText.trim()} className="p-2 text-emerald-500 hover:text-emerald-600 transition-colors"><Check className="w-4 h-4" /></button>
+                          <button aria-label="Save" onClick={saveCommandment} disabled={savingCmd || !cmdText.trim()} className="p-2 text-emerald-500 hover:text-emerald-400 transition-colors"><Check className="w-4 h-4" /></button>
                         </div>
                       </div>
                     )}
@@ -569,7 +569,7 @@ export default function TeacherProduction() {
                               <input className="input py-1.5 text-sm w-full" value={cmdDesc} onChange={e => setCmdDesc(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveCommandment()} placeholder="What this means…" />
                               <div className="flex justify-end gap-1">
                                 <button onClick={() => setCmdEditing(null)} className="p-1.5 text-zinc-400 hover:text-zinc-300 transition-colors"><X className="w-4 h-4" /></button>
-                                <button onClick={saveCommandment} className="p-1.5 text-emerald-500 hover:text-emerald-600 transition-colors"><Check className="w-4 h-4" /></button>
+                                <button aria-label="Save" onClick={saveCommandment} className="p-1.5 text-emerald-500 hover:text-emerald-400 transition-colors"><Check className="w-4 h-4" /></button>
                               </div>
                             </div>
                           ) : (

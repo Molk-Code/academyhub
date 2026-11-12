@@ -52,11 +52,11 @@ export default function TeacherVideoLibrary() {
         {/* Stats */}
         <div className="flex items-center gap-3">
           <div className="text-center bg-amber-950/40 border border-amber-800/50 rounded-xl px-4 py-2">
-            <p className="text-lg font-bold text-amber-700">{pending}</p>
+            <p className="text-lg font-bold text-amber-400">{pending}</p>
             <p className="text-xs text-amber-600">Pending</p>
           </div>
           <div className="text-center bg-emerald-950/40 border border-emerald-800/50 rounded-xl px-4 py-2">
-            <p className="text-lg font-bold text-emerald-700">{reviewed}</p>
+            <p className="text-lg font-bold text-emerald-400">{reviewed}</p>
             <p className="text-xs text-emerald-600">Reviewed</p>
           </div>
         </div>

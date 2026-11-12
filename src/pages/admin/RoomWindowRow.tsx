@@ -27,7 +27,7 @@ export function WindowRow({ w, onChange, onRemove }: {
             >{DAY_LABELS[d]}</button>
           ))}
         </div>
-        <button type="button" onClick={onRemove} className="p-1.5 text-zinc-300 hover:text-rose-500 transition-colors flex-shrink-0">
+        <button aria-label="Delete" type="button" onClick={onRemove} className="p-1.5 text-zinc-300 hover:text-rose-500 transition-colors flex-shrink-0">
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>

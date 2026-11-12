@@ -11,6 +11,7 @@ import {
   Building2, Users, Clapperboard, Boxes, Plus, X, ChevronDown, ChevronUp,
   ExternalLink, CheckCircle2, Loader2, AlertCircle,
 } from 'lucide-react'
+import { clickableRow } from '@/lib/a11y'
 
 // Who may open this page (the rules and functions check again server-side).
 // VITE_SUPERADMIN_EMAILS (comma-separated) overrides, e.g. for the emulator.
@@ -98,7 +99,7 @@ function SchoolRow({ school }: { school: SchoolDoc }) {
 
   return (
     <>
-      <tr
+      <tr {...clickableRow}
         className="border-b border-white/5 hover:bg-white/[0.03] transition-colors cursor-pointer select-none"
         onClick={() => setOpen(o => !o)}
       >
@@ -158,6 +159,9 @@ function SchoolRow({ school }: { school: SchoolDoc }) {
                   <span className="label mb-0">Beta access</span>
                   <button
                     type="button"
+                    role="switch"
+                    aria-checked={!!school.isBeta}
+                    aria-label="Beta access"
                     onClick={e => { e.stopPropagation(); patch('isBeta', !school.isBeta) }}
                     className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${school.isBeta ? 'bg-brand-500' : 'bg-zinc-700'}`}
                   >

@@ -712,7 +712,7 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
                       />
                       {canEdit && locations.length > 0 && (
                         <button ref={el => { locBtnRefs.current[scene.id] = el }} onClick={() => openLocDropdown(scene.id)}
-                          className={cn('p-0.5 rounded flex-shrink-0 transition-colors', scene.locationId ? 'text-brand-400' : 'text-zinc-700 hover:text-brand-400')}>
+                          className={cn('p-0.5 rounded flex-shrink-0 transition-colors', scene.locationId ? 'text-brand-400' : 'text-zinc-500 hover:text-brand-400')}>
                           <MapPin className="w-3 h-3" />
                         </button>
                       )}

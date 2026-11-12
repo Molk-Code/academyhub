@@ -36,13 +36,13 @@ export default function TestResults() {
         {passed === true && (
           <>
             <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
-            <h1 className="text-2xl font-bold text-emerald-700">You passed!</h1>
+            <h1 className="text-2xl font-bold text-emerald-400">You passed!</h1>
           </>
         )}
         {passed === false && (
           <>
             <XCircle className="w-12 h-12 text-rose-500 mx-auto mb-2" />
-            <h1 className="text-2xl font-bold text-rose-700">Not quite</h1>
+            <h1 className="text-2xl font-bold text-rose-400">Not quite</h1>
           </>
         )}
         {passed === null && (
@@ -139,7 +139,7 @@ export default function TestResults() {
                       </p>
                     )}
                     {!isCorrect && !isPending && (
-                      <p className="text-emerald-700 font-medium">
+                      <p className="text-emerald-400 font-medium">
                         Correct:{' '}
                         {q.type === 'multiple_select'
                           ? (q.correctAnswers ?? []).map((idx: string) => q.options[Number(idx)]).join(', ')

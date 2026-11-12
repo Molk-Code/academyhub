@@ -414,7 +414,7 @@ function BookingMessageThread({ bookingId }: { bookingId: string }) {
           placeholder="Reply to your teacher…"
           className="flex-1 text-xs bg-zinc-800 border border-white/10 rounded-lg px-2.5 py-1.5 text-zinc-200 placeholder:text-zinc-600"
         />
-        <button
+        <button aria-label="Send"
           onClick={send}
           disabled={sending || !text.trim()}
           className="flex items-center gap-1 text-xs px-3 py-1.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-40 text-white rounded-lg transition-colors"

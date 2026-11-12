@@ -291,6 +291,7 @@ export default function TeacherLayout() {
   return (
     <AttendanceProvider>
     <CompleteProfileGate>
+      <a href="#main-content" className="skip-link">Skip to main content</a>
     <>
     <div className="flex" style={{ height: '100dvh', background: 'var(--bg-primary)', overflow: 'clip' }}>
 
@@ -307,7 +308,7 @@ export default function TeacherLayout() {
           <div className="flex items-center gap-1">
             <BugReportButton />
             <NotificationInbox />
-            <button
+            <button aria-label="Open menu" aria-expanded={drawerOpen}
               onClick={() => setDrawerOpen(true)}
               className="relative p-2 rounded-xl text-zinc-400 hover:text-zinc-100 hover:bg-white/10 transition-colors"
             >
@@ -338,7 +339,7 @@ export default function TeacherLayout() {
                   <span className="text-[10px] text-zinc-400 leading-none">Teacher Portal</span>
                 </div>
               </Link>
-              <button
+              <button aria-label="Close menu"
                 onClick={() => setDrawerOpen(false)}
                 className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-100 hover:bg-white/10 transition-colors"
               >
@@ -374,6 +375,8 @@ export default function TeacherLayout() {
 
       {/* ── Main content ───────────────────────────────────────────────────── */}
       <main
+        id="main-content"
+        tabIndex={-1}
         ref={mainRef}
         style={{ '--header-h': '3.5rem' } as React.CSSProperties}
         className={cn(

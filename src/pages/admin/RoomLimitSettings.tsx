@@ -92,7 +92,7 @@ export default function RoomLimitSettings({ settings }: { settings: BookingSetti
     return (
       <span className={cn(
         'text-sm font-semibold px-3 py-1 rounded-full',
-        l.max !== null && !muted ? 'bg-brand-50 text-brand-700' : 'bg-zinc-800 text-zinc-500',
+        l.max !== null && !muted ? 'bg-brand-50 text-brand-800' : 'bg-zinc-800 text-zinc-500',
       )}>
         {label(l)}
       </span>
@@ -121,7 +121,7 @@ export default function RoomLimitSettings({ settings }: { settings: BookingSetti
             </button>
           </div>
         ) : (
-          <button onClick={startEdit} className="p-1.5 text-zinc-400 hover:text-zinc-300 rounded-lg hover:bg-zinc-800 transition-colors">
+          <button aria-label="Edit" onClick={startEdit} className="p-1.5 text-zinc-400 hover:text-zinc-300 rounded-lg hover:bg-zinc-800 transition-colors">
             <Pencil className="w-3.5 h-3.5" />
           </button>
         )}

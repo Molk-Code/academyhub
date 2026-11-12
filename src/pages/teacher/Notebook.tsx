@@ -218,7 +218,7 @@ export default function Notebook() {
             <BookOpen className="w-4 h-4 text-amber-400" />
             <h1 className="text-base font-bold text-zinc-100">Notebook</h1>
           </div>
-          <button
+          <button aria-label="New note"
             onClick={createNote}
             disabled={creating}
             className="w-7 h-7 flex items-center justify-center rounded-lg bg-brand-600 hover:bg-brand-500 text-white transition-colors"

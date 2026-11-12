@@ -1990,7 +1990,7 @@ export default function Lessons() {
               <button
                 onClick={() => handleDelete(selected.id)}
                 disabled={deleting === selected.id}
-                className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-sm font-medium transition-colors disabled:opacity-50"
+                className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-500/10 text-sm font-medium transition-colors disabled:opacity-50"
               >
                 <Trash2 className="w-4 h-4" /> {deleting === selected.id ? 'Deleting…' : 'Delete'}
               </button>
@@ -2038,13 +2038,13 @@ export default function Lessons() {
                   <div key={b.id} className={`flex items-center gap-3 px-3 py-2 rounded-xl border border-dashed border-amber-300 ${hasLesson ? 'bg-amber-950/30' : 'bg-amber-950/20'}`}>
                     <div className="w-16 text-xs text-amber-600 font-medium shrink-0">{b.startTime}–{b.endTime}</div>
                     <div className="flex-1">
-                      <p className="text-xs text-amber-700 font-medium">{b.name}</p>
+                      <p className="text-xs text-amber-400 font-medium">{b.name}</p>
                       {hasLesson && <p className="text-[10px] text-amber-500">lesson scheduled</p>}
                     </div>
                     {!hasLesson && (
                       <button
                         onClick={() => { navigate(`/teacher/lessons/new?date=${dayDetail.dateStr}&start=${b.startTime}&end=${b.endTime}`); setDayDetail(null) }}
-                        className="text-[10px] text-amber-600 hover:text-amber-800 border border-amber-300 rounded-md px-2 py-0.5 hover:bg-amber-100 transition-colors shrink-0"
+                        className="text-[10px] text-amber-600 hover:text-amber-800 border border-amber-300 rounded-md px-2 py-0.5 hover:bg-amber-500/15 transition-colors shrink-0"
                       >
                         + Schedule
                       </button>
@@ -2255,7 +2255,7 @@ export default function Lessons() {
             <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
               <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Edit Personal Event</p>
               <div className="flex items-center gap-1">
-                <button onClick={deletePersonalEvent} disabled={savingEdit} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-500 transition-colors disabled:opacity-40">
+                <button aria-label="Delete" onClick={deletePersonalEvent} disabled={savingEdit} className="p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-500 transition-colors disabled:opacity-40">
                   <Trash2 className="w-4 h-4" />
                 </button>
                 <button onClick={closeEditEvent} className="p-1.5 rounded-lg hover:bg-white/5" style={{ color: 'var(--text-muted)' }}>

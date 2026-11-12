@@ -13,6 +13,7 @@ import {
   Calendar, CheckCircle2, Send, Trash2,
 } from 'lucide-react'
 import { BOOKING_STATUSES, STATUS_COLOR, formatDate } from './adminEquipmentShared'
+import { clickable } from '@/lib/a11y'
 
 // ── Booking message thread ───────────────────────────────────────────────────
 
@@ -70,7 +71,7 @@ function BookingMessageThread({ bookingId }: { bookingId: string }) {
           placeholder="Reply to student…"
           style={{ flex: 1, fontSize: '.78rem', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 8, padding: '7px 10px', color: '#f0f0f5' }}
         />
-        <button
+        <button aria-label="Send"
           disabled={sending || !text.trim()}
           onClick={send}
           style={{ padding: '7px 12px', borderRadius: 8, background: 'rgba(76,217,100,.15)', border: '1px solid rgba(76,217,100,.3)', color: '#4cd964', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: sending || !text.trim() ? 0.5 : 1 }}
@@ -221,7 +222,7 @@ export function BookingsTab() {
             const expanded = expandedId === b.id
             const col = STATUS_COLOR[b.status] ?? '#6b7280'
             return (
-              <div
+              <div {...clickable}
                 key={b.id}
                 style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 12, overflow: 'hidden', cursor: 'pointer' }}
                 onClick={() => setExpandedId(expanded ? null : b.id)}
@@ -300,7 +301,7 @@ export function BookingsTab() {
       )}
 
       {actionModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setActionModal(null)}>
+        <div {...clickable} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setActionModal(null)}>
           <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 16, width: '100%', maxWidth: 400, padding: '1.5rem' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#f0f0f5', marginBottom: 6 }}>
               {actionModal.action === 'confirmed' ? 'Accept' : 'Deny'}{' '}

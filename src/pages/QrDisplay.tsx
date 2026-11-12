@@ -40,7 +40,7 @@ function InstallBanner() {
         >
           <span>📲</span> Add to Home Screen
         </button>
-        <button onClick={() => setDismissed(true)} className="text-gray-600 hover:text-gray-400 text-xs">Dismiss</button>
+        <button onClick={() => setDismissed(true)} className="text-zinc-500 hover:text-gray-400 text-xs">Dismiss</button>
       </div>
     )
   }
@@ -53,7 +53,7 @@ function InstallBanner() {
           tap <span className="text-brand-400 font-bold">Share ↑</span> then{' '}
           <span className="text-brand-400 font-bold">Add to Home Screen</span>
         </p>
-        <button onClick={() => setDismissed(true)} className="text-gray-600 hover:text-gray-400 text-xs flex-shrink-0">✕</button>
+        <button onClick={() => setDismissed(true)} className="text-zinc-500 hover:text-gray-400 text-xs flex-shrink-0">✕</button>
       </div>
     )
   }
@@ -97,7 +97,7 @@ function DeviceSelector() {
       </div>
       <div className="flex-1 px-10 py-10">
         {devices.length === 0 ? (
-          <p className="text-gray-600 text-2xl text-center mt-16">No active display devices configured.</p>
+          <p className="text-zinc-500 text-2xl text-center mt-16">No active display devices configured.</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl">
             {devices.map(device => (
@@ -256,7 +256,7 @@ function QrDeviceDisplay({ deviceId, displayKey }: { deviceId: string; displayKe
             <span className="text-emerald-400 text-3xl font-black tabular-nums">{attendeeCount}</span>
             <span className="text-emerald-300 text-base font-semibold">checked in</span>
           </div>
-          <p className="text-gray-600 text-sm uppercase tracking-widest">Scan with CineForge to check in</p>
+          <p className="text-zinc-500 text-sm uppercase tracking-widest">Scan with CineForge to check in</p>
         </div>
       </div>
 

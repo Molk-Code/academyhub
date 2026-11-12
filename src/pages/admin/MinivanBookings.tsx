@@ -48,7 +48,7 @@ function TimeEditor({
   ) : (
     <span className="flex items-center gap-2">
       <span>{label}</span>
-      <button onClick={() => { setInput(value); setEditing(true) }} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 text-xs font-medium hover:bg-brand-100 hover:text-brand-700 transition-colors">
+      <button onClick={() => { setInput(value); setEditing(true) }} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 text-xs font-medium hover:bg-brand-500/15 hover:text-brand-400 transition-colors">
         <Pencil className="w-3 h-3" /> Edit
       </button>
     </span>
@@ -174,14 +174,14 @@ function BookingRow({ b }: { b: MinivanBookingDoc }) {
                 <button
                   onClick={() => setStatus('approved')}
                   disabled={updating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 text-emerald-300 text-sm font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 text-emerald-300 text-sm font-medium hover:bg-emerald-500/15 transition-colors disabled:opacity-50"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" /> Approve
                 </button>
                 <button
                   onClick={() => setStatus('rejected')}
                   disabled={updating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-950/40 text-rose-300 text-sm font-medium hover:bg-rose-100 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-950/40 text-rose-300 text-sm font-medium hover:bg-rose-500/15 transition-colors disabled:opacity-50"
                 >
                   <XCircle className="w-3.5 h-3.5" /> Reject
                 </button>
@@ -200,7 +200,7 @@ function BookingRow({ b }: { b: MinivanBookingDoc }) {
               <button
                 onClick={exportPdf}
                 disabled={exporting}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 text-sm font-medium hover:bg-brand-100 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 text-brand-800 text-sm font-medium hover:bg-brand-100 transition-colors disabled:opacity-50"
               >
                 {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
                 {exporting ? 'Exporting…' : 'Export PDF'}
@@ -266,7 +266,7 @@ function VehicleRow({ v, onDelete, deleting }: { v: VehicleDoc; onDelete: () => 
             />
             <span className="text-xs text-zinc-500 whitespace-nowrap">working days in advance</span>
             <button onClick={saveDays} disabled={savingDays}
-              className="p-1 text-emerald-600 hover:text-emerald-700 disabled:opacity-40">
+              className="p-1 text-emerald-600 hover:text-emerald-400 disabled:opacity-40">
               {savingDays ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
             </button>
             <button onClick={() => setEditingDays(false)} className="p-1 text-zinc-400 hover:text-zinc-400">
@@ -276,7 +276,7 @@ function VehicleRow({ v, onDelete, deleting }: { v: VehicleDoc; onDelete: () => 
         ) : (
           <button
             onClick={() => { setDaysInput(String(leadDays)); setEditingDays(true) }}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-700 text-zinc-400 text-xs font-medium hover:bg-brand-100 hover:text-brand-700 transition-colors"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-700 text-zinc-400 text-xs font-medium hover:bg-brand-500/15 hover:text-brand-400 transition-colors"
             title="Working days in advance required to book"
           >
             <Pencil className="w-3 h-3" /> {leadDays} working days
@@ -332,7 +332,7 @@ function VehicleManager() {
         {!adding && (
           <button
             onClick={() => setAdding(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 text-xs font-medium hover:bg-brand-100 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 text-brand-800 text-xs font-medium hover:bg-brand-100 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" /> Add vehicle
           </button>

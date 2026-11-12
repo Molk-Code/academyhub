@@ -22,6 +22,7 @@ import Avatar from '@/components/common/Avatar'
 import { cn } from '@/lib/utils'
 import { ChatGlobalSettingsModal } from './ChatGlobalSettingsModal'
 import { ChannelSettingsModal } from './ChannelSettingsModal'
+import { clickable } from '@/lib/a11y'
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '🔥', '🎉', '👀', '✅', '💯', '🙌', '😢', '👎']
 
@@ -383,7 +384,7 @@ export default function ChatPage() {
               const isPrivate  = ch.isPublic === false
               const unread     = !isActive && unreadChannelIds.has(ch.id)
               return (
-                <div
+                <div {...clickable}
                   key={ch.id}
                   onClick={() => { setActiveChannelId(ch.id); setMobileChatView('messages') }}
                   className={cn(
@@ -440,7 +441,7 @@ export default function ChatPage() {
               const displayName = otherUser?.displayName ?? fallback
               const avatarUrl = otherUser?.avatarUrl ?? null
               return (
-                <div
+                <div {...clickable}
                   key={ch.id}
                   onClick={() => { setActiveChannelId(ch.id); setMobileChatView('messages') }}
                   className={cn(
@@ -752,7 +753,7 @@ export default function ChatPage() {
                                         className={cn(
                                           'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-all',
                                           reacted
-                                            ? 'bg-brand-50 border-brand-200 text-brand-700 hover:bg-brand-100'
+                                            ? 'bg-brand-50 border-brand-200 text-brand-800 hover:bg-brand-100'
                                             : 'bg-zinc-800 border-white/10 text-zinc-400 hover:bg-zinc-700',
                                         )}
                                       >
@@ -777,7 +778,7 @@ export default function ChatPage() {
                               {canDelete && (
                                 <button
                                   onClick={() => deleteMessage(msg.id)}
-                                  className="p-1 text-zinc-400 hover:text-rose-600 rounded-md hover:bg-rose-50 transition-colors"
+                                  className="p-1 text-zinc-400 hover:text-rose-400 rounded-md hover:bg-rose-500/10 transition-colors"
                                   title="Delete message"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -839,7 +840,7 @@ export default function ChatPage() {
                 <div className="flex items-end gap-2 bg-zinc-800 rounded-2xl px-3 py-2 border border-white/10 focus-within:border-brand-300 transition-colors">
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-1.5 text-zinc-400 hover:text-brand-600 transition-colors flex-shrink-0 mb-px"
+                    className="p-1.5 text-zinc-400 hover:text-brand-400 transition-colors flex-shrink-0 mb-px"
                     title="Attach file or photo"
                   >
                     <Paperclip className="w-5 h-5" />

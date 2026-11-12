@@ -361,7 +361,7 @@ export default function AdminLayout() {
             <p className="text-sm font-medium text-white truncate">{profile?.displayName}</p>
             <p className="text-xs text-rose-400 truncate">Admin</p>
           </div>
-          <button
+          <button aria-label="Sign out"
             onClick={handleSignOut}
             className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-[var(--bg-hover)] transition-colors"
           >
@@ -375,6 +375,7 @@ export default function AdminLayout() {
   return (
     <>
     <div className="flex" style={{ height: '100dvh', background: 'var(--bg-primary)', overflow: 'clip' }}>
+      <a href="#main-content" className="skip-link">Skip to main content</a>
       <OfflineBanner />
 
       {/* ── Mobile top header ──────────────────────────────────────────────── */}
@@ -390,7 +391,7 @@ export default function AdminLayout() {
           <div className="flex items-center gap-1">
             <BugReportButton />
             <NotificationInbox />
-            <button
+            <button aria-label="Open menu" aria-expanded={drawerOpen}
               onClick={() => setDrawerOpen(true)}
               className="relative p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-[var(--bg-elevated)] transition-colors"
             >
@@ -421,7 +422,7 @@ export default function AdminLayout() {
                   <span className="text-[10px] text-rose-400 leading-none">Admin Portal</span>
                 </div>
               </Link>
-              <button
+              <button aria-label="Close menu"
                 onClick={() => setDrawerOpen(false)}
                 className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-[var(--bg-elevated)] transition-colors"
               >
@@ -457,6 +458,8 @@ export default function AdminLayout() {
 
       {/* ── Main content ───────────────────────────────────────────────────── */}
       <main
+        id="main-content"
+        tabIndex={-1}
         ref={mainRef}
         style={{ '--header-h': '3.5rem' } as React.CSSProperties}
         className={cn(

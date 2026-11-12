@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { MotionConfig } from 'framer-motion'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { MicrosoftAuthProvider } from '@/contexts/MicrosoftAuthContext'
 import { SchoolProvider } from '@/contexts/SchoolContext'
@@ -125,6 +126,8 @@ const PublicShopPage       = lazy(() => import('@/pages/equipment/PublicShopPage
 
 export default function App() {
   return (
+    // Honour the OS "reduce motion" setting in framer-motion animations (WCAG 2.3.3)
+    <MotionConfig reducedMotion="user">
     <SchoolProvider>
     <AuthProvider>
     <MicrosoftAuthProvider>
@@ -277,5 +280,6 @@ export default function App() {
     </MicrosoftAuthProvider>
     </AuthProvider>
     </SchoolProvider>
+    </MotionConfig>
   )
 }

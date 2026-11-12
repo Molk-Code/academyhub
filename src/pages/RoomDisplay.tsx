@@ -137,7 +137,7 @@ function SingleRoomDisplay({
 
       <div className="flex-1 px-10 pt-6 pb-10 space-y-3">
         {slots.length === 0 ? (
-          <p className="text-gray-600 text-2xl text-center mt-16">No bookings scheduled today.</p>
+          <p className="text-zinc-500 text-2xl text-center mt-16">No bookings scheduled today.</p>
         ) : (
           slots.map(slot => {
             const status    = slotStatus(slot)
@@ -159,15 +159,15 @@ function SingleRoomDisplay({
                 )}
               >
                 <div className="w-32 flex-shrink-0">
-                  <p className={cn('text-2xl font-bold tabular-nums', isPast ? 'text-gray-600' : 'text-gray-200')}>
+                  <p className={cn('text-2xl font-bold tabular-nums', isPast ? 'text-zinc-500' : 'text-gray-200')}>
                     {slot.startTime}
                   </p>
-                  <p className="text-gray-600 text-sm">{slot.endTime}</p>
+                  <p className="text-zinc-500 text-sm">{slot.endTime}</p>
                 </div>
                 <div className="flex-1">
                   {booking
-                    ? <p className={cn('text-2xl font-bold', isPast ? 'text-gray-600' : 'text-rose-300')}>{booking.studentName}</p>
-                    : <p className={cn('text-2xl font-semibold', isPast ? 'text-gray-600' : 'text-gray-400')}>Available</p>
+                    ? <p className={cn('text-2xl font-bold', isPast ? 'text-zinc-500' : 'text-rose-300')}>{booking.studentName}</p>
+                    : <p className={cn('text-2xl font-semibold', isPast ? 'text-zinc-500' : 'text-gray-400')}>Available</p>
                   }
                 </div>
                 {!isPast && (

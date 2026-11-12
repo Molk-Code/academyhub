@@ -827,7 +827,7 @@ export default function ProductionEditor() {
                 } finally { setExportingPdf(false) }
               }}
               disabled={exportingPdf}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-medium bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-medium bg-brand-50 text-brand-800 hover:bg-brand-100 transition-colors disabled:opacity-50"
               title="Export PDF"
             >
               {exportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
@@ -868,7 +868,7 @@ export default function ProductionEditor() {
 
             {/* Delete */}
             {(isOwner || isTeacherOrAdmin) && (
-              <button
+              <button aria-label="Delete production"
                 onClick={deleteProduction}
                 disabled={deleting}
                 className="p-2 text-zinc-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-xl transition-colors"

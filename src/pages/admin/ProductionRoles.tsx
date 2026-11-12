@@ -300,7 +300,7 @@ export default function ProductionRoles() {
 
           {adding && (
             <div className="flex items-center gap-3 px-5 py-3">
-              <GripVertical className="w-4 h-4 text-zinc-700 flex-shrink-0" />
+              <GripVertical className="w-4 h-4 text-zinc-500 flex-shrink-0" />
               <input
                 autoFocus
                 className="flex-1 bg-zinc-800 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-brand-500/30"
@@ -312,7 +312,7 @@ export default function ProductionRoles() {
                   if (e.key === 'Escape') { setAdding(false); setNewName('') }
                 }}
               />
-              <button onClick={addRole} className="p-1.5 text-emerald-400 hover:text-emerald-300 transition-colors">
+              <button aria-label="Add role" onClick={addRole} className="p-1.5 text-emerald-400 hover:text-emerald-300 transition-colors">
                 <Check className="w-4 h-4" />
               </button>
               <button onClick={() => { setAdding(false); setNewName('') }} className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors">

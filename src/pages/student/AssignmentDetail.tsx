@@ -200,10 +200,10 @@ export default function AssignmentDetail() {
                 href={r.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 p-3 rounded-xl border border-white/8 hover:border-brand-200 hover:bg-brand-50 transition-all group"
+                className="flex items-center gap-3 p-3 rounded-xl border border-white/8 hover:border-brand-200 hover:bg-brand-500/10 transition-all group"
               >
                 <ResourceIcon type={r.type} />
-                <span className="text-sm font-medium text-zinc-300 group-hover:text-brand-700 flex-1 truncate">
+                <span className="text-sm font-medium text-zinc-300 group-hover:text-brand-400 flex-1 truncate">
                   {r.label}
                 </span>
                 <Link2 className="w-3.5 h-3.5 text-zinc-300 group-hover:text-brand-400 flex-shrink-0" />

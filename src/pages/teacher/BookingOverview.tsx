@@ -190,7 +190,7 @@ export default function BookingOverview() {
 
       {/* Week + day navigation */}
       <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={() => setWeekOffset(w => w - 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
+        <button aria-label="Previous week" onClick={() => setWeekOffset(w => w - 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
           <ChevronLeft className="w-4 h-4 text-zinc-500" />
         </button>
 
@@ -207,7 +207,7 @@ export default function BookingOverview() {
                   isSelected
                     ? 'bg-brand-600 text-white font-semibold shadow-sm'
                     : today
-                      ? 'bg-brand-50 text-brand-700 border border-brand-200 font-medium'
+                      ? 'bg-brand-50 text-brand-800 border border-brand-200 font-medium'
                       : 'text-zinc-400 hover:bg-zinc-800',
                 )}
               >
@@ -218,12 +218,12 @@ export default function BookingOverview() {
           })}
         </div>
 
-        <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
+        <button aria-label="Next week" onClick={() => setWeekOffset(w => w + 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
           <ChevronRight className="w-4 h-4 text-zinc-500" />
         </button>
 
         {!isCurrentWeek && (
-          <button onClick={goToday} className="flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-800 px-3 py-2 rounded-lg hover:bg-brand-50 transition-colors">
+          <button onClick={goToday} className="flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-800 px-3 py-2 rounded-lg hover:bg-brand-500/10 transition-colors">
             <CalendarDays className="w-4 h-4" /> Today
           </button>
         )}
@@ -286,7 +286,7 @@ export default function BookingOverview() {
                             disabled={cancelling}
                             onClick={() => handleCancelBooking(booking)}
                             title="Click to cancel this booking"
-                            className="w-full rounded-xl px-2 py-3.5 text-xs font-medium transition-all border bg-rose-950/40 border-rose-800/50 text-rose-700 hover:bg-rose-100 hover:border-rose-300 active:bg-rose-200"
+                            className="w-full rounded-xl px-2 py-3.5 text-xs font-medium transition-all border bg-rose-950/40 border-rose-800/50 text-rose-400 hover:bg-rose-500/15 hover:border-rose-300 active:bg-rose-200"
                           >
                             <div className="font-semibold truncate">{booking.studentName.split(' ')[0]}</div>
                             <div className="opacity-60 text-[10px] mt-0.5 truncate">{booking.studentName.split(' ').slice(1).join(' ')}</div>
@@ -296,7 +296,7 @@ export default function BookingOverview() {
                             disabled={cancelling || isSlotPast(slot)}
                             onClick={() => bookSlot(slot, room)}
                             title={isSlotPast(slot) ? undefined : 'Click to book this slot'}
-                            className="w-full rounded-xl px-2 py-3.5 text-xs font-medium transition-all border bg-emerald-950/40 border-emerald-800/50 text-emerald-700 hover:bg-emerald-900/60 active:bg-emerald-900 disabled:opacity-40 disabled:cursor-default"
+                            className="w-full rounded-xl px-2 py-3.5 text-xs font-medium transition-all border bg-emerald-950/40 border-emerald-800/50 text-emerald-400 hover:bg-emerald-900/60 active:bg-emerald-900 disabled:opacity-40 disabled:cursor-default"
                           >
                             {isSlotPast(slot) ? 'Past' : 'Free'}
                           </button>

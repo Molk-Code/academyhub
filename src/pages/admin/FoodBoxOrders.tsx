@@ -146,7 +146,7 @@ function OrderRow({ order }: { order: FoodBoxOrderDoc }) {
                 <span className="flex items-center gap-2">
                   <span>{effectiveDate}</span>
                   {order.adminDate && <span className="text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">Admin updated</span>}
-                  <button onClick={() => { setDateInput(effectiveDate); setEditingDate(true) }} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 text-xs font-medium hover:bg-brand-100 hover:text-brand-700 transition-colors">
+                  <button onClick={() => { setDateInput(effectiveDate); setEditingDate(true) }} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 text-xs font-medium hover:bg-brand-500/15 hover:text-brand-400 transition-colors">
                     <Pencil className="w-3 h-3" /> Edit date
                   </button>
                 </span>
@@ -165,7 +165,7 @@ function OrderRow({ order }: { order: FoodBoxOrderDoc }) {
                   <button
                     onClick={savePickupTime}
                     disabled={savingTime}
-                    className="p-1 rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-50"
+                    className="p-1 rounded text-emerald-600 hover:bg-emerald-500/10 disabled:opacity-50"
                   >
                     {savingTime ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                   </button>
@@ -181,7 +181,7 @@ function OrderRow({ order }: { order: FoodBoxOrderDoc }) {
                   )}
                   <button
                     onClick={() => { setTimeInput(effectivePickupTime ?? ''); setEditingTime(true) }}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 text-xs font-medium hover:bg-brand-100 hover:text-brand-700 transition-colors"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 text-xs font-medium hover:bg-brand-500/15 hover:text-brand-400 transition-colors"
                   >
                     <Pencil className="w-3 h-3" /> Edit time
                   </button>
@@ -228,14 +228,14 @@ function OrderRow({ order }: { order: FoodBoxOrderDoc }) {
                 <button
                   onClick={() => setStatus('confirmed')}
                   disabled={updating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 text-emerald-300 text-sm font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 text-emerald-300 text-sm font-medium hover:bg-emerald-500/15 transition-colors disabled:opacity-50"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" /> Confirm
                 </button>
                 <button
                   onClick={() => setStatus('cancelled')}
                   disabled={updating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-950/40 text-rose-300 text-sm font-medium hover:bg-rose-100 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-950/40 text-rose-300 text-sm font-medium hover:bg-rose-500/15 transition-colors disabled:opacity-50"
                 >
                   <XCircle className="w-3.5 h-3.5" /> Cancel
                 </button>
@@ -253,7 +253,7 @@ function OrderRow({ order }: { order: FoodBoxOrderDoc }) {
             <button
               onClick={exportPdf}
               disabled={exporting}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 text-sm font-medium hover:bg-brand-100 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 text-brand-800 text-sm font-medium hover:bg-brand-100 transition-colors disabled:opacity-50"
             >
               {exporting
                 ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Exporting…</>
@@ -329,7 +329,7 @@ function LeadDaysSetting() {
           </div>
         ) : (
           <div className="flex items-center gap-3 flex-shrink-0">
-            <span className="text-sm font-bold text-brand-700 bg-brand-50 px-3 py-1 rounded-full">{current} days</span>
+            <span className="text-sm font-bold text-brand-800 bg-brand-50 px-3 py-1 rounded-full">{current} days</span>
             <button onClick={() => { setInput(String(current)); setEditing(true) }}
               className="p-1.5 text-zinc-400 hover:text-zinc-300 rounded-lg hover:bg-zinc-800 transition-colors">
               <Pencil className="w-3.5 h-3.5" />

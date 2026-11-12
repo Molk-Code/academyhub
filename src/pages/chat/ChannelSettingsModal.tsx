@@ -157,7 +157,7 @@ export function ChannelSettingsModal({
                 className={cn(
                   'flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all',
                   isPublic
-                    ? 'bg-brand-50 border-brand-200 text-brand-700'
+                    ? 'bg-brand-50 border-brand-200 text-brand-800'
                     : 'border-white/10 text-zinc-500 hover:border-white/15',
                 )}
               >
@@ -172,7 +172,7 @@ export function ChannelSettingsModal({
                 className={cn(
                   'flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all',
                   !isPublic
-                    ? 'bg-brand-50 border-brand-200 text-brand-700'
+                    ? 'bg-brand-50 border-brand-200 text-brand-800'
                     : 'border-white/10 text-zinc-500 hover:border-white/15',
                 )}
               >
@@ -357,7 +357,7 @@ export function ChannelSettingsModal({
               <button
                 onClick={handleClear}
                 disabled={clearing || deleting}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-rose-200 text-rose-600 text-sm font-medium hover:bg-rose-50 transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-rose-200 text-rose-600 text-sm font-medium hover:bg-rose-500/10 transition-colors disabled:opacity-50"
               >
                 <Trash2 className="w-4 h-4" />
                 {clearing ? 'Clearing…' : 'Clear messages'}
@@ -369,7 +369,7 @@ export function ChannelSettingsModal({
               <button
                 onClick={handleDelete}
                 disabled={deleting || clearing}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-rose-200 text-rose-600 text-sm font-medium hover:bg-rose-50 transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-rose-200 text-rose-600 text-sm font-medium hover:bg-rose-500/10 transition-colors disabled:opacity-50"
               >
                 <Trash2 className="w-4 h-4" />
                 {deleting ? 'Deleting…' : `Delete #${channel.name}`}

@@ -293,13 +293,13 @@ export default function BookingHub() {
         <div className="space-y-2">
           {/* Row 1: arrows + week label + room filter */}
           <div className="flex items-center gap-2">
-            <button onClick={() => setWeekOffset(w => w - 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
+            <button aria-label="Previous week" onClick={() => setWeekOffset(w => w - 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
               <ChevronLeft className="w-4 h-4 text-zinc-500" />
             </button>
             <span className="flex-1 text-sm text-zinc-400 text-center">
               {format(weekStart, 'd MMM')} – {format(addDays(weekStart, 6), 'd MMM yyyy')}
             </span>
-            <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
+            <button aria-label="Next week" onClick={() => setWeekOffset(w => w + 1)} className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors">
               <ChevronRight className="w-4 h-4 text-zinc-500" />
             </button>
             {weekOffset !== 0 && (
@@ -470,7 +470,7 @@ export default function BookingHub() {
                         <button onClick={() => setRoomModal({ room })} className="p-1.5 text-zinc-400 hover:text-zinc-300 rounded-lg hover:bg-zinc-800 transition-colors">
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => setDeleteRoomId(room.id)} className="p-1.5 text-zinc-400 hover:text-rose-600 rounded-lg hover:bg-rose-50/10 transition-colors">
+                        <button onClick={() => setDeleteRoomId(room.id)} className="p-1.5 text-zinc-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -494,7 +494,7 @@ export default function BookingHub() {
                             <div key={w.id} className="space-y-1.5">
                               <div className="flex items-center gap-1 flex-wrap">
                                 {DAYS_ORDER.filter(d => sortedDays.includes(d)).map(d => (
-                                  <span key={d} className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-brand-100 text-brand-700">
+                                  <span key={d} className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-brand-100 text-brand-800">
                                     {DAY_LABELS[d]}
                                   </span>
                                 ))}

@@ -228,6 +228,7 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
         <div className="flex items-center gap-2">
           <button
             onClick={() => canGoPrev && setWeekOffset(w => w - 1)}
+            aria-label="Previous week"
             disabled={!canGoPrev}
             className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           >
@@ -238,6 +239,7 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
           </span>
           <button
             onClick={() => canGoNext && setWeekOffset(w => w + 1)}
+            aria-label="Next week"
             disabled={!canGoNext}
             className="p-2 rounded-lg border border-white/10 hover:bg-zinc-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           >
@@ -264,7 +266,7 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
                   isSelected
                     ? 'bg-brand-600 text-white font-semibold shadow-sm'
                     : today
-                      ? 'bg-brand-50 text-brand-700 border border-brand-200 font-medium'
+                      ? 'bg-brand-50 text-brand-800 border border-brand-200 font-medium'
                       : 'text-zinc-400 hover:bg-zinc-800',
                 )}
               >

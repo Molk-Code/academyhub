@@ -105,6 +105,9 @@ describe('product type', () => {
     expect(deriveProductType({})).toBe('education')
     expect(deriveProductType({ modules: { rentalInventory: true, production: false, academy: false } })).toBe('rental')
     expect(deriveProductType({ modules: { rentalInventory: true, production: true, academy: false } })).toBe('education')
+    // Explicit modules decide over a stale stored productType
+    expect(deriveProductType({ productType: 'education', modules: { rentalInventory: true, production: false, academy: false } })).toBe('rental')
+    expect(deriveProductType({ productType: 'rental', modules: { rentalInventory: true, production: true, academy: false } })).toBe('education')
   })
 })
 

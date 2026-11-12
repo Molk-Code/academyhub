@@ -152,12 +152,15 @@ export function effectiveModules(school: FeatureSource): ModuleFlags {
   return school.modules ? { ...school.modules } : modulesFromTier(school.tier).modules
 }
 
-/** Product type for screens that still branch on it */
+/**
+ * Product type for screens that still branch on it (the rental admin layout).
+ * Module-based schools: rental exactly when Rental & Inventory is the only
+ * module. Legacy schools: their stored productType, as before.
+ */
 export function deriveProductType(school: FeatureSource & { productType?: ProductType | null }): ProductType {
-  if (school.productType) return school.productType
   const m = school.modules
-  if (m && m.rentalInventory && !m.production && !m.academy) return 'rental'
-  return 'education'
+  if (m) return m.rentalInventory && !m.production && !m.academy ? 'rental' : 'education'
+  return school.productType ?? 'education'
 }
 
 /**

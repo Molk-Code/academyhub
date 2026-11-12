@@ -8,7 +8,7 @@ import { useCollection, useDocument, where, orderBy } from '@/hooks/useFirestore
 import { useVisibleEvents, useInvitableUserGroups, filterGroups, cohortToggleAllows } from '@/lib/queries'
 import { shortDate, timeStr, toDate } from '@/lib/utils'
 import type { LessonDoc, SubjectDoc, CohortDoc, LessonBlockDoc, SemesterSettingsDoc, LessonCategoryDoc, UserDoc, PersonalEventDoc, SyncedEventDoc, GuestTeacherDoc, GuestTeacherBookingDoc } from '@/types'
-import { Plus, Pencil, Trash2, CalendarDays, LayoutGrid, X, QrCode, Circle, SlidersHorizontal, ChevronDown, Check, MapPin, Download } from 'lucide-react'
+import { Plus, Pencil, Trash2, CalendarDays, LayoutGrid, X, QrCode, Circle, SlidersHorizontal, ChevronDown, Check, MapPin, Download, RefreshCw } from 'lucide-react'
 import { markCalendarInvitesSeen } from '@/hooks/useCalendarInviteBadge'
 import AnnualPlanWheel from '@/components/calendar/AnnualPlanWheel'
 import CurriculumOptions from '@/components/subjects/CurriculumOptions'
@@ -22,6 +22,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import type { EventInput } from '@fullcalendar/core'
 import CalendarFilterChips from '@/components/calendar/CalendarFilterChips'
+import ImportIcsDialog from '@/components/calendar/ImportIcsDialog'
 import { useCalendarFilters } from '@/lib/calendarFilters'
 
 // ── Semester marker helper ────────────────────────────────────────────────────
@@ -215,6 +216,7 @@ export default function Lessons() {
   const [editInviteeSearch, setEditInviteeSearch] = useState('')
   const [viewingInvitedEvent, setViewingInvitedEvent] = useState<PersonalEventDoc | null>(null)
   const [pdfPickerOpen, setPdfPickerOpen] = useState(false)
+  const [icsOpen, setIcsOpen] = useState(false)
   const calendarRef     = useRef<FullCalendar>(null)
   // Desktop: FullCalendar grid (default — scheduling/ghost blocks live there) or the day timeline
   const [desktopView, setDesktopView] = useState<'timeline' | 'grid'>(() => {
@@ -1106,11 +1108,20 @@ export default function Lessons() {
           >
             <Download className="w-4 h-4" /> Download PDF
           </button>
+          <button
+            onClick={() => setIcsOpen(true)}
+            className="btn-secondary py-2"
+            title="Import an Outlook calendar export when the automatic sync has stopped"
+          >
+            <RefreshCw className="w-4 h-4" /> Sync Outlook (.ics)
+          </button>
           <Link to="/teacher/lessons/new" className="btn-primary py-2">
             <Plus className="w-4 h-4" /> New Lesson
           </Link>
         </div>
       </div>
+
+      {icsOpen && <ImportIcsDialog onClose={() => setIcsOpen(false)} />}
 
       {/* ── Filters panel ────────────────────────────────────────────────── */}
       {showFilters && (

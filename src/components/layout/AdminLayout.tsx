@@ -17,6 +17,7 @@ import firePng from '@/assets/fire.png'
 import { useBookingBadge, useBookingBadgeDetail } from '@/hooks/useBookingBadge'
 import { useChatUnreadCount } from '@/hooks/useChatUnread'
 import { useBugReportBadge } from '@/hooks/useBugReportBadge'
+import { useCalendarSyncAlert } from '@/hooks/useCalendarSyncAlert'
 import { useContactRequestBadge } from '@/hooks/useContactRequestBadge'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { useAppBadge } from '@/hooks/useAppBadge'
@@ -69,7 +70,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/admin/email-config', icon: Mail,             label: 'Email Config' },
       { to: '/admin/sharepoint',   icon: Share2,           label: 'SharePoint'   },
-      { to: '/admin/calendar-sync', icon: RefreshCw,       label: 'Calendar Sync' },
+      { to: '/admin/calendar-sync', icon: RefreshCw,       label: 'Calendar Sync', showBadge: true },
       { to: '/admin/nav-settings', icon: SlidersHorizontal, label: 'Nav Settings' },
       { to: '/admin/gdpr',         icon: Shield,           label: 'GDPR'         },
       { to: '/admin/bug-reports',  icon: BugIcon,          label: 'Bug Reports', showBadge: true },
@@ -124,7 +125,8 @@ export default function AdminLayout() {
   const bookingDetail  = useBookingBadgeDetail()
   const bugReportBadge = useBugReportBadge()
   const contactBadge   = useContactRequestBadge()
-  const totalBadge     = chatUnread + bookingBadge + bugReportBadge
+  const calendarSyncAlert = useCalendarSyncAlert()
+  const totalBadge     = chatUnread + bookingBadge + bugReportBadge + calendarSyncAlert
   useAppBadge(totalBadge)
 
   useEffect(() => { setPreviewCohortId(null) }, [])
@@ -217,7 +219,7 @@ export default function AdminLayout() {
               <div className="space-y-0.5 mb-1">
                 {visibleItems.map(({ to, icon: Icon, label, showBadge, showUnread }) => {
                   const badgeCount = showBadge
-                    ? (to === '/admin/food-box-orders' ? bookingDetail.food : to === '/admin/equipment' ? bookingDetail.equipment : to === '/admin/bug-reports' ? bugReportBadge : to === '/admin/contact-requests' ? contactBadge : bookingDetail.van)
+                    ? (to === '/admin/food-box-orders' ? bookingDetail.food : to === '/admin/equipment' ? bookingDetail.equipment : to === '/admin/bug-reports' ? bugReportBadge : to === '/admin/contact-requests' ? contactBadge : to === '/admin/calendar-sync' ? calendarSyncAlert : bookingDetail.van)
                     : showUnread ? chatUnread : 0
                   return (
                     <NavLink

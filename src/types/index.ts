@@ -1067,6 +1067,9 @@ export interface OfficeCalendarSyncDoc {
   lastReceivedAt?: Timestamp | null
   lastReconciledAt?: Timestamp | null   // last daily check-up run (reconcileOfficeCalendar)
   lastReconcile?: { deleted: number; added: number; updated: number }
+  lastImportedAt?: Timestamp | null     // last manual .ics import (importCalendarIcs)
+  lastImport?: { deleted: number; added: number; updated: number; by: string; byName: string }
+  warnAfterDays?: number                // warn in the admin UI after this many silent days (default 3)
   createdAt: Timestamp
   createdBy: string
   updatedAt?: Timestamp

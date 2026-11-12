@@ -1,11 +1,13 @@
 import { useState } from 'react'
+import ImportIcsDialog from '@/components/calendar/ImportIcsDialog'
+import { syncHealth, SOURCE_LABEL, DEFAULT_WARN_AFTER_DAYS } from '@/lib/calendarSync'
 import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { db, FUNCTIONS_REGION } from '@/lib/firebase'
 import { useCollection } from '@/hooks/useFirestore'
 import { useAuth } from '@/contexts/AuthContext'
 import type { OfficeCalendarSyncDoc, CohortDoc } from '@/types'
 import {
-  RefreshCw, Plus, Trash2, Copy, Check, ExternalLink, ChevronDown, ChevronUp,
+  RefreshCw, Plus, Trash2, Copy, Check, ExternalLink, ChevronDown, ChevronUp, AlertTriangle, Upload,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
@@ -76,6 +78,8 @@ function CopyField({ label, value }: { label: string; value: string }) {
 function SyncCard({ sync, cohorts }: { sync: OfficeCalendarSyncDoc; cohorts: CohortDoc[] }) {
   const [expanded, setExpanded] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const health = syncHealth(sync)
   const webhookUrl = `${WEBHOOK_BASE}?syncId=${sync.id}`
   const reconcileUrl = `${RECONCILE_BASE}?syncId=${sync.id}`
 
@@ -88,6 +92,10 @@ function SyncCard({ sync, cohorts }: { sync: OfficeCalendarSyncDoc; cohorts: Coh
 
   async function changeCohort(cohortId: string) {
     await updateDoc(doc(db, 'office_calendar_syncs', sync.id), { cohortId, updatedAt: serverTimestamp() })
+  }
+
+  async function changeWarnAfter(days: number) {
+    await updateDoc(doc(db, 'office_calendar_syncs', sync.id), { warnAfterDays: days, updatedAt: serverTimestamp() })
   }
 
   async function renameSync(name: string) {
@@ -117,7 +125,8 @@ function SyncCard({ sync, cohorts }: { sync: OfficeCalendarSyncDoc; cohorts: Coh
     : cohorts.find(c => c.id === sync.cohortId)?.name ?? '— pick a cohort —'
 
   return (
-    <div className="bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden">
+    <div className={cn('bg-zinc-900 border rounded-2xl overflow-hidden', health.stale ? 'border-amber-500/40' : 'border-white/10')}>
+      {importing && <ImportIcsDialog initialSyncId={sync.id} onClose={() => setImporting(false)} />}
       <div className="flex items-center gap-3 px-5 py-4">
         <div className={cn(
           'w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0',
@@ -133,14 +142,25 @@ function SyncCard({ sync, cohorts }: { sync: OfficeCalendarSyncDoc; cohorts: Coh
           />
           <p className="text-xs text-zinc-500 mt-0.5">
             → {cohortLabel}
-            {sync.lastReceivedAt && (
-              <span> · last event received {format((sync.lastReceivedAt as any).toDate(), 'd MMM HH:mm')}</span>
-            )}
+            {health.lastActivityAt != null
+              ? <span> · last activity {format(health.lastActivityAt, 'd MMM HH:mm')} ({SOURCE_LABEL[health.lastSource!]})</span>
+              : <span> · nothing received yet</span>}
           </p>
+          {health.stale && (
+            <p className="text-xs text-amber-300 mt-1 flex items-start gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 mt-px flex-shrink-0" aria-hidden="true" />
+              <span>
+                Nothing received for {health.daysSilent} days. The Power Automate flow may have stopped (its owner left,
+                or a licence or password changed). Check the flow, or <button type="button" onClick={() => setImporting(true)} className="underline hover:text-amber-200">import an .ics file</button> meanwhile.
+              </span>
+            </p>
+          )}
         </div>
         <Toggle checked={sync.enabled} onChange={toggleEnabled} label="Sync enabled" />
         <button
           onClick={() => setExpanded(v => !v)}
+          aria-expanded={expanded}
+          aria-label={expanded ? 'Hide settings' : 'Show settings'}
           className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-white/10 transition-colors"
         >
           {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -160,6 +180,32 @@ function SyncCard({ sync, cohorts }: { sync: OfficeCalendarSyncDoc; cohorts: Coh
               {cohorts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
+
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label htmlFor={`warn-${sync.id}`} className="label text-xs">Warn when nothing has arrived for</label>
+              <select
+                id={`warn-${sync.id}`}
+                value={sync.warnAfterDays ?? DEFAULT_WARN_AFTER_DAYS}
+                onChange={e => changeWarnAfter(Number(e.target.value))}
+                className="input text-sm w-auto"
+              >
+                {[1, 2, 3, 5, 7, 14, 30].map(d => <option key={d} value={d}>{d} {d === 1 ? 'day' : 'days'}</option>)}
+              </select>
+            </div>
+            <button type="button" onClick={() => setImporting(true)} className="btn-secondary py-2 text-sm">
+              <Upload className="w-4 h-4" /> Sync now from .ics file
+            </button>
+          </div>
+          {sync.lastImportedAt && sync.lastImport && (
+            <p className="text-[11px] text-zinc-500">
+              Last .ics import {sync.lastImportedAt.toDate().toLocaleString('sv-SE')}{sync.lastImport.byName && ` by ${sync.lastImport.byName}`}: {sync.lastImport.added} added, {sync.lastImport.updated} changed, {sync.lastImport.deleted} removed.
+            </p>
+          )}
+          <p className="text-[11px] text-zinc-500">
+            With the daily check-up flow running, a quiet calendar still shows activity every day, so a warning after a
+            couple of days means the flow has stopped.
+          </p>
 
           <CopyField label="Webhook URL" value={webhookUrl} />
           <CopyField label="x-webhook-secret header value" value={sync.webhookSecret} />
@@ -241,6 +287,8 @@ export default function OfficeCalendarSync() {
 
   if (loading) return <LoadingSpinner />
 
+  const silent = syncs.filter(s => syncHealth(s).stale)
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -260,6 +308,21 @@ export default function OfficeCalendarSync() {
           <Plus className="w-4 h-4" /> {creating ? 'Adding…' : 'Add calendar sync'}
         </button>
       </div>
+
+      {silent.length > 0 && (
+        <div role="status" className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-200 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" aria-hidden="true" />
+          <div>
+            <p className="font-semibold">Calendar sync may have stopped</p>
+            <p className="text-amber-200/80 text-xs mt-1">
+              {silent.map(s => s.name).join(', ')} {silent.length === 1 ? 'has' : 'have'} received nothing for longer than
+              the warning limit. The Power Automate flows run under one person's Microsoft account, so they stop without
+              any error if that account or its licence goes away. Teachers can keep calendars current meanwhile with
+              <b> Sync now from .ics file</b> (also on the teacher calendar).
+            </p>
+          </div>
+        </div>
+      )}
 
       {syncs.length === 0 ? (
         <div className="bg-zinc-900 border border-white/10 rounded-2xl px-5 py-10 text-center text-zinc-500 text-sm">

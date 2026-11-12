@@ -1,4 +1,6 @@
-import { admin, functions, db, escapeHtml, sendEmailOrThrow, getEmailConfig, requireTeacherOrAdmin, LIMITS, requireMember, REGION } from './lib'
+import { admin, functions, db, escapeHtml, sendEmailOrThrow, getEmailConfig, requireTeacherOrAdmin, LIMITS, requireMember, requireAllowed, REGION } from './lib'
+import { FieldValue, Timestamp } from 'firebase-admin/firestore'
+import { parseIcs, type CalendarEvent } from './calendar-ics'
 import { sendPush, saveNotifications, sendFcmToTokens, tokensFor } from './notifications-core'
 import { checkLevelUp } from './points'
 import { writePoints } from './jobs'
@@ -34,7 +36,7 @@ export const checkInAttendance = functions.region(REGION).runWith(LIMITS).https.
       throw new functions.https.HttpsError('failed-precondition', 'This attendance session is no longer active.')
     }
 
-    const now     = admin.firestore.Timestamp.now()
+    const now     = Timestamp.now()
     const expired = session.expiresAt.toMillis() < now.toMillis()
 
     if (expired) {
@@ -61,7 +63,7 @@ export const checkInAttendance = functions.region(REGION).runWith(LIMITS).https.
     await attendanceRef.set({
       studentId:     uid,
       displayName,
-      checkedInAt:   admin.firestore.FieldValue.serverTimestamp(),
+      checkedInAt:   FieldValue.serverTimestamp(),
       sessionId:     sessionDoc.id,
       pointsAwarded: pointsPerCheckIn,
     })
@@ -355,19 +357,19 @@ export const receiveOfficeCalendarEvent = functions.region(REGION).runWith(LIMIT
         cohortId:   sync.cohortId ?? 'all',
         externalId: body.externalId,
         title:      body.subject,
-        startTime:  admin.firestore.Timestamp.fromDate(startDate),
-        endTime:    endDate && !isNaN(endDate.getTime()) ? admin.firestore.Timestamp.fromDate(endDate) : null,
+        startTime:  Timestamp.fromDate(startDate),
+        endTime:    endDate && !isNaN(endDate.getTime()) ? Timestamp.fromDate(endDate) : null,
         allDay,
         location:   body.location || null,
         source:     'office365',
-        updatedAt:  admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt:  FieldValue.serverTimestamp(),
       }, { merge: true })
 
       // Deduplicate: if Outlook changed the externalId (e.g. event moved between calendars),
       // stale docs with the same syncId + title + startTime will remain. Delete them.
       const staleByTitle = await db.collection('synced_events')
         .where('syncId', '==', syncId)
-        .where('startTime', '==', admin.firestore.Timestamp.fromDate(startDate))
+        .where('startTime', '==', Timestamp.fromDate(startDate))
         .get()
       const newTitleNorm = (body.subject ?? '').trim().toLowerCase()
       const staleDocs = staleByTitle.docs.filter(d =>
@@ -382,8 +384,8 @@ export const receiveOfficeCalendarEvent = functions.region(REGION).runWith(LIMIT
     }
 
     await syncSnap.ref.update({
-      lastReceivedAt: admin.firestore.FieldValue.serverTimestamp(),
-      eventCount:     admin.firestore.FieldValue.increment(1),
+      lastReceivedAt: FieldValue.serverTimestamp(),
+      eventCount:     FieldValue.increment(1),
     })
 
     res.status(200).json({ ok: true })
@@ -474,7 +476,7 @@ async function reconcile(req: functions.https.Request, res: functions.Response) 
       res.status(200).json({ ok: true, skipped: true, reason: 'Outlook returned no events — nothing changed.' }); return
     }
 
-    const outlook = new Map<string, { title: string; start: Date; end: Date | null; allDay: boolean; location: string | null }>()
+    const outlook = new Map<string, CalendarEvent>()
     let cancelled = 0
     for (const e of rawEvents as ReconcileEvent[]) {
       const externalId = e?.externalId ?? e?.id ?? e?.Id
@@ -502,89 +504,206 @@ async function reconcile(req: functions.https.Request, res: functions.Response) 
       if (lastStart < windowEnd.getTime()) checkedEnd = new Date(lastStart)
     }
 
-    const storedSnap = await db.collection('synced_events')
-      .where('syncId', '==', syncId)
-      .where('startTime', '>=', admin.firestore.Timestamp.fromDate(windowStart))
-      .where('startTime', '<',  admin.firestore.Timestamp.fromDate(windowEnd))
-      .get()
-    const stored = new Map(storedSnap.docs.map(d => [d.data().externalId as string, d]))
-
-    const toDelete = storedSnap.docs.filter(d =>
-      !outlook.has(d.data().externalId as string)
-      && (d.data().startTime?.toMillis?.() ?? 0) <= checkedEnd.getTime())
-    const matched  = storedSnap.docs.filter(d => outlook.has(d.data().externalId as string)).length
-    const toWrite: { id: string; data: Record<string, unknown>; isNew: boolean }[] = []
-    for (const [externalId, ev] of outlook) {
-      if (ev.start < windowStart || ev.start >= windowEnd) continue
-      const existing = stored.get(externalId)?.data()
-      const startTs = admin.firestore.Timestamp.fromDate(ev.start)
-      const endTs   = ev.end ? admin.firestore.Timestamp.fromDate(ev.end) : null
-      const same = existing
-        && existing.title === ev.title
-        && existing.startTime?.toMillis?.() === startTs.toMillis()
-        && (existing.endTime?.toMillis?.() ?? null) === (endTs?.toMillis() ?? null)
-        && !!existing.allDay === ev.allDay
-        && (existing.location ?? null) === ev.location
-      if (same) continue
-      toWrite.push({
-        id: stored.get(externalId)?.id ?? `${syncId}_${externalId}`,
-        isNew: !existing,
-        data: {
-          syncId,
-          cohortId:   sync.cohortId ?? 'all',
-          externalId,
-          title:      ev.title,
-          startTime:  startTs,
-          endTime:    endTs,
-          allDay:     ev.allDay,
-          location:   ev.location,
-          source:     'office365',
-          updatedAt:  admin.firestore.FieldValue.serverTimestamp(),
-        },
-      })
-    }
-
-    const summary = {
-      window: { start: windowStart.toISOString(), end: windowEnd.toISOString() },
-      ...(checkedEnd < windowEnd ? { removalsCheckedUntil: checkedEnd.toISOString(), note: `Outlook sent ${rawEvents.length} events — possibly capped, so removals were only checked up to the last one. Shorten the window if this persists.` } : {}),
-      outlookEvents: outlook.size,
-      outlookCancelled: cancelled,
-      storedInWindow: storedSnap.size,
-      matched,
-      toDelete: toDelete.length,
-      toAdd: toWrite.filter(w => w.isNew).length,
-      toUpdate: toWrite.filter(w => !w.isNew).length,
-      deleting: toDelete.slice(0, 50).map(d => `${d.data().startTime?.toDate?.().toISOString()} ${d.data().title}`),
-    }
-
-    // Guard against a partial Outlook list (e.g. pagination off) or a change
-    // of Outlook ids wiping the calendar: refuse big deletions unless forced
-    const suspicious = storedSnap.size > 0 && (
-      matched === 0 || (toDelete.length > 10 && toDelete.length > matched)
-    )
-    console.log('[officeReconcile]', syncId, dryRun ? 'DRY RUN' : '', JSON.stringify(summary))
-    if (suspicious && !force) {
-      res.status(409).json({ ok: false, refused: true, reason: 'Would remove most of the calendar — check that Pagination is on in the Outlook step. Nothing was changed.', ...summary })
-      return
-    }
-    if (dryRun) { res.status(200).json({ ok: true, dryRun: true, ...summary }); return }
-
-    const ops = [
-      ...toDelete.map(d => (b: FirebaseFirestore.WriteBatch) => b.delete(d.ref)),
-      ...toWrite.map(w => (b: FirebaseFirestore.WriteBatch) =>
-        b.set(db.collection('synced_events').doc(w.id), w.data, { merge: true })),
-    ]
-    for (let i = 0; i < ops.length; i += 400) {
-      const batch = db.batch()
-      ops.slice(i, i + 400).forEach(op => op(batch))
-      await batch.commit()
-    }
-    await syncSnap.ref.update({
-      lastReconciledAt: admin.firestore.FieldValue.serverTimestamp(),
-      lastReconcile: { deleted: toDelete.length, added: summary.toAdd, updated: summary.toUpdate },
+    const result = await applyCalendarSnapshot(syncId, sync, {
+      windowStart, windowEnd, checkedEnd, events: outlook, dryRun, force,
+      extra: {
+        ...(checkedEnd < windowEnd ? { removalsCheckedUntil: checkedEnd.toISOString(), note: `Outlook sent ${rawEvents.length} events — possibly capped, so removals were only checked up to the last one. Shorten the window if this persists.` } : {}),
+        outlookCancelled: cancelled,
+      },
+      stamp: summary => ({
+        lastReconciledAt: FieldValue.serverTimestamp(),
+        lastReconcile: { deleted: summary.toDelete, added: summary.toAdd, updated: summary.toUpdate },
+      }),
     })
-    res.status(200).json({ ok: true, ...summary })
+    res.status(result.status).json(result.body)
 }
+
+interface SnapshotSummary { toDelete: number; toAdd: number; toUpdate: number }
+
+// Makes synced_events for one sync match a full list of the source calendar's
+// events in [windowStart, windowEnd): removes what the list no longer has
+// (only up to checkedEnd), adds what's missing, refreshes what changed.
+// Override fields (subject link, custom title, teachers …) are never touched.
+// matchByTitle: an event whose id isn't known still updates the stored event
+// with the same title and start, keeping its id — an .ics file uses different
+// ids from Power Automate, and dropping the stored event would lose its overrides.
+export async function applyCalendarSnapshot(
+  syncId: string,
+  sync: FirebaseFirestore.DocumentData,
+  opts: {
+    windowStart: Date; windowEnd: Date; checkedEnd?: Date
+    events: Map<string, CalendarEvent>
+    dryRun: boolean; force: boolean; matchByTitle?: boolean
+    extra?: Record<string, unknown>
+    stamp: (s: SnapshotSummary) => Record<string, unknown>
+  },
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  const { windowStart, windowEnd, events, dryRun, force } = opts
+  const checkedEnd = opts.checkedEnd ?? windowEnd
+  const storedSnap = await db.collection('synced_events')
+    .where('syncId', '==', syncId)
+    .where('startTime', '>=', Timestamp.fromDate(windowStart))
+    .where('startTime', '<',  Timestamp.fromDate(windowEnd))
+    .get()
+  const byId = new Map(storedSnap.docs.map(d => [d.data().externalId as string, d]))
+  const titleKey = (title: unknown, startMs: number) => `${String(title ?? '').trim().toLowerCase()}|${startMs}`
+  const byTitle = new Map<string, FirebaseFirestore.QueryDocumentSnapshot[]>()
+  for (const d of storedSnap.docs) {
+    const k = titleKey(d.data().title, d.data().startTime?.toMillis?.() ?? 0)
+    byTitle.set(k, [...(byTitle.get(k) ?? []), d])
+  }
+
+  const used = new Set<string>()
+  const toWrite: { id: string; data: Record<string, unknown>; isNew: boolean }[] = []
+  for (const [externalId, ev] of events) {
+    let existingDoc = byId.get(externalId)
+    let viaTitle = false
+    if (!existingDoc && opts.matchByTitle) {
+      existingDoc = byTitle.get(titleKey(ev.title, ev.start.getTime()))?.find(d => !used.has(d.id))
+      viaTitle = !!existingDoc
+    }
+    if (existingDoc) used.add(existingDoc.id)
+    if (ev.start < windowStart || ev.start >= windowEnd) continue
+    const existing = existingDoc?.data()
+    const startTs = Timestamp.fromDate(ev.start)
+    const endTs   = ev.end ? Timestamp.fromDate(ev.end) : null
+    const same = existing
+      && existing.title === ev.title
+      && existing.startTime?.toMillis?.() === startTs.toMillis()
+      && (existing.endTime?.toMillis?.() ?? null) === (endTs?.toMillis() ?? null)
+      && !!existing.allDay === ev.allDay
+      && (existing.location ?? null) === ev.location
+    if (same) continue
+    toWrite.push({
+      id: existingDoc?.id ?? `${syncId}_${externalId}`.replace(/\//g, '_'),
+      isNew: !existing,
+      data: {
+        syncId,
+        cohortId:   sync.cohortId ?? 'all',
+        // Matched by title: keep the stored id, so the flow still finds it if it comes back
+        ...(viaTitle ? {} : { externalId }),
+        title:      ev.title,
+        startTime:  startTs,
+        endTime:    endTs,
+        allDay:     ev.allDay,
+        location:   ev.location,
+        source:     'office365',
+        updatedAt:  FieldValue.serverTimestamp(),
+      },
+    })
+  }
+
+  const toDelete = storedSnap.docs.filter(d =>
+    !used.has(d.id) && (d.data().startTime?.toMillis?.() ?? 0) <= checkedEnd.getTime())
+  const matched = used.size
+  const counts: SnapshotSummary = {
+    toDelete: toDelete.length,
+    toAdd: toWrite.filter(w => w.isNew).length,
+    toUpdate: toWrite.filter(w => !w.isNew).length,
+  }
+  const summary = {
+    window: { start: windowStart.toISOString(), end: windowEnd.toISOString() },
+    ...opts.extra,
+    outlookEvents: events.size,
+    storedInWindow: storedSnap.size,
+    matched,
+    ...counts,
+    deleting: toDelete.slice(0, 50).map(d => `${d.data().startTime?.toDate?.().toISOString()} ${d.data().title}`),
+  }
+
+  // Guard against a partial list (e.g. pagination off) or a change of ids
+  // wiping the calendar: refuse big deletions unless forced
+  const suspicious = storedSnap.size > 0 && (
+    matched === 0 || (toDelete.length > 10 && toDelete.length > matched)
+  )
+  console.log('[calendarSnapshot]', syncId, dryRun ? 'DRY RUN' : '', JSON.stringify(summary))
+  if (suspicious && !force) {
+    return { status: 409, body: { ok: false, refused: true, reason: 'Would remove most of the calendar — check that Pagination is on in the Outlook step. Nothing was changed.', ...summary } }
+  }
+  if (dryRun) return { status: 200, body: { ok: true, dryRun: true, ...summary } }
+
+  const ops = [
+    ...toDelete.map(d => (b: FirebaseFirestore.WriteBatch) => b.delete(d.ref)),
+    ...toWrite.map(w => (b: FirebaseFirestore.WriteBatch) =>
+      b.set(db.collection('synced_events').doc(w.id), w.data, { merge: true })),
+  ]
+  for (let i = 0; i < ops.length; i += 400) {
+    const batch = db.batch()
+    ops.slice(i, i + 400).forEach(op => op(batch))
+    await batch.commit()
+  }
+  await db.collection('office_calendar_syncs').doc(syncId).update(opts.stamp(counts))
+  return { status: 200, body: { ok: true, ...summary } }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Manual fallback when the Power Automate flow has stopped: a teacher or admin
+// uploads an .ics export of the Outlook calendar. The file counts as the full
+// calendar for the period it covers (its first to last event): same rules and
+// safety guard as the daily check-up. Run with dryRun first to preview.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ICS_MAX_CHARS = 5_000_000
+const DAY = 86_400_000
+
+export const listCalendarSyncs = functions.region(REGION).runWith(LIMITS).https.onCall(async (_data, context) => {
+  requireTeacherOrAdmin(context)
+  const snap = await db.collection('office_calendar_syncs').get()
+  // Never the webhook secret: teachers can't read the configs themselves
+  return snap.docs.map(d => {
+    const s = d.data()
+    const ms = (v: any) => v?.toMillis?.() ?? null
+    return {
+      id: d.id, name: s.name ?? '', cohortId: s.cohortId ?? 'all', enabled: s.enabled !== false,
+      warnAfterDays: s.warnAfterDays ?? null, createdAt: ms(s.createdAt),
+      lastReceivedAt: ms(s.lastReceivedAt), lastReconciledAt: ms(s.lastReconciledAt), lastImportedAt: ms(s.lastImportedAt),
+    }
+  })
+})
+
+export const importCalendarIcs = functions.region(REGION)
+  .runWith({ ...LIMITS, timeoutSeconds: 120, memory: '512MB' })
+  .https.onCall(async (data, context) => {
+    requireTeacherOrAdmin(context)
+    const uid = context.auth!.uid
+    await requireAllowed(uid, 'importCalendarIcs', 10)
+    const syncId = String(data?.syncId ?? '')
+    const ics = String(data?.ics ?? '')
+    if (!syncId) throw new functions.https.HttpsError('invalid-argument', 'Choose which calendar to update.')
+    if (!ics.trim()) throw new functions.https.HttpsError('invalid-argument', 'The file is empty.')
+    if (ics.length > ICS_MAX_CHARS) throw new functions.https.HttpsError('invalid-argument', 'The file is too large (max 5 MB). Export a shorter date range.')
+
+    const syncSnap = await db.collection('office_calendar_syncs').doc(syncId).get()
+    if (!syncSnap.exists) throw new functions.https.HttpsError('not-found', 'That calendar sync no longer exists.')
+
+    // Expand series from two months back to a year ahead
+    const now = Date.now()
+    let events: Map<string, CalendarEvent>
+    try {
+      events = parseIcs(ics, new Date(now - 60 * DAY), new Date(now + 400 * DAY))
+    } catch (err: any) {
+      throw new functions.https.HttpsError('invalid-argument', `Couldn't read the file as a calendar (.ics): ${err?.message ?? err}`)
+    }
+    if (events.size === 0) {
+      throw new functions.https.HttpsError('invalid-argument', 'No events in the file between two months ago and a year ahead.')
+    }
+    const starts = [...events.values()].map(e => e.start.getTime())
+    const windowStart = new Date(Math.min(...starts))
+    const windowEnd = new Date(Math.max(...starts) + 1)
+
+    const profile = (await db.collection('users').doc(uid).get()).data()
+    const result = await applyCalendarSnapshot(syncId, syncSnap.data()!, {
+      windowStart, windowEnd, events,
+      dryRun: data?.dryRun !== false,
+      force: data?.force === true,
+      matchByTitle: true,
+      stamp: counts => ({
+        lastImportedAt: FieldValue.serverTimestamp(),
+        lastImport: { deleted: counts.toDelete, added: counts.toAdd, updated: counts.toUpdate, by: uid, byName: profile?.displayName ?? '' },
+      }),
+    })
+    return result.body
+  })
 
 // ── sendGuestTeacherBookingEmail ──────────────────────────────────────────────
 export const sendGuestTeacherBookingEmail = functions.region(REGION).runWith({ ...LIMITS, secrets: ['RESEND_API_KEY'] }).https.onCall(async (data, context) => {

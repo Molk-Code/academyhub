@@ -37,6 +37,8 @@ import MobileAgendaView from '@/components/calendar/MobileAgendaView'
 import { Circle, X, CalendarDays, BookOpen, Clock, ChevronDown, Check, MapPin, Trash2, Mail, ExternalLink } from 'lucide-react'
 import { markCalendarInvitesSeen } from '@/hooks/useCalendarInviteBadge'
 import { format } from 'date-fns'
+import CalendarFilterChips from '@/components/calendar/CalendarFilterChips'
+import { useCalendarFilters } from '@/lib/calendarFilters'
 
 type ViewId = 'timeGridWorkWeek' | 'timeGridWeek' | 'dayGridMonth' | 'timeGridDay'
 const MOBILE_VIEWS: { id: ViewId; label: string }[] = [
@@ -556,6 +558,8 @@ export default function StudentCalendar() {
     () => [...events, ...personalEventInputs, ...invitedEventInputs, ...syncedEventInputs],
     [events, personalEventInputs, invitedEventInputs, syncedEventInputs],
   )
+  // Lessons / Deadlines / Outlook / Mine chips (remembered per browser)
+  const calFilters = useCalendarFilters('student', allEvents)
 
   function resetAddEventForm() {
     setAddEventModal(null)
@@ -856,6 +860,10 @@ export default function StudentCalendar() {
         </div>
       ) : (
         <>
+          <CalendarFilterChips
+            available={calFilters.available} isOn={calFilters.isOn} onToggle={calFilters.toggle}
+            anyHidden={calFilters.anyHidden} onShowAll={calFilters.showAll}
+          />
           {/* Legend — desktop only */}
           <div className="hidden sm:flex items-center gap-4 flex-wrap">
             <div className="flex p-1 rounded-xl bg-zinc-900 shadow-inner order-last ml-auto">
@@ -905,7 +913,7 @@ export default function StudentCalendar() {
           {/* ── Mobile: day timeline (page-scrolled, sticky week strip) ──── */}
           <div className="sm:hidden">
             <MobileAgendaView
-              events={allEvents}
+              events={calFilters.visible}
               subjects={subjects}
               onEventClick={handleMobileEventClick}
               onAddClick={(dateStr, timeStr) => {
@@ -919,7 +927,7 @@ export default function StudentCalendar() {
             <div className="hidden sm:block">
               <MobileAgendaView
                 variant="desktop"
-                events={allEvents}
+                events={calFilters.visible}
                 subjects={subjects}
                 onEventClick={handleMobileEventClick}
                 onAddClick={(dateStr, timeStr) => {
@@ -992,7 +1000,7 @@ export default function StudentCalendar() {
                 },
               }}
               eventContent={renderEventContent}
-              events={allEvents}
+              events={calFilters.visible}
               height={
                 isMobileDim
                   ? isLandscape

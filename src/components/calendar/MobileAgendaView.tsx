@@ -73,7 +73,6 @@ const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
 export default function MobileAgendaView({ events, onEventClick, onAddClick, initialDate, subjects = [], variant = 'mobile' }: MobileAgendaViewProps) {
   const isDesktop = variant === 'desktop'
-  const [kindFilter, setKindFilter] = useState<Kind | 'all'>('all')
   // Re-render every minute so Completed / In Session / Upcoming stay current
   const [now, setNow] = useState(() => new Date())
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 60_000); return () => clearInterval(t) }, [])
@@ -140,7 +139,6 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
   }, [events])
 
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd')
-  useEffect(() => { setKindFilter('all') }, [selectedDateStr])
 
   const dayEvents = useMemo(() => {
     const out: EventInput[] = []
@@ -254,8 +252,9 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
     willChange: 'transform',
   }
 
-  const kindsToday = Array.from(new Set(dayEvents.map(kindOf)))
-  const shown  = kindFilter === 'all' ? dayEvents : dayEvents.filter(e => kindOf(e) === kindFilter)
+  // Which sources show is decided by the calendar's filter chips (Lessons /
+  // Deadlines / Outlook / Mine) before events reach this view
+  const shown  = dayEvents
   const allDay = shown.filter(e => e.allDay)
   const timed  = shown.filter(e => !e.allDay)
 
@@ -397,26 +396,6 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
 
       {/* ── Event list ──────────────────────────────────────────────────── */}
       <div className={isDesktop ? 'min-w-0' : 'pt-3 pb-4'}>
-        {/* Filter pills — only when the day mixes kinds of events */}
-        {kindsToday.length > 1 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {(['all', ...kindsToday] as const).map(k => (
-              <button
-                key={k}
-                onClick={() => setKindFilter(k)}
-                className={cn(
-                  'flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all',
-                  kindFilter === k
-                    ? 'bg-brand-500 text-white font-semibold shadow-[0_0_12px_rgba(255,107,53,0.4)]'
-                    : 'bg-zinc-800 text-zinc-400 hover:text-zinc-100',
-                )}
-              >
-                {k === 'all' ? `All (${dayEvents.length})` : KIND_LABEL[k]}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* Day header */}
         <div className="flex items-center justify-between pb-3">
           <div className="flex items-center gap-2 min-w-0">

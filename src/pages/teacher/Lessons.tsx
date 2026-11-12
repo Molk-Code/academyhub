@@ -21,6 +21,8 @@ import dayGridPlugin  from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import type { EventInput } from '@fullcalendar/core'
+import CalendarFilterChips from '@/components/calendar/CalendarFilterChips'
+import { useCalendarFilters } from '@/lib/calendarFilters'
 
 // ── Semester marker helper ────────────────────────────────────────────────────
 
@@ -610,6 +612,8 @@ export default function Lessons() {
     () => [...(isTeacher && showGhostBlocks ? ghostEvents : []), ...filteredLessonEvents, ...semesterEvents, ...personalEventInputs, ...invitedEventInputs, ...filteredSyncedEventInputs],
     [isTeacher, showGhostBlocks, ghostEvents, filteredLessonEvents, semesterEvents, personalEventInputs, invitedEventInputs, filteredSyncedEventInputs],
   )
+  // Lessons / Outlook / Mine chips (remembered per browser); colleagues' events keep their own toggle
+  const calFilters = useCalendarFilters('teacher', allEvents)
 
   const dayDetailLessons = useMemo(() => {
     if (!dayDetail) return []
@@ -1237,6 +1241,10 @@ export default function Lessons() {
       {/* ── Calendar view ────────────────────────────────────────────────── */}
       {view === 'calendar' && (
         <>
+          <CalendarFilterChips
+            available={calFilters.available} isOn={calFilters.isOn} onToggle={calFilters.toggle}
+            anyHidden={calFilters.anyHidden} onShowAll={calFilters.showAll}
+          />
           {/* Legend */}
           <div className="hidden sm:flex items-center gap-3 flex-wrap">
             <div className="flex p-1 rounded-xl bg-zinc-900 shadow-inner order-last ml-auto">
@@ -1271,7 +1279,7 @@ export default function Lessons() {
           <div className="sm:hidden">
             <MobileAgendaView
               key={pendingCalendarDate?.getTime() ?? 0}
-              events={allEvents}
+              events={calFilters.visible}
               subjects={subjects}
               onEventClick={handleMobileEventClick}
               initialDate={pendingCalendarDate ?? undefined}
@@ -1282,7 +1290,7 @@ export default function Lessons() {
             <div className="hidden sm:block">
               <MobileAgendaView
                 variant="desktop"
-                events={allEvents}
+                events={calFilters.visible}
                 subjects={subjects}
                 onEventClick={handleMobileEventClick}
                 initialDate={pendingCalendarDate ?? undefined}
@@ -1328,7 +1336,7 @@ export default function Lessons() {
               // Month columns span many weeks — a date in the header was wrong
               dayGridMonth: { dayHeaderFormat: { weekday: 'short' } },
             }}
-            events={allEvents}
+            events={calFilters.visible}
             height={
               isMobileDim
                 ? isLandscape
@@ -1508,7 +1516,7 @@ export default function Lessons() {
             firstDay={1}
             weekNumbers={true}
             weekText=""
-            events={allEvents.filter(ev => !ev.extendedProps?.isBlock && !ev.extendedProps?.isSemesterMarker)}
+            events={calFilters.visible.filter(ev => !ev.extendedProps?.isBlock && !ev.extendedProps?.isSemesterMarker)}
             height="calc(100vh - 180px)"
             headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
             displayEventTime={false}

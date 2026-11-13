@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { doc, addDoc, updateDoc, collection, serverTimestamp, onSnapshot, getDocs, getDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
-import { BrowserMultiFormatReader } from '@zxing/browser'
-import { NotFoundException } from '@zxing/library'
+import { startCameraScan, savedScanKind, saveScanKind, type ScanKind } from '@/lib/cameraScanner'
+import { ScanKindToggle, BarcodeGuide } from './ScanKindToggle'
 import { Scan, Check, X, Wifi, WifiOff, LogIn, AlertTriangle } from 'lucide-react'
 import { parseScanText, checkoutScan, matchCheckinScan } from './inventoryShared'
 import { ScanFlash, useScanFlash } from './ScanFeedback'
@@ -51,6 +51,7 @@ export default function ScanPage() {
   const [sessionEnded, setSessionEnded] = useState(false)
   const [scanEntries, setScanEntries] = useState<ScanEntry[]>([])
   const [scanActive, setScanActive] = useState(false)
+  const [scanKind, setScanKind] = useState<ScanKind>(savedScanKind)
   const [cameraError, setCameraError] = useState('')
   const [cooldown, setCooldown] = useState<CooldownState>({ active: false })
 
@@ -200,20 +201,11 @@ export default function ScanPage() {
     setScanEntries(prev => [{ name: equipmentName, time: new Date().toLocaleTimeString(), ok }, ...prev.slice(0, 29)])
   }, [sessionId])
 
-  async function startScanner() {
+  async function startScanner(kind: ScanKind = scanKind) {
     setCameraError('')
     setScanActive(true)
-    const reader = new BrowserMultiFormatReader()
     try {
-      const controls = await reader.decodeFromConstraints(
-        { video: { facingMode: 'environment' } },
-        videoRef.current!,
-        (result, err) => {
-          if (result) handleScan(result.getText())
-          if (err && !(err instanceof NotFoundException)) { /* silent */ }
-        },
-      )
-      controlsRef.current = controls
+      controlsRef.current = await startCameraScan(videoRef.current!, kind, handleScan)
     } catch (e: any) {
       setScanActive(false)
       setCameraError(e?.message?.includes('ermission') ? 'Camera permission denied' : 'Could not access camera')
@@ -223,6 +215,16 @@ export default function ScanPage() {
   function stopScanner() {
     controlsRef.current?.stop(); controlsRef.current = null
     setScanActive(false)
+  }
+
+  // QR codes or barcodes; remembered on this phone. Switching while scanning restarts the camera.
+  function changeScanKind(kind: ScanKind) {
+    setScanKind(kind)
+    saveScanKind(kind)
+    if (scanActive) {
+      controlsRef.current?.stop(); controlsRef.current = null
+      startScanner(kind)
+    }
   }
 
   useEffect(() => () => stopScanner(), [])
@@ -297,7 +299,7 @@ export default function ScanPage() {
       {/* Camera area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '1rem', gap: '1rem' }}>
         <div style={{ position: 'relative', background: '#000', borderRadius: 12, overflow: 'hidden', aspectRatio: '4/3' }}>
-          <video ref={videoRef} style={{ width: '100%', height: '100%', objectFit: 'cover', display: scanActive ? 'block' : 'none' }} />
+          <video ref={videoRef} playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: scanActive ? 'block' : 'none' }} />
 
           {!scanActive && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
@@ -309,9 +311,11 @@ export default function ScanPage() {
           {/* Reticle + scanning indicator (hidden during cooldown) */}
           {scanActive && !cooldown.active && (
             <>
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                <div style={{ width: 200, height: 200, border: '2px solid rgba(76,217,100,.7)', borderRadius: 12, boxShadow: '0 0 0 9999px rgba(0,0,0,.35)' }} />
-              </div>
+              {scanKind === 'barcode' ? <BarcodeGuide /> : (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                  <div style={{ width: 200, height: 200, border: '2px solid rgba(76,217,100,.7)', borderRadius: 12, boxShadow: '0 0 0 9999px rgba(0,0,0,.35)' }} />
+                </div>
+              )}
               <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,.6)', borderRadius: 20, padding: '4px 10px' }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4cd964', animation: 'pulse 1.2s ease-in-out infinite', flexShrink: 0 }} />
                 <span style={{ fontSize: '.7rem', color: '#4cd964', fontWeight: 700 }}>Scanning…</span>
@@ -368,10 +372,14 @@ export default function ScanPage() {
           </div>
         )}
 
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <ScanKindToggle value={scanKind} onChange={changeScanKind} large />
+        </div>
+
         {/* Start / Stop */}
         {!scanActive ? (
           <button
-            onClick={startScanner}
+            onClick={() => startScanner()}
             style={{ padding: '14px', background: '#4cd964', border: 'none', borderRadius: 12, color: '#000', fontWeight: 700, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
             <Scan size={20} /> Start Scanning

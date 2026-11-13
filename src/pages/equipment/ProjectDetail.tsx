@@ -10,8 +10,8 @@ import {
   Package, Calendar, Users, Clock, AlertTriangle, Check, Trash2, Plus,
   Edit2, CheckCircle2, ArchiveRestore, ZapOff, Scan, Smartphone, ScanBarcode, ArrowRightLeft,
 } from 'lucide-react'
-import { BrowserMultiFormatReader } from '@zxing/browser'
-import { NotFoundException } from '@zxing/library'
+import { startCameraScan, savedScanKind, saveScanKind, type ScanKind } from '@/lib/cameraScanner'
+import { ScanKindToggle, BarcodeGuide } from './ScanKindToggle'
 import { QRCodeSVG } from 'qrcode.react'
 import { buildEquipmentContractHtml } from '@/lib/equipmentContract'
 import { isOverdue, formatDate, overdueDays, parseScanText, beep, itemDisplayName, checkoutScan, matchCheckinScan } from './inventoryShared'
@@ -116,6 +116,7 @@ export function ProjectDetail({
   const [remoteScanCount, setRemoteScanCount] = useState(0)
 
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [scanKind, setScanKind] = useState<ScanKind>(savedScanKind)
   const controlsRef = useRef<{ stop: () => void } | null>(null)
   const lastScanRef = useRef<string>('')
   const lastScanTimeRef = useRef<number>(0)
@@ -211,32 +212,31 @@ export function ProjectDetail({
     setUsbActive(usbByDefault)
   }
 
-  async function startScanner() {
+  async function startScanner(kind: ScanKind = scanKind) {
     setUsbActive(false)
     setScanActive(true)
-    const reader = new BrowserMultiFormatReader()
     try {
-      const controls = await reader.decodeFromConstraints(
-        { video: { facingMode: 'environment' } },
-        videoRef.current!,
-        (result, err) => {
-          if (result) {
-            const text = result.getText()
-            const now = Date.now()
-            if (text === lastScanRef.current && now - lastScanTimeRef.current < 1500) return
-            lastScanRef.current = text
-            lastScanTimeRef.current = now
-            beep(scanMode === 'checkout' ? 880 : 660)
-            handleScan(text)
-          }
-          if (err && !(err instanceof NotFoundException)) {
-            // silent
-          }
-        },
-      )
-      controlsRef.current = controls
+      controlsRef.current = await startCameraScan(videoRef.current!, kind, text => {
+        const now = Date.now()
+        if (text === lastScanRef.current && now - lastScanTimeRef.current < 1500) return
+        lastScanRef.current = text
+        lastScanTimeRef.current = now
+        beep(scanMode === 'checkout' ? 880 : 660)
+        handleScan(text)
+      })
     } catch {
       setScanActive(false)
+    }
+  }
+
+  // QR codes or barcodes; remembered per device. Switching while scanning restarts the camera.
+  function changeScanKind(kind: ScanKind) {
+    setScanKind(kind)
+    saveScanKind(kind)
+    if (scanActive) {
+      controlsRef.current?.stop()
+      controlsRef.current = null
+      startScanner(kind)
     }
   }
 
@@ -665,10 +665,11 @@ export function ProjectDetail({
           </div>
           <div className="scan-monitor-actions">
             {/* Local camera */}
+            {!remoteSessionId && <ScanKindToggle value={scanKind} onChange={changeScanKind} />}
             {!remoteSessionId && (
               scanActive
                 ? <button className="scan-stop-btn" onClick={stopScanner}><ZapOff size={14} /> Stop</button>
-                : <button className="manual-add-btn" onClick={startScanner}><Scan size={14} /> This Device</button>
+                : <button className="manual-add-btn" onClick={() => startScanner()}><Scan size={14} /> This Device</button>
             )}
             {/* USB / Bluetooth barcode scanner */}
             {!remoteSessionId && !scanActive && !usbByDefault && (
@@ -694,7 +695,10 @@ export function ProjectDetail({
             Scanning on this device ({scanMode})…
           </div>
         )}
-        <video ref={videoRef} style={{ width: '100%', maxHeight: 240, borderRadius: 8, display: scanActive ? 'block' : 'none', background: '#000' }} />
+        <div style={{ position: 'relative', display: scanActive ? 'block' : 'none' }}>
+          <video ref={videoRef} playsInline muted style={{ width: '100%', maxHeight: scanKind === 'barcode' ? 300 : 240, borderRadius: 8, display: 'block', background: '#000', objectFit: 'cover' }} />
+          {scanKind === 'barcode' && <BarcodeGuide />}
+        </div>
 
         {/* USB scanner input — the scanner types here and presses Enter */}
         {usbActive && (
@@ -748,8 +752,8 @@ export function ProjectDetail({
         {scanEntries.length === 0 && !scanActive && (!usbActive || usbByDefault) && !remoteSessionId && (
           <div className="scan-waiting">
             {usbByDefault
-              ? <>A plugged-in barcode scanner works automatically on this page. Or use <strong>This Device</strong> to scan with this camera, or <strong>Mobile</strong> to use a phone as a scanner.</>
-              : <>Use <strong>This Device</strong> to scan with this camera, <strong>USB Scanner</strong> for a plugged-in or Bluetooth barcode scanner, or <strong>Mobile</strong> to use a phone as a scanner.</>}
+              ? <>A plugged-in barcode scanner works automatically on this page. Or use <strong>This Device</strong> to scan QR codes or barcodes (choose above) with this camera, or <strong>Mobile</strong> to use a phone as a scanner.</>
+              : <>Use <strong>This Device</strong> to scan QR codes or barcodes (choose above) with this camera, <strong>USB Scanner</strong> for a plugged-in or Bluetooth barcode scanner, or <strong>Mobile</strong> to use a phone as a scanner.</>}
           </div>
         )}
 

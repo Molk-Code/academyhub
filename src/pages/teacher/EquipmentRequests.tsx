@@ -8,7 +8,7 @@ import type { EquipmentBookingDoc, EquipmentBookingMessageDoc, EquipmentDoc } fr
 import { Package, Trash2, Send } from 'lucide-react'
 import { useEquipmentResponsibility } from '@/hooks/useEquipmentResponsibility'
 import { BookingPartsPanel, ProductionLink } from '@/components/equipment/BookingPartsPanel'
-import { bookingParts, decideEquipmentBookingParts, myParts } from '@/lib/bookingParts'
+import { bookingParts, decideEquipmentBookingParts, setEquipmentBookingItems, myParts } from '@/lib/bookingParts'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 
 function BookingMessageThread({ bookingId }: { bookingId: string }) {
@@ -123,6 +123,19 @@ export default function EquipmentRequests() {
     } catch (e: any) {
       setActionError(e?.message ?? 'Could not save.')
       return false
+    } finally {
+      setConfirmingId(null)
+    }
+  }
+
+  // Single items: not available / available again (no message to write)
+  async function onItems(booking: EquipmentBookingDoc, keys: string[], available: boolean) {
+    setConfirmingId(booking.id)
+    setActionError('')
+    try {
+      await setEquipmentBookingItems(booking.id, keys, available)
+    } catch (e: any) {
+      setActionError(e?.message ?? 'Could not save.')
     } finally {
       setConfirmingId(null)
     }
@@ -246,6 +259,7 @@ export default function EquipmentRequests() {
                 inventoryPath="/teacher/inventory"
                 busy={confirmingId === booking.id}
                 onDecide={(cats, d) => onDecide(booking, cats, d)}
+                onItems={(keys, available) => onItems(booking, keys, available)}
               />
 
               <BookingMessageThread bookingId={booking.id} />

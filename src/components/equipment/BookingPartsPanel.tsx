@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { Check, X, Undo2, ArrowRight, ExternalLink, Clock, Clapperboard } from 'lucide-react'
+import { Check, X, Undo2, ArrowRight, ExternalLink, Clock, Clapperboard, Ban } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { bookingParts, handlesCategory, myParts, partStatus, type PartStatus } from '@/lib/bookingParts'
+import { bookingParts, bookingItemKey, handlesCategory, isItemUnavailable, myParts, partStatus, type PartStatus } from '@/lib/bookingParts'
 import type { EquipmentBookingDoc, EquipmentResponsibility } from '@/types'
 
 type Catalog = Map<string, { category?: string }>
@@ -13,21 +13,40 @@ const STATUS: Record<PartStatus, { label: string; cls: string }> = {
   'set-up':  { label: 'In project',      cls: 'text-orange-300 bg-orange-500/10 border-orange-500/30' },
 }
 
-export function PartStatusBadge({ booking, category }: { booking: EquipmentBookingDoc; category: string }) {
+export function PartStatusBadge({ booking, category, catalog }: { booking: EquipmentBookingDoc; category: string; catalog?: Catalog }) {
   const st = partStatus(booking, category)
   const by = booking.categoryDecisions?.[category]?.byName
+  const items = bookingParts(booking, catalog).find(p => p.category === category)?.items ?? []
+  const missing = st === 'confirmed' ? items.filter(it => isItemUnavailable(booking, it)).length : 0
   return (
     <span className={cn('inline-flex items-center gap-1 text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-full border whitespace-nowrap', STATUS[st].cls)}>
       {st === 'pending' ? <Clock className="w-3 h-3" /> : st === 'denied' ? <X className="w-3 h-3" /> : <Check className="w-3 h-3" />}
-      {STATUS[st].label}{by && (st === 'confirmed' || st === 'denied') ? ` · ${by}` : ''}
+      {STATUS[st].label}{missing ? ` · ${missing} not available` : ''}{by && (st === 'confirmed' || st === 'denied') ? ` · ${by}` : ''}
     </span>
+  )
+}
+
+// One booked item; struck through when staff marked it as not available
+function ItemLine({ booking, item, children }: { booking: EquipmentBookingDoc; item: EquipmentBookingDoc['items'][number]; children?: React.ReactNode }) {
+  const off = isItemUnavailable(booking, item)
+  return (
+    <li className="flex items-center justify-between gap-3 text-[13px]">
+      <span className={cn('min-w-0 break-words', off ? 'text-zinc-500 line-through' : 'text-zinc-300')}>
+        {item.equipmentName}
+        {off && <span className="ml-1.5 no-underline inline-block text-[10px] font-bold text-rose-300 not-italic" style={{ textDecoration: 'none' }}>Not available</span>}
+      </span>
+      <span className="flex items-center gap-2 flex-shrink-0">
+        <span className="text-zinc-500">×{item.quantity}</span>
+        {children}
+      </span>
+    </li>
   )
 }
 
 // Staff review of a booking, part by part: the categories this person handles
 // are highlighted with their actions, everyone else's parts are greyed out.
 export function BookingPartsPanel({
-  booking, catalog, responsibility, inventoryPath, busy, onDecide,
+  booking, catalog, responsibility, inventoryPath, busy, onDecide, onItems,
 }: {
   booking: EquipmentBookingDoc
   catalog: Catalog
@@ -35,6 +54,8 @@ export function BookingPartsPanel({
   inventoryPath: string
   busy?: boolean
   onDecide: (categories: string[], decision: 'confirmed' | 'denied' | 'pending') => void
+  /** Mark single items as not available, or available again */
+  onItems?: (keys: string[], available: boolean) => void
 }) {
   const navigate = useNavigate()
   const parts = bookingParts(booking, catalog)
@@ -62,16 +83,37 @@ export function BookingPartsPanel({
                 {p.category}
                 {!isMine && <span className="ml-2 normal-case tracking-normal font-medium text-zinc-500">· someone else handles this</span>}
               </span>
-              <PartStatusBadge booking={booking} category={p.category} />
+              <PartStatusBadge booking={booking} category={p.category} catalog={catalog} />
             </div>
-            <ul className="mt-1.5 space-y-0.5">
-              {p.items.map((it, i) => (
-                <li key={i} className="flex justify-between gap-3 text-[13px] text-zinc-300">
-                  <span className="min-w-0 break-words">{it.equipmentName}</span>
-                  <span className="text-zinc-500 flex-shrink-0">×{it.quantity}</span>
-                </li>
-              ))}
+            <ul className="mt-1.5 space-y-1">
+              {p.items.map((it, i) => {
+                // Items can be switched while the part is open; a part denied as a whole stays denied
+                const editable = !!onItems && isMine && canChange && st !== 'set-up'
+                  && !(st === 'denied' && !booking.categoryDecisions?.[p.category]?.auto)
+                const off = isItemUnavailable(booking, it)
+                return (
+                  <ItemLine key={i} booking={booking} item={it}>
+                    {editable && (
+                      <button
+                        type="button" disabled={busy}
+                        onClick={() => onItems!([bookingItemKey(it)], off)}
+                        aria-pressed={!off}
+                        aria-label={off ? `Make ${it.equipmentName} available again` : `Mark ${it.equipmentName} as not available`}
+                        className={cn('inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-md border disabled:opacity-50',
+                          off ? 'border-white/10 text-zinc-400 hover:text-zinc-200 hover:bg-white/5' : 'border-emerald-500/30 text-emerald-300 hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-500/30')}
+                      >
+                        {off ? <><Undo2 className="w-3 h-3" /> Make available</> : <><Check className="w-3 h-3" /> Available</>}
+                      </button>
+                    )}
+                  </ItemLine>
+                )
+              })}
             </ul>
+            {!!onItems && isMine && canChange && st === 'pending' && p.items.length > 1 && (
+              <p className="mt-1 text-[11px] text-zinc-500 flex items-center gap-1">
+                <Ban className="w-3 h-3" aria-hidden="true" /> Untick what you can't lend, then accept the rest.
+              </p>
+            )}
             {isMine && canChange && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {st === 'pending' && (
@@ -135,10 +177,26 @@ export function BookingPartsSummary({ booking }: { booking: EquipmentBookingDoc 
             <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">{p.category}</span>
             <PartStatusBadge booking={booking} category={p.category} />
           </div>
-          <p className="mt-1 text-xs text-zinc-300">{p.items.map(it => `${it.quantity}× ${it.equipmentName}`).join(' · ')}</p>
+          <BookingItemsInline booking={booking} items={p.items} />
         </div>
       ))}
     </div>
+  )
+}
+
+// Student view of booked items: "2× Camera · Tripod (not available)"
+export function BookingItemsInline({ booking, items }: { booking: EquipmentBookingDoc; items: EquipmentBookingDoc['items'] }) {
+  return (
+    <p className="mt-1 text-xs text-zinc-300">
+      {items.map((it, i) => (
+        <span key={i}>
+          {i > 0 && ' · '}
+          {isItemUnavailable(booking, it)
+            ? <><span className="line-through text-zinc-500">{it.quantity}× {it.equipmentName}</span> <span className="text-rose-300 font-semibold">not available</span></>
+            : `${it.quantity}× ${it.equipmentName}`}
+        </span>
+      ))}
+    </p>
   )
 }
 

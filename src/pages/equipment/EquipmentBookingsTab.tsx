@@ -8,7 +8,7 @@ import { useCollection, orderBy } from '@/hooks/useFirestore'
 import type { EquipmentBookingDoc, EquipmentBookingMessageDoc, EquipmentDoc } from '@/types'
 import { useEquipmentResponsibility } from '@/hooks/useEquipmentResponsibility'
 import { BookingPartsPanel, ProductionLink } from '@/components/equipment/BookingPartsPanel'
-import { bookingParts, decideEquipmentBookingParts, myParts } from '@/lib/bookingParts'
+import { bookingParts, decideEquipmentBookingParts, setEquipmentBookingItems, myParts } from '@/lib/bookingParts'
 import {
   Calendar, CheckCircle2, Send, Trash2,
 } from 'lucide-react'
@@ -145,6 +145,19 @@ export function BookingsTab() {
     }
   }
 
+  // Single items: not available / available again (no message to write)
+  async function onItems(booking: EquipmentBookingDoc, keys: string[], available: boolean) {
+    setSavingId(booking.id)
+    setActionError('')
+    try {
+      await setEquipmentBookingItems(booking.id, keys, available)
+    } catch (e: any) {
+      setActionError(e?.message ?? 'Could not save.')
+    } finally {
+      setSavingId(null)
+    }
+  }
+
   function onDecide(booking: EquipmentBookingDoc, categories: string[], decision: 'confirmed' | 'denied' | 'pending') {
     if (decision === 'pending') { decide(booking, categories, 'pending'); return }
     setActionModal({ booking, action: decision, categories })
@@ -254,6 +267,7 @@ export function BookingsTab() {
                         inventoryPath="/admin/inventory"
                         busy={savingId === b.id}
                         onDecide={(cats, d) => onDecide(b, cats, d)}
+                        onItems={(keys, available) => onItems(b, keys, available)}
                       />
                       {actionError && savingId === null && expandedId === b.id && !actionModal && (
                         <p style={{ fontSize: '.75rem', color: '#f87171', marginTop: 6 }}>{actionError}</p>

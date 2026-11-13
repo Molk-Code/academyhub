@@ -1,5 +1,6 @@
 import { functions, db, admin, requireTeacherOrAdmin, LIMITS, allow, REGION } from './lib'
 import { sendPush, saveNotifications, tokensFor } from './notifications-core'
+import { Timestamp } from 'firebase-admin/firestore'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Booking parts — each catalog category of a booking is accepted or denied by
@@ -390,6 +391,36 @@ export const onInventoryItemWritten = functions.region(REGION).runWith(LIMITS).f
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// The booking's status from its parts: pending while any part is undecided,
+// then denied if every part was denied, otherwise confirmed; once checked out
+// it stays so while every part is set up or denied
+function overallStatus(current: string, all: string[], decisions: Record<string, unknown>, setUp: Record<string, string>) {
+  const statusOf = (c: string) => setUp[c] ? 'confirmed' : (decisions[c] as { status?: string } | undefined)?.status
+  const undecided = all.some(c => !statusOf(c))
+  const everyDenied = all.every(c => statusOf(c) === 'denied')
+  const anySetUp = Object.keys(setUp).length > 0
+  const status = anySetUp && current === 'checked-out'
+    ? (all.every(c => setUp[c] || statusOf(c) === 'denied') ? 'checked-out' : 'confirmed')
+    : undecided ? 'pending' : everyDenied ? 'denied' : 'confirmed'
+  return { status, undecided }
+}
+
+// One line of a booking (a booking lists each piece of equipment once)
+export const bookingItemKey = (it: { equipmentId?: string; equipmentName?: string }) =>
+  it.equipmentId || `name:${it.equipmentName ?? ''}`
+
+async function itemCategories(items: { equipmentId?: string; equipmentName?: string; category?: string }[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  for (const it of items) out.set(bookingItemKey(it), (await bookingCategories([it]))[0])
+  return out
+}
+
+const notifyStudent = async (studentId: string | undefined, opts: { title: string; body: string; url: string }) => {
+  if (!studentId) return
+  const tokens: string[] = await tokensFor([studentId])
+  await Promise.all([sendPush(tokens, { ...opts, tag: 'equipment-booking' }), saveNotifications([studentId], opts)])
+}
+
 // decideEquipmentBookingParts — accept, deny or reopen the caller's parts of a
 // booking. Only staff responsible for a category can decide it. The booking's
 // overall status follows the parts: pending while any is undecided, then
@@ -436,15 +467,9 @@ export const decideEquipmentBookingParts = functions.region(REGION).runWith(LIMI
     }
     for (const c of categories) {
       if (decision === 'pending') delete decisions[c]
-      else decisions[c] = { status: decision, byUid: uid, byName: (caller.displayName as string) ?? '', at: admin.firestore.Timestamp.now() }
+      else decisions[c] = { status: decision, byUid: uid, byName: (caller.displayName as string) ?? '', at: Timestamp.now() }
     }
-    const statusOf = (c: string) => setUp[c] ? 'confirmed' : (decisions[c] as { status?: string } | undefined)?.status
-    const undecided = all.some(c => !statusOf(c))
-    const everyDenied = all.every(c => statusOf(c) === 'denied')
-    const anySetUp = Object.keys(setUp).length > 0
-    const status = anySetUp && b.status === 'checked-out'
-      ? (all.every(c => setUp[c] || statusOf(c) === 'denied') ? 'checked-out' : 'confirmed')
-      : undecided ? 'pending' : everyDenied ? 'denied' : 'confirmed'
+    const { status, undecided } = overallStatus(b.status, all, decisions, setUp)
     tx.update(ref, {
       categoryDecisions: decisions,
       status,
@@ -461,11 +486,17 @@ export const decideEquipmentBookingParts = functions.region(REGION).runWith(LIMI
     const verb = decision === 'confirmed' ? 'confirmed' : 'denied'
     const extra = typeof note === 'string' && note.trim() ? `: ${note.trim()}` : ''
     const left = result.undecided ? ' — the rest is still being reviewed' : ''
+    const unavailable: Record<string, unknown> = b.unavailableItems ?? {}
+    const cats = await itemCategories(b.items ?? [])
+    const missing = decision === 'confirmed'
+      ? (b.items ?? []).filter((it: any) => unavailable[bookingItemKey(it)] && categories.includes(cats.get(bookingItemKey(it))!)).map((it: any) => it.equipmentName)
+      : []
+    const except = missing.length ? ` (not available: ${missing.join(', ')})` : ''
     const opts = {
       title: decision === 'confirmed'
         ? (whole ? '✅ Equipment booking confirmed' : '✅ Part of your booking confirmed')
         : (whole ? '❌ Equipment booking denied' : '❌ Part of your booking denied'),
-      body: `${what} for "${b.projectName}" was ${verb}${extra}${left}`,
+      body: `${what} for "${b.projectName}" was ${verb}${except}${extra}${left}`,
       url: '/my-bookings',
     }
     const studentId = b.studentId as string
@@ -479,3 +510,79 @@ export const decideEquipmentBookingParts = functions.region(REGION).runWith(LIMI
   }
   return { status: result.status }
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// setEquipmentBookingItems — mark single items of a booking as not available
+// (or available again), for the categories the caller handles. A category
+// whose every item is unavailable is denied; making one available again
+// reopens a category denied that way. Set-up parts can't change. The student
+// is told when a part they already had confirmed changes.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const setEquipmentBookingItems = functions.region(REGION).runWith(LIMITS).https.onCall(async (data, context) => {
+  requireTeacherOrAdmin(context)
+  return runSetBookingItems(context.auth!.uid, data)
+})
+
+export async function runSetBookingItems(uid: string, data: unknown): Promise<{ status: string }> {
+  const { bookingId, keys, available } = data as { bookingId?: string; keys?: string[]; available?: boolean }
+  if (!bookingId || typeof bookingId !== 'string') throw new functions.https.HttpsError('invalid-argument', 'bookingId is required.')
+  if (!Array.isArray(keys) || keys.length === 0 || !keys.every(k => typeof k === 'string')) {
+    throw new functions.https.HttpsError('invalid-argument', 'keys is required.')
+  }
+  if (typeof available !== 'boolean') throw new functions.https.HttpsError('invalid-argument', 'available must be true or false.')
+  const resp = (await loadResponsibility())[uid]
+  const ref = db.collection('equipment_bookings').doc(bookingId)
+  const caller = (await db.collection('users').doc(uid).get()).data() ?? {}
+  const byName = (caller.displayName as string) ?? ''
+
+  const result = await db.runTransaction(async tx => {
+    const snap = await tx.get(ref)
+    if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Booking not found.')
+    const b = snap.data()!
+    if (!['pending', 'confirmed', 'denied', 'checked-out'].includes(b.status)) {
+      throw new functions.https.HttpsError('failed-precondition', `This booking is ${b.status}.`)
+    }
+    const items: { equipmentId?: string; equipmentName?: string; category?: string }[] = b.items ?? []
+    const cats = await itemCategories(items)
+    const all = [...new Set(cats.values())]
+    const setUp: Record<string, string> = b.setUpCategories ?? {}
+    const unknown = keys.filter(k => !cats.has(k))
+    if (unknown.length) throw new functions.https.HttpsError('invalid-argument', 'Item not in this booking.')
+    const touched = [...new Set(keys.map(k => cats.get(k)!))]
+    const notAllowed = touched.filter(c => !handlesCategory(resp, c))
+    if (notAllowed.length) throw new functions.https.HttpsError('permission-denied', `You don't handle bookings for ${notAllowed.join(', ')}.`)
+    if (touched.some(c => setUp[c])) throw new functions.https.HttpsError('failed-precondition', 'That part is already set up in a project.')
+
+    const unavailable: Record<string, unknown> = { ...(b.unavailableItems ?? {}) }
+    for (const k of keys) {
+      if (available) delete unavailable[k]
+      else unavailable[k] = { byUid: uid, byName, at: Timestamp.now() }
+    }
+    const decisions: Record<string, any> = { ...(b.categoryDecisions ?? {}) }
+    if (!b.categoryDecisions && (b.status === 'confirmed' || b.status === 'denied')) {
+      for (const c of all) decisions[c] = { status: b.status, byUid: '', byName: '' }
+    }
+    const before = Object.fromEntries(touched.map(c => [c, decisions[c]?.status ?? 'pending']))
+    for (const c of touched) {
+      const keysInCat = [...cats].filter(([, cat]) => cat === c).map(([k]) => k)
+      if (keysInCat.every(k => unavailable[k])) {
+        decisions[c] = { status: 'denied', byUid: uid, byName, at: Timestamp.now(), auto: true }
+      } else if (decisions[c]?.status === 'denied' && decisions[c]?.auto) {
+        delete decisions[c]   // denied only because nothing was available: decide again
+      }
+    }
+    const { status } = overallStatus(b.status, all, decisions, setUp)
+    tx.update(ref, { unavailableItems: unavailable, categoryDecisions: decisions, status })
+    return { status, booking: b, before, touched, decisions }
+  })
+
+  // The student has already been told about confirmed parts: tell them what changed
+  const b = result.booking
+  const names = (b.items ?? []).filter((it: any) => keys.includes(bookingItemKey(it))).map((it: any) => it.equipmentName)
+  if (result.touched.some(c => result.before[c] === 'confirmed')) {
+    await notifyStudent(b.studentId, available
+      ? { title: '✅ Equipment available again', body: `${names.join(', ')} for "${b.projectName}" is available after all`, url: '/my-bookings' }
+      : { title: '⚠️ Equipment not available', body: `${names.join(', ')} for "${b.projectName}" is not available — the rest of your booking stands`, url: '/my-bookings' })
+  }
+  return { status: result.status }}

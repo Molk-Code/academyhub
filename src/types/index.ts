@@ -431,6 +431,7 @@ export interface BookingPartDecision {
   byUid: string
   byName: string
   at?: Timestamp
+  auto?: boolean   // denied because every item was marked not available
 }
 
 export interface EquipmentBookingDoc {
@@ -448,6 +449,7 @@ export interface EquipmentBookingDoc {
   linkedProjectId?: string   // set once "Set Up in Inventory" has created the inventory_projects doc
   linkedProjectIds?: string[]                        // every project set up from it (parts can go to different projects)
   categoryDecisions?: Record<string, BookingPartDecision>  // per-category accept/deny (decideEquipmentBookingParts)
+  unavailableItems?: Record<string, { byUid: string; byName: string; at?: Timestamp }>  // bookingItemKey → marked not available (setEquipmentBookingItems)
   setUpCategories?: Record<string, string>           // category → project it was set up in
   closedByProject?: boolean  // closed automatically when its inventory project was archived/returned
   productionId?: string

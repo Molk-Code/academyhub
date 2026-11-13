@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { safeRedirect } from '@/lib/safeRedirect'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -21,6 +22,8 @@ export default function Login() {
   const { signIn, user, role, loading } = useAuth()
   const { shortName } = useSchool()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const afterSignIn = safeRedirect(searchParams.get('redirect'))
   const [showPw,            setShowPw]            = useState(false)
   const [error,             setError]             = useState('')
   const [showForgotPw,      setShowForgotPw]      = useState(false)
@@ -44,7 +47,7 @@ export default function Login() {
     setError('')
     try {
       await signIn(data.email, data.password)
-      navigate('/')
+      navigate(afterSignIn)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Sign-in failed'
       if (msg.includes('user-not-found') || msg.includes('wrong-password') || msg.includes('invalid-credential')) {
@@ -88,7 +91,7 @@ export default function Login() {
 
   // Already signed in (old bookmark, mistyped link, or the catch-all route):
   // go to the app instead of showing a login form
-  if (!loading && user && role) return <Navigate to="/" replace />
+  if (!loading && user && role) return <Navigate to={afterSignIn} replace />
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-brand-900 to-slate-900 overflow-y-auto flex items-start sm:items-center justify-center px-4 py-8">

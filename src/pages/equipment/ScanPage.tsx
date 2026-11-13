@@ -49,6 +49,7 @@ export default function ScanPage() {
   const [session, setSession] = useState<ScanSession | null>(null)
   const [sessionLoading, setSessionLoading] = useState(true)
   const [sessionEnded, setSessionEnded] = useState(false)
+  const [sessionError, setSessionError] = useState('')
   const [scanEntries, setScanEntries] = useState<ScanEntry[]>([])
   const [scanActive, setScanActive] = useState(false)
   const [scanKind, setScanKind] = useState<ScanKind>(savedScanKind)
@@ -69,18 +70,29 @@ export default function ScanPage() {
   const { flash, show: showFlash } = useScanFlash()
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Listen to session doc
+  // Listen to session doc. Only once signed in: on a phone that has just opened
+  // the link, Firebase restores the sign-in a moment after the page starts, and
+  // reading before that is refused by the rules (the page then never left "Loading").
+  const signedInUid = profile?.uid
   useEffect(() => {
-    if (!sessionId) return
+    if (!sessionId || !signedInUid) return
+    setSessionError('')
     const unsub = onSnapshot(doc(db, 'scan_sessions', sessionId), snap => {
+      setSessionError('')
       if (!snap.exists()) { setSessionLoading(false); setSessionEnded(true); return }
       const data = snap.data() as ScanSession
       setSession(data); sessionRef.current = data
       setSessionLoading(false)
-      if (!data.active) setSessionEnded(true)
+      setSessionEnded(!data.active)
+    }, err => {
+      console.error('[scan] session', err)
+      setSessionError(err.code === 'permission-denied'
+        ? 'This account can’t open the scanning session. Sign in with a staff account of the same school.'
+        : 'Could not load the scanning session. Check the connection and try again.')
+      setSessionLoading(false)
     })
     return unsub
-  }, [sessionId])
+  }, [sessionId, signedInUid])
 
   useEffect(() => {
     if (!session?.projectId) return
@@ -236,7 +248,7 @@ export default function ScanPage() {
     fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', flexDirection: 'column',
   }
 
-  if (authLoading || sessionLoading) {
+  if (authLoading || (profile && sessionLoading)) {
     return (
       <div style={{ ...base, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
@@ -257,6 +269,22 @@ export default function ScanPage() {
           style={{ padding: '10px 24px', background: '#4cd964', color: '#000', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '.9rem', cursor: 'pointer' }}
         >
           Sign in
+        </button>
+      </div>
+    )
+  }
+
+  if (sessionError) {
+    return (
+      <div style={{ ...base, alignItems: 'center', justifyContent: 'center', gap: 16, padding: '2rem', textAlign: 'center' }}>
+        <AlertTriangle size={40} color="#f59e0b" />
+        <h2 style={{ fontWeight: 700, fontSize: '1.25rem' }}>Can’t open the session</h2>
+        <p role="alert" style={{ color: '#a0a0b8', fontSize: '.9rem', maxWidth: 320 }}>{sessionError}</p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{ padding: '10px 24px', background: '#4cd964', color: '#000', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '.9rem', cursor: 'pointer' }}
+        >
+          Try again
         </button>
       </div>
     )

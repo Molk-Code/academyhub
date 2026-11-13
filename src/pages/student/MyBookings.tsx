@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useFeature } from '@/hooks/useFeature'
 import { BookingPartsSummary, ProductionLink } from '@/components/equipment/BookingPartsPanel'
-import { bookingParts } from '@/lib/bookingParts'
+import { bookingParts, isItemUnavailable } from '@/lib/bookingParts'
 import { useCollection, useDocument, orderBy, where } from '@/hooks/useFirestore'
 import { markFoodBoxSeen, markMinivanSeen } from '@/hooks/useBookingBadge'
 import { LEGAL_TEXT } from '@/lib/equipmentContract'
@@ -450,8 +450,10 @@ function BookingRequestsSection({ bookings }: { bookings: EquipmentBookingDoc[] 
             {bookingParts(b).length > 1 ? <BookingPartsSummary booking={b} /> : b.items?.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {b.items.map((it, i) => (
-                  <span key={i} className="text-xs px-2.5 py-1 rounded-full border bg-zinc-800/60 text-zinc-300 border-white/10">
-                    {it.quantity}× {it.equipmentName}
+                  <span key={i} className={`text-xs px-2.5 py-1 rounded-full border bg-zinc-800/60 border-white/10 ${isItemUnavailable(b, it) ? 'text-zinc-500' : 'text-zinc-300'}`}>
+                    {isItemUnavailable(b, it)
+                      ? <><span className="line-through">{it.quantity}× {it.equipmentName}</span> <span className="text-rose-300 font-semibold">not available</span></>
+                      : <>{it.quantity}× {it.equipmentName}</>}
                   </span>
                 ))}
               </div>

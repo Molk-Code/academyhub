@@ -1,4 +1,5 @@
 import { admin, db, functions, LIMITS, requireMember, requireAllowed, REGION } from './lib'
+import { FieldValue } from 'firebase-admin/firestore'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Push notification helpers
@@ -19,7 +20,7 @@ export async function removeStaleTokens(stale: string[]) {
     const chunk = stale.slice(i, i + 30)
     const holders = await db.collection('push_tokens').where('tokens', 'array-contains-any', chunk).get()
     await Promise.all(holders.docs.map(d =>
-      d.ref.update({ tokens: admin.firestore.FieldValue.arrayRemove(...chunk) }),
+      d.ref.update({ tokens: FieldValue.arrayRemove(...chunk) }),
     ))
   }
 }
@@ -99,7 +100,7 @@ export async function saveNotifications(
       body:      opts.body,
       url:       opts.url ?? '/',
       isRead:    false,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     })
   }
   await batch.commit()
@@ -156,7 +157,7 @@ export async function getOrCreateBookingsChannel(): Promise<string> {
     allowedCohortIds: [],
     allowedTeamIds:   [],
     memberIds:        [],
-    createdAt:        admin.firestore.FieldValue.serverTimestamp(),
+    createdAt:        FieldValue.serverTimestamp(),
     createdBy:        'system',
   })
   return ref.id
@@ -172,10 +173,10 @@ export async function postToBookingsChannel(channelId: string, text: string) {
       attachments:     [],
       reactions:       {},
       skipPush:        true,   // prevent onChatMessage from sending a duplicate push
-      createdAt:       admin.firestore.FieldValue.serverTimestamp(),
+      createdAt:       FieldValue.serverTimestamp(),
     })
   await db.collection('chat_channels').doc(channelId).update({
-    lastMessageAt: admin.firestore.FieldValue.serverTimestamp(),
+    lastMessageAt: FieldValue.serverTimestamp(),
   })
 }
 
@@ -247,10 +248,10 @@ export const claimFcmToken = functions.region(REGION).runWith(LIMITS).https.onCa
   let removed = 0
   for (const d of holders.docs) {
     if (d.id === uid) continue
-    batch.update(d.ref, { tokens: admin.firestore.FieldValue.arrayRemove(token) })
+    batch.update(d.ref, { tokens: FieldValue.arrayRemove(token) })
     removed++
   }
-  batch.set(db.collection('push_tokens').doc(uid), { tokens: admin.firestore.FieldValue.arrayUnion(token) }, { merge: true })
+  batch.set(db.collection('push_tokens').doc(uid), { tokens: FieldValue.arrayUnion(token) }, { merge: true })
   await batch.commit()
   return { removedFromOtherAccounts: removed }
 })

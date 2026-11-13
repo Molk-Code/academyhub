@@ -61,10 +61,25 @@ export function myParts(b: EquipmentBookingDoc, r: EquipmentResponsibility | und
   }
 }
 
+// One line of a booking (each piece of equipment is listed once); matches
+// bookingItemKey in functions/src/equipment.ts
+export const bookingItemKey = (it: Pick<EquipmentBookingItem, 'equipmentId' | 'equipmentName'>) =>
+  it.equipmentId || `name:${it.equipmentName ?? ''}`
+
+// Staff marked this item as not available: it is left out even when its part is confirmed
+export function isItemUnavailable(b: Pick<EquipmentBookingDoc, 'unavailableItems'>, it: EquipmentBookingItem): boolean {
+  return !!b.unavailableItems?.[bookingItemKey(it)]
+}
+
 // Does the booking split across categories so parts are worth showing?
 export function hasSeveralParts(b: EquipmentBookingDoc, catalog?: CategoryLookup): boolean {
   return bookingParts(b, catalog).length > 1
 }
+
+export const setEquipmentBookingItems = (bookingId: string, keys: string[], available: boolean) =>
+  httpsCallable<{ bookingId: string; keys: string[]; available: boolean }, { status: string }>(
+    functions, 'setEquipmentBookingItems',
+  )({ bookingId, keys, available })
 
 export const decideEquipmentBookingParts = (bookingId: string, categories: string[], decision: 'confirmed' | 'denied' | 'pending', note?: string) =>
   httpsCallable<{ bookingId: string; categories: string[]; decision: string; note?: string }, { status: string }>(

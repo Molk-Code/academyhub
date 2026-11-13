@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection } from '@/hooks/useFirestore'
 import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, InventoryPresetDoc, InventoryPresetItem, UserDoc, EquipmentBookingDoc, EquipmentResponsibility } from '@/types'
-import { bookingParts, myParts, partStatus, OTHER_CATEGORY } from '@/lib/bookingParts'
+import { bookingParts, myParts, partStatus, isItemUnavailable, OTHER_CATEGORY } from '@/lib/bookingParts'
 import {
   Package, Calendar, Users, Clock, AlertTriangle, Check, Trash2, Plus, Minus,
   ChevronDown, ChevronRight, ArrowLeft, Edit2, CheckCircle2, ArchiveRestore,
@@ -157,7 +157,8 @@ async function loadBookingForSetup(bookingId: string, uid: string): Promise<Setu
   const parts = myParts(booking, resp).toSetUp.map(p => p.category)
   return {
     ...booking,
-    items: allItems.filter(i => parts.includes(i.category!)),
+    // Items staff marked as not available aren't lent out
+    items: allItems.filter(i => parts.includes(i.category!) && !isItemUnavailable(raw, i)),
     allItems,
     setUpParts: parts,
     partCount: bookingParts(booking).length,

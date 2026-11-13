@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { doc, addDoc, updateDoc, collection, serverTimestamp, onSnapshot, getDocs, getDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
-import { startCameraScan, savedScanKind, saveScanKind, type ScanKind } from '@/lib/cameraScanner'
-import { ScanKindToggle, BarcodeGuide } from './ScanKindToggle'
+import { startCameraScan, savedScanKind, saveScanKind, type ScanKind, type ScanControls } from '@/lib/cameraScanner'
+import { ScanKindToggle, BarcodeGuide, ZoomButtons } from './ScanKindToggle'
 import { Scan, Check, X, Wifi, WifiOff, LogIn, AlertTriangle } from 'lucide-react'
 import { parseScanText, checkoutScan, matchCheckinScan } from './inventoryShared'
 import { ScanFlash, useScanFlash } from './ScanFeedback'
@@ -57,7 +57,8 @@ export default function ScanPage() {
   const [cooldown, setCooldown] = useState<CooldownState>({ active: false })
 
   const videoRef = useRef<HTMLVideoElement>(null)
-  const controlsRef = useRef<{ stop: () => void } | null>(null)
+  const controlsRef = useRef<ScanControls | null>(null)
+  const [zoom, setZoom] = useState<ScanControls['zoom']>()
   const cooldownRef = useRef(false)          // fast ref to block scans during cooldown
   const sessionRef = useRef<ScanSession | null>(null)
   const equipmentCacheRef = useRef<Record<string, string>>({})
@@ -218,6 +219,7 @@ export default function ScanPage() {
     setScanActive(true)
     try {
       controlsRef.current = await startCameraScan(videoRef.current!, kind, handleScan)
+      setZoom(controlsRef.current.zoom)
     } catch (e: any) {
       setScanActive(false)
       setCameraError(e?.message?.includes('ermission') ? 'Camera permission denied' : 'Could not access camera')
@@ -226,6 +228,7 @@ export default function ScanPage() {
 
   function stopScanner() {
     controlsRef.current?.stop(); controlsRef.current = null
+    setZoom(undefined)
     setScanActive(false)
   }
 
@@ -235,6 +238,7 @@ export default function ScanPage() {
     saveScanKind(kind)
     if (scanActive) {
       controlsRef.current?.stop(); controlsRef.current = null
+      setZoom(undefined)
       startScanner(kind)
     }
   }
@@ -348,6 +352,7 @@ export default function ScanPage() {
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4cd964', animation: 'pulse 1.2s ease-in-out infinite', flexShrink: 0 }} />
                 <span style={{ fontSize: '.7rem', color: '#4cd964', fontWeight: 700 }}>Scanning…</span>
               </div>
+              {scanKind === 'barcode' && <ZoomButtons key={String(!!zoom)} zoom={zoom} />}
             </>
           )}
 

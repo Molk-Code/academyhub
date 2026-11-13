@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { StatsContent } from './InventoryStats'
 import {
   collection, collectionGroup, addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, setDoc,
@@ -14,6 +14,7 @@ import {
   Package, Calendar, Users, Clock, AlertTriangle, Check, Trash2, Plus, Minus,
   ChevronDown, ChevronRight, ArrowLeft, Edit2, CheckCircle2, ArchiveRestore,
   Layers, Search, X, ZapOff, Scan, Smartphone, QrCode, ClipboardList, Pencil,
+  ScanLine,
 } from 'lucide-react'
 import { EquipmentImg, today, isOverdue, isDueThisWeek, formatDate, overdueDays, parseScanText, beep } from './inventoryShared'
 import { EquipmentPicker } from './EquipmentPicker'
@@ -790,9 +791,17 @@ export default function InventoryPage() {
             <ArchiveRestore size={22} color="#4cd964" />
             Inventory
           </div>
-          <button className="primary-btn" onClick={() => setCreateProject(true)}>
-            <Plus size={16} /> New Project
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {/* Phones: join a computer's scanning session from here (already signed in) */}
+            <span className="sm:hidden">
+              <Link to="/scan" className="secondary-btn" style={{ padding: '.75rem 1rem' }}>
+                <ScanLine size={16} aria-hidden="true" /> Phone scanner
+              </Link>
+            </span>
+            <button className="primary-btn" onClick={() => setCreateProject(true)}>
+              <Plus size={16} /> New Project
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}

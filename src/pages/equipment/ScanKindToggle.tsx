@@ -1,5 +1,6 @@
 import { QrCode, ScanBarcode } from 'lucide-react'
-import type { ScanKind } from '@/lib/cameraScanner'
+import { useState } from 'react'
+import type { ScanKind, ZoomControl } from '@/lib/cameraScanner'
 
 // QR / Barcode choice for camera scanning (project page and phone scanner)
 export function ScanKindToggle({ value, onChange, large = false }: { value: ScanKind; onChange: (k: ScanKind) => void; large?: boolean }) {
@@ -42,9 +43,34 @@ export function BarcodeGuide({ hint = true }: { hint?: boolean }) {
       </div>
       {hint && (
         <p style={{ marginTop: 10, fontSize: '.75rem', color: '#f0f0f5', background: 'rgba(0,0,0,.55)', padding: '3px 10px', borderRadius: 999 }}>
-          Fill the frame with the barcode, 10–20 cm away
+          Hold the code 20–30 cm away, across the red line
         </p>
       )}
+    </div>
+  )
+}
+
+// 1× / 2× / 3× camera zoom in barcode mode, where the camera supports zoom.
+// Zooming in lets the phone stay far enough away to focus.
+export function ZoomButtons({ zoom }: { zoom?: ZoomControl }) {
+  const [value, setValue] = useState(zoom?.value ?? 1)
+  if (!zoom) return null
+  const steps = [1, 2, 3].filter(z => z >= zoom.min && z <= zoom.max)
+  if (steps.length < 2) return null
+  return (
+    <div role="radiogroup" aria-label="Camera zoom"
+      style={{ position: 'absolute', bottom: 10, right: 10, display: 'flex', gap: 4, background: 'rgba(0,0,0,.55)', borderRadius: 999, padding: 3 }}>
+      {steps.map(z => {
+        const on = Math.abs(value - z) < 0.05
+        return (
+          <button key={z} type="button" role="radio" aria-checked={on}
+            onClick={async () => setValue(await zoom.set(z))}
+            style={{ minWidth: 40, minHeight: 40, borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: '.8rem', fontWeight: 700,
+              background: on ? '#f0f0f5' : 'transparent', color: on ? '#0a0a0f' : '#f0f0f5' }}>
+            {z}×
+          </button>
+        )
+      })}
     </div>
   )
 }

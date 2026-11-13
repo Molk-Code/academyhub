@@ -126,6 +126,7 @@ const EquipmentBookingPage = lazy(() => import('@/pages/equipment/EquipmentBooki
 const AdminEquipmentPage   = lazy(() => import('@/pages/equipment/AdminEquipmentPage'))
 const InventoryPage        = lazy(() => import('@/pages/equipment/InventoryPage'))
 const ScanPage             = lazy(() => import('@/pages/equipment/ScanPage'))
+const JoinScanPage         = lazy(() => import('@/pages/equipment/JoinScanPage'))
 const PublicShopPage       = lazy(() => import('@/pages/equipment/PublicShopPage'))
 
 export default function App() {
@@ -266,6 +267,7 @@ export default function App() {
           </Route>
 
           {/* ── Equipment scanner (auth required, no layout) ─────────────── */}
+          <Route path="/scan"            element={<ModuleGate module="rental_inventory"><JoinScanPage /></ModuleGate>} />
           <Route path="/scan/:sessionId" element={<ModuleGate module="rental_inventory"><ScanPage /></ModuleGate>} />
 
           {/* ── Public display (no auth) ────────────────────────────────── */}

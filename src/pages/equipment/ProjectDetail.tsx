@@ -10,8 +10,8 @@ import {
   Package, Calendar, Users, Clock, AlertTriangle, Check, Trash2, Plus,
   Edit2, CheckCircle2, ArchiveRestore, ZapOff, Scan, Smartphone, ScanBarcode, ArrowRightLeft,
 } from 'lucide-react'
-import { startCameraScan, savedScanKind, saveScanKind, type ScanKind } from '@/lib/cameraScanner'
-import { ScanKindToggle, BarcodeGuide } from './ScanKindToggle'
+import { startCameraScan, savedScanKind, saveScanKind, type ScanKind, type ScanControls } from '@/lib/cameraScanner'
+import { ScanKindToggle, BarcodeGuide, ZoomButtons } from './ScanKindToggle'
 import { QRCodeSVG } from 'qrcode.react'
 import { buildEquipmentContractHtml } from '@/lib/equipmentContract'
 import { isOverdue, formatDate, overdueDays, parseScanText, beep, itemDisplayName, checkoutScan, matchCheckinScan } from './inventoryShared'
@@ -117,7 +117,8 @@ export function ProjectDetail({
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const [scanKind, setScanKind] = useState<ScanKind>(savedScanKind)
-  const controlsRef = useRef<{ stop: () => void } | null>(null)
+  const controlsRef = useRef<ScanControls | null>(null)
+  const [zoom, setZoom] = useState<ScanControls['zoom']>()
   const lastScanRef = useRef<string>('')
   const lastScanTimeRef = useRef<number>(0)
 
@@ -224,6 +225,7 @@ export function ProjectDetail({
         beep(scanMode === 'checkout' ? 880 : 660)
         handleScan(text)
       })
+      setZoom(controlsRef.current.zoom)
     } catch {
       setScanActive(false)
     }
@@ -236,6 +238,7 @@ export function ProjectDetail({
     if (scanActive) {
       controlsRef.current?.stop()
       controlsRef.current = null
+      setZoom(undefined)
       startScanner(kind)
     }
   }
@@ -243,6 +246,7 @@ export function ProjectDetail({
   function stopScanner() {
     controlsRef.current?.stop()
     controlsRef.current = null
+    setZoom(undefined)
     setScanActive(false)
     setUsbActive(usbByDefault)
   }
@@ -706,6 +710,7 @@ export function ProjectDetail({
         <div style={{ position: 'relative', display: scanActive ? 'block' : 'none' }}>
           <video ref={videoRef} playsInline muted style={{ width: '100%', maxHeight: scanKind === 'barcode' ? 300 : 240, borderRadius: 8, display: 'block', background: '#000', objectFit: 'cover' }} />
           {scanKind === 'barcode' && <BarcodeGuide />}
+          {scanKind === 'barcode' && <ZoomButtons key={String(!!zoom)} zoom={zoom} />}
         </div>
 
         {/* USB scanner input — the scanner types here and presses Enter */}
@@ -744,6 +749,7 @@ export function ProjectDetail({
             </div>
             <p style={{ fontSize: '.8rem', color: '#6a6a80', textAlign: 'center', maxWidth: 280 }}>
               Scan this QR code on a mobile device to start scanning equipment into this project.
+              In the installed app you can also choose Inventory → Phone scanner, then scan the code (no extra sign-in).
             </p>
             <p style={{ fontSize: '.65rem', color: '#4a4a60', fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center', maxWidth: 320 }}>
               {window.location.origin}/scan/{remoteSessionId}

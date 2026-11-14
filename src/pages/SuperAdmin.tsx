@@ -11,16 +11,13 @@ import DeleteSchoolDialog from '@/pages/superadmin/DeleteSchoolDialog'
 import VerifyEmailNotice from '@/pages/superadmin/VerifyEmailNotice'
 import CustomerOrders from '@/pages/superadmin/CustomerOrders'
 import { SCHOOL_ID } from '@/lib/school'
+import { isSuperAdminEmail } from '@/lib/superadmin'
 import {
   Building2, Users, Clapperboard, Boxes, Plus, X, ChevronDown, ChevronUp,
   ExternalLink, CheckCircle2, Loader2, AlertCircle, Trash2,
 } from 'lucide-react'
 import { clickableRow } from '@/lib/a11y'
 
-// Who may open this page (the rules and functions check again server-side).
-// VITE_SUPERADMIN_EMAILS (comma-separated) overrides, e.g. for the emulator.
-const SUPER_ADMIN_EMAILS = (import.meta.env.VITE_SUPERADMIN_EMAILS as string | undefined)?.split(',').map(e => e.trim()).filter(Boolean)
-  ?? ['fredrik.fridlund@gmail.com']
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -403,7 +400,7 @@ export default function SuperAdmin() {
   const [showForm,  setShowForm]  = useState(false)
   const [createdMsg, setCreatedMsg] = useState(false)
 
-  const isSuperAdmin = !!profile?.email && SUPER_ADMIN_EMAILS.includes(profile.email)
+  const isSuperAdmin = isSuperAdminEmail(profile?.email)
 
   const { data: schools,     loading: schoolsLoading } = useCollection<SchoolDoc>('schools',     [], isSuperAdmin)
   const { data: users }                                 = useCollection<UserDoc>('users',         [], isSuperAdmin)

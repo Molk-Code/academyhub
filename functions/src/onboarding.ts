@@ -163,7 +163,7 @@ function emptySteps() {
 }
 
 /** Creates an order and reserves its short name, atomically. */
-export async function createOrder(input: OrderInput, meta: { source: 'superadmin' | 'self_service'; by: Actor; terms?: { version: string } | null; ipHash?: string }): Promise<string> {
+export async function createOrder(input: OrderInput, meta: { source: 'superadmin' | 'self_service'; by: Actor; terms?: { version: string } | null; ipHash?: string; preview?: boolean }): Promise<string> {
   const ref = orders().doc()
   const slugRef = db.collection('customer_slugs').doc(input.school.shortName)
   const startNow = input.startPolicy === 'immediately'
@@ -179,6 +179,7 @@ export async function createOrder(input: OrderInput, meta: { source: 'superadmin
       provisioning: { steps: emptySteps(), attempts: 0, startedAt: null, finishedAt: null, error: null, note: null },
       terms: meta.terms ? { version: meta.terms.version, acceptedAt: FieldValue.serverTimestamp() } : null,
       ipHash: meta.ipHash ?? null,
+      preview: meta.preview ?? false,
       createdBy: meta.by,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
@@ -382,6 +383,10 @@ export const checkCustomerShortName = superadminCall(async d => shortNameAvailab
 // Signed-out callers, like the contact form: honeypot, rate limits, terms
 // acceptance required. The order waits for payment (invoice: the superadmin's
 // approval) before anything is set up.
+//
+// While it's off, the superadmin can still use the hidden order page (preview):
+// such orders are marked preview: true. Without ORDER_TERMS_VERSION set, a
+// preview accepts the draft terms version the page sends.
 
 const ORDERS_PER_IP_PER_HOUR = 3
 const ORDERS_GLOBAL_PER_HOUR = 10
@@ -390,12 +395,14 @@ const HOUR = 60 * 60_000
 export async function handleSelfServiceOrder(
   data: unknown,
   meta: { ip: string },
-  deps: { sendEmail: (msg: Parameters<typeof sendEmailOrThrow>[0]) => Promise<unknown>; notifyEmail: string | undefined; termsVersion: string | undefined },
-): Promise<{ ok: true }> {
+  deps: { sendEmail: (msg: Parameters<typeof sendEmailOrThrow>[0]) => Promise<unknown>; notifyEmail: string | undefined; termsVersion: string | undefined; preview?: boolean },
+): Promise<{ ok: true; address: string }> {
   const d = (data ?? {}) as Record<string, any>
-  if (typeof d.website === 'string' && d.website.trim() !== '') return { ok: true } // honeypot
-  if (!deps.termsVersion) throw new functions.https.HttpsError('unavailable', 'Ordering online is not open yet. Please contact us.')
-  if (d.acceptTerms !== true || d.termsVersion !== deps.termsVersion) {
+  if (typeof d.website === 'string' && d.website.trim() !== '') return { ok: true, address: '' } // honeypot
+  const termsVersion = deps.termsVersion
+    ?? (deps.preview && typeof d.termsVersion === 'string' && /^[a-z0-9.-]{1,40}$/.test(d.termsVersion) ? d.termsVersion : undefined)
+  if (!termsVersion) throw new functions.https.HttpsError('unavailable', 'Ordering online is not open yet. Please contact us.')
+  if (d.acceptTerms !== true || d.termsVersion !== termsVersion) {
     throw new functions.https.HttpsError('failed-precondition', 'Accept the current terms and data processing agreement to order.')
   }
   const input = validateOrderInput(d, { selfService: true })
@@ -405,7 +412,9 @@ export async function handleSelfServiceOrder(
   if (!(await allow(`ip_${ipHash}`, 'order', ORDERS_PER_IP_PER_HOUR, HOUR))) throw tooMany()
   if (!(await allow('global', 'order', ORDERS_GLOBAL_PER_HOUR, HOUR))) throw tooMany()
 
-  const orderId = await createOrder(input, { source: 'self_service', by: { system: 'self_service' }, terms: { version: deps.termsVersion }, ipHash })
+  const orderId = await createOrder(input, { source: 'self_service', by: { system: 'self_service' }, terms: { version: termsVersion }, ipHash, preview: !!deps.preview })
+  const address = `${input.school.shortName}.${customerBaseDomain()}`
+  if (deps.preview) return { ok: true, address }
 
   // The order is saved; a failed email is logged, never surfaced
   try {
@@ -426,13 +435,22 @@ export async function handleSelfServiceOrder(
   } catch (err) {
     console.error(`Order ${orderId} saved, but the notification email failed:`, err)
   }
-  return { ok: true }
+  return { ok: true, address }
 }
+
+/** A superadmin previewing the hidden order page */
+function isSuperAdminCaller(context: functions.https.CallableContext): boolean {
+  try { requireSuperAdmin(context); return true } catch { return false }
+}
+
+const orderingOpen = () => process.env.SELF_SERVICE_ORDERS === 'true'
+const notOpen = () => new functions.https.HttpsError('unavailable', 'Ordering online is not open yet. Please contact us.')
 
 export const submitCustomerOrder = functions.region(REGION)
   .runWith({ ...LIMITS, maxInstances: 3, secrets: ['RESEND_API_KEY'] })
   .https.onCall(async (data, context) => {
-    if (process.env.SELF_SERVICE_ORDERS !== 'true') throw new functions.https.HttpsError('unavailable', 'Ordering online is not open yet. Please contact us.')
+    const preview = !orderingOpen() && isSuperAdminCaller(context)
+    if (!orderingOpen() && !preview) throw notOpen()
     if (process.env.CONTACT_REQUIRE_APP_CHECK === 'true' && !context.app) {
       throw new functions.https.HttpsError('failed-precondition', 'This form must be sent from the CineForge site.')
     }
@@ -440,8 +458,19 @@ export const submitCustomerOrder = functions.region(REGION)
     return handleSelfServiceOrder(data, { ip: clientIp(req) }, {
       notifyEmail: process.env.CONTACT_NOTIFY_EMAIL || undefined,
       termsVersion: process.env.ORDER_TERMS_VERSION || undefined,
+      preview,
       sendEmail: process.env.FUNCTIONS_EMULATOR === 'true'
         ? async msg => { console.log('[emulator] order email not sent:\n' + JSON.stringify(msg, null, 2)) }
         : sendEmailOrThrow,
     })
   })
+
+/** Short-name check for the order page; rate-limited per IP */
+export const checkOrderShortName = functions.region(REGION).runWith({ ...LIMITS, maxInstances: 3 }).https.onCall(async (data, context) => {
+  if (!orderingOpen() && !isSuperAdminCaller(context)) throw notOpen()
+  const req = context.rawRequest as unknown as { headers?: Record<string, unknown>; ip?: string }
+  if (!(await allow(`ip_${await hashIp(clientIp(req))}`, 'order_name', 60, HOUR))) {
+    throw new functions.https.HttpsError('resource-exhausted', 'Too many checks right now. Try again later.')
+  }
+  return shortNameAvailable((data as Record<string, unknown> | null)?.shortName)
+})

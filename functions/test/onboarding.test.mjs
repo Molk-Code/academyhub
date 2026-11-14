@@ -129,7 +129,7 @@ test('self-service: closed without terms, needs acceptance, waits for approval',
   const deps = v => ({ sendEmail: async m => sent.push(m), notifyEmail: 'orders@example.test', termsVersion: v })
   await assert.rejects(ob.handleSelfServiceOrder({ ...valid, acceptTerms: true }, { ip: '1.2.3.4' }, deps(undefined)), e => e.code === 'unavailable')
   await assert.rejects(ob.handleSelfServiceOrder({ ...valid, acceptTerms: true, termsVersion: 'old' }, { ip: '1.2.3.4' }, deps('2026-11')), e => e.code === 'failed-precondition')
-  assert.deepEqual(await ob.handleSelfServiceOrder({ ...valid, website: 'spam' }, { ip: '1.2.3.4' }, deps('2026-11')), { ok: true })
+  assert.equal((await ob.handleSelfServiceOrder({ ...valid, website: 'spam' }, { ip: '1.2.3.4' }, deps('2026-11'))).ok, true)
   assert.equal((await db.collection('customer_orders').get()).size, 0, 'honeypot saves nothing')
 
   await ob.handleSelfServiceOrder({ ...valid, acceptTerms: true, termsVersion: '2026-11' }, { ip: '1.2.3.4' }, deps('2026-11'))
@@ -139,4 +139,16 @@ test('self-service: closed without terms, needs acceptance, waits for approval',
   assert.equal(o.notes, null)
   assert.equal(o.terms.version, '2026-11')
   assert.equal(sent.length, 1)
+})
+
+test('preview (superadmin, ordering closed): accepts the draft terms version, marks the order, sends no email', async () => {
+  const sent = []
+  const deps = { sendEmail: async m => sent.push(m), notifyEmail: 'orders@example.test', termsVersion: undefined, preview: true }
+  await assert.rejects(ob.handleSelfServiceOrder({ ...valid, acceptTerms: false, termsVersion: 'draft-1' }, { ip: '1.2.3.4' }, deps), e => e.code === 'failed-precondition')
+  const r = await ob.handleSelfServiceOrder({ ...valid, acceptTerms: true, termsVersion: 'draft-1' }, { ip: '1.2.3.4' }, deps)
+  assert.equal(r.address, 'nordic.cineforge.se')
+  const [o] = (await db.collection('customer_orders').get()).docs.map(d => d.data())
+  assert.equal(o.preview, true)
+  assert.equal(o.terms.version, 'draft-1')
+  assert.equal(sent.length, 0)
 })

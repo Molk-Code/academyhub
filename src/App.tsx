@@ -122,6 +122,10 @@ const ExperienceLevels  = lazy(() => import('@/pages/admin/ExperienceLevels'))
 const ContactRequests   = lazy(() => import('@/pages/admin/ContactRequests'))
 const Contact           = lazy(() => import('@/pages/Contact'))
 const NotFound          = lazy(() => import('@/pages/NotFound'))
+const OrderLayout       = lazy(() => import('@/pages/order/OrderLayout'))
+const OrderPage         = lazy(() => import('@/pages/order/OrderPage'))
+const OrderTerms        = lazy(() => import('@/pages/order/OrderTerms'))
+const OrderDpa          = lazy(() => import('@/pages/order/OrderDpa'))
 
 // ── Equipment lazy ──────────────────────────────────────────────────────────
 const EquipmentBookingPage = lazy(() => import('@/pages/equipment/EquipmentBookingPage'))
@@ -281,6 +285,12 @@ export default function App() {
           <Route path="/privacy"      element={<PrivacyPolicy />} />
           <Route path="/contact"      element={<Contact />} />
           <Route path="/superadmin"   element={<SuperAdmin />} />
+          {/* Order page and its terms: superadmin-only preview for now */}
+          <Route path="/order" element={<OrderLayout />}>
+            <Route index         element={<OrderPage />} />
+            <Route path="terms"  element={<OrderTerms />} />
+            <Route path="dpa"    element={<OrderDpa />} />
+          </Route>
           <Route path="/upgrade"      element={<UpgradePage />} />
           <Route path="/shop"         element={<PublicShopGate><PublicShopPage /></PublicShopGate>} />
 

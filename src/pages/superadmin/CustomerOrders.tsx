@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '@/lib/firebase'
 import { useCollection, orderBy } from '@/hooks/useFirestore'
@@ -28,6 +29,7 @@ interface Order {
   startPolicy: 'after_payment' | 'immediately'
   provisioning: { steps: Record<string, { status: StepStatus; error?: string }>; error: string | null; note: string | null; attempts: number }
   notes: string | null
+  preview?: boolean
   createdAt?: { toDate(): Date }
 }
 
@@ -334,6 +336,7 @@ export default function CustomerOrders() {
           <p className="text-xs text-zinc-500">New customers are orders: paid by invoice, then set up on their own address.</p>
         </div>
         <div className="flex items-center gap-3">
+          <Link to="/order" className="text-sm text-zinc-400 hover:text-zinc-200">Order page (preview)</Link>
           {created && <span className="text-sm text-emerald-400 flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> Order created</span>}
           <button type="button" onClick={() => setShowForm(s => !s)} className="flex items-center gap-2 btn bg-brand-600 text-white hover:bg-brand-500 py-2 text-sm">
             {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />} {showForm ? 'Cancel' : 'New customer'}
@@ -355,7 +358,7 @@ export default function CustomerOrders() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-zinc-100 truncate">{o.school.name}</p>
                 <p className="text-xs text-zinc-500 truncate">
-                  {o.address} · {o.organisation.name}{o.source === 'self_service' && ' · ordered online'}
+                  {o.address} · {o.organisation.name}{o.source === 'self_service' && ' · ordered online'}{o.preview && ' · preview'}
                   {o.createdAt && ` · ${format(o.createdAt.toDate(), 'd MMM yyyy')}`}
                 </p>
               </div>

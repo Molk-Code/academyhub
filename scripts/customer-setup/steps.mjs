@@ -282,12 +282,23 @@ export async function domain(ctx) {
       added.push({ id: made.id, type: rec.type, name: full })
       await ctx.save({ dnsRecords: added })
     }
+    // Google can say "propagating" for hours after the certificate already
+    // works; accept that once the address answers over HTTPS (a bad
+    // certificate makes fetch throw)
     const certOk = ['CERT_ACTIVE', 'CERT_EXPIRING_SOON'].includes(cur.cert?.state)
+      || (cur.cert?.state === 'CERT_PROPAGATING' && await servesHttps(address))
     if (cur.hostState === 'HOST_ACTIVE' && cur.ownershipState === 'OWNERSHIP_ACTIVE' && certOk) return { address }
     await ctx.note(`Waiting for ${address}: host ${cur.hostState ?? '…'}, ownership ${cur.ownershipState ?? '…'}, certificate ${cur.cert?.state ?? '…'}`)
     if (Date.now() > until) throw new Error(`${address} isn't active after 90 minutes (host ${cur.hostState}, ownership ${cur.ownershipState}, certificate ${cur.cert?.state})`)
     await sleep(60_000)
   }
+}
+
+async function servesHttps(address) {
+  try {
+    const res = await fetch(`https://${address}/`, { redirect: 'manual', signal: AbortSignal.timeout(15_000) })
+    return res.status < 500
+  } catch { return false }
 }
 
 /** Allow sign-in on the address (again, in case the domain step changed the config) */

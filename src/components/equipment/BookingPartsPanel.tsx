@@ -33,6 +33,7 @@ function ItemLine({ booking, item, children }: { booking: EquipmentBookingDoc; i
     <li className="flex items-center justify-between gap-3 text-[13px]">
       <span className={cn('min-w-0 break-words', off ? 'text-zinc-500 line-through' : 'text-zinc-300')}>
         {item.equipmentName}
+        {item.kitName && <span className="ml-1.5 text-[11px] text-zinc-500">{item.kitName}</span>}
         {off && <span className="ml-1.5 no-underline inline-block text-[10px] font-bold text-rose-300 not-italic" style={{ textDecoration: 'none' }}>Not available</span>}
       </span>
       <span className="flex items-center gap-2 flex-shrink-0">

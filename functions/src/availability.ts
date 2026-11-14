@@ -191,7 +191,7 @@ export const equipmentAvailability = functions.region(REGION).runWith({ ...LIMIT
 
 // ── createEquipmentBooking: the only way a booking is made ───────────────────
 
-interface BookingItemIn { equipmentId: string; equipmentName: string; quantity: number }
+interface BookingItemIn { equipmentId: string; equipmentName: string; quantity: number; kitId?: string; kitName?: string }
 
 function cleanItems(raw: unknown): BookingItemIn[] {
   if (!Array.isArray(raw) || !raw.length) throw bad('Add at least one item.')
@@ -200,7 +200,11 @@ function cleanItems(raw: unknown): BookingItemIn[] {
     const quantity = Number(x?.quantity)
     if (typeof x?.equipmentId !== 'string' || !x.equipmentId || typeof x?.equipmentName !== 'string') throw bad('Each line needs an item.')
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) throw bad('Quantities must be whole numbers from 1 to 999.')
-    return { equipmentId: x.equipmentId, equipmentName: String(x.equipmentName).slice(0, 200), quantity }
+    return {
+      equipmentId: x.equipmentId, equipmentName: String(x.equipmentName).slice(0, 200), quantity,
+      // Booked as part of a kit: shown with the kit's name
+      ...(typeof x.kitId === 'string' && x.kitId ? { kitId: x.kitId.slice(0, 100), kitName: String(x.kitName ?? '').slice(0, 200) } : {}),
+    }
   })
 }
 

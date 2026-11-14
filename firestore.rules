@@ -634,6 +634,14 @@ service cloud.firestore {
       allow write: if (isAdmin()) && moduleOn('rentalInventory');
     }
 
+    // Kits: named sets of catalog items, readable wherever the catalog is,
+    // edited by the staff who edit the catalog
+    match /kits/{kitId} {
+      allow read: if ((isSignedIn() && (isAdmin() || tierHasFeature('equipment')))
+        || publicShopOpen()) && moduleOn('rentalInventory');
+      allow write: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))) && moduleOn('rentalInventory');
+    }
+
     match /equipment/{itemId} {
       allow read: if ((isSignedIn() && (isAdmin() || tierHasFeature('equipment')))
         || publicShopOpen()) && moduleOn('rentalInventory');

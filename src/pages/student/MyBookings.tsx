@@ -453,7 +453,7 @@ function BookingRequestsSection({ bookings }: { bookings: EquipmentBookingDoc[] 
                   <span key={i} className={`text-xs px-2.5 py-1 rounded-full border bg-zinc-800/60 border-white/10 ${isItemUnavailable(b, it) ? 'text-zinc-500' : 'text-zinc-300'}`}>
                     {isItemUnavailable(b, it)
                       ? <><span className="line-through">{it.quantity}× {it.equipmentName}</span> <span className="text-rose-300 font-semibold">not available</span></>
-                      : <>{it.quantity}× {it.equipmentName}</>}
+                      : <>{it.quantity}× {it.equipmentName}{it.kitName && <span className="text-zinc-500"> · {it.kitName}</span>}</>}
                   </span>
                 ))}
               </div>

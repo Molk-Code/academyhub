@@ -422,6 +422,8 @@ export interface EquipmentBookingItem {
   equipmentId: string
   equipmentName: string
   quantity: number
+  kitId?: string      // booked as part of this kit (kits/{id})
+  kitName?: string
   category?: string   // catalog category, stamped server-side when the booking is created
 }
 
@@ -530,6 +532,18 @@ export interface InventoryItemDoc {
   addonManager?: string
   isManualEntry?: boolean
   unit?: number          // physical unit scanned out (e.g. 1 for "#1"), when the code carries one
+}
+
+// kits/{id}: a named set of catalog items booked and checked out together
+// (e.g. "FX6 camera kit"). An item listed twice is two units of it.
+export interface KitDoc {
+  id: string
+  name: string
+  itemIds: string[]
+  notes?: string
+  imageUrl?: string
+  createdAt?: Timestamp
+  updatedAt?: Timestamp
 }
 
 export interface InventoryPresetItem {

@@ -190,7 +190,7 @@ const ACADEMY_COLLECTIONS = `lessons lessonCategories lessonBlocks classrooms su
   video_comments guest_teachers guest_teacher_bookings attendance_sessions absence_reports qr_display_devices
   rooms room_bookings room_slots time_blocks vehicles minivan_bookings food_box_orders`.split(/\s+/)
 const PRODUCTION_COLLECTIONS = ['productions', 'production_periods']
-const RENTAL_COLLECTIONS = `equipment equipment_categories equipment_bookings equipment_units inventory_presets inventory_projects
+const RENTAL_COLLECTIONS = `equipment equipment_categories equipment_bookings equipment_units kits inventory_presets inventory_projects
   scan_sessions`.split(/\s+/)
 
 export const COLLECTION_MODULE: Record<string, ModuleId> = Object.fromEntries([

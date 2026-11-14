@@ -3,7 +3,7 @@ import { collection, addDoc, updateDoc, serverTimestamp, query, where, orderBy, 
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument } from '@/hooks/useFirestore'
-import type { EquipmentDoc, EquipmentCategoryDoc, EquipmentBookingDoc, EquipmentBookingMessageDoc, CohortDoc, ProductionDoc, ProductionSceneDoc, ProductionCrewAssignmentDoc, ProductionCastDoc, ProductionLocationDoc, ProductionShootingDayDoc, CrewRoleDoc } from '@/types'
+import type { EquipmentDoc, EquipmentCategoryDoc, EquipmentBookingDoc, KitDoc, EquipmentBookingMessageDoc, CohortDoc, ProductionDoc, ProductionSceneDoc, ProductionCrewAssignmentDoc, ProductionCastDoc, ProductionLocationDoc, ProductionShootingDayDoc, CrewRoleDoc } from '@/types'
 import { calcRentalDays, billableDays, salaryCost as calcSalaryCost, equipmentCostForProduction } from '@/lib/productionBudget'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import {
@@ -18,6 +18,7 @@ import './molkom.css'
 import { BookingPartsSummary, ProductionLink } from '@/components/equipment/BookingPartsPanel'
 import { bookingParts, isItemUnavailable } from '@/lib/bookingParts'
 import { equipmentAvailability, createEquipmentBooking, bookingErrorMessage } from '@/lib/equipmentAvailability'
+import { KIT_CODE_PREFIX, kitCounts, kitsFree, expandKit, mergeLines, wantedPerItem } from '@/lib/kits'
 import { clickable } from '@/lib/a11y'
 
 const INFO_LABEL: React.CSSProperties = { fontSize: '.7rem', fontWeight: 700, color: '#6a6a80', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }
@@ -167,6 +168,7 @@ export default function EquipmentBookingPage() {
   const isStaffBooker = useLocation().pathname.startsWith('/teacher')
 
   const { data: equipmentRaw } = useCollection<EquipmentDoc>('equipment')
+  const { data: kits } = useCollection<KitDoc>('kits')
   const { data: categoryDocs } = useCollection<EquipmentCategoryDoc>('equipment_categories')
   const { data: cohort } = useDocument<CohortDoc>('cohorts', cohortId || null)
   const { data: navVis, loading: navVisLoading } = useDocument<{ id: string; student: Record<string, boolean> }>('settings', 'nav_visibility')
@@ -341,7 +343,32 @@ export default function EquipmentBookingPage() {
     }, 300)
     return () => { live = false; clearTimeout(t) }
   }, [fromDate, toDate])
-  const freeFor = (it: EquipmentDoc) => dateFree?.[it.id] ?? it.available
+  // Kits go into the cart as one line (id "kit:<kitId>") and expand to their
+  // items when the booking is sent. A kit is as free as its scarcest item.
+  const equipById = useMemo(() => new Map(equipmentRaw.map(e => [e.id, e])), [equipmentRaw])
+  const kitById = useMemo(() => new Map(kits.map(k => [k.id, k])), [kits])
+  const kitOf = (it: EquipmentDoc) => (it.id.startsWith(KIT_CODE_PREFIX) ? kitById.get(it.id.slice(KIT_CODE_PREFIX.length)) : undefined)
+  const unitFree = (id: string) => dateFree?.[id] ?? equipById.get(id)?.available ?? 0
+  const freeFor = (it: EquipmentDoc) => {
+    const kit = kitOf(it)
+    return kit ? kitsFree(kit, unitFree) : dateFree?.[it.id] ?? it.available
+  }
+  const kitItems = useMemo(() => kits
+    .filter(k => k.itemIds?.length && kitCounts(k).size && [...kitCounts(k).keys()].every(id => equipById.get(id)?.isActive !== false && equipById.has(id)))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(k => {
+      const members = [...kitCounts(k)].map(([id, n]) => ({ e: equipById.get(id)!, n }))
+      return {
+        id: `${KIT_CODE_PREFIX}${k.id}`, name: k.name, category: 'KIT', description: k.notes ?? '', notes: k.notes ?? '', location: '',
+        priceExclVat: members.reduce((s, m) => s + (m.e.priceExclVat ?? 0) * m.n, 0),
+        priceInclVat: members.reduce((s, m) => s + (m.e.priceInclVat ?? 0) * m.n, 0),
+        available: kitsFree(k, id => equipById.get(id)?.available), totalQuantity: kitsFree(k, id => equipById.get(id)?.totalQuantity),
+        imageUrl: k.imageUrl ?? '', qrCode: '', included: members.map(m => `${m.n > 1 ? `${m.n}× ` : ''}${m.e.name}`),
+        filmYear2Only: members.some(m => m.e.filmYear2Only),
+        requiresProduction: members.some(m => m.e.requiresProduction !== false),
+        isActive: true,
+      } as EquipmentDoc
+    }), [kits, equipById])
   const freeLabel = (n: number) => (dateFree ? `${n} free on your dates` : `${n} available`)
 
   // Category counts
@@ -365,7 +392,13 @@ export default function EquipmentBookingPage() {
   }, [equipment, category, search])
 
   const cartList = Array.from(cart.values())
-  const notFreeInCart = !!dateFree && cartList.some(({ item, quantity }) => quantity > freeFor(item))
+  // What the cart asks for per item, kits expanded (a kit and the same item on its own add up)
+  const bookingLines = mergeLines(cartList.flatMap(({ item, quantity }) => {
+    const kit = kitOf(item)
+    return kit ? expandKit(kit, quantity, equipById) : [{ equipmentId: item.id, equipmentName: item.name, quantity }]
+  }))
+  const notFreeInCart = !!dateFree && (cartList.some(({ item, quantity }) => quantity > freeFor(item))
+    || [...wantedPerItem(bookingLines)].some(([id, n]) => n > unitFree(id)))
   const cartCount = cartList.length
   const chargeableDays = billableDays(rentalDays)
   const weekDiscountActive = rentalDays >= 5
@@ -422,6 +455,8 @@ export default function EquipmentBookingPage() {
 
   function isItemLocked(item: EquipmentDoc): boolean {
     if (isStaffBooker) return false
+    const kit = kitOf(item)
+    if (kit) return [...kitCounts(kit).keys()].some(id => { const e = equipById.get(id); return !e || isItemLocked(e) })
     if (item.allowedCohortIds && item.allowedCohortIds.length > 0) {
       return !cohortId || !item.allowedCohortIds.includes(cohortId)
     }
@@ -545,11 +580,7 @@ export default function EquipmentBookingPage() {
               })(),
             }
           : {}),
-        items: cartList.map(({ item, quantity }) => ({
-          equipmentId: item.id,
-          equipmentName: item.name,
-          quantity,
-        })),
+        items: bookingLines,
         checkoutDate: fromDate,
         returnDate: toDate,
         teacherNotes: isStaffBooker ? 'Staff booking (teacher)' : `Cohort: ${cohort?.name ?? cohortId}`,
@@ -758,6 +789,7 @@ export default function EquipmentBookingPage() {
                 <div className="cart-item" key={item.id}>
                   <div className="cart-item-info">
                     <h4>{item.name}</h4>
+                    {kitOf(item) && <p style={{ fontSize: '.7rem', color: '#8a8aab' }}>Kit: {item.included.join(' · ')}</p>}
                     {dateFree && quantity > freeFor(item) && (
                       <p role="alert" style={{ fontSize: '.72rem', color: '#ff4757', fontWeight: 600 }}>
                         {freeFor(item) === 0 ? 'None free on your dates' : `Only ${freeFor(item)} free on your dates`}
@@ -1122,6 +1154,17 @@ export default function EquipmentBookingPage() {
               </div>
             </div>
 
+            {kitItems.length > 0 && category === 'ALL' && (() => {
+              const q = search.trim().toLowerCase()
+              const visible = q ? kitItems.filter(k => k.name.toLowerCase().includes(q) || k.included.some(i => i.toLowerCase().includes(q))) : kitItems
+              return visible.length > 0 && (
+                <section aria-labelledby="kits-title" style={{ marginBottom: 16 }}>
+                  <h3 id="kits-title" style={{ fontSize: '.8rem', fontWeight: 700, color: '#a0a0b5', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Kits</h3>
+                  {renderAccessoryRows(visible)}
+                </section>
+              )
+            })()}
+
             <div className="results-info">
               <span>{filtered.length} items</span>
               {category !== 'ALL' && <span className="active-filter">{category}</span>}
@@ -1419,7 +1462,7 @@ export default function EquipmentBookingPage() {
                             <span key={i} style={{ fontSize: '.72rem', background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 20, padding: '2px 8px', color: isItemUnavailable(b, it) ? '#6a6a80' : '#c0c0d5' }}>
                               {isItemUnavailable(b, it)
                                 ? <><span style={{ textDecoration: 'line-through' }}>{it.quantity}× {it.equipmentName}</span> <span style={{ color: '#fda4af', fontWeight: 700 }}>not available</span></>
-                                : <>{it.quantity}× {it.equipmentName}</>}
+                                : <>{it.quantity}× {it.equipmentName}{it.kitName && <span style={{ color: '#8a8aab' }}> · {it.kitName}</span>}</>}
                             </span>
                           ))}
                         </div>

@@ -10,9 +10,10 @@ import { myParts } from '@/lib/bookingParts'
 import { CatalogTab } from './EquipmentCatalogTab'
 import { BookingsTab } from './EquipmentBookingsTab'
 import { CategoriesTab } from './EquipmentCategoriesTab'
+import { KitsTab } from './EquipmentKitsTab'
 import './molkom.css'
 
-type AdminTab = 'catalog' | 'bookings' | 'categories'
+type AdminTab = 'catalog' | 'bookings' | 'categories' | 'kits'
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
@@ -20,7 +21,7 @@ export default function AdminEquipmentPage() {
   // ?tab=bookings opens a tab directly (the admin dashboard links there)
   const [tab, setTab] = useState<AdminTab>(() => {
     const t = new URLSearchParams(window.location.search).get('tab')
-    return t === 'bookings' || t === 'categories' ? t : 'catalog'
+    return t === 'bookings' || t === 'categories' || t === 'kits' ? t : 'catalog'
   })
   const { data: bookings } = useCollection<EquipmentBookingDoc>('equipment_bookings')
   const { data: categoriesRaw, loading: catsLoading } = useCollection<EquipmentCategoryDoc>('equipment_categories')
@@ -71,6 +72,7 @@ export default function AdminEquipmentPage() {
     { id: 'catalog',    label: 'Catalog' },
     { id: 'bookings',   label: 'Bookings', badge: pendingCount },
     { id: 'categories', label: 'Categories' },
+    { id: 'kits',       label: 'Kits' },
   ]
 
   return (
@@ -138,6 +140,7 @@ export default function AdminEquipmentPage() {
         {tab === 'catalog'     && <CatalogTab categories={categories} pricingEnabled={pricingEnabled} />}
         {tab === 'bookings'    && <BookingsTab />}
         {tab === 'categories'  && <CategoriesTab categories={categoriesRaw} />}
+        {tab === 'kits'        && <KitsTab />}
       </div>
     </div>
   )

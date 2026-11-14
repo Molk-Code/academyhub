@@ -105,7 +105,7 @@ export default function OrderPage() {
 
       <form onSubmit={submit} className="space-y-8">
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold text-white">Plans</h2>
+          <h2 className="text-lg font-semibold text-white">Modules</h2>
           <PlanPicker value={f.selection} onChange={v => set('selection', v)} />
         </section>
 

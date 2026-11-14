@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Bell } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { doc, updateDoc, writeBatch, collection } from 'firebase/firestore'
@@ -11,6 +12,7 @@ import { useChatUnreadCount } from '@/hooks/useChatUnread'
 import { useBugReportBadge } from '@/hooks/useBugReportBadge'
 import { useFeature } from '@/hooks/useFeature'
 import type { InventoryProjectDoc, NotificationDoc } from '@/types'
+import { notificationTarget } from '@/lib/notificationLinks'
 
 // Pending-item badges (food/van/equipment requests, open bug reports, unread
 // chat) live outside the `notifications` log — they're derived counts, not
@@ -48,7 +50,7 @@ function useSyntheticItems(): SyntheticItem[] {
 }
 
 export default function NotificationInbox() {
-  const { profile } = useAuth()
+  const { profile, role } = useAuth()
   const [open, setOpen] = useState(false)
   const btnRef = useRef<HTMLButtonElement>(null)
   const [pos, setPos] = useState<{ top: number; left: number; width: number }>({ top: 56, left: 8, width: 320 })
@@ -135,9 +137,9 @@ export default function NotificationInbox() {
                   const isSynthetic = !('createdAt' in n)
                   const isUnread = isSynthetic || !n.isRead
                   return (
-                    <a
+                    <Link
                       key={n.id}
-                      href={n.url ?? '#'}
+                      to={notificationTarget(n.url, role)}
                       onClick={() => { if (!isSynthetic) markRead(n.id); setOpen(false) }}
                       className={`block px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors ${isUnread ? 'bg-orange-500/5' : ''}`}
                     >
@@ -153,7 +155,7 @@ export default function NotificationInbox() {
                           </p>
                         </div>
                       </div>
-                    </a>
+                    </Link>
                   )
                 })
               )}

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   collection, addDoc, deleteDoc, doc, serverTimestamp, writeBatch,
 } from 'firebase/firestore'
@@ -114,6 +114,15 @@ export function BookingsTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sorted, statusFilter, responsibility, catalog],
   )
+
+  // Opened from a notification about one booking: show and expand it
+  const [focusId, setFocusId] = useState(() => new URLSearchParams(window.location.search).get('focus'))
+  useEffect(() => {
+    if (!focusId || !sorted.some(b => b.id === focusId)) return
+    if (!filtered.some(b => b.id === focusId)) { setStatusFilter('all'); return }
+    setExpandedId(focusId)
+    setFocusId(null)   // once; collapsing it afterwards stays collapsed
+  }, [focusId, sorted, filtered])
 
   async function setStatus(id: string, newStatus: string, teacherNotes?: string) {
     setSavingId(id)
@@ -236,6 +245,7 @@ export function BookingsTab() {
             return (
               <div
                 key={b.id}
+                data-focus-id={b.id}
                 style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 12, overflow: 'hidden', cursor: 'pointer' }}
                 onClick={() => setExpandedId(expanded ? null : b.id)}
               >

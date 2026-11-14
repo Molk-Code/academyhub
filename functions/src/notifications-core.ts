@@ -106,7 +106,7 @@ export async function saveNotifications(
   await batch.commit()
 }
 
-export async function sendFcmToTokens(tokens: string[], title: string, body: string): Promise<void> {
+export async function sendFcmToTokens(tokens: string[], title: string, body: string, url = '/'): Promise<void> {
   if (!tokens.length) return
   const messaging = admin.messaging()
   // Send in batches of 500 (FCM multicast limit)
@@ -115,8 +115,9 @@ export async function sendFcmToTokens(tokens: string[], title: string, body: str
     await messaging.sendEachForMulticast({
       tokens: batch,
       notification: { title, body },
-      data: { title, body, tag: 'event-reminder' },
+      data: { title, body, url, tag: 'event-reminder' },
       webpush: {
+        fcmOptions: { link: url },
         notification: {
           title,
           body,
@@ -209,10 +210,10 @@ export async function pushToTeachersAndAdmins(title: string, body: string, url: 
   ])
 }
 
-export async function pushToStudent(studentId: string, title: string, body: string) {
+export async function pushToStudent(studentId: string, title: string, body: string, url = '/my-bookings') {
   const snap = await db.collection('users').doc(studentId).get()
   const tokens: string[] = await tokensFor([snap.id])
-  const opts = { title, body, url: '/my-bookings' }
+  const opts = { title, body, url }
   await Promise.all([
     sendPush(tokens, { ...opts, tag: 'booking-update' }),
     saveNotifications([studentId], opts),

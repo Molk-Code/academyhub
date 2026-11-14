@@ -15,6 +15,58 @@ self.addEventListener('fetch', (event) => {
   }
 })
 
+// ── Notification clicks ──────────────────────────────────────────────────────
+// Registered before firebase.messaging() on purpose: the Messaging SDK adds its
+// own click handler, which for pushes with a `notification` block (all of ours)
+// stops other handlers and only *focuses* an open app window without going to
+// the link. Ours runs first and stops the SDK's instead.
+//   App open (any tab / the installed app): focus it and ask it to navigate
+//     in-app ({ type: 'notification-click', url }); NotificationNavigator in
+//     the app maps the link to the right page for the user's role. If the
+//     window doesn't answer (an older version still loaded), load the link.
+//   App not open: open /open?to=<link>, which waits for sign-in, then does
+//     the same mapping.
+function notificationLink(notification) {
+  const d = notification.data || {}
+  const fcm = d.FCM_MSG || {}
+  return d.url || (fcm.data && fcm.data.url) || (fcm.fcmOptions && fcm.fcmOptions.link) ||
+    (fcm.notification && fcm.notification.click_action) || '/'
+}
+
+function inAppPath(link) {
+  try {
+    const u = new URL(link, self.location.origin)
+    return u.origin === self.location.origin ? u.pathname + u.search + u.hash : '/'
+  } catch (e) { return '/' }
+}
+
+function askToNavigate(client, path) {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel()
+    const timer = setTimeout(() => resolve(false), 1500)
+    channel.port1.onmessage = () => { clearTimeout(timer); resolve(true) }
+    try { client.postMessage({ type: 'notification-click', url: path }, [channel.port2]) }
+    catch (e) { clearTimeout(timer); resolve(false) }
+  })
+}
+
+self.addEventListener('notificationclick', (event) => {
+  event.stopImmediatePropagation()
+  event.notification.close()
+  const path = inAppPath(notificationLink(event.notification))
+  const openPath = '/open?to=' + encodeURIComponent(path)
+  event.waitUntil((async () => {
+    const windows = await clients.matchAll({ type: 'window', includeUncontrolled: true })
+    const ours = windows.filter(c => c.url.startsWith(self.location.origin))
+    const client = ours.find(c => c.focused) || ours.find(c => c.visibilityState === 'visible') || ours[0]
+    if (!client) return clients.openWindow(openPath)
+    try { await client.focus() } catch (e) { /* not allowed on some platforms; navigation still works */ }
+    if (await askToNavigate(client, path)) return
+    try { await client.navigate(new URL(openPath, self.location.origin).href) }
+    catch (e) { return clients.openWindow(openPath) }
+  })())
+})
+
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js')
 
@@ -44,22 +96,6 @@ messaging.onBackgroundMessage((payload) => {
     renotify: false,
     data: payload.data,
   })
-})
-
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close()
-  const url = new URL(event.notification.data?.url || '/', self.location.origin).href
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // Re-use an existing tab and navigate it to the target URL
-      const existing = windowClients.find(c => c.url.startsWith(self.location.origin))
-      if (existing) {
-        existing.navigate(url)
-        return existing.focus()
-      }
-      return clients.openWindow(url)
-    })
-  )
 })
 
 self.addEventListener('message', (event) => {

@@ -22,6 +22,8 @@ import SchoolSignup from '@/pages/SchoolSignup'
 
 import NotificationInit from '@/components/NotificationInit'
 import BugReportHighlighter from '@/components/BugReportHighlighter'
+import FocusTarget from '@/components/FocusTarget'
+import OpenNotificationLink from '@/components/layout/OpenNotificationLink'
 import FeatureGate from '@/components/FeatureGate'
 import NavVisibilityGate from '@/components/NavVisibilityGate'
 import UpgradePage from '@/pages/UpgradePage'
@@ -128,6 +130,7 @@ export default function App() {
       <BrowserRouter>
         <NotificationInit />
         <BugReportHighlighter />
+        <FocusTarget />
         {/* Catches lazily loaded pages outside the layouts (shop, scanner, …) —
             without it, opening one from inside the app crashed (React #426) */}
         <Suspense fallback={<div className="min-h-screen bg-zinc-950" />}>
@@ -139,6 +142,8 @@ export default function App() {
 
           {/* ── Post-login landing: waits for auth to settle, then redirects */}
           <Route path="/" element={<RoleRedirect />} />
+          {/* ── Opened from a push notification while the app wasn't running */}
+          <Route path="/open" element={<OpenNotificationLink />} />
 
           {/* ── Student ─────────────────────────────────────────────────── */}
           <Route element={<RoleRoute role={['student', 'admin']} skeleton={<StudentLayoutSkeleton />}><StudentLayout /></RoleRoute>}>

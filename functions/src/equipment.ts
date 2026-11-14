@@ -159,7 +159,7 @@ export const onEquipmentBookingCreated = functions.region(REGION).runWith(LIMITS
       categories,
       '📦 Equipment booking request',
       `${booking.studentName} requested equipment for "${booking.projectName}"`,
-      '/admin/equipment',
+      `/admin/equipment?tab=bookings&focus=${snap.id}`,
     )
     return null
   })
@@ -182,7 +182,7 @@ export const onEquipmentBookingMessageCreated = functions.region(REGION).runWith
         await bookingCategories(booking.items ?? []),
         '💬 New message on a booking',
         `${message.senderName} — "${booking.projectName}": ${message.text}`,
-        '/admin/equipment',
+        `/admin/equipment?tab=bookings&focus=${context.params.bookingId}`,
       )
     } else {
       const studentSnap = await db.collection('users').doc(booking.studentId as string).get()
@@ -190,7 +190,7 @@ export const onEquipmentBookingMessageCreated = functions.region(REGION).runWith
       const opts = {
         title: '💬 New message on your booking',
         body:  `"${booking.projectName}": ${message.text}`,
-        url:   '/my-bookings',
+        url:   `/my-bookings?focus=${context.params.bookingId}`,
       }
       await Promise.all([
         sendPush(tokens, { ...opts, tag: 'equipment-booking' }),
@@ -226,19 +226,19 @@ export const onEquipmentBookingUpdated = functions.region(REGION).runWith(LIMITS
         body:  after.teacherNotes
           ? `Your equipment for "${after.projectName}" has been confirmed: ${after.teacherNotes}`
           : `Your equipment for "${after.projectName}" has been confirmed`,
-        url:   '/my-bookings',
+        url:   `/my-bookings?focus=${change.after.id}`,
       }
     } else if (after.status === 'checked-out') {
       opts = {
         title: '📦 Equipment checked out',
         body:  `Equipment for "${after.projectName}" has been handed over — remember to return it on time`,
-        url:   '/my-bookings',
+        url:   `/my-bookings?focus=${change.after.id}`,
       }
     } else if (after.status === 'returned') {
       opts = {
         title: '✅ Equipment returned',
         body:  `Your equipment for "${after.projectName}" has been marked as returned`,
-        url:   '/my-bookings',
+        url:   `/my-bookings?focus=${change.after.id}`,
       }
     } else if (after.status === 'denied') {
       opts = {
@@ -246,13 +246,13 @@ export const onEquipmentBookingUpdated = functions.region(REGION).runWith(LIMITS
         body:  after.teacherNotes
           ? `Your equipment request for "${after.projectName}" was denied: ${after.teacherNotes}`
           : `Your equipment request for "${after.projectName}" was denied`,
-        url:   '/my-bookings',
+        url:   `/my-bookings?focus=${change.after.id}`,
       }
     } else if (after.status === 'cancelled') {
       opts = {
         title: '🗑️ Equipment booking cancelled',
         body:  `Your equipment request for "${after.projectName}" was cancelled`,
-        url:   '/my-bookings',
+        url:   `/my-bookings?focus=${change.after.id}`,
       }
     }
     if (!opts) return null
@@ -279,7 +279,7 @@ export const onInventoryProjectCreated = functions.region(REGION).runWith(LIMITS
     const opts = {
       title: '📦 Equipment project created',
       body:  `"${project.name}" — return by ${project.returnDate}`,
-      url:   '/my-bookings',
+      url:   `/my-bookings?focus=${snap.id}`,
     }
     await Promise.all([
       sendPush(tokens, { ...opts, tag: 'inventory' }),
@@ -329,13 +329,13 @@ export const onInventoryProjectUpdated = functions.region(REGION).runWith(LIMITS
       opts = {
         title: '✅ Equipment returned',
         body:  `Project "${after.name}" has been marked as returned`,
-        url:   '/my-bookings',
+        url:   `/my-bookings?focus=${change.after.id}`,
       }
     } else if (before.returnDate !== after.returnDate && after.returnDate && after.status !== 'archived') {
       opts = {
         title: '📅 Return date changed',
         body:  `"${after.name}" — now return by ${after.returnDate}`,
-        url:   '/my-bookings',
+        url:   `/my-bookings?focus=${change.after.id}`,
       }
     }
     if (!opts) return null
@@ -497,7 +497,7 @@ export const decideEquipmentBookingParts = functions.region(REGION).runWith(LIMI
         ? (whole ? '✅ Equipment booking confirmed' : '✅ Part of your booking confirmed')
         : (whole ? '❌ Equipment booking denied' : '❌ Part of your booking denied'),
       body: `${what} for "${b.projectName}" was ${verb}${except}${extra}${left}`,
-      url: '/my-bookings',
+      url: `/my-bookings?focus=${bookingId}`,
     }
     const studentId = b.studentId as string
     if (studentId) {
@@ -582,7 +582,7 @@ export async function runSetBookingItems(uid: string, data: unknown): Promise<{ 
   const names = (b.items ?? []).filter((it: any) => keys.includes(bookingItemKey(it))).map((it: any) => it.equipmentName)
   if (result.touched.some(c => result.before[c] === 'confirmed')) {
     await notifyStudent(b.studentId, available
-      ? { title: '✅ Equipment available again', body: `${names.join(', ')} for "${b.projectName}" is available after all`, url: '/my-bookings' }
-      : { title: '⚠️ Equipment not available', body: `${names.join(', ')} for "${b.projectName}" is not available — the rest of your booking stands`, url: '/my-bookings' })
+      ? { title: '✅ Equipment available again', body: `${names.join(', ')} for "${b.projectName}" is available after all`, url: `/my-bookings?focus=${bookingId}` }
+      : { title: '⚠️ Equipment not available', body: `${names.join(', ')} for "${b.projectName}" is not available — the rest of your booking stands`, url: `/my-bookings?focus=${bookingId}` })
   }
   return { status: result.status }}

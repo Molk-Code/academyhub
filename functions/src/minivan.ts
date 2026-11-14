@@ -83,7 +83,7 @@ export const onMinivanBookingUpdated = functions.region(REGION).runWith(LIMITS).
       const depTime = after.adminTimeFrom ?? after.timeFrom
       const retDate = after.adminDateTo   ?? after.dateTo
       const retTime = after.adminTimeTo   ?? after.timeTo
-      await pushToStudent(after.studentId, '⏰ Minivan schedule updated', `Your trip to ${after.destination}: departure ${depDate} at ${depTime}, return ${retDate} at ${retTime}.`)
+      await pushToStudent(after.studentId, '⏰ Minivan schedule updated', `Your trip to ${after.destination}: departure ${depDate} at ${depTime}, return ${retDate} at ${retTime}.`, `/my-bookings?focus=${change.after.id}`)
     }
 
     if (before.status === after.status) return
@@ -92,9 +92,9 @@ export const onMinivanBookingUpdated = functions.region(REGION).runWith(LIMITS).
 
     if (after.status === 'approved') {
       const depTime = after.adminTimeFrom ?? after.timeFrom
-      await pushToStudent(after.studentId, '✅ Minivan request approved', `Your trip to ${after.destination} on ${after.dateFrom} at ${depTime} has been approved.`)
+      await pushToStudent(after.studentId, '✅ Minivan request approved', `Your trip to ${after.destination} on ${after.dateFrom} at ${depTime} has been approved.`, `/my-bookings?focus=${change.after.id}`)
     } else if (after.status === 'rejected') {
-      await pushToStudent(after.studentId, '❌ Minivan request rejected', `Your trip to ${after.destination} on ${after.dateFrom} was not approved.`)
+      await pushToStudent(after.studentId, '❌ Minivan request rejected', `Your trip to ${after.destination} on ${after.dateFrom} was not approved.`, `/my-bookings?focus=${change.after.id}`)
     }
   })
 

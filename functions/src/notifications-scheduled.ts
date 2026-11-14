@@ -57,7 +57,7 @@ export const sendInventoryReturnReminders = functions.region(REGION).runWith(LIM
       if (borrowerIds.length === 0) return
       const usersSnaps = await Promise.all(borrowerIds.map(uid => db.collection('users').doc(uid).get()))
       const tokens = await tokensFor(usersSnaps.map(s => s.id))
-      const opts = { title, body, url: '/my-bookings' }
+      const opts = { title, body, url: `/my-bookings?focus=${doc.id}` }
       await Promise.all([
         sendPush(tokens, { ...opts, tag: `${tag}-${doc.id}` }),
         saveNotifications(borrowerIds, opts),
@@ -118,7 +118,7 @@ export const sendEquipmentBookingOverdueReminders = functions.region(REGION).run
       const projectName = booking.projectName || 'your booking'
       const title = '🚨 Equipment overdue'
       const body  = `Equipment for "${projectName}" is ${overdueDays} day${overdueDays === 1 ? '' : 's'} overdue`
-      const opts  = { title, body, url: '/booking/equipment' }
+      const opts  = { title, body, url: `/my-bookings?focus=${bookingDoc.id}` }
 
       const userSnap = await db.collection('users').doc(booking.studentId).get()
       const tokens: string[] = (await tokensFor([userSnap.id])) as string[]
@@ -240,7 +240,7 @@ export const sendEventReminders = functions.region(REGION).runWith(LIMITS).pubsu
           .where('isActive', '==', true)
           .get()
         const studentTokens = await tokensFor(studentsSnap.docs.map(d => d.id))
-        await sendFcmToTokens(studentTokens, notifTitle, notifBody)
+        await sendFcmToTokens(studentTokens, notifTitle, notifBody, '/calendar')
       }
 
       // Notify the teacher(s) on this lesson
@@ -252,7 +252,7 @@ export const sendEventReminders = functions.region(REGION).runWith(LIMITS).pubsu
       for (const tid of teacherIds) {
         const tSnap = await db.collection('users').doc(tid).get()
         const tokens: string[] = (await tokensFor([tSnap.id])) as string[]
-        await sendFcmToTokens(tokens, notifTitle, notifBody)
+        await sendFcmToTokens(tokens, notifTitle, notifBody, '/calendar')
       }
     }
 
@@ -279,7 +279,7 @@ export const sendEventReminders = functions.region(REGION).runWith(LIMITS).pubsu
         inviteeTokens.push(...(await tokensFor(inviteeSnaps.map(s => s.id))))
       }
 
-      await sendFcmToTokens([...ownerTokens, ...inviteeTokens], notifTitle, notifBody)
+      await sendFcmToTokens([...ownerTokens, ...inviteeTokens], notifTitle, notifBody, '/calendar')
     }
   })
 

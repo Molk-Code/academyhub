@@ -351,7 +351,7 @@ export const onFoodBoxOrderUpdated = functions.region(REGION).runWith(LIMITS).fi
     if (foodScheduleChanged && after.pickupTimeModified) {
       const effectiveDate = after.adminDate ?? after.date
       const effectiveTime = after.adminPickupTime ?? after.pickupTime
-      await pushToStudent(after.studentId, '⏰ Food box schedule updated', `Your food box has been rescheduled to ${effectiveDate}${effectiveTime ? ` at ${effectiveTime}` : ''}.`)
+      await pushToStudent(after.studentId, '⏰ Food box schedule updated', `Your food box has been rescheduled to ${effectiveDate}${effectiveTime ? ` at ${effectiveTime}` : ''}.`, `/my-bookings?focus=${change.after.id}`)
     }
 
     if (before.status === after.status) return
@@ -360,9 +360,9 @@ export const onFoodBoxOrderUpdated = functions.region(REGION).runWith(LIMITS).fi
 
     if (after.status === 'confirmed') {
       const effectiveTime = after.adminPickupTime ?? after.pickupTime
-      await pushToStudent(after.studentId, '✅ Food box order confirmed', `Your order for ${after.date} has been confirmed.${effectiveTime ? ` Pick-up at ${effectiveTime}.` : ''}`)
+      await pushToStudent(after.studentId, '✅ Food box order confirmed', `Your order for ${after.date} has been confirmed.${effectiveTime ? ` Pick-up at ${effectiveTime}.` : ''}`, `/my-bookings?focus=${change.after.id}`)
     } else if (after.status === 'cancelled') {
-      await pushToStudent(after.studentId, '❌ Food box order cancelled', `Your order for ${after.date} has been cancelled.`)
+      await pushToStudent(after.studentId, '❌ Food box order cancelled', `Your order for ${after.date} has been cancelled.`, `/my-bookings?focus=${change.after.id}`)
     }
   })
 
@@ -401,6 +401,7 @@ export const foodBoxPickupReminder = functions.region(REGION).runWith(LIMITS).pu
           order.studentId,
           '🍱 Food pick-up in 30 minutes',
           `Your food box for ${order.date} is ready at ${order.pickupTime}. Don't forget to pick it up!`,
+          `/my-bookings?focus=${doc.id}`,
         )
       }
     }

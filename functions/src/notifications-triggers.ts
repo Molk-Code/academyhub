@@ -26,7 +26,7 @@ export const onAssignmentPublished = functions.region(REGION).runWith(LIMITS).fi
     const opts = {
       title: '📋 New assignment posted',
       body:  after.title ?? 'A new assignment has been published.',
-      url:   '/assignments',
+      url:   `/assignments/${change.after.id}`,
     }
     await Promise.all([
       sendPush(tokens, { ...opts, tag: 'assignment' }),
@@ -109,7 +109,7 @@ export const onAbsenceReportCreated = functions.region(REGION).runWith(LIMITS).f
     const opts = {
       title: '🤒 Absence reported',
       body:  `${studentName} reported an absence for ${when}`,
-      url:   '/teacher/students',
+      url:   report.studentId ? `/teacher/students/${report.studentId}` : '/teacher/students',
     }
     await Promise.all([
       tokens.length > 0 ? sendPush(tokens, { ...opts, tag: 'absence-report' }) : Promise.resolve(),
@@ -229,7 +229,7 @@ export const onChatMessage = functions.region(REGION).runWith(LIMITS).firestore
           channelId,
           title:     senderName,
           body:      notifBody,
-          url:       '/chat',
+          url:       `/chat?channel=${channelId}`,
           tag:       `chat-${channelId}`,
         },
         webpush: {

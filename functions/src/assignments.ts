@@ -458,7 +458,7 @@ export const gradeShortAnswers = functions.region(REGION).runWith(LIMITS).https.
   const testOpts = {
     title: passed ? '✅ Test passed!' : '📝 Test result available',
     body:  `You scored ${percentageScore}% on your test.`,
-    url:   '/assignments',
+    url:   `/submissions/${submissionId}/results`,
   }
   await Promise.all([
     tokens.length > 0 ? sendPush(tokens, { ...testOpts, tag: 'test-result' }) : Promise.resolve(),

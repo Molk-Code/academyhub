@@ -383,7 +383,7 @@ export default function BugReports() {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map(r => <ReportCard key={r.id} report={r} />)}
+          {filtered.map(r => <div key={r.id} data-focus-id={r.id}><ReportCard report={r} /></div>)}
         </div>
       )}
     </div>

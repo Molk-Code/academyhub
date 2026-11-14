@@ -1,7 +1,9 @@
 import { FieldValue } from 'firebase-admin/firestore'
+import { GoogleAuth } from 'google-auth-library'
 import { functions, db, escapeHtml, sendEmailOrThrow, getEmailConfig, LIMITS, REGION, allow } from './lib'
 import { requireSuperAdminSession } from './school-admin'
 import { hashIp, clientIp } from './contact'
+import { selectionProblem, quote, planLabel, planFor, modulesFor, type PlanSelection, type Quote } from './pricing'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Customer orders: how a new customer (school) comes in, gets paid for and is
@@ -25,7 +27,7 @@ import { hashIp, clientIp } from './contact'
 // superadmin only (firestore.rules) and written only here.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const ORDER_STATUSES = ['awaiting_payment', 'queued', 'provisioning', 'live', 'failed', 'cancelled'] as const
+export const ORDER_STATUSES = ['awaiting_payment', 'queued', 'provisioning', 'live', 'failed', 'cancelled', 'removing', 'removed'] as const
 export type OrderStatus = typeof ORDER_STATUSES[number]
 
 export const PAYMENT_METHODS = ['invoice', 'card'] as const
@@ -67,6 +69,10 @@ export interface OrderInput {
   admin: { name: string; email: string }
   billing: { email: string; reference: string | null; address: string | null }
   plan: {
+    /** Chosen plan per module (functions/src/pricing.ts) */
+    selection: PlanSelection
+    /** Price computed here from the price list */
+    quote: Quote
     planName: string | null
     modules: { academy: boolean; production: boolean; rentalInventory: boolean }
     maxStudents: number | null
@@ -118,9 +124,12 @@ export function validateOrderInput(data: unknown, opts: { selfService: boolean }
   const problem = shortNameProblem(shortName)
   if (problem) throw bad(problem)
 
-  const m = d.plan?.modules ?? {}
-  for (const k of ['academy', 'production', 'rentalInventory']) if (typeof m[k] !== 'boolean') throw bad(`plan.modules.${k} must be true or false.`)
-  if (!m.academy && !m.production && !m.rentalInventory) throw bad('Choose at least one module.')
+  const rawSel = (d.plan?.selection ?? {}) as Record<string, unknown>
+  const planProblem = selectionProblem(rawSel)
+  if (planProblem) throw bad(planProblem)
+  const selection = Object.fromEntries(Object.entries(rawSel).filter(([, v]) => typeof v === 'string' && v)) as PlanSelection
+  // Students included in the Academy plan, unless the superadmin sets a limit
+  const planStudents = planFor('academy', selection.academy)?.maxStudents ?? null
 
   const method = d.payment?.method ?? 'invoice'
   if (!PAYMENT_METHODS.includes(method)) throw bad('Unknown payment method.')
@@ -139,10 +148,12 @@ export function validateOrderInput(data: unknown, opts: { selfService: boolean }
       address: str(d.billing?.address, 'Invoice address', 300, false),
     },
     plan: {
-      planName: str(d.plan?.planName, 'Plan', 60, false),
-      modules: { academy: m.academy, production: m.production, rentalInventory: m.rentalInventory },
-      maxStudents: intOrNull(d.plan?.maxStudents, 'Student limit', 100_000),
-      storageQuotaGB: intOrNull(d.plan?.storageQuotaGB, 'Storage quota', 100_000),
+      selection,
+      quote: quote(selection),
+      planName: planLabel(selection).slice(0, 120),
+      modules: modulesFor(selection),
+      maxStudents: (opts.selfService ? null : intOrNull(d.plan?.maxStudents, 'Student limit', 100_000)) ?? planStudents,
+      storageQuotaGB: opts.selfService ? null : intOrNull(d.plan?.storageQuotaGB, 'Storage quota', 100_000),
     },
     payment: { method },
     startPolicy,
@@ -243,8 +254,9 @@ export async function setInvoiceNumber(orderId: string, by: Actor, invoiceNumber
 export async function cancelOrder(orderId: string, by: Actor) {
   const o = await transition(orderId, by, 'cancelled', o => {
     if (!['awaiting_payment', 'queued', 'failed'].includes(o.status)) {
-      throw precondition(o.status === 'live' ? 'This customer is live: ending it is an offboarding, not a cancellation.' : `An order that is ${o.status} can't be cancelled.`)
+      throw precondition(o.status === 'live' ? 'This customer is live: remove it instead.' : `An order that is ${o.status} can't be cancelled.`)
     }
+    if (o.provisioning?.state?.projectId) throw precondition('Setup already created a project for this order: remove the customer instead, so the project and its address go too.')
     return { status: 'cancelled' }
   })
   const slugRef = db.collection('customer_slugs').doc(String(o.school?.shortName))
@@ -258,6 +270,7 @@ export async function cancelOrder(orderId: string, by: Actor) {
 export async function retryOrder(orderId: string, by: Actor) {
   return transition(orderId, by, 'retry', o => {
     if (o.status !== 'failed') throw precondition('Only a failed setup can be retried.')
+    if (o.removal) return { status: 'removing', 'provisioning.error': null }
     return { status: 'queued', 'provisioning.error': null }
   })
 }
@@ -337,9 +350,139 @@ export const onCustomerOrderQueued = functions.region(REGION).runWith({ ...LIMIT
   .onWrite(async (change, context) => {
     const before = change.before.exists ? change.before.data()?.status : null
     const after = change.after.exists ? change.after.data()?.status : null
-    if (after !== 'queued' || before === 'queued') return
-    await runProvisioning(context.params.orderId, provisionerFor(process.env.PROVISIONING_MODE))
+    if (after === before) return
+    const orderId = context.params.orderId
+    if (process.env.PROVISIONING_MODE === 'cloudbuild') {
+      if (after === 'queued') await startSetupBuild(orderId, 'setup')
+      if (after === 'removing') await startSetupBuild(orderId, 'remove')
+      return
+    }
+    if (after === 'queued') await runProvisioning(orderId, provisionerFor(process.env.PROVISIONING_MODE))
   })
+
+// ── Setup in Cloud Build (PROVISIONING_MODE=cloudbuild) ──────────────────────
+// The steps (scripts/customer-setup) run as a Cloud Build job in this project,
+// as the customer-setup service account, from the release published with
+// scripts/publish-release.mjs (platform/release). The job writes its progress
+// to the order. Setup takes 20–40 minutes, mostly the deploy and the certificate.
+
+export interface SetupConfig {
+  controlProject: string
+  folderId: string
+  billingAccount: string
+  setupServiceAccount: string
+  superadminEmails: string
+  release: { bucket: string; object: string }
+}
+
+export function setupConfig(release: { bucket?: string; object?: string } | undefined): SetupConfig | string {
+  const e = process.env
+  const missing = ['CUSTOMER_FOLDER_ID', 'BILLING_ACCOUNT_ID', 'SETUP_SERVICE_ACCOUNT', 'SUPERADMIN_EMAILS'].filter(k => !e[k])
+  if (missing.length) return `Setup isn't configured: ${missing.join(', ')} missing in functions/.env.<project>.`
+  if (!release?.bucket || !release?.object) return 'No release published yet: run scripts/publish-release.mjs.'
+  return {
+    controlProject: String(e.GCLOUD_PROJECT ?? e.GCP_PROJECT),
+    folderId: e.CUSTOMER_FOLDER_ID!, billingAccount: e.BILLING_ACCOUNT_ID!,
+    setupServiceAccount: e.SETUP_SERVICE_ACCOUNT!, superadminEmails: e.SUPERADMIN_EMAILS!,
+    release: { bucket: release.bucket, object: release.object },
+  }
+}
+
+/** The Cloud Build request for one order (pure, so it's tested) */
+export function setupBuildRequest(orderId: string, mode: 'setup' | 'remove', c: SetupConfig) {
+  const install = mode === 'setup' ? 'npm ci --no-audit --no-fund && npm --prefix functions ci --no-audit --no-fund' : 'npm ci --no-audit --no-fund'
+  const secret = (name: string) => ({ versionName: `projects/${c.controlProject}/secrets/${name}/versions/latest`, env: name })
+  return {
+    source: { storageSource: { bucket: c.release.bucket, object: c.release.object } },
+    steps: [{
+      name: 'node:22',
+      entrypoint: 'bash',
+      args: ['-c', `${install} && node scripts/customer-setup/run.mjs`],
+      env: [
+        `ORDER_ID=${orderId}`, `MODE=${mode}`, `CONTROL_PROJECT=${c.controlProject}`, `FOLDER_ID=${c.folderId}`,
+        `BILLING_ACCOUNT=${c.billingAccount}`, `SETUP_SA=${c.setupServiceAccount}`, `SUPERADMIN_EMAILS=${c.superadminEmails}`,
+        `ZONE=${customerBaseDomain()}`,
+      ],
+      secretEnv: ['HOSTUP_API_KEY', 'RESEND_API_KEY'],
+    }],
+    availableSecrets: { secretManager: [secret('HOSTUP_API_KEY'), secret('RESEND_API_KEY')] },
+    serviceAccount: `projects/${c.controlProject}/serviceAccounts/${c.setupServiceAccount}`,
+    options: { logging: 'CLOUD_LOGGING_ONLY', machineType: 'E2_HIGHCPU_8' },
+    timeout: '7200s',
+    tags: ['customer-setup', mode, orderId.toLowerCase()],
+  }
+}
+
+const cloudAuth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] })
+const BUILDS_REGION = 'europe-west1'
+
+async function cloudBuild(method: string, path: string, body?: unknown) {
+  const client = await cloudAuth.getClient()
+  const res = await client.request({ url: `https://cloudbuild.googleapis.com/v1/${path}`, method: method as 'GET' | 'POST', data: body })
+  return res.data as Record<string, any>
+}
+
+/** Submits the setup (or removal) job; on any problem the order fails with the reason */
+export async function startSetupBuild(orderId: string, mode: 'setup' | 'remove') {
+  const ref = orders().doc(orderId)
+  const claimed = await db.runTransaction(async tx => {
+    const s = await tx.get(ref)
+    const status = s.data()?.status
+    if (status !== (mode === 'setup' ? 'queued' : 'removing')) return false
+    if (mode === 'setup') {
+      tx.update(ref, {
+        status: 'provisioning', 'provisioning.note': 'Starting the setup job…', 'provisioning.error': null,
+        'provisioning.attempts': FieldValue.increment(1), 'provisioning.startedAt': FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
+      })
+    } else {
+      tx.update(ref, { 'provisioning.note': 'Starting the removal job…', 'provisioning.error': null, updatedAt: FieldValue.serverTimestamp() })
+    }
+    return true
+  })
+  if (!claimed) return
+  try {
+    const release = (await db.collection('platform').doc('release').get()).data() as { bucket?: string; object?: string } | undefined
+    const cfg = setupConfig(release)
+    if (typeof cfg === 'string') throw new Error(cfg)
+    const op = await cloudBuild('POST', `projects/${cfg.controlProject}/locations/${BUILDS_REGION}/builds`, setupBuildRequest(orderId, mode, cfg))
+    const build = op?.metadata?.build ?? {}
+    await ref.update({
+      'provisioning.buildId': build.id ?? null, 'provisioning.logUrl': build.logUrl ?? null,
+      'provisioning.release': release?.object ?? null,
+      'provisioning.note': mode === 'setup' ? 'Setup job started: installing, then the steps below.' : 'Removal job started.',
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    await ref.update({ status: 'failed', 'provisioning.note': null, 'provisioning.error': `Couldn't start the ${mode === 'setup' ? 'setup' : 'removal'} job: ${message}`.slice(0, 600), updatedAt: FieldValue.serverTimestamp() })
+  }
+}
+
+/** A job that stopped without reporting (crash, timeout, cancelled) marks the order failed */
+export async function refreshOrder(orderId: string) {
+  const ref = orders().doc(orderId)
+  const o = (await ref.get()).data()
+  if (!o) throw new functions.https.HttpsError('not-found', 'Order not found.')
+  const buildId = o.provisioning?.buildId
+  if (!['provisioning', 'removing'].includes(o.status) || !buildId) return { status: o.status, build: null }
+  const control = String(process.env.GCLOUD_PROJECT ?? process.env.GCP_PROJECT)
+  const build = await cloudBuild('GET', `projects/${control}/locations/${BUILDS_REGION}/builds/${buildId}`)
+  const ended = ['FAILURE', 'INTERNAL_ERROR', 'TIMEOUT', 'CANCELLED', 'EXPIRED'].includes(build.status)
+  if (ended) {
+    await ref.update({ status: 'failed', 'provisioning.note': null, 'provisioning.error': `The ${o.status === 'removing' ? 'removal' : 'setup'} job stopped (${build.status}) before finishing: see its log.`, updatedAt: FieldValue.serverTimestamp() })
+  }
+  return { status: ended ? 'failed' : o.status, build: build.status as string }
+}
+
+/** Removes a set-up customer: its DNS records and its project. Asked three times in the page; the name is checked here */
+export async function requestRemoval(orderId: string, by: Actor, confirmName: unknown) {
+  return transition(orderId, by, 'removal_requested', o => {
+    const hasProject = !!o.provisioning?.state?.projectId
+    if (!(o.status === 'live' || (o.status === 'failed' && hasProject))) throw precondition('Only a customer that has been set up (or partly set up) can be removed.')
+    if (typeof confirmName !== 'string' || confirmName.trim() !== String(o.school?.name ?? '').trim()) throw precondition("The name typed doesn't match the school's name.")
+    return { status: 'removing', removal: true }
+  })
+}
 
 // ── Superadmin callables ─────────────────────────────────────────────────────
 
@@ -368,6 +511,8 @@ export const setOrderInvoiceNumber = superadminCall(async (d, by) => { await set
 export const startCustomerOrder = superadminCall(async (d, by) => { await startOrderNow(orderIdOf(d), by); return { ok: true } })
 export const cancelCustomerOrder = superadminCall(async (d, by) => { await cancelOrder(orderIdOf(d), by); return { ok: true } })
 export const retryCustomerOrder = superadminCall(async (d, by) => { await retryOrder(orderIdOf(d), by); return { ok: true } })
+export const refreshCustomerOrder = superadminCall(async d => refreshOrder(orderIdOf(d)))
+export const removeCustomer = superadminCall(async (d, by) => { await requestRemoval(orderIdOf(d), by, d.confirmName); return { ok: true } })
 
 /** Whether a short name can be used; superadmin form checks as you type */
 export async function shortNameAvailable(v: unknown): Promise<{ ok: boolean; problem: string | null; address: string | null }> {

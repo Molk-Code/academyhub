@@ -16,7 +16,7 @@ const valid = {
   school: { name: 'Nordic Film Academy', shortName: 'Nordic' },
   admin: { name: 'Alex Admin', email: 'Alex@Example.test' },
   billing: { email: 'invoices@example.test', reference: 'REF 12' },
-  plan: { planName: 'Academy', modules: { academy: true, production: false, rentalInventory: true }, maxStudents: 200 },
+  plan: { selection: { academy: 'medium', rentalInventory: 'standard' }, maxStudents: 200 },
   payment: { method: 'invoice' },
   startPolicy: 'after_payment',
   notes: 'met at a fair',
@@ -43,7 +43,9 @@ test('order input is validated; self-service is stricter', () => {
   bad({ school: { name: 'X', shortName: '1abc' } })
   bad({ school: { name: 'X', shortName: 'ab--cd' } })
   bad({ admin: { name: 'A', email: 'not-an-email' } })
-  bad({ plan: { modules: { academy: false, production: false, rentalInventory: false } } })
+  bad({ plan: { selection: {} } })
+  bad({ plan: { selection: { academy: 'huge' } } })
+  bad({ plan: { selection: { billing: 'starter' } } })
   bad({ payment: { method: 'card' } })
   bad({ payment: { method: 'bitcoin' } })
   bad({ startPolicy: 'immediately' }, true)
@@ -71,7 +73,7 @@ test('invoice paid later: waits, then setup runs to live', async () => {
   assert.equal(o.status, 'live')
   assert.ok(ob.PROVISIONING_STEPS.every(s => o.provisioning.steps[s.id].status === 'done'))
   assert.equal(o.provisioning.steps.domain.did, 'domain')
-  await assert.rejects(ob.cancelOrder(id, boss), e => /offboarding/.test(e.message), 'live orders are not cancelled')
+  await assert.rejects(ob.cancelOrder(id, boss), e => /remove it instead/.test(e.message), 'live orders are not cancelled')
 
   const events = (await db.collection('customer_orders').doc(id).collection('events').get()).docs.map(d => d.data().action).sort()
   assert.deepEqual(events, ['created', 'live', 'payment_confirmed'])
@@ -151,4 +153,59 @@ test('preview (superadmin, ordering closed): accepts the draft terms version, ma
   assert.equal(o.preview, true)
   assert.equal(o.terms.version, 'draft-1')
   assert.equal(sent.length, 0)
+})
+
+test('setup in Cloud Build: config is checked, the request runs the release as the setup account', () => {
+  const saved = { ...process.env }
+  try {
+    delete process.env.CUSTOMER_FOLDER_ID
+    assert.match(ob.setupConfig({ bucket: 'b', object: 'o.tgz' }), /CUSTOMER_FOLDER_ID/)
+    Object.assign(process.env, { CUSTOMER_FOLDER_ID: '100', BILLING_ACCOUNT_ID: 'AAA-BBB', SETUP_SERVICE_ACCOUNT: 'setup@ctl.iam.gserviceaccount.com', SUPERADMIN_EMAILS: 'boss@example.test', GCLOUD_PROJECT: 'ctl' })
+    assert.match(ob.setupConfig(undefined), /No release published/)
+    const cfg = ob.setupConfig({ bucket: 'ctl-releases', object: 'releases/abc.tgz' })
+    const req = ob.setupBuildRequest('Order123', 'setup', cfg)
+    assert.deepEqual(req.source, { storageSource: { bucket: 'ctl-releases', object: 'releases/abc.tgz' } })
+    assert.equal(req.serviceAccount, 'projects/ctl/serviceAccounts/setup@ctl.iam.gserviceaccount.com')
+    assert.ok(req.steps[0].env.includes('ORDER_ID=Order123') && req.steps[0].env.includes('MODE=setup') && req.steps[0].env.includes('FOLDER_ID=100'))
+    assert.deepEqual(req.steps[0].secretEnv, ['HOSTUP_API_KEY', 'RESEND_API_KEY'])
+    assert.ok(req.availableSecrets.secretManager.every(s => s.versionName.startsWith('projects/ctl/secrets/')))
+    assert.ok(!req.steps[0].env.some(e => /KEY=/.test(e)), 'no secret values in the build request')
+    assert.match(ob.setupBuildRequest('Order123', 'remove', cfg).steps[0].args[1], /^npm ci .*run\.mjs$/)
+  } finally {
+    for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]
+    Object.assign(process.env, saved)
+  }
+})
+
+test('removal: only set-up customers, with the exact name; a failed removal retries the removal; cancel refuses once a project exists', async () => {
+  const id = await ob.createOrder(ob.validateOrderInput({ ...valid, startPolicy: 'immediately' }, { selfService: false }), { source: 'superadmin', by: boss })
+  await assert.rejects(ob.requestRemoval(id, boss, 'Nordic Film Academy'), e => e.code === 'failed-precondition', 'queued: nothing to remove')
+  await db.collection('customer_orders').doc(id).update({ status: 'failed', 'provisioning.state.projectId': 'cf-nordic-ab12' })
+  await assert.rejects(ob.cancelOrder(id, boss), e => /remove the customer instead/.test(e.message))
+  await assert.rejects(ob.requestRemoval(id, boss, 'Nordic'), e => /doesn't match/.test(e.message))
+  await ob.requestRemoval(id, boss, ' Nordic Film Academy ')
+  assert.equal((await order(id)).status, 'removing')
+  await db.collection('customer_orders').doc(id).update({ status: 'failed' })
+  await ob.retryOrder(id, boss)
+  assert.equal((await order(id)).status, 'removing', 'retry of a failed removal')
+})
+
+test('prices: plans per module, 20% off all three, billed annually; computed on the server', async () => {
+  const pr = await import('../lib/pricing.js')
+  const v = ob.validateOrderInput({ ...valid, plan: { selection: { academy: 'small', production: 'team', rentalInventory: 'starter', bogus: '' } } }, { selfService: true })
+  assert.deepEqual(v.plan.modules, { academy: true, production: true, rentalInventory: true })
+  assert.equal(v.plan.quote.subtotalMonthly, 49 + 69 + 129)
+  assert.equal(v.plan.quote.discountRate, 0.2)
+  assert.equal(v.plan.quote.monthly, 197.6)
+  assert.equal(v.plan.quote.annual, 2371.2)
+  assert.equal(v.plan.maxStudents, 50, 'students from the Academy plan')
+  assert.equal(v.plan.planName, 'Rental & Inventory Starter + Production Team + Academy Small')
+  const two = pr.quote({ academy: 'large', production: 'studio' })
+  assert.equal(two.discountRate, 0)
+  assert.equal(two.monthly, 598)
+  assert.equal(two.annual, 7176)
+  const self = ob.validateOrderInput({ ...valid, plan: { selection: { academy: 'small' }, maxStudents: 9999, storageQuotaGB: 999 } }, { selfService: true })
+  assert.equal(self.plan.maxStudents, 50, "a customer can't raise their own limits")
+  assert.equal(self.plan.storageQuotaGB, null)
+  assert.equal(ob.validateOrderInput({ ...valid, plan: { selection: { academy: 'small' }, maxStudents: 80 } }, { selfService: false }).plan.maxStudents, 80, 'the superadmin can')
 })

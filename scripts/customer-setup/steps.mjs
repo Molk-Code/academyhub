@@ -92,6 +92,10 @@ export async function project(ctx) {
     await waitForOperation(SU, op)
   }
 
+  // Firestore before App Engine: creating the App Engine app first gives the
+  // project a (default) database in Datastore mode, which Firebase can't use
+  await ensureFirestore(projectId)
+
   const app = await google('GET', `${GAE}apps/${projectId}`, undefined, { allow: [404] })
   if (app.__status === 404) {
     const op = await google('POST', `${GAE}apps`, { id: projectId, locationId: APP_ENGINE_LOCATION })
@@ -115,6 +119,23 @@ export async function project(ctx) {
   return { projectId }
 }
 
+/**
+ * The (default) database in Firestore (native) mode, in eur3. One that an App
+ * Engine app already created in Datastore mode is switched while it's empty.
+ */
+async function ensureFirestore(projectId) {
+  const url = `${FS}projects/${projectId}/databases/(default)`
+  const db = await google('GET', url, undefined, { allow: [404] })
+  if (db.__status === 404) {
+    await waitForOperation(FS, await google('POST', `${FS}projects/${projectId}/databases?databaseId=(default)`, { type: 'FIRESTORE_NATIVE', locationId: FIRESTORE_LOCATION }))
+    return
+  }
+  if (db.type === 'DATASTORE_MODE') {
+    console.log('(default) is in Datastore mode: switching the empty database to Firestore mode')
+    await waitForOperation(FS, await google('PATCH', `${url}?updateMask=type`, { type: 'FIRESTORE_NATIVE' }))
+  }
+}
+
 /** Firebase, Firestore (eur3), Storage, backups bucket, sign-in, web app, Hosting site */
 export async function services(ctx) {
   const { projectId, projectNumber } = ctx.state
@@ -123,11 +144,7 @@ export async function services(ctx) {
   const fb = await google('GET', `${FB}projects/${projectId}`, undefined, { allow: [403, 404] })
   if (fb.__status) await waitForOperation(FB, await google('POST', `${FB}projects/${projectId}:addFirebase`, {}))
 
-  const db = await google('GET', `${FS}projects/${projectId}/databases/(default)`, undefined, { allow: [404] })
-  if (db.__status === 404) {
-    const op = await google('POST', `${FS}projects/${projectId}/databases?databaseId=(default)`, { type: 'FIRESTORE_NATIVE', locationId: FIRESTORE_LOCATION })
-    await waitForOperation(FS, op)
-  }
+  await ensureFirestore(projectId)
 
   const storageBucket = `${projectId}.firebasestorage.app`
   const sb = await google('GET', `${GCS}b/${storageBucket}`, undefined, { allow: [404] })
@@ -183,6 +200,7 @@ export async function deploy(ctx) {
   const { projectId, webConfig } = ctx.state
   const { order, env } = ctx
   const schoolId = order.school.shortName
+  await ensureFirestore(projectId)
 
   const secret = await google('GET', `${SM}projects/${projectId}/secrets/RESEND_API_KEY`, undefined, { allow: [404] })
   if (secret.__status === 404) {

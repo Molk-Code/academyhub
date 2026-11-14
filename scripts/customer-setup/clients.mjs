@@ -48,7 +48,8 @@ export const sleep = ms => new Promise(r => setTimeout(r, ms))
  * name is relative to, e.g. https://cloudresourcemanager.googleapis.com/v3/
  */
 export async function waitForOperation(base, op, { timeoutMs = 15 * 60_000, everyMs = 5_000 } = {}) {
-  if (!op?.name || op.done) {
+  // Some calls answer with the finished resource instead of an operation
+  if (!op?.name || op.done || !/(^|\/)operations\//.test(op.name)) {
     if (op?.error) throw new Error(`Operation failed: ${JSON.stringify(op.error)}`)
     return op?.response ?? op
   }

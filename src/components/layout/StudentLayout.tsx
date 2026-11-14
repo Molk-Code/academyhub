@@ -450,10 +450,10 @@ export default function StudentLayout() {
       {/* ── Mobile top header ──────────────────────────────────────────────── */}
       <header className="mobile-header lg:hidden fixed top-0 left-0 right-0 z-40 backdrop-blur-xl shadow-[0_4px_20px_rgba(0,0,0,0.5)]" style={{ background: 'rgba(16,20,26,0.85)' }}>
         <div className="h-16 flex items-center justify-between px-4">
-          <Link to="/dashboard" className="flex items-end gap-2.5 overflow-hidden max-w-[calc(100vw-6rem)]">
+          <Link to="/dashboard" className="flex items-center gap-2.5 min-w-0 max-w-[calc(100vw-6rem)]">
             <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain flex-shrink-0" />
-            <div className="overflow-hidden">
-              <p className="text-sm font-bold text-zinc-100 tracking-tight leading-none">{shortName}</p>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-zinc-100 tracking-tight leading-none whitespace-nowrap">{shortName}</p>
               {schoolName && <p className="text-[9px] text-zinc-500 tracking-tight mt-[3px] leading-none whitespace-nowrap overflow-hidden text-ellipsis">{schoolName}</p>}
             </div>
           </Link>
@@ -479,10 +479,10 @@ export default function StudentLayout() {
           />
           <aside className="absolute left-0 top-0 bottom-0 w-72 flex flex-col shadow-2xl" style={{ background: 'var(--bg-surface)', paddingTop: 'env(safe-area-inset-top)' }}>
             <div className="h-14 flex items-center justify-between px-5 border-b flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
-              <Link to="/dashboard" onClick={() => setDrawerOpen(false)} className="flex items-end gap-2.5 overflow-hidden">
+              <Link to="/dashboard" onClick={() => setDrawerOpen(false)} className="flex items-center gap-2.5 min-w-0">
                 <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain flex-shrink-0" />
-                <div className="overflow-hidden">
-                  <p className="text-sm font-bold text-zinc-100 tracking-tight leading-none">{shortName}</p>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-zinc-100 tracking-tight leading-none whitespace-nowrap">{shortName}</p>
                   {schoolName && <p className="text-[9px] text-zinc-500 tracking-tight mt-[3px] leading-none whitespace-nowrap overflow-hidden text-ellipsis">{schoolName}</p>}
                 </div>
               </Link>
@@ -504,10 +504,10 @@ export default function StudentLayout() {
       {/* ── Desktop sidebar ────────────────────────────────────────────────── */}
       <aside className="hidden lg:flex w-64 flex-col flex-shrink-0 border-r" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
         <div className="h-16 flex items-center gap-3 px-5 border-b" style={{ borderColor: 'var(--border)' }}>
-          <Link to="/dashboard" className="flex items-end gap-3 overflow-hidden flex-1 min-w-0">
+          <Link to="/dashboard" className="flex items-center gap-3 flex-1 min-w-0">
             <img src={firePng} alt="CineForge" className="w-8 h-8 object-contain flex-shrink-0" />
-            <div className="overflow-hidden">
-              <p className="text-base font-bold text-zinc-100 tracking-tight leading-none">{shortName}</p>
+            <div className="min-w-0">
+              <p className="text-base font-bold text-zinc-100 tracking-tight leading-none whitespace-nowrap">{shortName}</p>
               {schoolName && <p className="text-[9px] text-zinc-500 tracking-tight mt-[3px] leading-none whitespace-nowrap overflow-hidden text-ellipsis">{schoolName}</p>}
             </div>
           </Link>

@@ -10,6 +10,7 @@ import SchoolModulesPanel from '@/pages/superadmin/SchoolModulesPanel'
 import DeleteSchoolDialog from '@/pages/superadmin/DeleteSchoolDialog'
 import VerifyEmailNotice from '@/pages/superadmin/VerifyEmailNotice'
 import CustomerOrders from '@/pages/superadmin/CustomerOrders'
+import GoogleSessionGate from '@/pages/superadmin/GoogleSessionGate'
 import { SCHOOL_ID } from '@/lib/school'
 import { isSuperAdminEmail } from '@/lib/superadmin'
 import {
@@ -397,15 +398,7 @@ function AddSchoolForm({ onDone, onCancel }: { onDone: () => void; onCancel: () 
 
 export default function SuperAdmin() {
   const { user, profile, loading: authLoading } = useAuth()
-  const [showForm,  setShowForm]  = useState(false)
-  const [createdMsg, setCreatedMsg] = useState(false)
-
   const isSuperAdmin = isSuperAdminEmail(profile?.email)
-
-  const { data: schools,     loading: schoolsLoading } = useCollection<SchoolDoc>('schools',     [], isSuperAdmin)
-  const { data: users }                                 = useCollection<UserDoc>('users',         [], isSuperAdmin)
-  const { data: productions }                           = useCollection<ProductionDoc>('productions', [], isSuperAdmin)
-  const { data: equipment }                             = useCollection<EquipmentDoc>('equipment', [], isSuperAdmin)
 
   // Wait for the profile before deciding: it arrives after sign-in is restored,
   // and judging on the empty profile flashed "Access denied." on every load.
@@ -420,6 +413,18 @@ export default function SuperAdmin() {
       </div>
     )
   }
+
+  return <GoogleSessionGate><SuperAdminContent /></GoogleSessionGate>
+}
+
+function SuperAdminContent() {
+  const [showForm,  setShowForm]  = useState(false)
+  const [createdMsg, setCreatedMsg] = useState(false)
+
+  const { data: schools,     loading: schoolsLoading } = useCollection<SchoolDoc>('schools',     [])
+  const { data: users }                                 = useCollection<UserDoc>('users',         [])
+  const { data: productions }                           = useCollection<ProductionDoc>('productions', [])
+  const { data: equipment }                             = useCollection<EquipmentDoc>('equipment', [])
 
   function handleCreated() {
     setShowForm(false)

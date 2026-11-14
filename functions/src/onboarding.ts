@@ -1,6 +1,6 @@
 import { FieldValue } from 'firebase-admin/firestore'
 import { functions, db, escapeHtml, sendEmailOrThrow, getEmailConfig, LIMITS, REGION, allow } from './lib'
-import { requireSuperAdmin } from './school-admin'
+import { requireSuperAdminSession } from './school-admin'
 import { hashIp, clientIp } from './contact'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -345,7 +345,7 @@ export const onCustomerOrderQueued = functions.region(REGION).runWith({ ...LIMIT
 
 const superadminCall = (fn: (data: Record<string, any>, actor: { email: string }) => Promise<unknown>) =>
   functions.region(REGION).runWith({ ...LIMITS, maxInstances: 2 }).https.onCall(async (data, context) => {
-    const actor = requireSuperAdmin(context)
+    const actor = await requireSuperAdminSession(context)
     return fn((data ?? {}) as Record<string, any>, { email: actor.email })
   })
 
@@ -439,8 +439,8 @@ export async function handleSelfServiceOrder(
 }
 
 /** A superadmin previewing the hidden order page */
-function isSuperAdminCaller(context: functions.https.CallableContext): boolean {
-  try { requireSuperAdmin(context); return true } catch { return false }
+async function isSuperAdminCaller(context: functions.https.CallableContext): Promise<boolean> {
+  try { await requireSuperAdminSession(context); return true } catch { return false }
 }
 
 const orderingOpen = () => process.env.SELF_SERVICE_ORDERS === 'true'
@@ -449,7 +449,7 @@ const notOpen = () => new functions.https.HttpsError('unavailable', 'Ordering on
 export const submitCustomerOrder = functions.region(REGION)
   .runWith({ ...LIMITS, maxInstances: 3, secrets: ['RESEND_API_KEY'] })
   .https.onCall(async (data, context) => {
-    const preview = !orderingOpen() && isSuperAdminCaller(context)
+    const preview = !orderingOpen() && await isSuperAdminCaller(context)
     if (!orderingOpen() && !preview) throw notOpen()
     if (process.env.CONTACT_REQUIRE_APP_CHECK === 'true' && !context.app) {
       throw new functions.https.HttpsError('failed-precondition', 'This form must be sent from the CineForge site.')
@@ -467,7 +467,7 @@ export const submitCustomerOrder = functions.region(REGION)
 
 /** Short-name check for the order page; rate-limited per IP */
 export const checkOrderShortName = functions.region(REGION).runWith({ ...LIMITS, maxInstances: 3 }).https.onCall(async (data, context) => {
-  if (!orderingOpen() && !isSuperAdminCaller(context)) throw notOpen()
+  if (!orderingOpen() && !(await isSuperAdminCaller(context))) throw notOpen()
   const req = context.rawRequest as unknown as { headers?: Record<string, unknown>; ip?: string }
   if (!(await allow(`ip_${await hashIp(clientIp(req))}`, 'order_name', 60, HOUR))) {
     throw new functions.https.HttpsError('resource-exhausted', 'Too many checks right now. Try again later.')

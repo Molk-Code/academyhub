@@ -6,6 +6,7 @@ import { useNoIndex } from '@/lib/pageMeta'
 import { LEGAL } from '@/config/legal'
 import { TERMS_VERSION, openDecisions } from '@/config/orderTerms'
 import NotFound from '@/pages/NotFound'
+import GoogleSessionGate from '@/pages/superadmin/GoogleSessionGate'
 
 // The order page and its terms (/order, /order/terms, /order/dpa). Hidden for
 // now: only the superadmin sees them — everyone else gets the 404 page — and
@@ -19,6 +20,10 @@ export default function OrderLayout() {
   if (loading || (user && !profile)) return <div className="min-h-screen bg-zinc-950" aria-busy="true" />
   if (!isSuperAdminEmail(profile?.email)) return <NotFound />
 
+  return <GoogleSessionGate><OrderPreview /></GoogleSessionGate>
+}
+
+function OrderPreview() {
   const open = openDecisions().length
   const tab = ({ isActive }: { isActive: boolean }) =>
     `px-3 py-1.5 rounded-lg text-sm ${isActive ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-zinc-200'}`

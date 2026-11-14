@@ -197,9 +197,11 @@ test('school_audit: readable only by the superadmin, writable by nobody', async 
   await seed(LEGACY)
   await owner('PATCH', 'school_audit/a1', { fields: { schoolId: str('molkom') } })
   const superadmin = readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf-8').match(/email in \['([^']+)'/)[1]
-  const su = (() => { const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url'); const t = Math.floor(Date.now() / 1000)
-    return `${b64({ alg: 'none', typ: 'JWT' })}.${b64({ iss: `https://securetoken.google.com/${PROJECT}`, aud: PROJECT, sub: 'su', user_id: 'su', iat: t, exp: t + 3600, auth_time: t, role: 'admin', email: superadmin, email_verified: true, firebase: { sign_in_provider: 'password' } })}.` })()
+  const suToken = provider => { const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url'); const t = Math.floor(Date.now() / 1000)
+    return `${b64({ alg: 'none', typ: 'JWT' })}.${b64({ iss: `https://securetoken.google.com/${PROJECT}`, aud: PROJECT, sub: 'su', user_id: 'su', iat: t, exp: t + 3600, auth_time: t, role: 'admin', email: superadmin, email_verified: true, firebase: { sign_in_provider: provider } })}.` }
+  const su = suToken('google.com')
   assert.equal(await call('GET', `${DOCS}/school_audit/a1`, su), 200, 'superadmin read')
+  assert.equal(await call('GET', `${DOCS}/school_audit/a1`, suToken('password')), 403, 'superadmin read with a password-only sign-in')
   assert.equal(await call('GET', `${DOCS}/school_audit/a1`, WHO.admin), 403, 'school admin read')
   assert.equal(await call('GET', `${DOCS}/school_audit/a1`, null), 403, 'signed-out read')
   assert.equal(await call('PATCH', `${DOCS}/school_audit/a1?updateMask.fieldPaths=schoolId`, su, { fields: { schoolId: str('x') } }), 403, 'superadmin write')

@@ -924,9 +924,14 @@ service cloud.firestore {
 
     // ── Schools ───────────────────────────────────────────────────────────────
 
+    // Superadmin: the verified address, signed in with Google within the last
+    // 12 hours (so the Google account's two-step verification protects it).
+    // The functions check the same, plus that the Google account is that address.
     function isSuperAdmin() {
       return isSignedIn() && request.auth.token.get('email_verified', false) == true
-        && request.auth.token.email in ['fredrik.fridlund@gmail.com'];
+        && request.auth.token.email in ['fredrik.fridlund@gmail.com']
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && request.auth.token.auth_time * 1000 > request.time.toMillis() - 12 * 60 * 60 * 1000;
     }
 
     match /_client_errors/{errorId} {

@@ -16,12 +16,12 @@ const rules = readFileSync(new URL('../../firestore.rules', import.meta.url), 'u
 const SUPERADMIN = rules.match(/function isSuperAdmin\(\)[\s\S]*?email in \['([^']+)'/)?.[1]
 assert.ok(SUPERADMIN, 'could not find the superadmin address in firestore.rules')
 
-function token(uid, role, email) {
+function token(uid, role, email, provider = 'password', ageHours = 0) {
   const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url')
   const t = Math.floor(Date.now() / 1000)
   return `${b64({ alg: 'none', typ: 'JWT' })}.${b64({
     iss: `https://securetoken.google.com/${PROJECT}`, aud: PROJECT, sub: uid, user_id: uid,
-    iat: t, exp: t + 3600, auth_time: t, role, email, email_verified: true, firebase: { sign_in_provider: 'password' },
+    iat: t, exp: t + 3600, auth_time: t - ageHours * 3600, role, email, email_verified: true, firebase: { sign_in_provider: provider },
   })}.`
 }
 const call = (method, path, bearer, body) => fetch(`${DOCS}/${path}`, {
@@ -49,6 +49,8 @@ test('only the superadmin can write it — not signed-out users, students or sch
   assert.equal(await call('PATCH', path, null, doc), 403, 'signed out')
   assert.equal(await call('PATCH', path, token('emu-student', 'student', 'student@example.test'), doc), 403, 'student')
   assert.equal(await call('PATCH', path, token('emu-admin', 'admin', 'admin@example.test'), doc), 403, 'school admin')
-  assert.equal(await call('PATCH', path, token('emu-super', 'admin', SUPERADMIN), doc), 200, 'superadmin')
+  assert.equal(await call('PATCH', path, token('emu-super', 'admin', SUPERADMIN, 'google.com'), doc), 200, 'superadmin, signed in with Google')
+  assert.equal(await call('PATCH', path, token('emu-super', 'admin', SUPERADMIN), doc), 403, 'superadmin with a password-only sign-in')
+  assert.equal(await call('PATCH', path, token('emu-super', 'admin', SUPERADMIN, 'google.com', 13), doc), 403, 'superadmin, Google sign-in older than 12 hours')
   assert.equal(await call('DELETE', 'public_config/main', token('emu-admin', 'admin', 'admin@example.test')), 403, 'admin delete')
 })

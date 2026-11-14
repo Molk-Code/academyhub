@@ -26,6 +26,37 @@ export function requireSuperAdmin(context: functions.https.CallableContext): { u
   return { uid: context.auth.uid, email }
 }
 
+/** How long a Google sign-in counts for superadmin changes */
+export const SUPERADMIN_SESSION_HOURS = 12
+
+/**
+ * With SUPERADMIN_REQUIRE_GOOGLE=true (functions/.env.<projectId>): the
+ * superadmin must have signed in with Google — so their Google account's
+ * two-step verification protects it — within the last 12 hours, with the
+ * Google account of the superadmin address itself. A problem, or null.
+ */
+export function superAdminSessionProblem(
+  token: { auth_time?: unknown; firebase?: { sign_in_provider?: unknown } },
+  email: string, googleEmail: string | undefined, nowMs = Date.now(),
+): string | null {
+  const authTime = typeof token.auth_time === 'number' ? token.auth_time : 0
+  if (token.firebase?.sign_in_provider !== 'google.com' || nowMs / 1000 - authTime > SUPERADMIN_SESSION_HOURS * 3600) {
+    return `Confirm with Google first: superadmin changes need a Google sign-in from the last ${SUPERADMIN_SESSION_HOURS} hours.`
+  }
+  if (!googleEmail || googleEmail.toLowerCase() !== email) return 'Confirm with the Google account of the superadmin address itself.'
+  return null
+}
+
+/** requireSuperAdmin plus, where switched on, a recent Google sign-in */
+export async function requireSuperAdminSession(context: functions.https.CallableContext): Promise<{ uid: string; email: string }> {
+  const actor = requireSuperAdmin(context)
+  if (process.env.SUPERADMIN_REQUIRE_GOOGLE !== 'true') return actor
+  const google = (await admin.auth().getUser(actor.uid)).providerData.find(p => p.providerId === 'google.com')
+  const problem = superAdminSessionProblem(context.auth!.token, actor.email, google?.email)
+  if (problem) throw new functions.https.HttpsError('failed-precondition', problem)
+  return actor
+}
+
 const FRONT_DOORS = ['academy', 'rental_inventory', 'production'] as const
 type FrontDoor = typeof FRONT_DOORS[number]
 
@@ -137,7 +168,7 @@ export async function applySchoolUpdate(input: ModulesInput, actor: { uid: strin
 }
 
 export const updateSchoolModules = functions.region(REGION).runWith({ ...LIMITS, maxInstances: 2 }).https.onCall(async (data, context) => {
-  const actor = requireSuperAdmin(context)
+  const actor = await requireSuperAdminSession(context)
   const input = validateModulesInput(data)
   const after = await applySchoolUpdate(input, actor)
   return { ok: true, after }
@@ -164,7 +195,7 @@ export function validateLogo(data: unknown): { contentType: string; bytes: Buffe
 }
 
 export const uploadSchoolLogo = functions.region(REGION).runWith({ ...LIMITS, maxInstances: 2 }).https.onCall(async (data, context) => {
-  requireSuperAdmin(context)
+  await requireSuperAdminSession(context)
   const { contentType, bytes } = validateLogo(data)
   const bucket = admin.storage().bucket()
   const path = `branding/logo-${Date.now()}.${LOGO_TYPES[contentType]}`
@@ -194,7 +225,7 @@ export function checkSchoolDeletion(schoolId: unknown, confirmName: unknown, sch
 }
 
 export const deleteSchool = functions.region(REGION).runWith({ ...LIMITS, maxInstances: 2 }).https.onCall(async (data, context) => {
-  const actor = requireSuperAdmin(context)
+  const actor = await requireSuperAdminSession(context)
   const { schoolId, confirmName } = (data ?? {}) as { schoolId?: unknown; confirmName?: unknown }
   const ref = typeof schoolId === 'string' && schoolId ? db.collection('schools').doc(schoolId) : null
   const snap = ref ? await ref.get() : null

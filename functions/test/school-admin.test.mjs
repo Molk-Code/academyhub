@@ -122,3 +122,15 @@ test("deleting a school: never the deployment's own, and only with its exact nam
   assert.match(checkSchoolDeletion('gone', 'x', undefined, 'molkom'), /not found/)
   assert.match(checkSchoolDeletion('', 'x', school, 'molkom'), /required/)
 })
+
+test('superadmin session: a Google sign-in from the last 12 hours, with the superadmin address itself', async () => {
+  const { superAdminSessionProblem } = await import('../lib/school-admin.js')
+  const now = 1_800_000_000_000
+  const google = (hoursAgo, provider = 'google.com') => ({ auth_time: now / 1000 - hoursAgo * 3600, firebase: { sign_in_provider: provider } })
+  assert.equal(superAdminSessionProblem(google(1), 'boss@example.test', 'Boss@Example.test', now), null)
+  assert.match(superAdminSessionProblem(google(1, 'password'), 'boss@example.test', 'boss@example.test', now), /Confirm with Google/)
+  assert.match(superAdminSessionProblem(google(13), 'boss@example.test', 'boss@example.test', now), /last 12 hours/)
+  assert.match(superAdminSessionProblem(google(1), 'boss@example.test', 'someone@example.test', now), /superadmin address itself/)
+  assert.match(superAdminSessionProblem(google(1), 'boss@example.test', undefined, now), /superadmin address itself/)
+  assert.match(superAdminSessionProblem({}, 'boss@example.test', 'boss@example.test', now), /Confirm with Google/)
+})

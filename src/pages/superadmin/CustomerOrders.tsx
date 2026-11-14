@@ -201,6 +201,11 @@ function NewCustomerForm({ onDone }: { onDone: () => void }) {
       <button type="submit" className="btn-primary py-2 px-4 text-sm" disabled={busy || check?.ok === false || !Object.keys(f.selection).length}>
         {busy && <Loader2 className="w-4 h-4 animate-spin" />} Create order
       </button>
+      {!busy && (check?.ok === false || !Object.keys(f.selection).length) && (
+        <p className="text-xs text-zinc-400">
+          {!Object.keys(f.selection).length ? 'Choose at least one module to create the order.' : `Choose another short name: ${check?.problem ?? 'this one can’t be used'}`}
+        </p>
+      )}
     </form>
   )
 }

@@ -171,6 +171,11 @@ export default function OrderPage() {
         <button type="submit" className="btn-primary py-3 px-6" disabled={busy || noModule || check?.ok === false || !f.acceptTerms}>
           {busy && <Loader2 className="w-4 h-4 animate-spin" />} Send order
         </button>
+        {!busy && (noModule || check?.ok === false || !f.acceptTerms) && (
+          <p className="text-xs text-zinc-400">
+            {noModule ? 'Choose at least one module.' : check?.ok === false ? `Choose another address: ${check.problem}` : 'Accept the terms to send the order.'}
+          </p>
+        )}
         <p className="text-xs text-zinc-500">Nothing is charged now. We review the order and send an invoice.</p>
       </form>
     </div>

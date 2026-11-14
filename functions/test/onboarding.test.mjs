@@ -16,7 +16,7 @@ const valid = {
   school: { name: 'Nordic Film Academy', shortName: 'Nordic' },
   admin: { name: 'Alex Admin', email: 'Alex@Example.test' },
   billing: { email: 'invoices@example.test', reference: 'REF 12' },
-  plan: { selection: { academy: 'medium', rentalInventory: 'standard' }, maxStudents: 200 },
+  plan: { selection: { academy: 'standard', rentalInventory: 'standard' }, maxStudents: 200 },
   payment: { method: 'invoice' },
   startPolicy: 'after_payment',
   notes: 'met at a fair',
@@ -45,6 +45,7 @@ test('order input is validated; self-service is stricter', () => {
   bad({ admin: { name: 'A', email: 'not-an-email' } })
   bad({ plan: { selection: {} } })
   bad({ plan: { selection: { academy: 'huge' } } })
+  bad({ plan: { selection: { production: 'team' } } })
   bad({ plan: { selection: { billing: 'starter' } } })
   bad({ payment: { method: 'card' } })
   bad({ payment: { method: 'bitcoin' } })
@@ -192,20 +193,21 @@ test('removal: only set-up customers, with the exact name; a failed removal retr
 
 test('prices: plans per module, 20% off all three, billed annually; computed on the server', async () => {
   const pr = await import('../lib/pricing.js')
-  const v = ob.validateOrderInput({ ...valid, plan: { selection: { academy: 'small', production: 'team', rentalInventory: 'starter', bogus: '' } } }, { selfService: true })
+  const v = ob.validateOrderInput({ ...valid, plan: { selection: { academy: 'starter', production: 'standard', rentalInventory: 'starter', bogus: '' } } }, { selfService: true })
   assert.deepEqual(v.plan.modules, { academy: true, production: true, rentalInventory: true })
-  assert.equal(v.plan.quote.subtotalMonthly, 49 + 69 + 129)
+  assert.equal(v.plan.quote.subtotalMonthly, 19 + 69 + 59)
   assert.equal(v.plan.quote.discountRate, 0.2)
-  assert.equal(v.plan.quote.monthly, 197.6)
-  assert.equal(v.plan.quote.annual, 2371.2)
-  assert.equal(v.plan.maxStudents, 50, 'students from the Academy plan')
-  assert.equal(v.plan.planName, 'Rental & Inventory Starter + Production Team + Academy Small')
-  const two = pr.quote({ academy: 'large', production: 'studio' })
+  assert.equal(v.plan.quote.monthly, 117.6)
+  assert.equal(v.plan.quote.annual, 1411.2)
+  assert.equal(v.plan.maxStudents, 40, 'students from the Academy plan')
+  assert.equal(v.plan.planName, 'Rental & Inventory Starter + Production Standard + Academy Starter')
+  const two = pr.quote({ academy: 'plus', production: 'plus' })
   assert.equal(two.discountRate, 0)
-  assert.equal(two.monthly, 598)
-  assert.equal(two.annual, 7176)
-  const self = ob.validateOrderInput({ ...valid, plan: { selection: { academy: 'small' }, maxStudents: 9999, storageQuotaGB: 999 } }, { selfService: true })
-  assert.equal(self.plan.maxStudents, 50, "a customer can't raise their own limits")
+  assert.equal(two.monthly, 448)
+  assert.equal(two.annual, 5376)
+  assert.equal(ob.validateOrderInput({ ...valid, plan: { selection: { academy: 'plus' } } }, { selfService: true }).plan.maxStudents, null, 'Plus: unlimited')
+  const self = ob.validateOrderInput({ ...valid, plan: { selection: { academy: 'starter' }, maxStudents: 9999, storageQuotaGB: 999 } }, { selfService: true })
+  assert.equal(self.plan.maxStudents, 40, "a customer can't raise their own limits")
   assert.equal(self.plan.storageQuotaGB, null)
-  assert.equal(ob.validateOrderInput({ ...valid, plan: { selection: { academy: 'small' }, maxStudents: 80 } }, { selfService: false }).plan.maxStudents, 80, 'the superadmin can')
+  assert.equal(ob.validateOrderInput({ ...valid, plan: { selection: { academy: 'starter' } , maxStudents: 80 } }, { selfService: false }).plan.maxStudents, 80, 'the superadmin can')
 })

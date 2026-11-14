@@ -19,8 +19,9 @@ interface AuditEntry {
   schoolId: string
   by: { email: string }
   at?: { toDate(): Date }
-  before: { school: Record<string, unknown> }
-  after: { school: Record<string, unknown> }
+  action?: string
+  before: { school?: Record<string, unknown> } | null
+  after: { school?: Record<string, unknown> } | null
 }
 
 const updateSchoolModules = httpsCallable<Record<string, unknown>, { ok: true }>(functions, 'updateSchoolModules')
@@ -121,7 +122,9 @@ export default function SchoolModulesPanel({ school }: { school: SchoolDoc }) {
     } finally { setBusy(null) }
   }
 
-  const entries = audit.filter(a => a.schoolId === school.id).slice(0, 5)
+  // Only module/profile saves carry before/after school states; a deleteSchool
+  // entry for an earlier school with the same id has after: null.
+  const entries = audit.filter(a => a.schoolId === school.id && a.action === 'updateSchoolModules' && a.after?.school).slice(0, 5)
 
   return (
     <div className="space-y-6" onClick={e => e.stopPropagation()}>
@@ -262,7 +265,7 @@ export default function SchoolModulesPanel({ school }: { school: SchoolDoc }) {
         <section className="space-y-1.5">
           <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5"><History className="w-3.5 h-3.5" /> Recent changes</p>
           {entries.map(a => {
-            const b = a.before.school.modules as ModuleFlags | null, n = a.after.school.modules as ModuleFlags
+            const b = (a.before?.school?.modules ?? null) as ModuleFlags | null, n = a.after!.school!.modules as ModuleFlags
             const changed = MODULE_IDS.filter(id => (b?.[MODULE_FLAG[id]] ?? null) !== n?.[MODULE_FLAG[id]])
               .map(id => `${MODULE_INFO[id].name} ${n[MODULE_FLAG[id]] ? 'on' : 'off'}`)
             return (

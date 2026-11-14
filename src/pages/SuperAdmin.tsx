@@ -398,7 +398,7 @@ function AddSchoolForm({ onDone, onCancel }: { onDone: () => void; onCancel: () 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function SuperAdmin() {
-  const { profile } = useAuth()
+  const { user, profile, loading: authLoading } = useAuth()
   const [showForm,  setShowForm]  = useState(false)
   const [createdMsg, setCreatedMsg] = useState(false)
 
@@ -408,6 +408,12 @@ export default function SuperAdmin() {
   const { data: users }                                 = useCollection<UserDoc>('users',         [], isSuperAdmin)
   const { data: productions }                           = useCollection<ProductionDoc>('productions', [], isSuperAdmin)
   const { data: equipment }                             = useCollection<EquipmentDoc>('equipment', [], isSuperAdmin)
+
+  // Wait for the profile before deciding: it arrives after sign-in is restored,
+  // and judging on the empty profile flashed "Access denied." on every load.
+  if (!isSuperAdmin && (authLoading || (user && !profile))) {
+    return <div className="min-h-screen bg-black" aria-busy="true" />
+  }
 
   if (!isSuperAdmin) {
     return (

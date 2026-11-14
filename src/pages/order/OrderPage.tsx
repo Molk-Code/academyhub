@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom'
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '@/lib/firebase'
 import { LEGAL } from '@/config/legal'
-import { MODULE_INFO } from '@/config/modules'
-import { MODULE_FLAG, MODULE_IDS } from '@/lib/features'
 import { ORDER_TERMS as T, TERMS_VERSION } from '@/config/orderTerms'
 import { usePageMeta } from '@/lib/pageMeta'
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 import { Decided } from './OrderLayout'
+import PlanPicker from './PlanPicker'
+import type { PlanSelection } from '@/config/pricing'
 
 // /order: an organisation orders CineForge, paid by invoice. The order lands
 // in Superadmin → Customers (submitCustomerOrder) and nothing is set up until
@@ -18,8 +18,8 @@ type NameCheck = { ok: boolean; problem: string | null; address: string | null }
 
 const EMPTY = {
   orgName: '', orgNumber: '', schoolName: '', shortName: '', adminName: '', adminEmail: '',
-  billingEmail: '', billingReference: '', billingAddress: '', maxStudents: '',
-  modules: { academy: true, production: true, rentalInventory: true } as Record<string, boolean>,
+  billingEmail: '', billingReference: '', billingAddress: '',
+  selection: {} as PlanSelection,
   acceptTerms: false, website: '',
 }
 
@@ -56,7 +56,7 @@ export default function OrderPage() {
         school: { name: f.schoolName, shortName: f.shortName },
         admin: { name: f.adminName, email: f.adminEmail },
         billing: { email: f.billingEmail, reference: f.billingReference, address: f.billingAddress },
-        plan: { planName: null, modules: f.modules, maxStudents: f.maxStudents.trim() === '' ? null : Number(f.maxStudents), storageQuotaGB: null },
+        plan: { selection: f.selection },
         payment: { method: 'invoice' },
         startPolicy: 'after_payment',
         acceptTerms: f.acceptTerms,
@@ -92,7 +92,7 @@ export default function OrderPage() {
       {opts.hint && <span className="block text-xs text-zinc-500">{opts.hint}</span>}
     </label>
   )
-  const noModule = !Object.values(f.modules).some(Boolean)
+  const noModule = !Object.keys(f.selection).length
 
   return (
     <div className="space-y-8">
@@ -104,25 +104,10 @@ export default function OrderPage() {
       </header>
 
       <form onSubmit={submit} className="space-y-8">
-        <fieldset className="space-y-3">
-          <legend className="text-lg font-semibold text-white mb-1">Modules</legend>
-          <p className="text-sm text-zinc-400">Prices: <Decided value={T.pricing} what="prices" /></p>
-          <div className="grid sm:grid-cols-3 gap-3">
-            {MODULE_IDS.map(id => {
-              const on = !!f.modules[MODULE_FLAG[id]]
-              return (
-                <label key={id} className={`rounded-xl border p-4 cursor-pointer space-y-1 ${on ? 'border-brand-500 bg-brand-500/10' : 'border-white/10 bg-zinc-900'}`}>
-                  <span className="flex items-center gap-2 font-semibold text-white">
-                    <input type="checkbox" checked={on} onChange={e => set('modules', { ...f.modules, [MODULE_FLAG[id]]: e.target.checked })} />
-                    {MODULE_INFO[id].name}
-                  </span>
-                  <span className="block text-xs text-zinc-400">{MODULE_INFO[id].tagline}</span>
-                </label>
-              )
-            })}
-          </div>
-          {noModule && <p className="text-sm text-rose-400">Choose at least one module.</p>}
-        </fieldset>
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold text-white">Plans</h2>
+          <PlanPicker value={f.selection} onChange={v => set('selection', v)} />
+        </section>
 
         <fieldset className="grid sm:grid-cols-2 gap-4">
           <legend className="text-lg font-semibold text-white mb-1">Your school</legend>
@@ -144,7 +129,6 @@ export default function OrderPage() {
               {check ? (check.ok ? `${check.address} is free` : check.problem) : ''}
             </span>
           </label>
-          {field('Number of students (approx.)', 'maxStudents', { type: 'number' })}
         </fieldset>
 
         <fieldset className="grid sm:grid-cols-2 gap-4">

@@ -6,16 +6,19 @@ import { useCollection, orderBy } from '@/hooks/useFirestore'
 import { MODULE_INFO } from '@/config/modules'
 import { MODULE_FLAG, MODULE_IDS } from '@/lib/features'
 import { format } from 'date-fns'
+import RemoveCustomerDialog from './RemoveCustomerDialog'
+import PlanPicker, { eur } from '@/pages/order/PlanPicker'
+import type { PlanSelection, Quote } from '@/config/pricing'
 import { Plus, X, ChevronDown, ChevronUp, Loader2, CheckCircle2, AlertCircle, Circle, CircleDot, XCircle } from 'lucide-react'
 
 // Superadmin → Customers: new customers come in as orders (functions/src/
 // onboarding.ts). Paid by invoice for now: mark the invoice paid, or start the
 // setup before payment. Setup then runs on its own and its steps show here.
 
-type Status = 'awaiting_payment' | 'queued' | 'provisioning' | 'live' | 'failed' | 'cancelled'
+type Status = 'awaiting_payment' | 'queued' | 'provisioning' | 'live' | 'failed' | 'cancelled' | 'removing' | 'removed'
 type StepStatus = 'pending' | 'running' | 'done' | 'failed'
 
-interface Order {
+export interface Order {
   id: string
   status: Status
   source: 'superadmin' | 'self_service'
@@ -24,10 +27,14 @@ interface Order {
   school: { name: string; shortName: string }
   admin: { name: string; email: string }
   billing: { email: string; reference: string | null; address: string | null }
-  plan: { planName: string | null; modules: Record<string, boolean>; maxStudents: number | null; storageQuotaGB: number | null }
+  plan: { planName: string | null; modules: Record<string, boolean>; maxStudents: number | null; storageQuotaGB: number | null; quote?: Quote }
   payment: { method: 'invoice' | 'card'; status: 'pending' | 'paid'; invoiceNumber: string | null }
   startPolicy: 'after_payment' | 'immediately'
-  provisioning: { steps: Record<string, { status: StepStatus; error?: string }>; error: string | null; note: string | null; attempts: number }
+  provisioning: {
+    steps: Record<string, { status: StepStatus; error?: string }>; error: string | null; note: string | null; attempts: number
+    state?: { projectId?: string }; logUrl?: string | null; buildId?: string | null
+  }
+  removal?: boolean
   notes: string | null
   preview?: boolean
   createdAt?: { toDate(): Date }
@@ -53,11 +60,14 @@ const STATUS: Record<Status, { label: string; pill: string }> = {
   live:             { label: 'Live',             pill: 'bg-emerald-900/50 text-emerald-300 border-emerald-800/50' },
   failed:           { label: 'Setup failed',     pill: 'bg-rose-900/50 text-rose-300 border-rose-800/50' },
   cancelled:        { label: 'Cancelled',        pill: 'bg-zinc-800 text-zinc-400 border-zinc-700' },
+  removing:         { label: 'Removing',         pill: 'bg-rose-900/50 text-rose-300 border-rose-800/50' },
+  removed:          { label: 'Removed',          pill: 'bg-zinc-800 text-zinc-400 border-zinc-700' },
 }
 
 const EVENT_LABEL: Record<string, string> = {
   created: 'Order created', payment_confirmed: 'Payment recorded', started_before_payment: 'Setup started before payment',
-  invoice_number: 'Invoice number set', cancelled: 'Cancelled', retry: 'Setup retried', setup_failed: 'Setup failed', live: 'Live',
+  invoice_number: 'Invoice number set', cancelled: 'Cancelled', retry: 'Retried', setup_failed: 'Setup failed', live: 'Live',
+  removal_requested: 'Removal requested', removal_failed: 'Removal failed', removed: 'Removed',
 }
 
 function call<T = unknown>(name: string, data: Record<string, unknown>) {
@@ -71,7 +81,7 @@ const who = (by: Record<string, string>) => by.email ?? by.provider ?? (by.syste
 const EMPTY = {
   orgName: '', orgNumber: '', schoolName: '', shortName: '', adminName: '', adminEmail: '',
   billingEmail: '', billingReference: '', billingAddress: '', maxStudents: '', storageGB: '',
-  modules: { academy: true, production: true, rentalInventory: true } as Record<string, boolean>,
+  selection: {} as PlanSelection,
   startPolicy: 'after_payment' as 'after_payment' | 'immediately', notes: '',
 }
 
@@ -107,7 +117,7 @@ function NewCustomerForm({ onDone }: { onDone: () => void }) {
         school: { name: f.schoolName, shortName: f.shortName },
         admin: { name: f.adminName, email: f.adminEmail },
         billing: { email: f.billingEmail, reference: f.billingReference, address: f.billingAddress },
-        plan: { planName: null, modules: f.modules, maxStudents: num(f.maxStudents), storageQuotaGB: num(f.storageGB) },
+        plan: { selection: f.selection, maxStudents: num(f.maxStudents), storageQuotaGB: num(f.storageGB) },
         payment: { method: 'invoice' },
         startPolicy: f.startPolicy,
         notes: f.notes,
@@ -161,20 +171,14 @@ function NewCustomerForm({ onDone }: { onDone: () => void }) {
         </label>
       </fieldset>
 
-      <fieldset className="grid sm:grid-cols-2 gap-3">
-        <legend className="text-sm font-semibold text-zinc-200 mb-2">Plan</legend>
-        {field('Student limit', 'maxStudents', { type: 'number' })}
-        {field('Storage (GB)', 'storageGB', { type: 'number' })}
-        <div className="sm:col-span-2 flex flex-wrap gap-4">
-          {MODULE_IDS.map(id => (
-            <label key={id} className="flex items-center gap-2 text-sm text-zinc-300">
-              <input type="checkbox" checked={!!f.modules[MODULE_FLAG[id]]}
-                onChange={e => set('modules', { ...f.modules, [MODULE_FLAG[id]]: e.target.checked })} />
-              {MODULE_INFO[id].name}
-            </label>
-          ))}
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold text-zinc-200">Plans</h3>
+        <PlanPicker compact value={f.selection} onChange={v => set('selection', v)} />
+        <div className="grid sm:grid-cols-2 gap-3">
+          {field('Student limit (empty: from the Academy plan)', 'maxStudents', { type: 'number' })}
+          {field('Storage (GB)', 'storageGB', { type: 'number' })}
         </div>
-      </fieldset>
+      </section>
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-semibold text-zinc-200 mb-2">When to set up</legend>
@@ -194,7 +198,7 @@ function NewCustomerForm({ onDone }: { onDone: () => void }) {
       </label>
 
       {error && <p role="alert" className="text-sm text-rose-400 flex items-center gap-1.5"><AlertCircle className="w-4 h-4" /> {error}</p>}
-      <button type="submit" className="btn-primary py-2 px-4 text-sm" disabled={busy || check?.ok === false}>
+      <button type="submit" className="btn-primary py-2 px-4 text-sm" disabled={busy || check?.ok === false || !Object.keys(f.selection).length}>
         {busy && <Loader2 className="w-4 h-4 animate-spin" />} Create order
       </button>
     </form>
@@ -216,6 +220,7 @@ function OrderDetails({ order }: { order: Order }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const [removing, setRemoving] = useState(false)
 
   async function act(name: string, data: Record<string, unknown> = {}) {
     setBusy(name); setError('')
@@ -225,8 +230,11 @@ function OrderDetails({ order }: { order: Order }) {
   }
 
   const modules = MODULE_IDS.filter(id => order.plan.modules[MODULE_FLAG[id]]).map(id => MODULE_INFO[id].name).join(', ')
-  const unpaid = order.payment.status !== 'paid' && order.status !== 'cancelled'
-  const cancellable = ['awaiting_payment', 'queued', 'failed'].includes(order.status)
+  const unpaid = order.payment.status !== 'paid' && !['cancelled', 'removed'].includes(order.status)
+  const projectId = order.provisioning.state?.projectId
+  const cancellable = ['awaiting_payment', 'queued', 'failed'].includes(order.status) && !projectId
+  const removable = order.status === 'live' || (order.status === 'failed' && !!projectId)
+  const running = ['provisioning', 'removing'].includes(order.status) && !!order.provisioning.buildId
 
   return (
     <div className="px-5 pb-5 pt-1 grid lg:grid-cols-2 gap-6 text-sm">
@@ -237,7 +245,10 @@ function OrderDetails({ order }: { order: Order }) {
           <dt className="text-zinc-500">School admin</dt><dd>{order.admin.name} · {order.admin.email}</dd>
           <dt className="text-zinc-500">Invoice to</dt><dd>{order.billing.email}{order.billing.reference && ` · ref ${order.billing.reference}`}</dd>
           {order.billing.address && (<><dt className="text-zinc-500">Invoice address</dt><dd className="whitespace-pre-line">{order.billing.address}</dd></>)}
-          <dt className="text-zinc-500">Plan</dt><dd>{[order.plan.planName, modules].filter(Boolean).join(' · ')}</dd>
+          <dt className="text-zinc-500">Plan</dt><dd>{order.plan.planName || modules}</dd>
+          {order.plan.quote && (
+            <><dt className="text-zinc-500">Price</dt><dd>{eur(order.plan.quote.monthly)}/month · {eur(order.plan.quote.annual)} per year, excl. VAT{order.plan.quote.discountRate > 0 && ` (${Math.round(order.plan.quote.discountRate * 100)}% bundle discount)`}</dd></>
+          )}
           {(order.plan.maxStudents !== null || order.plan.storageQuotaGB !== null) && (
             <><dt className="text-zinc-500">Limits</dt><dd>{[order.plan.maxStudents !== null && `${order.plan.maxStudents} students`, order.plan.storageQuotaGB !== null && `${order.plan.storageQuotaGB} GB`].filter(Boolean).join(' · ')}</dd></>
           )}
@@ -269,8 +280,16 @@ function OrderDetails({ order }: { order: Order }) {
           )}
           {order.status === 'failed' && (
             <button type="button" className="btn-primary py-2 px-3 text-sm" disabled={!!busy} onClick={() => act('retryCustomerOrder')}>
-              {busy === 'retryCustomerOrder' && <Loader2 className="w-4 h-4 animate-spin" />} Retry setup
+              {busy === 'retryCustomerOrder' && <Loader2 className="w-4 h-4 animate-spin" />} {order.removal ? 'Retry removal' : 'Retry setup'}
             </button>
+          )}
+          {running && (
+            <button type="button" className="btn-secondary py-2 px-3 text-sm" disabled={!!busy} onClick={() => act('refreshCustomerOrder')}>
+              {busy === 'refreshCustomerOrder' && <Loader2 className="w-4 h-4 animate-spin" />} Check the job
+            </button>
+          )}
+          {removable && (
+            <button type="button" className="text-sm text-rose-300 hover:text-rose-200 px-2" onClick={() => setRemoving(true)}>Remove customer…</button>
           )}
           {cancellable && (confirmCancel ? (
             <>
@@ -284,6 +303,7 @@ function OrderDetails({ order }: { order: Order }) {
           ))}
         </div>
         {error && <p role="alert" className="text-rose-400 flex items-center gap-1.5"><AlertCircle className="w-4 h-4" /> {error}</p>}
+        {removing && <RemoveCustomerDialog order={order} onClose={() => setRemoving(false)} />}
       </div>
 
       <div className="space-y-4">
@@ -303,6 +323,14 @@ function OrderDetails({ order }: { order: Order }) {
             })}
           </ol>
           {order.provisioning.note && <p className="mt-2 text-xs text-amber-300 flex items-center gap-1.5"><CircleDot className="w-3.5 h-3.5" /> {order.provisioning.note}</p>}
+          {order.provisioning.error && <p className="mt-2 text-xs text-rose-400">{order.provisioning.error}</p>}
+          {(projectId || order.provisioning.logUrl) && (
+            <p className="mt-2 text-xs text-zinc-500 flex flex-wrap gap-x-3">
+              {projectId && <a className="hover:text-zinc-300 underline" href={`https://console.firebase.google.com/project/${projectId}/overview`} target="_blank" rel="noreferrer">Project {projectId}</a>}
+              {order.provisioning.logUrl && <a className="hover:text-zinc-300 underline" href={order.provisioning.logUrl} target="_blank" rel="noreferrer">Job log</a>}
+              {order.status === 'live' && <a className="hover:text-zinc-300 underline" href={`https://${order.address}`} target="_blank" rel="noreferrer">Open {order.address}</a>}
+            </p>
+          )}
         </div>
         {events.length > 0 && (
           <div>

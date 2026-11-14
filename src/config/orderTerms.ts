@@ -32,7 +32,7 @@ export interface OrderTermsDecisions {
 }
 
 export const ORDER_TERMS: OrderTermsDecisions = {
-  pricing: '',
+  pricing: 'the plan per module chosen in the order, in euros per month, billed annually in advance (20% off when all three modules are ordered)',
   paymentTermDays: '',
   initialTerm: '',
   noticePeriod: '',

@@ -219,14 +219,16 @@ export async function deploy(ctx) {
         return
       } catch (e) {
         if (i >= tries) throw new Error(`firebase ${args.join(' ')} failed (see the build log)`)
-        console.log(`retrying firebase ${args.join(' ')} (${i}/${tries})`)
+        // A new or just-switched database answers 409 for a while: wait before retrying
+        console.log(`retrying firebase ${args.join(' ')} in 60 s (${i}/${tries})`)
+        execFileSync('sleep', ['60'])
       }
     }
   }
-  fire(['deploy', '--config', `firebase.${MODE}.json`, '--only', 'firestore,storage', '--force'], 2)
+  fire(['deploy', '--config', `firebase.${MODE}.json`, '--only', 'firestore,storage', '--force'], 5)
   fire(['deploy', '--config', `firebase.${MODE}.json`, '--only', 'functions', '--force'], 3)
   fire(['functions:artifacts:setpolicy', '--location', REGION, '--force'], 2)
-  fire(['deploy', '--config', `firebase.${MODE}.json`, '--only', 'hosting'], 2)
+  fire(['deploy', '--config', `firebase.${MODE}.json`, '--only', 'hosting'], 3)
 }
 
 function customerDb(projectId) {

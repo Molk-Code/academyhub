@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection } from '@/hooks/useFirestore'
@@ -14,17 +14,13 @@ import GoogleSessionGate from '@/pages/superadmin/GoogleSessionGate'
 import { SCHOOL_ID } from '@/lib/school'
 import { isSuperAdminEmail } from '@/lib/superadmin'
 import {
-  Building2, Users, Clapperboard, Boxes, Plus, X, ChevronDown, ChevronUp,
+  Building2, Users, Clapperboard, Boxes, ChevronDown, ChevronUp,
   ExternalLink, CheckCircle2, Loader2, AlertCircle, Trash2,
 } from 'lucide-react'
 import { clickableRow } from '@/lib/a11y'
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function slugify(s: string) {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32)
-}
 
 function fmtDate(ts: any) {
   try { return format(ts.toDate(), 'MMM d, yyyy') } catch { return '—' }
@@ -269,131 +265,6 @@ function SchoolRow({ school }: { school: SchoolDoc }) {
   )
 }
 
-// ── Add School form ───────────────────────────────────────────────────────────
-
-interface AddForm {
-  schoolId:     string
-  name:         string
-  contactEmail: string
-  tier:         SchoolTier
-}
-const EMPTY_FORM: AddForm = { schoolId: '', name: '', contactEmail: '', tier: 'studio' }
-
-function AddSchoolForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
-  const [form,        setForm]        = useState<AddForm>({ ...EMPTY_FORM })
-  const [idEdited,    setIdEdited]    = useState(false)
-  const [saving,      setSaving]      = useState(false)
-  const [saveError,   setSaveError]   = useState<string | null>(null)
-
-  function handleName(name: string) {
-    setForm(f => ({ ...f, name, ...(!idEdited ? { schoolId: slugify(name) } : {}) }))
-  }
-
-  function handleId(raw: string) {
-    setIdEdited(true)
-    setForm(f => ({ ...f, schoolId: slugify(raw) }))
-  }
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!form.name.trim() || !form.schoolId.trim()) return
-    setSaving(true)
-    setSaveError(null)
-    try {
-      await setDoc(doc(db, 'schools', form.schoolId), {
-        schoolId:           form.schoolId,
-        name:               form.name.trim(),
-        contactEmail:       form.contactEmail.trim() || null,
-        tier:               form.tier,
-        status:             'trial' as SchoolStatus,
-        isBeta:             true,
-        onboardingDate:     serverTimestamp(),
-        features:           {},
-        maxStudents:        100,
-        subscriptionStatus: 'free',
-      })
-      onDone()
-    } catch (err: any) {
-      setSaveError(err?.message ?? 'Failed to create school.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="bg-zinc-900 border border-white/10 rounded-2xl p-5 space-y-4">
-      <div className="flex items-start gap-3 bg-amber-950/30 border border-amber-800/40 rounded-xl p-3">
-        <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-        <p className="text-xs text-amber-300 leading-relaxed">
-          Registering a school here does not yet isolate its data — full multi-tenancy data migration is a separate future step.
-        </p>
-      </div>
-
-      <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="label">School name *</label>
-          <input
-            value={form.name}
-            onChange={e => handleName(e.target.value)}
-            className="input w-full"
-            placeholder="e.g. Molkom Gymnasium"
-            autoFocus
-          />
-        </div>
-        <div>
-          <label className="label">School ID *</label>
-          <input
-            value={form.schoolId}
-            onChange={e => handleId(e.target.value)}
-            className="input w-full font-mono"
-            placeholder="e.g. molkom"
-          />
-          <p className="text-xs text-zinc-500 mt-1">Lowercase, letters/numbers/hyphens only. Permanent.</p>
-        </div>
-        <div>
-          <label className="label">Contact email</label>
-          <input
-            type="email"
-            value={form.contactEmail}
-            onChange={e => setForm(f => ({ ...f, contactEmail: e.target.value }))}
-            className="input w-full"
-            placeholder="admin@school.se"
-          />
-        </div>
-        <div>
-          <label className="label">Tier</label>
-          <select
-            value={form.tier}
-            onChange={e => setForm(f => ({ ...f, tier: e.target.value as SchoolTier }))}
-            className="input w-full"
-          >
-            <option value="studio">Studio</option>
-            <option value="academy">Academy</option>
-            <option value="campus">Campus</option>
-          </select>
-        </div>
-
-        {saveError && (
-          <p className="col-span-full text-sm text-rose-400 bg-rose-950/30 border border-rose-800/40 rounded-xl px-3 py-2">
-            {saveError}
-          </p>
-        )}
-
-        <div className="col-span-full flex gap-2 pt-1">
-          <button
-            type="submit"
-            disabled={saving || !form.name.trim() || !form.schoolId.trim()}
-            className="btn-primary py-2 px-5 disabled:opacity-50"
-          >
-            {saving ? 'Creating…' : 'Create School'}
-          </button>
-          <button type="button" onClick={onCancel} className="btn-secondary py-2 px-4">Cancel</button>
-        </div>
-      </form>
-    </div>
-  )
-}
-
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function SuperAdmin() {
@@ -418,19 +289,11 @@ export default function SuperAdmin() {
 }
 
 function SuperAdminContent() {
-  const [showForm,  setShowForm]  = useState(false)
-  const [createdMsg, setCreatedMsg] = useState(false)
 
   const { data: schools,     loading: schoolsLoading } = useCollection<SchoolDoc>('schools',     [])
   const { data: users }                                 = useCollection<UserDoc>('users',         [])
   const { data: productions }                           = useCollection<ProductionDoc>('productions', [])
   const { data: equipment }                             = useCollection<EquipmentDoc>('equipment', [])
-
-  function handleCreated() {
-    setShowForm(false)
-    setCreatedMsg(true)
-    setTimeout(() => setCreatedMsg(false), 4000)
-  }
 
   return (
     <div className="min-h-screen bg-black text-white p-6 sm:p-10 space-y-8 max-w-6xl mx-auto">
@@ -476,30 +339,10 @@ function SuperAdminContent() {
 
       {/* Schools section */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div>
           <h2 className="text-base font-semibold text-zinc-100">Schools</h2>
-          <div className="flex items-center gap-3">
-            {createdMsg && (
-              <span className="text-sm text-emerald-400 flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4" /> School created
-              </span>
-            )}
-            <button
-              onClick={() => setShowForm(s => !s)}
-              className="flex items-center gap-2 btn bg-brand-600 text-white hover:bg-brand-500 py-2 text-sm"
-            >
-              {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-              {showForm ? 'Cancel' : 'Add School'}
-            </button>
-          </div>
+          <p className="text-xs text-zinc-500">The schools in this installation. New customers come in under Customers and get their own installation.</p>
         </div>
-
-        {showForm && (
-          <AddSchoolForm
-            onDone={handleCreated}
-            onCancel={() => setShowForm(false)}
-          />
-        )}
 
         <div className="bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">

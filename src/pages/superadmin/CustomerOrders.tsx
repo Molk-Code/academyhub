@@ -70,7 +70,7 @@ const who = (by: Record<string, string>) => by.email ?? by.provider ?? (by.syste
 
 const EMPTY = {
   orgName: '', orgNumber: '', schoolName: '', shortName: '', adminName: '', adminEmail: '',
-  billingEmail: '', billingReference: '', billingAddress: '', planName: '', maxStudents: '', storageGB: '',
+  billingEmail: '', billingReference: '', billingAddress: '', maxStudents: '', storageGB: '',
   modules: { academy: true, production: true, rentalInventory: true } as Record<string, boolean>,
   startPolicy: 'after_payment' as 'after_payment' | 'immediately', notes: '',
 }
@@ -107,7 +107,7 @@ function NewCustomerForm({ onDone }: { onDone: () => void }) {
         school: { name: f.schoolName, shortName: f.shortName },
         admin: { name: f.adminName, email: f.adminEmail },
         billing: { email: f.billingEmail, reference: f.billingReference, address: f.billingAddress },
-        plan: { planName: f.planName, modules: f.modules, maxStudents: num(f.maxStudents), storageQuotaGB: num(f.storageGB) },
+        plan: { planName: null, modules: f.modules, maxStudents: num(f.maxStudents), storageQuotaGB: num(f.storageGB) },
         payment: { method: 'invoice' },
         startPolicy: f.startPolicy,
         notes: f.notes,
@@ -161,12 +161,11 @@ function NewCustomerForm({ onDone }: { onDone: () => void }) {
         </label>
       </fieldset>
 
-      <fieldset className="grid sm:grid-cols-3 gap-3">
+      <fieldset className="grid sm:grid-cols-2 gap-3">
         <legend className="text-sm font-semibold text-zinc-200 mb-2">Plan</legend>
-        {field('Plan name', 'planName')}
         {field('Student limit', 'maxStudents', { type: 'number' })}
         {field('Storage (GB)', 'storageGB', { type: 'number' })}
-        <div className="sm:col-span-3 flex flex-wrap gap-4">
+        <div className="sm:col-span-2 flex flex-wrap gap-4">
           {MODULE_IDS.map(id => (
             <label key={id} className="flex items-center gap-2 text-sm text-zinc-300">
               <input type="checkbox" checked={!!f.modules[MODULE_FLAG[id]]}

@@ -79,9 +79,11 @@ export async function project(ctx) {
   const projectNumber = p.name.split('/')[1]
   await ctx.save({ projectNumber })
 
-  // The setup account and the superadmin own the project
+  // The setup account owns the project; the superadmin can manage it (Google
+  // only lets a person outside the organisation become Owner by invitation)
   const superadmins = env.SUPERADMIN_EMAILS.split(',').map(s => s.trim()).filter(Boolean)
-  await grant(projectId, [['roles/owner', `serviceAccount:${env.SETUP_SA}`], ...superadmins.map(e => ['roles/owner', `user:${e}`])])
+  await grant(projectId, [['roles/owner', `serviceAccount:${env.SETUP_SA}`]])
+  await grant(projectId, superadmins.flatMap(e => [['roles/editor', `user:${e}`], ['roles/firebase.admin', `user:${e}`]]))
 
   await google('PUT', `https://cloudbilling.googleapis.com/v1/projects/${projectId}/billingInfo`, { billingAccountName: `billingAccounts/${env.BILLING_ACCOUNT}` })
 

@@ -4,6 +4,7 @@ import {
   serverTimestamp, onSnapshot, writeBatch, getDocs, query,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { checkOutEquipmentUnits, bookingErrorMessage } from '@/lib/equipmentAvailability'
 import { useCollection, where } from '@/hooks/useFirestore'
 import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc } from '@/types'
 import {
@@ -333,8 +334,15 @@ export function ProjectDetail({
         return
       }
       if (result.kind === 'duplicate') {
-        log(displayName, 'Already checked out in this project', true)
-        flashItem(displayName, matchedEquip?.id, 'Already scanned out', true)
+        const where = result.elsewhere ? `Already out in ${result.elsewhere}` : 'Already checked out in this project'
+        log(displayName, where, true)
+        flashItem(displayName, matchedEquip?.id, result.elsewhere ? `Out in ${result.elsewhere}` : 'Already scanned out', true)
+        beep(220)
+        return
+      }
+      if (result.kind === 'refused') {
+        log(displayName, result.message, true)
+        flashItem(displayName, matchedEquip?.id, 'None free on these dates', true)
         beep(220)
         return
       }
@@ -367,6 +375,16 @@ export function ProjectDetail({
 
   async function addItemManual(name: string, equipmentId = '') {
     if (!name.trim()) return
+    if (equipmentId) {
+      // A catalog item: the server adds it only if one is free on the project's dates
+      try {
+        await checkOutEquipmentUnits(project.id, [{ equipmentId, equipmentName: name.trim() }], project.borrowers?.[0] ?? '')
+        setManualInput('')
+      } catch (err) {
+        flashItem(name.trim(), equipmentId, bookingErrorMessage(err, 'Could not add the item. Try again.'), true)
+      }
+      return
+    }
     await addDoc(collection(db, `inventory_projects/${project.id}/items`), {
       equipmentId,
       equipmentName: name.trim(),

@@ -1,6 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
-import { addDoc, collection, serverTimestamp, updateDoc, doc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { createEquipmentBooking, bookingErrorMessage } from '@/lib/equipmentAvailability'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument, orderBy, where } from '@/hooks/useFirestore'
 import { cn } from '@/lib/utils'
@@ -264,8 +263,8 @@ function CheckoutForm({ items, profile, cohortId, onSuccess, onBack }: {
         equipmentName: i.equipment.name,
         quantity: i.quantity,
       }))
-      await addDoc(collection(db, 'equipment_bookings'), {
-        studentId: profile.uid,
+      // The server checks every item is free on these dates and writes the booking
+      await createEquipmentBooking({
         studentName: profile.displayName ?? '',
         studentEmail: profile.email ?? '',
         cohortId: cohortId ?? '',
@@ -274,12 +273,10 @@ function CheckoutForm({ items, profile, cohortId, onSuccess, onBack }: {
         checkoutDate,
         returnDate,
         teacherNotes: notes.trim(),
-        status: 'pending',
-        createdAt: serverTimestamp(),
       })
       onSuccess()
     } catch (e: any) {
-      setError(e?.message ?? 'Failed to submit booking')
+      setError(bookingErrorMessage(e, 'Failed to submit booking'))
     } finally {
       setSubmitting(false)
     }

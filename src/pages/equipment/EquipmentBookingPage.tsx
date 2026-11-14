@@ -17,6 +17,7 @@ import { ImageGallery, equipmentImages } from './ImageGallery'
 import './molkom.css'
 import { BookingPartsSummary, ProductionLink } from '@/components/equipment/BookingPartsPanel'
 import { bookingParts, isItemUnavailable } from '@/lib/bookingParts'
+import { equipmentAvailability, createEquipmentBooking, bookingErrorMessage } from '@/lib/equipmentAvailability'
 import { clickable } from '@/lib/a11y'
 
 const INFO_LABEL: React.CSSProperties = { fontSize: '.7rem', fontWeight: 700, color: '#6a6a80', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }
@@ -327,6 +328,22 @@ export default function EquipmentBookingPage() {
 
   const rentalDays = calcRentalDays(fromDate, toDate)
 
+  // Units free on the chosen dates, from the server (it counts every booking
+  // and project, which this page can't read). Until both dates are set, the
+  // catalog's "on the shelf now" count is shown instead.
+  const [dateFree, setDateFree] = useState<Record<string, number> | null>(null)
+  useEffect(() => {
+    setDateFree(null)
+    if (!fromDate || !toDate || toDate < fromDate) return
+    let live = true
+    const t = setTimeout(() => {
+      equipmentAvailability(fromDate, toDate).then(a => { if (live) setDateFree(a) }).catch(() => { if (live) setDateFree(null) })
+    }, 300)
+    return () => { live = false; clearTimeout(t) }
+  }, [fromDate, toDate])
+  const freeFor = (it: EquipmentDoc) => dateFree?.[it.id] ?? it.available
+  const freeLabel = (n: number) => (dateFree ? `${n} free on your dates` : `${n} available`)
+
   // Category counts
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { ALL: 0 }
@@ -348,6 +365,7 @@ export default function EquipmentBookingPage() {
   }, [equipment, category, search])
 
   const cartList = Array.from(cart.values())
+  const notFreeInCart = !!dateFree && cartList.some(({ item, quantity }) => quantity > freeFor(item))
   const cartCount = cartList.length
   const chargeableDays = billableDays(rentalDays)
   const weekDiscountActive = rentalDays >= 5
@@ -358,9 +376,9 @@ export default function EquipmentBookingPage() {
       const next = new Map(prev)
       if (next.has(item.id)) {
         const entry = next.get(item.id)!
-        next.set(item.id, { ...entry, quantity: entry.quantity + qty })
+        next.set(item.id, { ...entry, quantity: Math.min(entry.quantity + qty, Math.max(1, freeFor(item))) })
       } else {
-        next.set(item.id, { item, quantity: qty })
+        next.set(item.id, { item, quantity: Math.min(qty, Math.max(1, freeFor(item))) })
       }
       return next
     })
@@ -392,7 +410,7 @@ export default function EquipmentBookingPage() {
       const next = new Map(prev)
       const entry = next.get(id)
       if (!entry) return prev
-      const newQty = entry.quantity + delta
+      const newQty = delta > 0 ? Math.min(entry.quantity + delta, Math.max(entry.quantity, freeFor(entry.item))) : entry.quantity + delta
       if (newQty <= 0) {
         next.delete(id)
       } else {
@@ -460,7 +478,7 @@ export default function EquipmentBookingPage() {
         {list.map(acc => {
           const inCart = cart.has(acc.id)
           const locked = isItemLocked(acc)
-          const outOfStock = acc.available <= 0
+          const outOfStock = freeFor(acc) <= 0
           const budgetBlocked = !inCart && isOverEquipmentBudget(acc)
           const needsProduction = (productionRequired || !productionSettingsLoaded) && acc.requiresProduction !== false
           const blockedReason = locked ? 'Not for your class' : outOfStock ? 'Out of stock' : budgetBlocked ? 'Over budget'
@@ -477,7 +495,7 @@ export default function EquipmentBookingPage() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p onClick={() => setModalItem(acc)} style={{ fontSize: '.88rem', fontWeight: 600, color: '#f0f0f5', cursor: 'pointer', margin: 0 }}>{acc.name}</p>
                 <p style={{ fontSize: '.72rem', margin: '2px 0 0', color: blockedReason && !inCart ? '#f59e0b' : '#6a6a80' }}>
-                  {blockedReason && !inCart ? blockedReason : `${acc.available} available`}
+                  {blockedReason && !inCart ? blockedReason : freeLabel(freeFor(acc))}
                   {pricingEnabled && (acc.priceInclVat > 0 ? ` · ${acc.priceInclVat} kr/day` : ' · Free')}
                 </p>
               </div>
@@ -511,7 +529,7 @@ export default function EquipmentBookingPage() {
     setSubmitting(true)
     setSubmitError('')
     try {
-      const bookingData: Omit<EquipmentBookingDoc, 'id'> = {
+      const bookingData: Omit<EquipmentBookingDoc, 'id' | 'status' | 'createdAt'> = {
         studentId: profile?.uid ?? '',
         studentName: contactName,
         studentEmail: profile?.email ?? '',
@@ -534,16 +552,15 @@ export default function EquipmentBookingPage() {
         })),
         checkoutDate: fromDate,
         returnDate: toDate,
-        status: 'pending',
         teacherNotes: isStaffBooker ? 'Staff booking (teacher)' : `Cohort: ${cohort?.name ?? cohortId}`,
-        createdAt: serverTimestamp() as any,
       }
-      await addDoc(collection(db, 'equipment_bookings'), bookingData)
+      // The server checks every item is free on these dates and writes the booking
+      await createEquipmentBooking(bookingData)
       try { sessionStorage.removeItem(draftKey) } catch { /* ignore */ }
       setView('success')
       setCartOpen(false)
     } catch (err: any) {
-      setSubmitError(err.message ?? 'Failed to submit booking')
+      setSubmitError(bookingErrorMessage(err, 'Failed to submit booking'))
     } finally {
       setSubmitting(false)
     }
@@ -741,6 +758,11 @@ export default function EquipmentBookingPage() {
                 <div className="cart-item" key={item.id}>
                   <div className="cart-item-info">
                     <h4>{item.name}</h4>
+                    {dateFree && quantity > freeFor(item) && (
+                      <p role="alert" style={{ fontSize: '.72rem', color: '#ff4757', fontWeight: 600 }}>
+                        {freeFor(item) === 0 ? 'None free on your dates' : `Only ${freeFor(item)} free on your dates`}
+                      </p>
+                    )}
                     <div className="cart-item-category">{item.category}</div>
                     <div className="cart-item-days">
                       <button className="day-btn-sm" onClick={() => updateCartQty(item.id, -1)}>−</button>
@@ -793,6 +815,9 @@ export default function EquipmentBookingPage() {
               {(!fromDate || !toDate) && (
                 <div className="cart-dates-hint">Select rental dates to proceed</div>
               )}
+              {notFreeInCart && (
+                <div className="cart-dates-hint">Change the dates or remove what isn't free</div>
+              )}
               {pricingEnabled && budgetInfo && (
                 <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: totalPrice > budgetInfo.equipmentBudget ? 'rgba(248,113,113,.1)' : 'rgba(52,211,153,.07)', border: `1px solid ${totalPrice > budgetInfo.equipmentBudget ? 'rgba(248,113,113,.3)' : 'rgba(52,211,153,.2)'}` }}>
                   <div style={{ fontSize: '.7rem', color: '#6a6a80', marginBottom: 2 }}>Equipment budget</div>
@@ -812,7 +837,7 @@ export default function EquipmentBookingPage() {
               )}
               <button
                 className="checkout-btn"
-                disabled={!fromDate || !toDate || isOverBudget}
+                disabled={!fromDate || !toDate || isOverBudget || notFreeInCart}
                 onClick={() => { setCartOpen(false); setView('checkout') }}
               >
                 Proceed to Checkout
@@ -887,8 +912,8 @@ export default function EquipmentBookingPage() {
               <div>
                 <p style={{ fontWeight: 700, fontSize: '1.1rem', color: '#f0f0f5' }}>{modalItem.name}</p>
                 <p style={{ fontSize: '.72rem', fontWeight: 700, color: '#f26419', textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 2 }}>{modalItem.category}</p>
-                <p style={{ fontSize: '.8rem', fontWeight: 600, marginTop: 6, color: modalItem.available > 0 ? '#4cd964' : '#ff4757' }}>
-                  {isItemLocked(modalItem) ? 'Not available for your class' : modalItem.available > 0 ? `${modalItem.available} available` : 'Out of stock'}
+                <p style={{ fontSize: '.8rem', fontWeight: 600, marginTop: 6, color: freeFor(modalItem) > 0 ? '#4cd964' : '#ff4757' }}>
+                  {isItemLocked(modalItem) ? 'Not available for your class' : freeFor(modalItem) > 0 ? freeLabel(freeFor(modalItem)) : dateFree ? 'None free on your dates' : 'Out of stock'}
                   {pricingEnabled && (modalItem.priceInclVat > 0
                     ? <span style={{ color: '#6a6a80', fontWeight: 500 }}> · {modalItem.priceInclVat} kr/day</span>
                     : <span style={{ color: '#6a6a80', fontWeight: 500 }}> · Free</span>)}
@@ -1117,7 +1142,7 @@ export default function EquipmentBookingPage() {
                 {filtered.map(item => {
                   const inCart = cart.has(item.id)
                   const qty = draftQty.get(item.id) ?? 1
-                  const outOfStock = item.available <= 0
+                  const outOfStock = freeFor(item) <= 0
                   const locked = isItemLocked(item)
                   const budgetBlocked = !inCart && isOverEquipmentBudget(item)
                   const needsProduction = (productionRequired || !productionSettingsLoaded) && item.requiresProduction !== false
@@ -1149,7 +1174,7 @@ export default function EquipmentBookingPage() {
                             ? <div style={{ fontSize: '.7rem', color: '#ff4757', fontWeight: 600 }}>Out of stock</div>
                             : budgetBlocked
                               ? <div style={{ fontSize: '.7rem', color: '#f87171', fontWeight: 600 }}>💰 Over budget</div>
-                              : <div className="product-available">{item.available} available</div>
+                              : <div className="product-available">{freeLabel(freeFor(item))}</div>
                         }
                         {item.notes && <div className="product-notes"><LinkifiedText text={item.notes} /></div>}
                         {item.description && <div className="product-description">{item.description}</div>}

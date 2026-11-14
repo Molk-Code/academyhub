@@ -6,6 +6,7 @@ import {
   serverTimestamp, query, where, onSnapshot, writeBatch, arrayUnion, arrayRemove, runTransaction,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { checkOutEquipmentUnits } from '@/lib/equipmentAvailability'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection } from '@/hooks/useFirestore'
 import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, InventoryPresetDoc, InventoryPresetItem, UserDoc, EquipmentBookingDoc, EquipmentResponsibility } from '@/types'
@@ -295,19 +296,31 @@ function CreateProjectForm({
       // handled (condition checked, handed over) before it actually leaves
       // availability. Manually-added items (preset or typed) keep the
       // previous immediate-checkout behavior.
-      const checkoutTimestamp = new Date().toISOString()
       const assignedTo = borrowers[0] ?? ''
-      for (const item of presetItems) {
-        for (let i = 0; i < item.quantity; i++) {
-          await addDoc(collection(db, `inventory_projects/${ref.id}/items`), {
-            equipmentId: item.equipmentId,
-            equipmentName: item.equipmentName,
-            checkoutTimestamp: fromBooking ? '' : checkoutTimestamp,
-            checkinTimestamp: '',
-            status: fromBooking ? 'pending' : 'checked-out',
-            damageNotes: '',
-            assignedTo,
-          })
+      if (fromBooking) {
+        // Already held by the booking: the rows just take over that hold
+        for (const item of presetItems) {
+          for (let i = 0; i < item.quantity; i++) {
+            await addDoc(collection(db, `inventory_projects/${ref.id}/items`), {
+              equipmentId: item.equipmentId,
+              equipmentName: item.equipmentName,
+              checkoutTimestamp: '',
+              checkinTimestamp: '',
+              status: 'pending',
+              damageNotes: '',
+              assignedTo,
+            })
+          }
+        }
+      } else if (presetItems.some(i => i.quantity > 0)) {
+        // Checked out now: the server adds them only if they're free on the
+        // project's dates; if not, the empty project is removed again
+        const units = presetItems.flatMap(i => Array.from({ length: i.quantity }, () => ({ equipmentId: i.equipmentId, equipmentName: i.equipmentName })))
+        try {
+          await checkOutEquipmentUnits(ref.id, units, assignedTo)
+        } catch (e) {
+          await deleteDoc(ref).catch(() => {})
+          throw e
         }
       }
       onCreate(ref.id)

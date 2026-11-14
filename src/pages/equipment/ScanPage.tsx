@@ -180,7 +180,11 @@ export default function ScanPage() {
           },
         })
         if (result.kind === 'duplicate') {
-          message = 'Already scanned out in this project'
+          message = result.elsewhere ? `Already out in ${result.elsewhere}` : 'Already scanned out in this project'
+          throw new Error(message)
+        }
+        if (result.kind === 'refused') {
+          message = result.message
           throw new Error(message)
         }
         if (result.kind === 'new' && fromBookingRef.current) message = 'Not in the booking — added as extra'

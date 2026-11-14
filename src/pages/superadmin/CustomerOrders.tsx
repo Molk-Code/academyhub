@@ -173,7 +173,7 @@ function NewCustomerForm({ onDone }: { onDone: () => void }) {
 
       <section className="space-y-3">
         <h3 className="text-sm font-semibold text-zinc-200">Modules</h3>
-        <PlanPicker compact value={f.selection} onChange={v => set('selection', v)} />
+        <PlanPicker compact showHidden value={f.selection} onChange={v => set('selection', v)} />
         <div className="grid sm:grid-cols-2 gap-3">
           {field('Student limit (empty: from the Academy plan)', 'maxStudents', { type: 'number' })}
           {field('Storage (GB)', 'storageGB', { type: 'number' })}

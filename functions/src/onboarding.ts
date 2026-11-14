@@ -3,7 +3,7 @@ import { GoogleAuth } from 'google-auth-library'
 import { functions, db, escapeHtml, sendEmailOrThrow, getEmailConfig, LIMITS, REGION, allow } from './lib'
 import { requireSuperAdminSession } from './school-admin'
 import { hashIp, clientIp } from './contact'
-import { selectionProblem, quote, planLabel, planFor, modulesFor, type PlanSelection, type Quote } from './pricing'
+import { selectionProblem, quote, planLabel, planFor, modulesFor, type PlanSelection, type Quote, type ModuleFlag } from './pricing'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Customer orders: how a new customer (school) comes in, gets paid for and is
@@ -128,6 +128,11 @@ export function validateOrderInput(data: unknown, opts: { selfService: boolean }
   const planProblem = selectionProblem(rawSel)
   if (planProblem) throw bad(planProblem)
   const selection = Object.fromEntries(Object.entries(rawSel).filter(([, v]) => typeof v === 'string' && v)) as PlanSelection
+  if (opts.selfService) {
+    for (const [m, id] of Object.entries(selection)) {
+      if (planFor(m as ModuleFlag, id)?.hidden) throw bad('That plan is not available to order online yet. Please contact us.')
+    }
+  }
   // Students included in the Academy plan, unless the superadmin sets a limit
   const planStudents = planFor('academy', selection.academy)?.maxStudents ?? null
 

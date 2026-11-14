@@ -22,18 +22,22 @@ export interface Plan {
   maxStudents?: number
   /** Assets included (Rental & Inventory plans). Absent = unlimited. A soft limit (see docs/claude-code-modules.md) */
   maxAssets?: number
+  /** Not offered on the order page yet (customers can't pick it; the superadmin can) */
+  hidden?: boolean
 }
 
 export const PLANS: Record<ModuleFlag, Plan[]> = {
   rentalInventory: [
     { id: 'starter',  name: 'Starter',  monthly: 19,  limits: 'Up to 50 assets', maxAssets: 50 },
     { id: 'standard', name: 'Standard', monthly: 79,  limits: 'Up to 200 assets', maxAssets: 200 },
-    { id: 'plus',     name: 'Plus',     monthly: 179, limits: 'Unlimited assets, multiple locations, custom domain for the rental shop, exports and API, priority support' },
+    // Hidden until the rental summary/CSV export (brief Phase 3) and a comparison with other rental tools are done
+    { id: 'plus',     name: 'Plus',     monthly: 179, limits: 'Unlimited assets, multiple locations, custom domain for the rental shop, exports and API, priority support', hidden: true },
   ],
   production: [
     { id: 'starter',  name: 'Starter',  monthly: 19,  limits: '' },
     { id: 'standard', name: 'Standard', monthly: 69,  limits: '' },
-    { id: 'plus',     name: 'Plus',     monthly: 149, limits: 'Unlimited users, advanced budgeting and exports, priority support' },
+    // Hidden until a comparison with StudioBinder-class tools is done
+    { id: 'plus',     name: 'Plus',     monthly: 149, limits: 'Unlimited users, advanced budgeting and exports, priority support', hidden: true },
   ],
   academy: [
     { id: 'starter',  name: 'Starter',  monthly: 59,  limits: 'Up to 40 students', maxStudents: 40 },

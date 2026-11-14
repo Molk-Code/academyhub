@@ -12,11 +12,14 @@ export const eur = (n: number) =>
 
 const MODULE_ID: Record<ModuleFlag, ModuleId> = { rentalInventory: 'rental_inventory', production: 'production', academy: 'academy' }
 
-export default function PlanPicker({ value, onChange, compact = false }: {
+export default function PlanPicker({ value, onChange, compact = false, showHidden = false }: {
   value: PlanSelection
   onChange: (v: PlanSelection) => void
   compact?: boolean
+  /** Superadmin: also offer plans not on the order page yet */
+  showHidden?: boolean
 }) {
+  const plansFor = (m: ModuleFlag) => PLANS[m].filter(p => showHidden || !p.hidden)
   const set = (m: ModuleFlag, id: string | undefined) => {
     const next = { ...value }
     if (id) next[m] = id; else delete next[m]
@@ -29,7 +32,7 @@ export default function PlanPicker({ value, onChange, compact = false }: {
       <div className="grid sm:grid-cols-3 gap-3">
         {MODULE_ORDER.map(m => {
           const on = !!value[m]
-          const from = Math.min(...PLANS[m].map(p => p.monthly))
+          const from = Math.min(...plansFor(m).map(p => p.monthly))
           return (
             <button key={m} type="button" aria-pressed={on} onClick={() => set(m, on ? undefined : PLANS[m][0].id)}
               className={`text-left rounded-xl border p-4 space-y-1.5 transition-colors ${on ? 'border-brand-500 bg-brand-500/10' : 'border-white/10 bg-zinc-900 hover:border-white/25'}`}>
@@ -50,14 +53,14 @@ export default function PlanPicker({ value, onChange, compact = false }: {
         <fieldset key={m} className="space-y-2">
           <legend className="text-sm font-semibold text-zinc-200 mb-1">{MODULE_NAMES[m]}: choose a plan</legend>
           <div className="grid sm:grid-cols-3 gap-2">
-            {PLANS[m].map(p => {
+            {plansFor(m).map(p => {
               const checked = value[m] === p.id
               return (
                 <label key={p.id} className={`rounded-xl border p-3 cursor-pointer space-y-0.5 ${checked ? 'border-brand-500 bg-brand-500/10' : 'border-white/10 bg-zinc-900 hover:border-white/20'}`}>
                   <span className="flex items-center justify-between gap-2 text-sm">
                     <span className="flex items-center gap-2 font-medium text-white">
                       <input type="radio" name={`plan-${m}`} checked={checked} onChange={() => set(m, p.id)} />
-                      {p.name}
+                      {p.name}{p.hidden && <span className="text-[10px] text-amber-300 font-normal">not on order page</span>}
                     </span>
                     <span className="text-zinc-200">{eur(p.monthly)}/mo</span>
                   </span>

@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
-  collection, getDocs, addDoc, serverTimestamp, query, where, getDoc, doc,
+  collection, getDocs, query, where, getDoc, doc,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { createEquipmentBooking, bookingErrorMessage } from '@/lib/equipmentAvailability'
 import { SCHOOL_ID } from '@/lib/school'
 import type { EquipmentDoc, EquipmentCategoryDoc } from '@/types'
 import { ShoppingCart, X, Plus, Minus, Package, ChevronRight, CheckCircle2, Search } from 'lucide-react'
@@ -76,6 +77,7 @@ export default function PublicShopPage() {
     checkoutDate: '', returnDate: '', notes: '',
   })
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof CheckoutForm, string>>>({})
+  const [submitError, setSubmitError] = useState('')
 
   // ── Load school doc for password ───────────────────────────────────────────
   useEffect(() => {
@@ -182,8 +184,10 @@ export default function PublicShopPage() {
     e.preventDefault()
     if (!validateForm()) return
     setSubmitting(true)
+    setSubmitError('')
     try {
-      await addDoc(collection(db, 'equipment_bookings'), {
+      // The server checks every item is free on these dates and writes the request
+      await createEquipmentBooking({
         guestName: form.name.trim(),
         guestEmail: form.email.trim(),
         guestPhone: form.phone.trim(),
@@ -192,19 +196,15 @@ export default function PublicShopPage() {
         checkoutDate: form.checkoutDate,
         returnDate: form.returnDate,
         teacherNotes: form.notes.trim(),
-        status: 'pending',
-        isGuest: true,
-        // Required fields from EquipmentBookingDoc — empty strings for guest bookings
-        studentId: '',
         studentName: form.name.trim(),
         studentEmail: form.email.trim(),
         cohortId: '',
-        createdAt: serverTimestamp(),
       })
       setView('success')
       setCart([])
     } catch (err) {
       console.error('Booking submit error:', err)
+      setSubmitError(bookingErrorMessage(err, 'Could not send the request. Please try again.'))
     } finally {
       setSubmitting(false)
     }
@@ -397,6 +397,7 @@ export default function PublicShopPage() {
               </div>
             </div>
 
+            {submitError && <p role="alert" className="text-rose-400 text-sm">{submitError}</p>}
             <button
               type="submit"
               disabled={submitting}

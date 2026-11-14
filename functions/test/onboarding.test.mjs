@@ -211,3 +211,10 @@ test('prices: plans per module, 20% off all three, billed annually; computed on 
   assert.equal(self.plan.storageQuotaGB, null)
   assert.equal(ob.validateOrderInput({ ...valid, plan: { selection: { academy: 'starter' } , maxStudents: 80 } }, { selfService: false }).plan.maxStudents, 80, 'the superadmin can')
 })
+
+test('plans not on the order page yet: refused online, allowed for the superadmin', () => {
+  const plus = { ...valid, plan: { selection: { rentalInventory: 'plus' } } }
+  assert.throws(() => ob.validateOrderInput(plus, { selfService: true }), e => e.code === 'invalid-argument' && /not available to order online/.test(e.message))
+  assert.equal(ob.validateOrderInput(plus, { selfService: false }).plan.planName, 'Rental & Inventory Plus')
+  assert.equal(ob.validateOrderInput({ ...valid, plan: { selection: { academy: 'plus' } } }, { selfService: true }).plan.planName, 'Academy Plus', 'Academy Plus stays orderable')
+})

@@ -643,16 +643,9 @@ service cloud.firestore {
     match /equipment_bookings/{bookingId} {
       allow read: if ((isAdmin() || tierHasFeature('equipment'))
         && (isTeacherOrAdmin() || (isSignedIn() && resource.data.studentId == request.auth.uid))) && moduleOn('rentalInventory');
-      // New bookings start pending, without decisions or project links (staff/functions set those)
-      allow create: if (request.resource.data.status == 'pending'
-        && !request.resource.data.keys().hasAny(['categoryDecisions', 'setUpCategories', 'linkedProjectIds', 'linkedProjectId'])
-        && (
-          (isSignedIn() && tierHasFeature('equipment')
-            && request.resource.data.studentId == request.auth.uid)
-          || (publicShopOpen() && request.resource.data.get('guestEmail', '') != ''
-              && request.resource.data.get('isGuest', false) == true
-              && request.resource.data.get('studentId', '') == '')
-        )) && moduleOn('rentalInventory');
+      // Bookings are created only by the createEquipmentBooking function, which
+      // checks the items are free on those dates in a transaction (no double-booking)
+      allow create: if false;
       allow update: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))
         || (isSignedIn() && resource.data.studentId == request.auth.uid
             && resource.data.status in ['pending', 'confirmed']
@@ -695,6 +688,13 @@ service cloud.firestore {
         allow read: if (isTeacherOrAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid)) && moduleOn('rentalInventory');
         allow write: if (false) && moduleOn('rentalInventory');
       }
+    }
+
+    // Numbered unit → the project row it's out in, across projects, so the same
+    // unit (#3) can't be out in two projects (inventoryShared checkoutScan,
+    // checkOutEquipmentUnits). equipment_locks has no rule: server only.
+    match /equipment_units/{unitId} {
+      allow read, write: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('inventory'))) && moduleOn('rentalInventory');
     }
 
     // Collection group rule required for collectionGroup('items') queries

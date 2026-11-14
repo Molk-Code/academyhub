@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { collection, doc, runTransaction } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { optimizeImageUrl } from '@/lib/cloudinary'
+import { checkOutEquipmentUnits } from '@/lib/equipmentAvailability'
 
 export function EquipmentImg({ url, name, fallback }: { url: string | undefined | null; name: string; fallback: React.ReactNode }) {
   const [failed, setFailed] = useState(false)
@@ -113,11 +114,20 @@ export function matchCheckoutScan<T extends ScanRow>(items: T[], equipmentId: st
 // Checkout a scan safely when two scanners (desktop + phone) work the same
 // project at once. matchCheckoutScan picks from each device's own copy of the
 // list, which can be a moment old, so the write is re-checked atomically:
-//  · a booked row is only filled if it is still "pending" (else the next one)
-//  · a numbered unit holds a marker inventory_projects/{id}/unit_out/{equipmentId}__{unit}
-//    while it is out — a second scan of it is refused. A marker whose item is
-//    no longer out (returned by any route) is stale and simply replaced.
-export type CheckoutResult = { kind: 'duplicate' } | { kind: 'booked'; id: string } | { kind: 'new'; id: string }
+//  · a booked row is only filled if it is still "pending" (else the next one).
+//    Booked rows are already counted as taken, so no availability check.
+//  · a numbered unit holds a marker equipment_units/{equipmentId}__{unit}
+//    (every project) and inventory_projects/{id}/unit_out/… (this project)
+//    while it is out: a second scan of it, here or in another project, is
+//    refused. A marker whose item is no longer out is stale and replaced.
+//  · a new unit of a catalog item goes through the server
+//    (checkOutEquipmentUnits), which refuses it when none is free on the
+//    project's dates. Codes not in the catalog are added here, unchecked.
+export type CheckoutResult =
+  | { kind: 'duplicate'; elsewhere?: string } | { kind: 'booked'; id: string } | { kind: 'new'; id: string }
+  | { kind: 'refused'; message: string }
+
+const NEW_ROW_EXTRA = ['scannedViaSession', 'notInBooking'] as const
 
 export async function checkoutScan<T extends ScanRow>(opts: {
   projectId: string
@@ -136,31 +146,56 @@ export async function checkoutScan<T extends ScanRow>(opts: {
   const pending = items.filter(i => i.status === 'pending' && same(i))
   const candidates = [...pending.filter(i => i.equipmentName === scannedName), ...pending.filter(i => i.equipmentName !== scannedName)]
   const itemsCol = collection(db, 'inventory_projects', projectId, 'items')
-  const lockRef = equipmentId && unit != null ? doc(db, 'inventory_projects', projectId, 'unit_out', `${equipmentId}__${unit}`) : null
+  const unitKey = equipmentId && unit != null ? `${equipmentId}__${unit}` : null
+  const lockRef = unitKey ? doc(db, 'inventory_projects', projectId, 'unit_out', unitKey) : null
+  const globalRef = unitKey ? doc(db, 'equipment_units', unitKey) : null
   const now = new Date().toISOString()
 
-  return runTransaction(db, async tx => {
-    if (lockRef) {
-      const lock = await tx.get(lockRef)
+  const result = await runTransaction(db, async tx => {
+    if (lockRef && globalRef) {
+      const [lock, global] = await Promise.all([tx.get(lockRef), tx.get(globalRef)])
       const heldId = lock.exists() ? (lock.data().itemId as string | undefined) : undefined
       if (heldId) {
         const held = await tx.get(doc(itemsCol, heldId))
         if (held.exists() && OUT.has(held.data().status)) return { kind: 'duplicate' } as const
+      }
+      const g = global.exists() ? global.data() as { projectId?: string; itemId?: string } : undefined
+      if (g?.projectId && g.itemId && g.projectId !== projectId) {
+        const held = await tx.get(doc(db, 'inventory_projects', g.projectId, 'items', g.itemId))
+        if (held.exists() && OUT.has(held.data().status)) {
+          const other = await tx.get(doc(db, 'inventory_projects', g.projectId))
+          return { kind: 'duplicate', elsewhere: (other.data()?.name as string | undefined) ?? 'another project' } as const
+        }
       }
     }
     for (const c of candidates) {
       const row = await tx.get(doc(itemsCol, c.id))
       if (row.exists() && row.data().status === 'pending') {
         tx.update(row.ref, { status: 'checked-out', checkoutTimestamp: now, ...(unit != null ? { unit } : {}), ...(opts.bookedFields ?? {}) })
-        if (lockRef) tx.set(lockRef, { itemId: c.id })
+        if (lockRef && globalRef) {
+          tx.set(lockRef, { itemId: c.id })
+          tx.set(globalRef, { projectId, itemId: c.id })
+        }
         return { kind: 'booked', id: c.id } as const
       }
     }
+    if (equipmentId) return { kind: 'server' } as const
     const ref = doc(itemsCol)
     tx.set(ref, { checkoutTimestamp: now, ...opts.newRow, ...(unit != null ? { unit } : {}) })
-    if (lockRef) tx.set(lockRef, { itemId: ref.id })
     return { kind: 'new', id: ref.id } as const
   })
+  if (result.kind !== 'server') return result
+
+  // Nothing booked left: a new unit, only if one is free on the project's dates
+  try {
+    const extra = Object.fromEntries(NEW_ROW_EXTRA.filter(k => opts.newRow[k] !== undefined).map(k => [k, opts.newRow[k]]))
+    const [id] = await checkOutEquipmentUnits(projectId, [{ equipmentId, equipmentName: scannedName, unit, ...extra }], String(opts.newRow.assignedTo ?? ''))
+    return { kind: 'new', id }
+  } catch (err) {
+    const code = (err as { code?: string }).code ?? ''
+    if (code.endsWith('failed-precondition') || code.endsWith('already-exists')) return { kind: 'refused', message: (err as Error).message }
+    throw err
+  }
 }
 
 export function matchCheckinScan<T extends ScanRow>(items: T[], equipmentId: string, scannedName: string, unit: number | null): T | undefined {

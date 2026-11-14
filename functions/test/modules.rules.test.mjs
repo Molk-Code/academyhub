@@ -167,6 +167,8 @@ test('shared collections: team reads stay core; crew roles readable with Product
 })
 
 // ── Public shop and audit log ────────────────────────────────────────────────
+// Guest booking requests are written only by createEquipmentBooking (which
+// checks the dates), so a direct write is refused even when the shop is open.
 
 const shopRequests = async () => ({
   categories: await call('GET', `${DOCS}/equipment_categories`, null),
@@ -180,7 +182,7 @@ test('public shop: legacy schools exactly as before — open only in rental mode
   await seed(LEGACY)
   assert.deepEqual(Object.values(await shopRequests()), [403, 403, 403], 'education school: closed')
   await seed({ tier: str('rental'), productType: str('rental') })
-  assert.deepEqual(await shopRequests(), { categories: 200, equipment: 200, guestBooking: 200 }, 'rental mode: open')
+  assert.deepEqual(await shopRequests(), { categories: 200, equipment: 200, guestBooking: 403 }, 'rental mode: open (bookings via the function)')
 })
 
 test('public shop: module-based schools are closed until publicShop is switched on', async () => {
@@ -188,7 +190,7 @@ test('public shop: module-based schools are closed until publicShop is switched 
   await seed(rentalOnly)
   assert.deepEqual(Object.values(await shopRequests()), [403, 403, 403], 'default: closed')
   await seed({ ...rentalOnly, publicShop: { booleanValue: true } })
-  assert.deepEqual(await shopRequests(), { categories: 200, equipment: 200, guestBooking: 200 }, 'switched on: open')
+  assert.deepEqual(await shopRequests(), { categories: 200, equipment: 200, guestBooking: 403 }, 'switched on: open (bookings via the function)')
   await seed({ ...modules(true, true, false), publicShop: { booleanValue: true } })
   assert.deepEqual(Object.values(await shopRequests()), [403, 403, 403], 'flag without Rental & Inventory: closed')
 })

@@ -10,7 +10,7 @@ assert.ok(HOST && PROJECT.startsWith('demo-'), 'run via `firebase emulators:exec
 process.env.SUPERADMIN_EMAILS = 'boss@example.test, Second@Example.test'
 
 const { db } = await import('../lib/lib.js')
-const { validateModulesInput, applySchoolUpdate, requireSuperAdmin, validateLogo } = await import('../lib/school-admin.js')
+const { validateModulesInput, applySchoolUpdate, requireSuperAdmin, validateLogo, checkSchoolDeletion } = await import('../lib/school-admin.js')
 
 const valid = {
   modules: { academy: true, production: false, rentalInventory: true },
@@ -27,7 +27,7 @@ beforeEach(async () => {
 test('only verified superadmin emails pass, case-insensitively', () => {
   assert.deepEqual(requireSuperAdmin(ctx('boss@example.test')), { uid: 'u1', email: 'boss@example.test' })
   assert.equal(requireSuperAdmin(ctx('SECOND@example.test')).email, 'second@example.test')
-  assert.throws(() => requireSuperAdmin(ctx('boss@example.test', false)), e => e.code === 'permission-denied', 'unverified')
+  assert.throws(() => requireSuperAdmin(ctx('boss@example.test', false)), e => e.code === 'failed-precondition' && /Verify your email/.test(e.message), 'unverified: told to verify')
   assert.throws(() => requireSuperAdmin(ctx('admin@example.test')), e => e.code === 'permission-denied', 'school admin')
   assert.throws(() => requireSuperAdmin({}), e => e.code === 'unauthenticated')
 })
@@ -110,4 +110,15 @@ test('logo uploads accept small images only', () => {
   assert.throws(() => validateLogo({ contentType: 'image/png', base64: '' }), e => e.code === 'invalid-argument')
   const big = Buffer.alloc(1024 * 1024 + 1).toString('base64')
   assert.throws(() => validateLogo({ contentType: 'image/png', base64: big }), e => e.code === 'invalid-argument')
+})
+
+test("deleting a school: never the deployment's own, and only with its exact name", () => {
+  const school = { name: 'Nordic Film Academy' }
+  assert.equal(checkSchoolDeletion('nordic', 'Nordic Film Academy', school, 'molkom'), null)
+  assert.equal(checkSchoolDeletion('nordic', '  Nordic Film Academy ', school, 'molkom'), null)
+  assert.match(checkSchoolDeletion('molkom', 'Molkom', { name: 'Molkom' }, 'molkom'), /own school/)
+  assert.match(checkSchoolDeletion('nordic', 'nordic film academy', school, 'molkom'), /doesn't match/)
+  assert.match(checkSchoolDeletion('nordic', undefined, school, 'molkom'), /doesn't match/)
+  assert.match(checkSchoolDeletion('gone', 'x', undefined, 'molkom'), /not found/)
+  assert.match(checkSchoolDeletion('', 'x', school, 'molkom'), /required/)
 })

@@ -7,9 +7,12 @@ import { useCollection } from '@/hooks/useFirestore'
 import type { SchoolDoc, SchoolStatus, SchoolTier, UserDoc, ProductionDoc, EquipmentDoc } from '@/types'
 import { format } from 'date-fns'
 import SchoolModulesPanel from '@/pages/superadmin/SchoolModulesPanel'
+import DeleteSchoolDialog from '@/pages/superadmin/DeleteSchoolDialog'
+import VerifyEmailNotice from '@/pages/superadmin/VerifyEmailNotice'
+import { SCHOOL_ID } from '@/lib/school'
 import {
   Building2, Users, Clapperboard, Boxes, Plus, X, ChevronDown, ChevronUp,
-  ExternalLink, CheckCircle2, Loader2, AlertCircle,
+  ExternalLink, CheckCircle2, Loader2, AlertCircle, Trash2,
 } from 'lucide-react'
 import { clickableRow } from '@/lib/a11y'
 
@@ -72,6 +75,7 @@ function SchoolRow({ school }: { school: SchoolDoc }) {
   const [saving,    setSaving]    = useState(false)
   const [saved,     setSaved]     = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [deleting,  setDeleting]  = useState(false)
   // Local optimistic state — keeps UI responsive; reverts to prop if save fails
   const [localTier,   setLocalTier]   = useState<SchoolTier | null>(null)
   const [localStatus, setLocalStatus] = useState<SchoolStatus | null>(null)
@@ -243,6 +247,22 @@ function SchoolRow({ school }: { school: SchoolDoc }) {
             <div className="mt-8 pt-6 border-t border-white/10 max-w-3xl">
               <SchoolModulesPanel school={school} />
             </div>
+
+            {/* Danger zone: three confirmations, then deleteSchool */}
+            <div className="mt-8 pt-6 border-t border-rose-500/20 max-w-3xl">
+              {school.id === SCHOOL_ID ? (
+                <p className="text-xs text-zinc-500">
+                  This is the school this deployment runs. It can't be deleted here: ending this customer means
+                  shutting down the deployment (export on request, then delete the project within 90 days).
+                </p>
+              ) : (
+                <button type="button" onClick={e => { e.stopPropagation(); setDeleting(true) }}
+                  className="flex items-center gap-2 text-sm font-semibold text-rose-400 hover:text-rose-300 border border-rose-500/30 rounded-xl px-3 py-2">
+                  <Trash2 className="w-4 h-4" aria-hidden="true" /> Delete school…
+                </button>
+              )}
+              {deleting && <DeleteSchoolDialog school={school} onClose={() => setDeleting(false)} />}
+            </div>
           </td>
         </tr>
       )}
@@ -412,6 +432,8 @@ export default function SuperAdmin() {
         <h1 className="text-3xl font-bold text-zinc-100">Schools Registry</h1>
         <p className="text-zinc-500 text-sm mt-1">CineForge — multi-tenant platform management</p>
       </div>
+
+      <VerifyEmailNotice />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

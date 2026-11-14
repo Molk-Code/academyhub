@@ -16,8 +16,12 @@ export function requireSuperAdmin(context: functions.https.CallableContext): { u
   const token = context.auth?.token
   if (!context.auth || !token) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
   const email = String(token.email ?? '').toLowerCase()
-  if (token.email_verified !== true || !email || !superadminEmails().includes(email)) {
+  if (!email || !superadminEmails().includes(email)) {
     throw new functions.https.HttpsError('permission-denied', 'Superadmin only.')
+  }
+  // Right account, but the address isn't verified yet: say so (the superadmin page offers the verification email)
+  if (token.email_verified !== true) {
+    throw new functions.https.HttpsError('failed-precondition', 'Verify your email address first: superadmin changes need a verified address.')
   }
   return { uid: context.auth.uid, email }
 }
@@ -171,4 +175,36 @@ export const uploadSchoolLogo = functions.region(REGION).runWith({ ...LIMITS, ma
   })
   const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(path)}?alt=media&token=${token}`
   return { url }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// deleteSchool — superadmin only: removes a school record from this
+// deployment's registry, with an audit entry. The deployment's own school
+// (SCHOOL_ID) can't be deleted here: every page and all its data depend on it;
+// ending that customer means shutting down their deployment (offboarding).
+// The client asks three times; the server requires the exact school name.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function checkSchoolDeletion(schoolId: unknown, confirmName: unknown, school: { name?: string } | undefined, ownSchoolId: string): string | null {
+  if (typeof schoolId !== 'string' || !schoolId) return 'schoolId is required.'
+  if (schoolId === ownSchoolId) return "This deployment's own school can't be deleted here."
+  if (!school) return 'School not found.'
+  if (typeof confirmName !== 'string' || confirmName.trim() !== String(school.name ?? schoolId).trim()) return "The name typed doesn't match the school's name."
+  return null
+}
+
+export const deleteSchool = functions.region(REGION).runWith({ ...LIMITS, maxInstances: 2 }).https.onCall(async (data, context) => {
+  const actor = requireSuperAdmin(context)
+  const { schoolId, confirmName } = (data ?? {}) as { schoolId?: unknown; confirmName?: unknown }
+  const ref = typeof schoolId === 'string' && schoolId ? db.collection('schools').doc(schoolId) : null
+  const snap = ref ? await ref.get() : null
+  const problem = checkSchoolDeletion(schoolId, confirmName, snap?.exists ? snap.data() : undefined, SCHOOL_ID)
+  if (problem) throw new functions.https.HttpsError(problem === 'School not found.' ? 'not-found' : 'failed-precondition', problem)
+  const before = snap!.data()!
+  await db.recursiveDelete(ref!)
+  await db.collection('school_audit').add({
+    schoolId, by: actor, at: FieldValue.serverTimestamp(), action: 'deleteSchool',
+    before: { name: before.name ?? null, status: before.status ?? null, tier: before.tier ?? null }, after: null,
+  })
+  return { ok: true }
 })

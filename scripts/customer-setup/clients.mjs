@@ -14,20 +14,31 @@ export class ApiError extends Error {
   }
 }
 
-/** Google API call; returns parsed JSON (or null for an empty body) */
+/**
+ * Google API call; returns parsed JSON (or null for an empty body). A 403 is
+ * retried for up to 6 minutes: roles granted on a new project (the setup
+ * account becomes Owner in the first step) take minutes to apply.
+ */
 export async function google(method, url, body, { allow = [] } = {}) {
-  const client = await auth.getClient()
-  const { token } = await client.getAccessToken()
-  const res = await fetch(url, {
-    method,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
-  const text = await res.text()
-  let parsed = null
-  try { parsed = text ? JSON.parse(text) : null } catch { parsed = text }
-  if (!res.ok && !allow.includes(res.status)) throw new ApiError(method, url, res.status, parsed)
-  return res.ok ? parsed : { __status: res.status, ...(typeof parsed === 'object' ? parsed : {}) }
+  for (let attempt = 0; ; attempt++) {
+    const client = await auth.getClient()
+    const { token } = await client.getAccessToken()
+    const res = await fetch(url, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+    const text = await res.text()
+    let parsed = null
+    try { parsed = text ? JSON.parse(text) : null } catch { parsed = text }
+    if (res.status === 403 && !allow.includes(403) && attempt < 12) {
+      console.log(`403 from ${method} ${url.replace(/\?.*$/, '')}: waiting for permissions to apply (${attempt + 1}/12)`)
+      await sleep(30_000)
+      continue
+    }
+    if (!res.ok && !allow.includes(res.status)) throw new ApiError(method, url, res.status, parsed)
+    return res.ok ? parsed : { __status: res.status, ...(typeof parsed === 'object' ? parsed : {}) }
+  }
 }
 
 export const sleep = ms => new Promise(r => setTimeout(r, ms))

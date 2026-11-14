@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { addDoc, collection, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -110,6 +110,14 @@ export default function EquipmentRequests() {
     return bookings.filter(b => b.status === statusFilter)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookings, statusFilter, responsibility, catalog])
+
+  // Opened from a notification about one booking: make sure the filter shows it
+  const [focusId, setFocusId] = useState(() => new URLSearchParams(window.location.search).get('focus'))
+  useEffect(() => {
+    if (!focusId || !bookings.some(b => b.id === focusId)) return
+    if (!filtered.some(b => b.id === focusId)) setStatusFilter('all')
+    setFocusId(null)   // once; the filter can be changed again afterwards
+  }, [focusId, bookings, filtered])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const pendingCount = useMemo(() => bookings.filter(awaitingMe).length, [bookings, responsibility, catalog])
@@ -223,7 +231,7 @@ export default function EquipmentRequests() {
       ) : (
         <div className="space-y-3">
           {filtered.map(booking => (
-            <div key={booking.id} className="bg-zinc-900 border border-white/8 rounded-2xl p-4 space-y-3">
+            <div key={booking.id} data-focus-id={booking.id} className="bg-zinc-900 border border-white/8 rounded-2xl p-4 space-y-3">
               {/* Header */}
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="space-y-0.5">

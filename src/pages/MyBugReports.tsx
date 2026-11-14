@@ -73,7 +73,7 @@ export default function MyBugReports() {
               ? formatDistanceToNow(r.createdAt.toDate(), { addSuffix: true })
               : ''
             return (
-              <div key={r.id} className="bg-zinc-900 border border-white/8 rounded-2xl px-5 py-4">
+              <div key={r.id} data-focus-id={r.id} className="bg-zinc-900 border border-white/8 rounded-2xl px-5 py-4">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   <StatusBadge status={r.status} />
                   <span className="text-xs text-zinc-500">{r.page}</span>

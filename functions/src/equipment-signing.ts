@@ -103,8 +103,8 @@ export const requestEquipmentSignatures = functions.region(REGION).runWith(LIMIT
       return !roles.includes('student') && roles.some(r => r === 'teacher' || r === 'admin')
     }
     const groups = [
-      { url: '/my-bookings',         users: users.filter(u => !isStaff(u)) },
-      { url: '/teacher/my-bookings', users: users.filter(isStaff) },
+      { url: `/my-bookings?focus=${projectId}`,         users: users.filter(u => !isStaff(u)) },
+      { url: `/teacher/my-bookings?focus=${projectId}`, users: users.filter(isStaff) },
     ]
     await Promise.all(groups.filter(g => g.users.length > 0).flatMap(g => {
       const msg = {

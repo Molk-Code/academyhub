@@ -140,7 +140,7 @@ async function enforceRoomLimit(id: string, b: FirebaseFirestore.DocumentData): 
   await saveNotifications([b.studentId], {
     title: 'Room booking removed',
     body:  `You can book ${max} room slot${max === 1 ? '' : 's'} per ${perDay ? 'day' : 'week'} — your extra booking on ${b.date} was removed.`,
-    url:   '/booking',
+    url:   '/booking',   // removed: the booking page, to book another slot
   })
   return true
 }
@@ -186,8 +186,8 @@ export const onBookingConfirmed = functions.region(REGION).runWith(LIMITS).fires
     const tokens: string[] = await tokensFor([userSnap.id])
 
     const bookingOpts = after.status === 'confirmed'
-      ? { title: '✅ Room booking confirmed', body: `Your booking for ${after.roomName ?? 'the room'} has been confirmed.`, url: '/booking' }
-      : { title: '❌ Room booking denied',    body: `Your booking for ${after.roomName ?? 'the room'} was not approved.`,  url: '/booking' }
+      ? { title: '✅ Room booking confirmed', body: `Your booking for ${after.roomName ?? 'the room'} has been confirmed.`, url: `/my-bookings?focus=${change.after.id}` }
+      : { title: '❌ Room booking denied',    body: `Your booking for ${after.roomName ?? 'the room'} was not approved.`,  url: `/my-bookings?focus=${change.after.id}` }
     await Promise.all([
       sendPush(tokens, { ...bookingOpts, tag: 'booking-update' }),
       saveNotifications([uid], bookingOpts),
@@ -234,6 +234,7 @@ export const onSemesterEventStart = functions.region(REGION).runWith(LIMITS).pub
         tokens,
         ev.title ?? 'Semester Event',
         ev.description || `Starting today — ${todayMmDd}`,
+        '/teacher/semester-wheel',
       )
     }
   })

@@ -313,7 +313,7 @@ function EquipmentProjectsSection({ projects, items, uid, accountName }: {
           const isOverdue = p.returnDate < today() && p.status !== 'returned' && p.status !== 'archived'
           const days = isOverdue ? overdueDays(p.returnDate) : 0
           return (
-            <div key={p.id} className="bg-zinc-900 rounded-xl border border-white/10 overflow-hidden">
+            <div key={p.id} data-focus-id={p.id} className="bg-zinc-900 rounded-xl border border-white/10 overflow-hidden">
               <div className="px-4 py-3 space-y-2">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="min-w-0">
@@ -438,7 +438,7 @@ function BookingRequestsSection({ bookings }: { bookings: EquipmentBookingDoc[] 
       </h2>
       <div className="space-y-2">
         {bookings.map(b => (
-          <div key={b.id} className="bg-zinc-900 rounded-xl border border-white/10 px-4 py-3 space-y-2">
+          <div key={b.id} data-focus-id={b.id} className="bg-zinc-900 rounded-xl border border-white/10 px-4 py-3 space-y-2">
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-zinc-200">{b.projectName}</p>
@@ -486,7 +486,7 @@ function FoodBoxSection({ orders }: { orders: FoodBoxOrderDoc[] }) {
             o.dinnerStudents?.length  ? `🍽️ ×${o.dinnerStudents.length}`  : '',
           ].filter(Boolean).join('  ')
           return (
-            <div key={o.id} className="bg-zinc-900 rounded-xl border border-white/10 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <div key={o.id} data-focus-id={o.id} className="bg-zinc-900 rounded-xl border border-white/10 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-zinc-200">
                   {effectiveDate}{effectiveTime ? ` · ${effectiveTime}` : ''}
@@ -523,7 +523,7 @@ function RoomBookingsSection({ bookings }: { bookings: RoomBookingDoc[] }) {
       </h2>
       <div className="space-y-2">
         {bookings.map(b => (
-          <div key={b.id} className="bg-zinc-900 rounded-xl border border-white/10 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+          <div key={b.id} data-focus-id={b.id} className="bg-zinc-900 rounded-xl border border-white/10 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
             <div className="min-w-0">
               <p className="text-sm font-medium text-zinc-200">{rooms.find(r => r.id === b.roomId)?.name ?? 'Room'}</p>
               <p className="text-xs text-zinc-400 mt-0.5">{fmtDate(b.date)} · {b.startTime}–{b.endTime}</p>
@@ -559,7 +559,7 @@ function MinivanSection({ bookings }: { bookings: MinivanBookingDoc[] }) {
           const retDate = b.adminDateTo   ?? b.dateTo
           const retTime = b.adminTimeTo   ?? b.timeTo
           return (
-            <div key={b.id} className="bg-zinc-900 rounded-xl border border-white/10 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <div key={b.id} data-focus-id={b.id} className="bg-zinc-900 rounded-xl border border-white/10 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-zinc-200">{b.destination}{b.vehicle ? ` · ${b.vehicle}` : ''}</p>
                 <p className="text-xs text-zinc-400 mt-0.5">{depDate} {depTime} → {retDate} {retTime}</p>

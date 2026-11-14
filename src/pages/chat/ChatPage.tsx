@@ -117,6 +117,16 @@ export default function ChatPage() {
     return set
   }, [channels, profile, seenRev])
 
+  // Open a channel from ?channel=ID (a chat notification), once the channel list has it
+  useEffect(() => {
+    const id = searchParams.get('channel')
+    if (!id || !channels.some(c => c.id === id)) return
+    setActiveChannelId(id)
+    setMobileChatView('messages')
+    const next = new URLSearchParams(searchParams); next.delete('channel')
+    setSearchParams(next, { replace: true })
+  }, [searchParams.get('channel'), channels]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Default to first regular channel
   useEffect(() => {
     if (regularChannels.length > 0 && (!activeChannelId || !channels.find(c => c.id === activeChannelId))) {

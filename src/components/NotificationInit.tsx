@@ -1,13 +1,34 @@
 import { useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { initFCM, onForegroundMessage } from '@/lib/fcm'
 import { clearLocalBadgeState } from '@/hooks/useMarkAllRead'
+import { notificationTarget } from '@/lib/notificationLinks'
 
 export default function NotificationInit() {
-  const { profile } = useAuth()
+  const { profile, role } = useAuth()
+  const navigate = useNavigate()
   const prevReadAtRef = useRef(0)
+  const roleRef = useRef(role)
+  roleRef.current = role
+
+  // A push notification was tapped while the app is open: the service worker
+  // asks this window to go to the notification's page (and waits for the
+  // answer, or it loads the page itself — see firebase-messaging-sw.js)
+  useEffect(() => {
+    const sw = navigator.serviceWorker
+    if (!sw) return
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type !== 'notification-click') return
+      event.ports[0]?.postMessage('ok')
+      navigate(notificationTarget(event.data.url, roleRef.current))
+    }
+    sw.addEventListener('message', onMessage)
+    sw.startMessages?.()   // deliver messages queued while the page was loading
+    return () => sw.removeEventListener('message', onMessage)
+  }, [navigate])
 
   useEffect(() => {
     if (!profile?.uid) return

@@ -18,7 +18,7 @@ export const onBugReportCreated = functions.region(REGION).runWith(LIMITS).fires
     await pushToTeachersAndAdmins(
       '🐛 New bug report',
       `${d.displayName ?? 'Someone'}: ${(d.description ?? '').slice(0, 120)}`,
-      '/admin/bug-reports',
+      `/admin/bug-reports?focus=${snap.id}`,
     )
     return null
   })
@@ -53,7 +53,7 @@ export const onBugReportUpdated = functions.region(REGION).runWith(LIMITS).fires
     if (messageAdded)  markNotified.notifiedMessageCount = afterMsgCount
     await change.after.ref.update(markNotified)
 
-    const url = after.role === 'teacher' ? '/teacher/bug-reports' : '/bug-reports'
+    const url = `${after.role === 'teacher' ? '/teacher/bug-reports' : '/bug-reports'}?focus=${change.after.id}`
 
     if (statusChanged) {
       const msg = STATUS_MESSAGE[after.status]

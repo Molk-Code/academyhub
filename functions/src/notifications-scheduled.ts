@@ -59,7 +59,7 @@ export const sendInventoryReturnReminders = functions.region(REGION).runWith(LIM
       if (!(await claimOnce(`${tag}__${doc.id}__${todayStr}`))) return   // once a day, even on a retry
       const usersSnaps = await Promise.all(borrowerIds.map(uid => db.collection('users').doc(uid).get()))
       const tokens = await tokensFor(usersSnaps.map(s => s.id))
-      const opts = { title, body, url: '/my-bookings' }
+      const opts = { title, body, url: `/my-bookings?focus=${doc.id}` }
       await Promise.all([
         sendPush(tokens, { ...opts, tag: `${tag}-${doc.id}` }),
         saveNotifications(borrowerIds, opts),
@@ -121,7 +121,7 @@ export const sendEquipmentBookingOverdueReminders = functions.region(REGION).run
       const projectName = booking.projectName || 'your booking'
       const title = '🚨 Equipment overdue'
       const body  = `Equipment for "${projectName}" is ${overdueDays} day${overdueDays === 1 ? '' : 's'} overdue`
-      const opts  = { title, body, url: '/booking/equipment' }
+      const opts  = { title, body, url: `/my-bookings?focus=${bookingDoc.id}` }
 
       const userSnap = await db.collection('users').doc(booking.studentId).get()
       const tokens: string[] = (await tokensFor([userSnap.id])) as string[]
@@ -253,7 +253,7 @@ export async function runEventReminders(now = new Date()) {
     recipients.push(...(lesson.teacherIds ?? []), ...(lesson.teacherId ? [lesson.teacherId] : []))
 
     const tokens = await tokensFor([...new Set(recipients.filter(Boolean))])
-    await sendFcmToTokens(tokens, title, body)
+    await sendFcmToTokens(tokens, title, body, '/calendar')
     sent++
   }
 
@@ -269,7 +269,7 @@ export async function runEventReminders(now = new Date()) {
     if (!(await claimOnce(`reminder__personal__${evDoc.id}__${start.getTime()}`))) continue
     const { title, body } = reminderText(ev.title ?? 'Personal event', start, ev.location)
     const tokens = await tokensFor([...new Set([ev.userId, ...(ev.inviteeIds ?? [])].filter(Boolean))] as string[])
-    await sendFcmToTokens(tokens, title, body)
+    await sendFcmToTokens(tokens, title, body, '/calendar')
     sent++
   }
   return { sent }

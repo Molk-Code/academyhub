@@ -102,7 +102,7 @@ export default function AdminDashboard() {
   const { data: users } = useAllUsers()
   const silentSyncs = useCalendarSyncAlert(academy)
 
-  const pending = bookings.filter(b => b.status === 'pending').sort((a, b) => a.checkoutDate.localeCompare(b.checkoutDate))
+  const pending = bookings.filter(b => b.status === 'pending').sort((a, b) => (a.checkoutDate ?? '').localeCompare(b.checkoutDate ?? ''))
   const pickups = pickupsToday(bookings, today)
   const eq = useMemo(() => equipmentOut(projects, today), [projects, today])
   const openBugs = [...bugs].sort(newestFirst)

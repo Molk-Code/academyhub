@@ -980,6 +980,18 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── Customer orders (onboarding.ts writes them via the Admin SDK) ────────
+    // customer_slugs (short-name reservations) has no rule: server only.
+
+    match /customer_orders/{orderId} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+      match /events/{eventId} {
+        allow read: if isSuperAdmin();
+        allow write: if false;
+      }
+    }
+
     // ── Login page profile (public, read before sign-in) ─────────────────────
 
     match /public_config/{docId} {

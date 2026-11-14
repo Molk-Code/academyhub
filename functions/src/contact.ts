@@ -72,7 +72,7 @@ export async function hashIp(ip: string): Promise<string> {
   return createHash('sha256').update(`${await ipSalt()}:${ip}`).digest('hex')
 }
 
-function clientIp(req?: { headers?: Record<string, unknown>; ip?: string }): string {
+export function clientIp(req?: { headers?: Record<string, unknown>; ip?: string }): string {
   const fwd = req?.headers?.['x-forwarded-for']
   const first = (Array.isArray(fwd) ? fwd[0] : typeof fwd === 'string' ? fwd : '').split(',')[0].trim()
   return first || req?.ip || 'unknown'

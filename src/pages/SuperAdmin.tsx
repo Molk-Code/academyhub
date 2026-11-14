@@ -9,6 +9,7 @@ import { format } from 'date-fns'
 import SchoolModulesPanel from '@/pages/superadmin/SchoolModulesPanel'
 import DeleteSchoolDialog from '@/pages/superadmin/DeleteSchoolDialog'
 import VerifyEmailNotice from '@/pages/superadmin/VerifyEmailNotice'
+import CustomerOrders from '@/pages/superadmin/CustomerOrders'
 import { SCHOOL_ID } from '@/lib/school'
 import {
   Building2, Users, Clapperboard, Boxes, Plus, X, ChevronDown, ChevronUp,
@@ -468,6 +469,8 @@ export default function SuperAdmin() {
           color="bg-emerald-900/50"
         />
       </div>
+
+      <CustomerOrders />
 
       {/* Schools section */}
       <div className="space-y-3">

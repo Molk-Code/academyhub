@@ -40,9 +40,10 @@ export function addMonths(day: string, months: number): string {
 export const suggestedNextService = (item: Pick<EquipmentDoc, 'serviceIntervalMonths'>, day: string) =>
   item.serviceIntervalMonths ? addMonths(day, item.serviceIntervalMonths) : ''
 
-/** Units in service after sending `unit` away, or bringing it (or every unit: null) back */
-export function sendToService(units: ServiceUnit[], unit: number, note: string, since: string): ServiceUnit[] {
-  return [...units.filter(u => u.unit !== unit), { unit, since, ...(note.trim() ? { note: note.trim().slice(0, 300) } : {}) }]
+/** Units in service after sending these units away (one or several), or bringing one (or every unit: null) back */
+export function sendToService(units: ServiceUnit[], send: number[], note: string, since: string): ServiceUnit[] {
+  const extra = note.trim() ? { note: note.trim().slice(0, 300) } : {}
+  return [...units.filter(u => !send.includes(u.unit)), ...[...new Set(send)].map(unit => ({ unit, since, ...extra }))]
     .sort((a, b) => a.unit - b.unit)
 }
 export const backFromService = (units: ServiceUnit[], unit: number | null) => unit == null ? [] : units.filter(u => u.unit !== unit)

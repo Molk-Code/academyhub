@@ -99,6 +99,8 @@ export function MaintenanceTab() {
 
 const DONE_TYPES: MaintenanceType[] = ['service', 'inspection']
 const field: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4 }
+const chip: React.CSSProperties = { padding: '6px 12px', borderRadius: 999, border: '1px solid #2a2a3a', background: '#1a1a25', color: '#c0c0d5', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }
+const chipOn: React.CSSProperties = { background: 'rgba(245,158,11,.15)', borderColor: '#f59e0b', color: '#f59e0b' }
 const sectionTitle: React.CSSProperties = { fontWeight: 700, color: '#f0f0f5', fontSize: '.88rem' }
 const divider: React.CSSProperties = { borderTop: '1px solid #2a2a3a', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }
 
@@ -111,7 +113,11 @@ function ItemMaintenance({ item, onClose }: { item: EquipmentDoc; onClose: () =>
   const allUnits = Array.from({ length: Math.max(1, item.totalQuantity ?? 1) }, (_, i) => i + 1)
   const free = allUnits.filter(n => !away.some(u => u.unit === n))
 
-  const [send, setSend] = useState({ unit: String(free[0] ?? ''), note: '' })
+  // Units picked to send for service (one, several or all)
+  const [send, setSend] = useState<{ units: number[]; note: string }>({ units: allUnits.length === 1 ? [1] : [], note: '' })
+  const picked = send.units.filter(n => free.includes(n))
+  const allPicked = free.length > 0 && picked.length === free.length
+  const toggle = (n: number) => setSend(x => ({ ...x, units: x.units.includes(n) ? x.units.filter(u => u !== n) : [...x.units, n] }))
   const [schedule, setSchedule] = useState({ next: item.nextServiceDate ?? '', interval: item.serviceIntervalMonths ? String(item.serviceIntervalMonths) : '' })
   const blankEntry = (unit = '', type: MaintenanceType = 'service', date = today()) => ({
     date, type, unit, note: '', cost: '', performedBy: profile?.displayName ?? '',
@@ -133,12 +139,11 @@ function ItemMaintenance({ item, onClose }: { item: EquipmentDoc; onClose: () =>
     try { await fn(); setDone(ok) } catch (e: any) { setError(e?.message ?? 'Save failed') } finally { setBusy(null) }
   }
 
-  const sendUnit = () => run('send', async () => {
-    const n = Number(send.unit)
-    if (!allUnits.includes(n)) throw new Error('Choose a unit.')
-    await updateDoc(ref, { ...serviceFields(sendToService(away, n, send.note, today())), maintenanceNote: deleteField(), updatedAt: serverTimestamp() })
-    setSend({ unit: String(free.find(f => f !== n) ?? ''), note: '' })
-  }, `#${send.unit} is in service: it can't be checked out until it's back.`)
+  const sendUnits = () => run('send', async () => {
+    if (!picked.length) throw new Error('Choose the units to send for service.')
+    await updateDoc(ref, { ...serviceFields(sendToService(away, picked, send.note, today())), maintenanceNote: deleteField(), updatedAt: serverTimestamp() })
+    setSend({ units: [], note: '' })
+  }, `${picked.length === 1 ? `#${picked[0]} is` : `${picked.map(n => `#${n}`).join(', ')} are`} in service: they can't be checked out until they're back.`)
 
   const backInUse = (unit: number | null) => run(`back-${unit ?? 'all'}`, async () => {
     await updateDoc(ref, { ...serviceFields(backFromService(away, unit)), ...(unit == null ? { maintenanceNote: deleteField() } : {}), updatedAt: serverTimestamp() })
@@ -202,6 +207,12 @@ function ItemMaintenance({ item, onClose }: { item: EquipmentDoc; onClose: () =>
               <button style={btn} disabled={busy !== null} onClick={() => backInUse(u.unit)}>Back in use</button>
             </div>
           ))}
+          {away.length > 1 && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={btn} disabled={busy !== null} onClick={() => setEntry(blankEntry(''))}>Log service for all</button>
+              <button style={btn} disabled={busy !== null} onClick={() => backInUse(null)}>All back in use</button>
+            </div>
+          )}
           {unnumbered > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '.85rem' }}>
               <span style={{ flex: 1, color: '#f0f0f5' }}>{unnumbered} of {item.totalQuantity} in service, unit numbers not recorded{item.maintenanceNote ? ` · ${item.maintenanceNote}` : ''}</span>
@@ -209,20 +220,37 @@ function ItemMaintenance({ item, onClose }: { item: EquipmentDoc; onClose: () =>
             </div>
           )}
           {free.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr auto', gap: 8, alignItems: 'end' }}>
-              <label style={field}>
-                <span style={label}>Unit</span>
-                <select style={inp} value={send.unit} onChange={e => setSend(x => ({ ...x, unit: e.target.value }))} aria-label="Unit to send for service">
-                  {free.map(n => <option key={n} value={n}>#{n}</option>)}
-                </select>
-              </label>
-              <label style={field}>
-                <span style={label}>Why it's away (optional)</span>
-                <input style={inp} value={send.note} onChange={e => setSend(x => ({ ...x, note: e.target.value }))} placeholder="Sensor cleaning at the dealer" />
-              </label>
-              <button style={btn} disabled={busy !== null} onClick={sendUnit}>
-                {busy === 'send' && <Loader2 size={14} className="animate-spin" />} Send to service
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <span style={label}>Send for service</span>
+              <div role="group" aria-label="Units to send for service" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {free.length > 1 && (
+                  <button type="button" aria-pressed={allPicked} onClick={() => setSend(x => ({ ...x, units: allPicked ? [] : [...free] }))}
+                    style={{ ...chip, ...(allPicked ? chipOn : {}) }}>
+                    {away.length ? `All available (${free.length})` : `All units (${free.length})`}
+                  </button>
+                )}
+                {allUnits.map(n => {
+                  const isAway = !free.includes(n)
+                  const on = picked.includes(n)
+                  return (
+                    <button key={n} type="button" aria-pressed={on} disabled={isAway} onClick={() => toggle(n)}
+                      title={isAway ? 'Already in service' : undefined}
+                      style={{ ...chip, ...(on ? chipOn : {}), ...(isAway ? { opacity: .35, cursor: 'not-allowed' } : {}) }}>
+                      #{n}
+                    </button>
+                  )
+                })}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'end' }}>
+                <label style={field}>
+                  <span style={label}>Why it's away (optional)</span>
+                  <input style={inp} value={send.note} onChange={e => setSend(x => ({ ...x, note: e.target.value }))} placeholder="Sensor cleaning at the dealer" />
+                </label>
+                <button style={btn} disabled={busy !== null || !picked.length} onClick={sendUnits}>
+                  {busy === 'send' && <Loader2 size={14} className="animate-spin" />}
+                  {picked.length > 1 ? `Send ${picked.length} units to service` : 'Send to service'}
+                </button>
+              </div>
             </div>
           )}
         </div>

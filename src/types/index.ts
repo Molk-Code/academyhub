@@ -413,9 +413,11 @@ export interface EquipmentDoc {
   filmYear2Only: boolean
   allowedCohortIds?: string[]   // empty / absent = available to all
   requiresProduction?: boolean  // default true; false = bookable without a production
-  maintenanceUnits?: number     // units away for service: can't be booked or checked out
-  maintenanceNote?: string      // why they're away (shown in the maintenance list)
+  maintenanceUnits?: number     // units away for service: can't be booked or checked out (= serviceUnits.length when that is set)
+  maintenanceNote?: string      // why they're away, for a count without unit numbers (older entries)
+  serviceUnits?: ServiceUnit[]  // which numbered units are away (#n as on the labels); that unit can't be checked out
   nextServiceDate?: string      // "YYYY-MM-DD": due for service from this day
+  serviceIntervalMonths?: number // when set, logging a service suggests the next date this many months on
   isActive: boolean
   createdAt?: Timestamp
   updatedAt?: Timestamp
@@ -537,6 +539,9 @@ export interface InventoryItemDoc {
   unit?: number          // physical unit scanned out (e.g. 1 for "#1"), when the code carries one
 }
 
+/** A numbered unit away for service */
+export interface ServiceUnit { unit: number; note?: string; since: string }
+
 // equipment/{id}/maintenance/{logId}: what was done to an item, by whom
 export type MaintenanceType = 'service' | 'repair' | 'inspection' | 'cleaning' | 'other'
 export interface MaintenanceLogDoc {
@@ -546,6 +551,9 @@ export interface MaintenanceLogDoc {
   note: string
   cost?: number | null       // optional, in the school's currency
   performedBy: string        // a name: staff, a service shop…
+  unit?: number | null       // the numbered unit (#n); absent/null = the whole item
+  backInUse?: boolean        // the unit came back from service with this entry
+  nextServiceDate?: string | null // next service date set with this entry (null: none planned)
   createdBy?: string         // uid of who logged it
   createdAt?: Timestamp
 }

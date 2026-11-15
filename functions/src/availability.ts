@@ -303,6 +303,17 @@ export async function checkOutUnits(projectId: string, units: UnitIn[], assigned
       }
     }
 
+    // Numbered units away for service (maintenance) can't go out
+    const numbered = units.filter(u => u.equipmentId && u.unit != null)
+    const equipSnaps = new Map((await Promise.all([...new Set(numbered.map(u => u.equipmentId!))]
+      .map(async id => [id, await tx.get(db.collection('equipment').doc(id))] as const))))
+    for (const u of numbered) {
+      const away = (equipSnaps.get(u.equipmentId!)?.data()?.serviceUnits ?? []) as { unit: number }[]
+      if (away.some(a => a.unit === u.unit)) {
+        throw new functions.https.HttpsError('failed-precondition', `${/#\d+$/.test(u.equipmentName) ? u.equipmentName : `${u.equipmentName} #${u.unit}`} is in service (Equipment → Maintenance) and can't be checked out.`)
+      }
+    }
+
     if (ids.length) {
       const wanted = new Map<string, number>()
       for (const u of units) if (u.equipmentId) wanted.set(u.equipmentId, (wanted.get(u.equipmentId) ?? 0) + 1)

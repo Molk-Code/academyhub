@@ -152,6 +152,11 @@ export async function checkoutScan<T extends ScanRow>(opts: {
   const now = new Date().toISOString()
 
   const result = await runTransaction(db, async tx => {
+    // A numbered unit away for service (maintenance) can't go out
+    if (equipmentId && unit != null) {
+      const away = ((await tx.get(doc(db, 'equipment', equipmentId))).data()?.serviceUnits ?? []) as { unit: number }[]
+      if (away.some(a => a.unit === unit)) return { kind: 'refused', message: `${scannedName} is in service (Equipment → Maintenance) and can't be checked out.` } as const
+    }
     if (lockRef && globalRef) {
       const [lock, global] = await Promise.all([tx.get(lockRef), tx.get(globalRef)])
       const heldId = lock.exists() ? (lock.data().itemId as string | undefined) : undefined

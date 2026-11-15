@@ -99,3 +99,13 @@ test('units away for service are never free', async () => {
   await db.collection('equipment').doc('cam').update({ maintenanceUnits: 0 })
   await booking(1, 1)
 })
+
+test('a numbered unit in service can\'t be checked out; the other units can', async () => {
+  await db.collection('inventory_projects').doc('a').set({ name: 'a', status: 'active', checkoutDate: day(0), returnDate: day(2) })
+  await db.collection('equipment').doc('cam').update({ serviceUnits: [{ unit: 2, since: day(0) }], maintenanceUnits: 1 })
+  await assert.rejects(av.checkOutUnits('a', [{ equipmentId: 'cam', equipmentName: 'FX6 #2', unit: 2 }], 'Kim'),
+    e => e.code === 'failed-precondition' && /FX6 #2 is in service/.test(e.message))
+  await av.checkOutUnits('a', [{ equipmentId: 'cam', equipmentName: 'FX6 #1', unit: 1 }], 'Kim')
+  await db.collection('equipment').doc('cam').update({ serviceUnits: [], maintenanceUnits: 0 })
+  await av.checkOutUnits('a', [{ equipmentId: 'cam', equipmentName: 'FX6 #2', unit: 2 }], 'Kim')
+})

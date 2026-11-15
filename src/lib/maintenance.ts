@@ -1,4 +1,4 @@
-import type { EquipmentDoc } from '@/types'
+import type { EquipmentDoc, ServiceUnit } from '@/types'
 
 // Maintenance: which catalog items need attention. "In service" = units away
 // for service right now (excluded from booking and check-out by the server);
@@ -26,3 +26,26 @@ export function serviceState(item: Pick<EquipmentDoc, 'maintenanceUnits' | 'next
 export function needsService(items: (Pick<EquipmentDoc, 'maintenanceUnits' | 'nextServiceDate'> & { isActive?: boolean })[], today: string): number {
   return items.filter(i => i.isActive !== false && ['in-service', 'overdue'].includes(serviceState(i, today) ?? '')).length
 }
+
+/** The day `months` months after `day` (clamped to the month's last day: 31 Jan + 1 month = 28/29 Feb) */
+export function addMonths(day: string, months: number): string {
+  const [y, m, d] = day.split('-').map(Number)
+  const first = new Date(Date.UTC(y, m - 1 + months, 1))
+  const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate()
+  first.setUTCDate(Math.min(d, last))
+  return first.toISOString().slice(0, 10)
+}
+
+/** The next service date to suggest after a service on `day` (empty: no interval set) */
+export const suggestedNextService = (item: Pick<EquipmentDoc, 'serviceIntervalMonths'>, day: string) =>
+  item.serviceIntervalMonths ? addMonths(day, item.serviceIntervalMonths) : ''
+
+/** Units in service after sending `unit` away, or bringing it (or every unit: null) back */
+export function sendToService(units: ServiceUnit[], unit: number, note: string, since: string): ServiceUnit[] {
+  return [...units.filter(u => u.unit !== unit), { unit, since, ...(note.trim() ? { note: note.trim().slice(0, 300) } : {}) }]
+    .sort((a, b) => a.unit - b.unit)
+}
+export const backFromService = (units: ServiceUnit[], unit: number | null) => unit == null ? [] : units.filter(u => u.unit !== unit)
+
+/** The equipment fields for a list of units in service (the count is what booking and check-out read) */
+export const serviceFields = (units: ServiceUnit[]) => ({ serviceUnits: units, maintenanceUnits: units.length })

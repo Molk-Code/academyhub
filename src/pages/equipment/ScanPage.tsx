@@ -6,7 +6,9 @@ import { useAuth } from '@/contexts/AuthContext'
 import { startCameraScan, savedScanKind, saveScanKind, type ScanKind, type ScanControls } from '@/lib/cameraScanner'
 import { ScanKindToggle, BarcodeGuide, ZoomButtons } from './ScanKindToggle'
 import { Scan, Check, X, Wifi, WifiOff, LogIn, AlertTriangle } from 'lucide-react'
-import { parseScanText, checkoutScan, matchCheckinScan } from './inventoryShared'
+import { parseScanText, checkoutScan, matchCheckinScan, checkoutKit, kitSummary } from './inventoryShared'
+import { kitIdFromCode } from '@/lib/kits'
+import type { KitDoc } from '@/types'
 import { ScanFlash, useScanFlash } from './ScanFeedback'
 
 const COOLDOWN_MS = 2500 // ms to block re-scan after a successful scan
@@ -108,6 +110,14 @@ export default function ScanPage() {
     }, () => { itemsRef.current = null })
   }, [session?.projectId])
 
+  // Kits, for kit labels (kit:<id>)
+  const kitsRef = useRef<Record<string, KitDoc>>({})
+  useEffect(() => {
+    getDocs(collection(db, 'kits')).then(snap => {
+      snap.docs.forEach(d => { kitsRef.current[d.id] = { id: d.id, ...(d.data() as Omit<KitDoc, 'id'>) } })
+    }).catch(() => {})
+  }, [])
+
   // Pre-load equipment name cache
   useEffect(() => {
     getDocs(collection(db, 'equipment')).then(snap => {
@@ -150,6 +160,29 @@ export default function ScanPage() {
     if (cooldownRef.current) return
     const sess = sessionRef.current
     if (!sess || !sess.active || !sessionId) return
+
+    // A kit label: every item of the kit (checkout only)
+    const kitId = kitIdFromCode(text)
+    if (kitId) {
+      const kit = kitsRef.current[kitId]
+      let ok = false
+      let message = 'Unknown kit'
+      if (kit && sess.mode !== 'checkout') message = 'Return a kit by scanning its items'
+      else if (kit) {
+        const r = await checkoutKit({
+          projectId: sess.projectId, items: itemsRef.current ?? [], kit,
+          nameOf: id => equipmentCacheRef.current[id],
+          newRow: { checkinTimestamp: '', status: 'checked-out', damageNotes: '', assignedTo: '', scannedViaSession: sessionId },
+        })
+        ok = r.out.length > 0
+        message = r.missing.length ? kitSummary('Kit', r) : 'Kit checked out'
+      }
+      beep(ok)
+      if (ok) showFlash({ name: kit!.name, imageUrl: kit!.imageUrl || null, label: message, warn: message !== 'Kit checked out' })
+      startCooldown(kit?.name ?? 'Kit', ok, message === 'Kit checked out' ? undefined : message)
+      setScanEntries(prev => [{ name: kit?.name ?? 'Unknown kit', time: new Date().toLocaleTimeString(), ok }, ...prev.slice(0, 29)])
+      return
+    }
 
     // Individual-unit codes carry a unit number (see parseScanText) so a scan
     // can be traced back to a specific physical unit.

@@ -6,7 +6,7 @@ import {
 import { db } from '@/lib/firebase'
 import { checkOutEquipmentUnits, bookingErrorMessage } from '@/lib/equipmentAvailability'
 import { useCollection, where } from '@/hooks/useFirestore'
-import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc } from '@/types'
+import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, KitDoc } from '@/types'
 import {
   Package, Calendar, Users, Clock, AlertTriangle, Check, Trash2, Plus,
   Edit2, CheckCircle2, ArchiveRestore, ZapOff, Scan, Smartphone, ScanBarcode, ArrowRightLeft,
@@ -15,7 +15,8 @@ import { startCameraScan, savedScanKind, saveScanKind, type ScanKind, type ScanC
 import { ScanKindToggle, BarcodeGuide, ZoomButtons } from './ScanKindToggle'
 import { QRCodeSVG } from 'qrcode.react'
 import { buildEquipmentContractHtml } from '@/lib/equipmentContract'
-import { isOverdue, formatDate, overdueDays, parseScanText, beep, itemDisplayName, checkoutScan, matchCheckinScan } from './inventoryShared'
+import { isOverdue, formatDate, overdueDays, parseScanText, beep, itemDisplayName, checkoutScan, matchCheckinScan, checkoutKit, kitSummary } from './inventoryShared'
+import { kitIdFromCode } from '@/lib/kits'
 import { EquipmentPicker } from './EquipmentPicker'
 import { ContractSignatures } from './ContractSignatures'
 import { ScanFlash, useScanFlash, NotInProjectModal, type NotInProjectData } from './ScanFeedback'
@@ -39,6 +40,9 @@ export function ProjectDetail({
     [unsortedItems],
   )
   const { data: equipmentAll } = useCollection<EquipmentDoc>('equipment')
+  const { data: kits } = useCollection<KitDoc>('kits')
+  const [kitPick, setKitPick] = useState('')
+  const [kitBusy, setKitBusy] = useState(false)
   // Other active projects an item can be moved to
   const { data: activeProjects } = useCollection<InventoryProjectDoc>(
     'inventory_projects',
@@ -298,10 +302,36 @@ export function ProjectDetail({
   // The catalog's "available" count is recomputed from project items by the
   // onInventoryItemWritten Cloud Function — no counting needed here.
 
+  // A kit (scanned label or "Add kit"): every item in it, each on its own row
+  async function addKit(kitId: string, log: (name: string, note: string, warn?: boolean) => void) {
+    const kit = kits.find(k => k.id === kitId)
+    if (!kit) { log('Unknown kit', 'This kit label is not in Equipment → Kits', true); beep(220); return }
+    setKitBusy(true)
+    try {
+      const r = await checkoutKit({
+        projectId: project.id, items, kit,
+        nameOf: id => equipmentAll.find(e => e.id === id)?.name,
+        newRow: { checkinTimestamp: '', status: 'checked-out', damageNotes: '', assignedTo: project.borrowers?.[0] ?? '' },
+      })
+      const warn = r.missing.length > 0
+      log(kit.name, kitSummary('Kit', r), warn)
+      showFlash({ name: kit.name, imageUrl: kit.imageUrl || null, label: warn ? `${r.out.length} of ${r.out.length + r.missing.length} out — some missing` : 'Kit checked out', warn })
+      if (warn) beep(220)
+    } finally {
+      setKitBusy(false)
+    }
+  }
+
   async function handleScan(text: string) {
     const time = new Date().toLocaleTimeString()
     const log = (name: string, note: string, warn = false) =>
       setScanEntries(prev => [{ name, time, note, warn }, ...prev.slice(0, 19)])
+    const kitId = kitIdFromCode(text)
+    if (kitId) {
+      if (scanMode === 'checkout') await addKit(kitId, log)
+      else { log('Kit label', 'To return a kit, scan its items one by one', true); beep(220) }
+      return
+    }
     const { base, unit, gtinNo } = parseScanText(text)
     const lower = base.toLowerCase()
     const matchedEquip = (gtinNo ? equipmentAll.find(e => e.gtinNo === gtinNo) : undefined)
@@ -834,6 +864,22 @@ export function ProjectDetail({
             <Plus size={14} /> Add
           </button>
         </div>
+        {kits.length > 0 && (
+          <div className="manual-add-row" style={{ marginTop: 8 }}>
+            <select className="manual-add-input" aria-label="Kit to check out" value={kitPick} onChange={e => setKitPick(e.target.value)}>
+              <option value="">Add a kit…</option>
+              {[...kits].sort((a, b) => a.name.localeCompare(b.name)).map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
+            </select>
+            <button className="manual-add-btn" disabled={!kitPick || kitBusy}
+              onClick={async () => {
+                const time = new Date().toLocaleTimeString()
+                await addKit(kitPick, (name, note, warn = false) => setScanEntries(prev => [{ name, time, note, warn }, ...prev.slice(0, 19)]))
+                setKitPick('')
+              }}>
+              <Plus size={14} /> Add kit
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Return summary */}

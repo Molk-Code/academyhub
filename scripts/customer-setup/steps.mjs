@@ -195,6 +195,24 @@ async function signInConfig(projectId, address) {
   })
 }
 
+/**
+ * The customer's RESEND_API_KEY secret, kept equal to the control project's:
+ * created when missing, and a new version added when the key changed (so a
+ * corrected key reaches the customer on the next run).
+ */
+async function syncResendKey(projectId, key) {
+  const base = `${SM}projects/${projectId}/secrets/RESEND_API_KEY`
+  const secret = await google('GET', base, undefined, { allow: [404] })
+  if (secret.__status === 404) {
+    await google('POST', `${SM}projects/${projectId}/secrets?secretId=RESEND_API_KEY`, { replication: { automatic: {} }, labels: { 'firebase-managed': 'true' } })
+  }
+  const latest = await google('GET', `${base}/versions/latest:access`, undefined, { allow: [404, 400] })
+  const current = latest.__status ? null : Buffer.from(latest.payload?.data ?? '', 'base64').toString()
+  if (current !== (key ?? '')) {
+    await google('POST', `${base}:addVersion`, { payload: { data: Buffer.from(key ?? '').toString('base64') } })
+  }
+}
+
 /** Secrets, generated config files, then rules, functions and the app */
 export async function deploy(ctx) {
   const { projectId, webConfig } = ctx.state
@@ -202,11 +220,7 @@ export async function deploy(ctx) {
   const schoolId = order.school.shortName
   await ensureFirestore(projectId)
 
-  const secret = await google('GET', `${SM}projects/${projectId}/secrets/RESEND_API_KEY`, undefined, { allow: [404] })
-  if (secret.__status === 404) {
-    await google('POST', `${SM}projects/${projectId}/secrets?secretId=RESEND_API_KEY`, { replication: { automatic: {} }, labels: { 'firebase-managed': 'true' } })
-    await google('POST', `${SM}projects/${projectId}/secrets/RESEND_API_KEY:addVersion`, { payload: { data: Buffer.from(env.RESEND_API_KEY ?? '').toString('base64') } })
-  }
+  await syncResendKey(projectId, env.RESEND_API_KEY)
 
   writeFileSync(`.env.${MODE}`, webEnv({ webConfig, schoolId, address: order.address }))
   writeFileSync(`functions/.env.${projectId}`, functionsEnv({ projectId, schoolId, address: order.address, superadminEmails: env.SUPERADMIN_EMAILS }))
@@ -309,12 +323,14 @@ export async function signin_domain(ctx) {
 /** An admin invitation in the customer's database, emailed to the school admin */
 export async function invite(ctx) {
   const { order, env } = ctx
-  if (ctx.state.inviteId) return { inviteId: ctx.state.inviteId }
+  await syncResendKey(ctx.state.projectId, env.RESEND_API_KEY)
   const db = customerDb(ctx.state.projectId)
-  const ref = await db.collection('invitations').add({
+  // A retry after a failed email reuses the invitation already saved
+  const ref = ctx.state.inviteId ? db.collection('invitations').doc(ctx.state.inviteId) : await db.collection('invitations').add({
     email: order.admin.email.toLowerCase(), displayName: order.admin.name, role: 'admin', cohortId: null, used: false,
     createdAt: FieldValue.serverTimestamp(), expiresAt: Timestamp.fromDate(new Date(Date.now() + 14 * 86_400_000)),
   })
+  if (!ctx.state.inviteId) await ctx.save({ inviteId: ref.id })
   const cfg = (await db.collection('email_config').doc('global').get()).data() ?? {}
   if (!env.RESEND_API_KEY || !cfg.fromEmail) throw new Error('No email sender configured (email_config/global or RESEND_API_KEY): invitation saved but not sent')
   const link = `https://${order.address}/accept-invite?token=${ref.id}`
@@ -334,7 +350,6 @@ export async function invite(ctx) {
     }),
   })
   if (!res.ok) throw new Error(`Invitation saved, but the email failed: ${res.status} ${(await res.text()).slice(0, 200)}`)
-  await ctx.save({ inviteId: ref.id })
   return { inviteId: ref.id }
 }
 

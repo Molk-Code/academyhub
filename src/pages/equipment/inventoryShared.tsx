@@ -247,3 +247,47 @@ export function LinkifiedText({ text }: { text: string }) {
     </>
   )
 }
+
+export interface KitCheckoutResult {
+  out: string[]                                   // checked out (or filled a booked row)
+  missing: { name: string; reason: string }[]     // couldn't be checked out, and why
+}
+
+/**
+ * Checks out every item of a kit (scanned label or "Add kit"), one unit at a
+ * time through checkoutScan, so booked rows are filled first and new units
+ * are checked on the project's dates. Items that can't go out are listed
+ * with the reason instead of stopping the rest.
+ */
+export async function checkoutKit<T extends ScanRow>(opts: {
+  projectId: string
+  items: T[]
+  kit: { itemIds: string[] }
+  nameOf: (equipmentId: string) => string | undefined
+  newRow: Record<string, unknown>
+}): Promise<KitCheckoutResult> {
+  const result: KitCheckoutResult = { out: [], missing: [] }
+  for (const equipmentId of opts.kit.itemIds) {
+    const name = opts.nameOf(equipmentId)
+    if (!name) { result.missing.push({ name: 'Removed item', reason: 'no longer in the catalog' }); continue }
+    try {
+      const r = await checkoutScan({
+        projectId: opts.projectId, items: opts.items, equipmentId, scannedName: name, unit: null,
+        newRow: { ...opts.newRow, equipmentId, equipmentName: name },
+      })
+      if (r.kind === 'booked' || r.kind === 'new') result.out.push(name)
+      else if (r.kind === 'refused') result.missing.push({ name, reason: 'none free on these dates' })
+      else result.missing.push({ name, reason: r.elsewhere ? `out in ${r.elsewhere}` : 'already out' })
+    } catch {
+      result.missing.push({ name, reason: 'could not save' })
+    }
+  }
+  return result
+}
+
+/** "4 of 5 out · missing: BP-U70 (none free on these dates)" */
+export function kitSummary(kitName: string, r: KitCheckoutResult): string {
+  const total = r.out.length + r.missing.length
+  const missing = r.missing.length ? ` · missing: ${r.missing.map(m => `${m.name} (${m.reason})`).join(', ')}` : ''
+  return `${kitName}: ${r.out.length} of ${total} out${missing}`
+}

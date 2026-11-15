@@ -20,6 +20,8 @@ import { kitIdFromCode } from '@/lib/kits'
 import { EquipmentPicker } from './EquipmentPicker'
 import { ContractSignatures } from './ContractSignatures'
 import { ScanFlash, useScanFlash, NotInProjectModal, type NotInProjectData } from './ScanFeedback'
+import { RentalSummaryButton } from './RentalSummary'
+import { projectSummaryInput } from '@/lib/rentalSummary'
 
 export function ProjectDetail({
   project,
@@ -40,6 +42,7 @@ export function ProjectDetail({
     [unsortedItems],
   )
   const { data: equipmentAll } = useCollection<EquipmentDoc>('equipment')
+  const catalog = useMemo(() => new Map(equipmentAll.map(e => [e.id, e])), [equipmentAll])
   const { data: kits } = useCollection<KitDoc>('kits')
   const [kitPick, setKitPick] = useState('')
   const [kitBusy, setKitBusy] = useState(false)
@@ -652,6 +655,11 @@ export function ProjectDetail({
         <button className="primary-btn" onClick={generateContract}>
           Download Contract PDF
         </button>
+        <RentalSummaryButton
+          input={() => projectSummaryInput(project, items)}
+          catalog={catalog}
+          className="secondary-btn"
+        />
         {((['active', 'checked-out'].includes(project.status) && actionState === 'idle') || actionState === 'complete') && (
           <button
             className="secondary-btn"

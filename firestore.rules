@@ -127,7 +127,7 @@ service cloud.firestore {
     function settingsModuleOn(docId) {
       return docId in ['booking', 'semester'] ? moduleOn('academy')
         : docId == 'production' ? moduleOn('production')
-        : docId in ['equipment_gtin', 'inventory_stats_resets'] ? moduleOn('rentalInventory')
+        : docId in ['equipment_gtin', 'inventory_stats_resets', 'rental_summary'] ? moduleOn('rentalInventory')
         : true;
     }
 

@@ -201,7 +201,7 @@ export const COLLECTION_MODULE: Record<string, ModuleId> = Object.fromEntries([
 
 const SETTINGS_MODULE: Record<string, ModuleId> = {
   booking: 'academy', semester: 'academy', production: 'production',
-  equipment_gtin: 'rental_inventory', inventory_stats_resets: 'rental_inventory',
+  equipment_gtin: 'rental_inventory', inventory_stats_resets: 'rental_inventory', rental_summary: 'rental_inventory',
 }
 
 /**

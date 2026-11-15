@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import { BOOKING_STATUSES, STATUS_COLOR, formatDate } from './adminEquipmentShared'
 import { clickable } from '@/lib/a11y'
+import { bookingSummaryInput } from '@/lib/rentalSummary'
+import { RentalSummaryButton } from './RentalSummary'
 
 // ── Booking message thread ───────────────────────────────────────────────────
 
@@ -289,6 +291,11 @@ export function BookingsTab() {
 
                     {/* Actions */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      <RentalSummaryButton
+                        input={() => bookingSummaryInput(b, catalog)}
+                        catalog={catalog}
+                        style={{ padding: '6px 14px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 8, color: '#f0f0f5', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                      />
                       {b.status === 'checked-out' && !b.linkedProjectId && (
                         <button
                           disabled={savingId === b.id}

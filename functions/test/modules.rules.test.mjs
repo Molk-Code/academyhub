@@ -28,7 +28,7 @@ const MODULE_PATHS = {
   rentalInventory: `equipment/x1 equipment_categories/x1 equipment_bookings/x1 equipment_bookings/x1/messages/x1
     inventory_presets/x1 inventory_projects/x1 inventory_projects/x1/items/x1 inventory_projects/x1/signatures/x1
     inventory_projects/x1/unit_out/x1 scan_sessions/x1 scan_sessions/x1/checkins/x1 settings/equipment_gtin
-    settings/inventory_stats_resets`.split(/\s+/),
+    settings/inventory_stats_resets settings/rental_summary kits/x1 equipment_units/x1 equipment/x1/maintenance/x1`.split(/\s+/),
 }
 const SHARED = ['production_teams/x1', 'crew_roles/x1']
 const CORE = ['users/emu-student', 'cohorts/x1', 'chat_channels/x1', 'notifications/x1', 'guide_articles/x1',

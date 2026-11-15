@@ -23,6 +23,7 @@ const COHORT_COLORS = [
 ]
 import Avatar from '@/components/common/Avatar'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
+import TermReports from '@/components/academy/TermReports'
 
 const schema = z.object({
   name:  z.string().min(2, 'Name required'),
@@ -607,6 +608,8 @@ export default function CohortDetail() {
           </div>
         )}
       </div>
+
+      <TermReports cohort={cohort} students={students} />
     </div>
   )
 }

@@ -2,6 +2,7 @@ import type { EquipmentBookingDoc, EquipmentDoc, InventoryItemDoc, InventoryProj
 import type { CurrencyCode } from '@/contexts/SchoolContext'
 import { calcRentalDays, billableDays } from './productionBudget'
 import { itemCategory, partStatus, isItemUnavailable } from './bookingParts'
+import { toCsv, downloadFile, fileSlug, type CsvFormat } from './csv'
 
 // Rental summary for one booking or project: items, days, day price, discount
 // and total, as a PDF (rentalSummaryPdf.ts) or CSV rows for accounting
@@ -174,8 +175,8 @@ export const summaryRef = (i: Pick<SummaryInput, 'kind' | 'id'>) =>
 
 // ── CSV ───────────────────────────────────────────────────────────────────────
 
-/** 'sv': semicolons and decimal commas (Swedish Excel); 'intl': commas and points */
-export type CsvFormat = 'sv' | 'intl'
+export type { CsvFormat }
+export { downloadFile }
 
 export const CSV_COLUMNS = [
   'Reference', 'Type', 'Title', 'Customer', 'Customer email', 'From', 'To', 'Item', 'Article', 'Kit',
@@ -183,28 +184,14 @@ export const CSV_COLUMNS = [
 ]
 
 export function summaryCsv(summaries: RentalSummary[], currency: CurrencyCode, format: CsvFormat): string {
-  const sep = format === 'sv' ? ';' : ','
-  const cell = (v: string | number | null | undefined) => {
-    const s = v == null ? '' : typeof v === 'number' ? (format === 'sv' ? String(v).replace('.', ',') : String(v)) : v
-    return s.includes(sep) || /["\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-  }
   const rows = summaries.flatMap(s => s.lines.map(l => [
     summaryRef(s.input), s.input.kind, s.input.title, s.input.customer, s.input.customerEmail,
     s.input.from, s.input.to, l.name, l.equipmentId, l.kitName,
     l.quantity, s.rentalDays, s.chargedDays, l.dayPrice, l.amount, l.discount, l.net,
     s.vatRate, l.vat, l.total, currency,
-  ].map(cell)))
-  return '﻿' + [CSV_COLUMNS, ...rows].map(r => r.join(sep)).join('\r\n') + '\r\n'
-}
-
-export function downloadFile(name: string, content: string | Blob, type = 'text/csv;charset=utf-8') {
-  const blob = typeof content === 'string' ? new Blob([content], { type }) : content
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = name
-  document.body.appendChild(a); a.click(); a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  ]))
+  return toCsv([CSV_COLUMNS, ...rows], format)
 }
 
 export const summaryFileName = (s: RentalSummary, ext: string) =>
-  `rental-summary-${summaryRef(s.input)}-${s.input.title.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 40) || 'untitled'}.${ext}`
+  `rental-summary-${summaryRef(s.input)}-${fileSlug(s.input.title)}.${ext}`

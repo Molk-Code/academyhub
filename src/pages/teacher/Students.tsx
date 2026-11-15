@@ -15,6 +15,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner'
 import EmptyState from '@/components/common/EmptyState'
 import ErrorState from '@/components/common/ErrorState'
 import { useCohorts } from '@/lib/queries'
+import TermReports from '@/components/academy/TermReports'
 
 interface AddAbsenceState {
   student: UserDoc
@@ -27,7 +28,7 @@ interface AddAbsenceState {
 
 interface AttendanceSettingsDoc { id: string; pointsPerCheckIn: number; absencePenalty?: number }
 
-type TabId = 'students' | 'lesson-absences' | 'student-absences'
+type TabId = 'students' | 'lesson-absences' | 'student-absences' | 'term-reports'
 
 export default function Students() {
   const { profile: teacherProfile } = useAuth()
@@ -289,6 +290,7 @@ export default function Students() {
     { id: 'students', label: 'Students', count: filtered.length },
     { id: 'lesson-absences', label: 'Absence by Lesson', count: lessonAbsenceGroups.length },
     { id: 'student-absences', label: 'Absence Reports', count: pendingCount > 0 ? pendingCount : undefined },
+    { id: 'term-reports', label: 'Term Reports' },
   ]
 
   return (
@@ -565,6 +567,11 @@ export default function Students() {
           )}
         </div>
       )}
+
+      {/* ── Term Reports tab ──────────────────────────────────────────────────── */}
+      {activeTab === 'term-reports' && (cohortOf(selectedCohort)
+        ? <TermReports cohort={cohortOf(selectedCohort)!} students={students.filter(s => s.cohortId === selectedCohort)} />
+        : <p className="text-sm text-zinc-400">Choose a class above to make its term reports.</p>)}
 
       {/* ── Absence Reports tab ───────────────────────────────────────────────── */}
       {activeTab === 'student-absences' && (

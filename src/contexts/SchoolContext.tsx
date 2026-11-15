@@ -4,6 +4,7 @@ import { db } from '@/lib/firebase'
 import { SCHOOL_ID } from '@/lib/school'
 import type { SchoolTier } from '@/types'
 import type { ProductType, ModuleFlags } from '@/lib/features'
+import type { PlanSelection } from '@/config/pricing'
 
 export type CurrencyCode = 'SEK' | 'EUR' | 'USD'
 
@@ -25,6 +26,12 @@ interface SchoolConfig {
   modules: ModuleFlags | null
   /** Public rental shop for signed-out visitors (module-based schools) */
   publicShop: boolean | null
+  /** Plan per module; null: no plan limits or plan features apply (schools set up before plans) */
+  planSelection: PlanSelection | null
+  /** Limits as stored (null = unlimited); maxStudents above keeps its old default */
+  limits: { assets: number | null; students: number | null }
+  /** Counted by functions for schools with a plan */
+  usage: { assets?: number; students?: number } | null
 }
 
 const defaultConfig: SchoolConfig = {
@@ -43,6 +50,9 @@ const defaultConfig: SchoolConfig = {
   productType: null,
   modules: null,
   publicShop: null,
+  planSelection: null,
+  limits: { assets: null, students: null },
+  usage: null,
 }
 
 const SchoolContext = createContext<SchoolConfig>(defaultConfig)
@@ -53,7 +63,11 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     return onSnapshot(
       doc(db, 'schools', SCHOOL_ID),
-      snap => { if (snap.exists()) setConfig({ ...defaultConfig, ...snap.data() } as SchoolConfig) },
+      snap => {
+        if (!snap.exists()) return
+        const d = snap.data()
+        setConfig({ ...defaultConfig, ...d, limits: { assets: d.maxAssets ?? null, students: d.maxStudents ?? null } } as SchoolConfig)
+      },
       err  => { console.warn('School config listener error:', err) },
     )
   }, [])

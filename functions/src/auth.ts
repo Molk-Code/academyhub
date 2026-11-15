@@ -1,4 +1,5 @@
 import { admin, functions, db, escapeHtml, sendEmailOrThrow, LIMITS, REGION, APP_URL } from './lib'
+import { assertCanAdd, isStudent } from './usage'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // onUserCreate — set custom claims from invitation
@@ -134,6 +135,7 @@ export const sendInviteEmail = functions
       throw new functions.https.HttpsError('invalid-argument', 'Invite students or teachers; make admins from the user list.')
     }
     const days = Math.min(60, Math.max(1, Math.round(Number(expiresInDays) || 7)))
+    if ((role ?? 'student') === 'student') await assertCanAdd('students')
 
     const expiresAt = admin.firestore.Timestamp.fromDate(new Date(Date.now() + days * 24 * 60 * 60 * 1000))
     const ref = await db.collection('invitations').add({
@@ -287,6 +289,8 @@ export const restoreUser = functions.region(REGION).runWith(LIMITS).https.onCall
     throw new functions.https.HttpsError('permission-denied', 'Admin only.')
   }
   const { uid } = data as { uid: string }
+  const user = (await db.collection('users').doc(uid).get()).data()
+  if (user && isStudent(user) && (user.isActive === false || user.disabled === true)) await assertCanAdd('students')
   await admin.auth().updateUser(uid, { disabled: false })
   await db.collection('users').doc(uid).update({ disabled: false, isActive: true })
   return { success: true }
@@ -354,6 +358,11 @@ export const setUserRole = functions.region(REGION).runWith(LIMITS).https.onCall
   }
   if (isStaffRole(role) && roles.includes('student')) {
     throw new functions.https.HttpsError('invalid-argument', 'Teachers and admins cannot have the student role.')
+  }
+
+  if (role === 'student') {
+    const before = (await db.collection('users').doc(uid).get()).data()
+    if (!before || !isStudent(before)) await assertCanAdd('students')
   }
 
   let userRecord: admin.auth.UserRecord

@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto'
 import { FieldValue } from 'firebase-admin/firestore'
 import { admin, functions, db, LIMITS, REGION, SCHOOL_ID } from './lib'
+import { refreshUsage } from './usage'
+import { MODULE_ORDER, planFor, type ModuleFlag, type PlanSelection } from './pricing'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // updateSchoolModules — superadmin only: modules, public shop, plan limits and
@@ -67,6 +69,10 @@ export interface ModulesInput {
   publicShop: boolean
   planName: string | null
   maxStudents: number | null
+  /** Asset limit (Rental & Inventory). Omitted: unchanged */
+  maxAssets?: number | null
+  /** Plan per module; limits and plan features apply only with one. Omitted: unchanged, null: removed */
+  planSelection?: PlanSelection | null
   storageQuotaGB: number | null
   /** Login page profile; '' clears a field. Omitted: profile unchanged */
   profile?: Partial<Record<'name' | 'shortName' | 'tagline' | 'primaryColor' | 'logoUrl', string> & { frontDoor: FrontDoor | '' }>
@@ -113,6 +119,23 @@ export function validateModulesInput(data: unknown): ModulesInput {
     }
   }
 
+  let planSelection: PlanSelection | null | undefined
+  if (d.planSelection === null) planSelection = null
+  else if (d.planSelection !== undefined) {
+    if (typeof d.planSelection !== 'object') throw bad('planSelection must be an object.')
+    planSelection = {}
+    for (const [k, v] of Object.entries(d.planSelection as Record<string, unknown>)) {
+      if (v === undefined || v === null || v === '') continue
+      if (!MODULE_ORDER.includes(k as ModuleFlag)) throw bad(`Unknown module ${k}.`)
+      if (typeof v !== 'string' || !planFor(k as ModuleFlag, v)) throw bad(`Unknown plan ${String(v)}.`)
+      planSelection[k as ModuleFlag] = v
+    }
+    for (const k of MODULE_ORDER) {
+      if (m[k] && !planSelection[k]) throw bad('Choose a plan for every module that is on.')
+      if (!m[k] && planSelection[k]) delete planSelection[k]
+    }
+  }
+
   const schoolId = d.schoolId === undefined || d.schoolId === null ? SCHOOL_ID : d.schoolId
   if (typeof schoolId !== 'string' || !/^[a-z0-9-]{1,40}$/.test(schoolId)) throw bad('Invalid school id.')
   // public_config/main belongs to this deployment, i.e. to SCHOOL_ID only
@@ -124,12 +147,14 @@ export function validateModulesInput(data: unknown): ModulesInput {
     publicShop,
     planName: planName === null ? null : planName.trim(),
     maxStudents: intOrNull(d.maxStudents, 'Student limit', 100_000),
+    ...(d.maxAssets !== undefined ? { maxAssets: intOrNull(d.maxAssets, 'Asset limit', 1_000_000) } : {}),
+    ...(planSelection !== undefined ? { planSelection } : {}),
     storageQuotaGB: intOrNull(d.storageQuotaGB, 'Storage quota', 100_000),
     profile,
   }
 }
 
-const SCHOOL_FIELDS = ['modules', 'publicShop', 'planName', 'maxStudents', 'storageQuotaGB'] as const
+const SCHOOL_FIELDS = ['modules', 'publicShop', 'planName', 'planSelection', 'maxStudents', 'maxAssets', 'storageQuotaGB'] as const
 const pick = (o: Record<string, unknown> | undefined, keys: readonly string[]) =>
   Object.fromEntries(keys.map(k => [k, o?.[k] ?? null]))
 
@@ -148,8 +173,8 @@ export async function applySchoolUpdate(input: ModulesInput, actor: { uid: strin
     const before = { school: pick(school.data(), SCHOOL_FIELDS), profile: pick(profile.data(), profileKeys) }
 
     const schoolUpdate: Record<string, unknown> = { modules: input.modules, publicShop: input.publicShop }
-    for (const k of ['planName', 'maxStudents', 'storageQuotaGB'] as const) {
-      schoolUpdate[k] = input[k] === null ? FieldValue.delete() : input[k]
+    for (const k of ['planName', 'maxStudents', 'storageQuotaGB', 'maxAssets', 'planSelection'] as const) {
+      if (input[k] !== undefined) schoolUpdate[k] = input[k] === null ? FieldValue.delete() : input[k]
     }
     tx.set(schoolRef, schoolUpdate, { merge: true })
 
@@ -159,7 +184,9 @@ export async function applySchoolUpdate(input: ModulesInput, actor: { uid: strin
 
     const after = {
       school: { ...pick(school.data(), SCHOOL_FIELDS), modules: input.modules, publicShop: input.publicShop,
-        planName: input.planName, maxStudents: input.maxStudents, storageQuotaGB: input.storageQuotaGB },
+        planName: input.planName, maxStudents: input.maxStudents, storageQuotaGB: input.storageQuotaGB,
+        ...(input.maxAssets !== undefined ? { maxAssets: input.maxAssets } : {}),
+        ...(input.planSelection !== undefined ? { planSelection: input.planSelection } : {}) },
       profile: Object.fromEntries(profileKeys.map(k => [k, (input.profile as Record<string, string>)[k] || null])),
     }
     tx.create(auditRef, { schoolId, by: actor, at: FieldValue.serverTimestamp(), action: 'updateSchoolModules', before, after })
@@ -171,7 +198,15 @@ export const updateSchoolModules = functions.region(REGION).runWith({ ...LIMITS,
   const actor = await requireSuperAdminSession(context)
   const input = validateModulesInput(data)
   const after = await applySchoolUpdate(input, actor)
+  // Usage is counted in this project, for its own school
+  if (input.schoolId === SCHOOL_ID) await refreshUsage()
   return { ok: true, after }
+})
+
+/** Admin or superadmin: count assets and students again now (plan limits, usage.ts) */
+export const recountUsage = functions.region(REGION).runWith({ ...LIMITS, maxInstances: 2 }).https.onCall(async (_data, context) => {
+  if (context.auth?.token.role !== 'admin') requireSuperAdmin(context)
+  return { usage: await refreshUsage() }
 })
 
 // ─────────────────────────────────────────────────────────────────────────────

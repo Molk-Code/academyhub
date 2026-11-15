@@ -262,6 +262,8 @@ export async function school(ctx) {
     await ref.set({
       schoolId: id, name: order.school.name, shortName: order.school.name, modules, publicShop: false,
       planName: order.plan.planName ?? null, maxStudents: order.plan.maxStudents ?? null, storageQuotaGB: order.plan.storageQuotaGB ?? null,
+      // The plan per module and its asset limit (plan limits and features, functions/src/pricing.ts)
+      planSelection: order.plan.selection ?? null, maxAssets: order.plan.maxAssets ?? null,
       status: 'active', isBeta: false, currency: 'SEK', onboardingDate: FieldValue.serverTimestamp(),
     })
   }

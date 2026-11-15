@@ -131,6 +131,25 @@ service cloud.firestore {
         : true;
     }
 
+    // ── Plan limits and plan features (functions/src/pricing.ts) ─────────────
+    // Only schools with a stored plan (planSelection, set at setup) are
+    // limited; schools without one keep everything, as before. usage is
+    // counted by functions (usage.ts). New items are blocked from 110% of the
+    // limit (BLOCK_PCT in pricing.ts); existing ones are never touched.
+
+    function underLimit(kind) {
+      let school = schoolDoc();
+      let limit = school.get(kind == 'assets' ? 'maxAssets' : 'maxStudents', null);
+      return school.get('planSelection', null) == null || limit == null
+        || school.get('usage', {}).get(kind, 0) * 100 < limit * 110;
+    }
+
+    // A feature that needs one of these plans of its module (PLAN_FEATURES)
+    function planIncludes(flag, plans) {
+      let selection = schoolDoc().get('planSelection', null);
+      return selection == null || selection.get(flag, '') in plans;
+    }
+
     // ── Users ─────────────────────────────────────────────────────────────────
 
     function validNewUser(d) {
@@ -179,7 +198,8 @@ service cloud.firestore {
       // Users create their own document during invite signup. The browser writes
       // it, so role and class are checked against the invite it came from: a
       // plain signup is always a student, staff roles need a matching invitation.
-      allow create: if isSelf(userId) && validNewUser(request.resource.data);
+      allow create: if isSelf(userId) && validNewUser(request.resource.data)
+        && (request.resource.data.role != 'student' || underLimit('students'));
       // Only admins can delete users
       allow delete: if isAdmin();
     }
@@ -305,7 +325,9 @@ service cloud.firestore {
       // list is admin-only so signed-in students cannot enumerate all pending invites
       allow get: if !('expiresAt' in resource.data) || resource.data.expiresAt > request.time;
       allow list: if isAdmin();
-      allow write: if isTeacherOrAdmin();
+      allow create: if isTeacherOrAdmin()
+        && (request.resource.data.get('role', 'student') != 'student' || underLimit('students'));
+      allow update, delete: if isTeacherOrAdmin();
       // Invited user may mark their own invite as used after creating their account.
       // Case-insensitive email match because Firebase Auth tokens store email in lowercase.
       allow update: if isSignedIn()
@@ -635,21 +657,28 @@ service cloud.firestore {
     }
 
     // Kits: named sets of catalog items, readable wherever the catalog is,
-    // edited by the staff who edit the catalog
+    // edited by the staff who edit the catalog, on Rental Standard and up
+    // (kept readable after a downgrade)
     match /kits/{kitId} {
       allow read: if ((isSignedIn() && (isAdmin() || tierHasFeature('equipment')))
         || publicShopOpen()) && moduleOn('rentalInventory');
-      allow write: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))) && moduleOn('rentalInventory');
+      allow write: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))) && moduleOn('rentalInventory')
+        && planIncludes('rentalInventory', ['standard', 'plus']);
     }
 
     match /equipment/{itemId} {
       allow read: if ((isSignedIn() && (isAdmin() || tierHasFeature('equipment')))
         || publicShopOpen()) && moduleOn('rentalInventory');
-      allow write: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))) && moduleOn('rentalInventory');
+      allow create: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))) && moduleOn('rentalInventory')
+        && underLimit('assets');
+      allow update, delete: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))) && moduleOn('rentalInventory');
 
-      // Maintenance log: staff only (costs and notes aren't for borrowers)
+      // Maintenance log: staff only (costs and notes aren't for borrowers);
+      // new entries on Rental Standard and up, kept readable after a downgrade
       match /maintenance/{logId} {
-        allow read, write: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))) && moduleOn('rentalInventory');
+        allow read: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))) && moduleOn('rentalInventory');
+        allow write: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))) && moduleOn('rentalInventory')
+          && planIncludes('rentalInventory', ['standard', 'plus']);
       }
     }
 
@@ -967,7 +996,11 @@ service cloud.firestore {
       allow create: if isSignedIn() && (isAdmin() || isSuperAdmin())
         && request.resource.data.schoolId == schoolId
         && !exists(/databases/$(database)/documents/schools/$(schoolId));
-      allow update: if isSignedIn() && (isAdmin() || isSuperAdmin());
+      // School admins can't change the plan, its limits, the counted usage or
+      // the modules: those come from the order and the superadmin (functions)
+      allow update: if isSignedIn() && (isSuperAdmin() || (isAdmin()
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'planSelection', 'maxAssets', 'maxStudents', 'usage', 'modules', 'publicShop', 'planName', 'storageQuotaGB'])));
       allow delete: if false;
     }
 

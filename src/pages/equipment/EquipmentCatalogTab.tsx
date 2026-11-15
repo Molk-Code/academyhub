@@ -14,6 +14,8 @@ import { QRModal } from './EquipmentQRModal'
 import { BarcodeModal } from './EquipmentBarcodeModal'
 import { clickable } from '@/lib/a11y'
 import { useCohorts } from '@/lib/queries'
+import { usePlan } from '@/hooks/usePlan'
+import { LimitNotice } from '@/components/admin/PlanNotices'
 
 // Known categories get a matching icon; anything custom (e.g. a school's own
 // added category) falls back to a generic package icon.
@@ -44,6 +46,9 @@ export function CatalogTab({ categories, pricingEnabled }: { categories: Equipme
   const [barcodeItem, setBarcodeItem] = useState<EquipmentDoc | null>(null)
   const [infoItem, setInfoItem] = useState<EquipmentDoc | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  // Plan limit, counted live from the catalog (active items)
+  const assets = usePlan().limit('assets', equipment.filter(e => e.isActive !== false).length)
+  const blocked = assets.state === 'blocked'
 
   const sortedCats = useMemo(
     () => [...categories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
@@ -92,12 +97,15 @@ export function CatalogTab({ categories, pricingEnabled }: { categories: Equipme
           <button
             className="primary-btn"
             onClick={() => { setEditItem(null); setShowForm(true) }}
+            disabled={blocked}
+            title={blocked ? "The plan's asset limit is reached" : undefined}
             style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
           >
             <Plus size={14} /> Add Item
           </button>
         </div>
       </div>
+      <LimitNotice info={assets} className="mt-3" />
 
       <div className="results-info">
         <span>{filtered.length} items</span>

@@ -13,6 +13,8 @@ import { CategoriesTab } from './EquipmentCategoriesTab'
 import { KitsTab } from './EquipmentKitsTab'
 import { MaintenanceTab } from './EquipmentMaintenanceTab'
 import { ExportTab } from './EquipmentExportTab'
+import { usePlan } from '@/hooks/usePlan'
+import { PlanFeatureNote } from '@/components/admin/PlanNotices'
 import './molkom.css'
 
 type AdminTab = 'catalog' | 'bookings' | 'categories' | 'kits' | 'maintenance' | 'export'
@@ -28,6 +30,7 @@ export default function AdminEquipmentPage() {
   const { data: bookings } = useCollection<EquipmentBookingDoc>('equipment_bookings')
   const { data: categoriesRaw, loading: catsLoading } = useCollection<EquipmentCategoryDoc>('equipment_categories')
   const { mine: responsibility } = useEquipmentResponsibility()
+  const plan = usePlan()
   const pendingCount = useMemo(() => bookings.filter(b => myParts(b, responsibility).pending.length > 0).length, [bookings, responsibility])
 
   const categories = useMemo(() => {
@@ -144,9 +147,10 @@ export default function AdminEquipmentPage() {
         {tab === 'catalog'     && <CatalogTab categories={categories} pricingEnabled={pricingEnabled} />}
         {tab === 'bookings'    && <BookingsTab />}
         {tab === 'categories'  && <CategoriesTab categories={categoriesRaw} />}
-        {tab === 'kits'        && <KitsTab />}
-        {tab === 'maintenance' && <MaintenanceTab />}
-        {tab === 'export'      && <ExportTab />}
+        {/* Plan features: a note instead of the tab on lower plans; existing data is kept */}
+        {tab === 'kits'        && (plan.has('kits') ? <KitsTab /> : <PlanFeatureNote feature="kits" />)}
+        {tab === 'maintenance' && (plan.has('maintenance') ? <MaintenanceTab /> : <PlanFeatureNote feature="maintenance" />)}
+        {tab === 'export'      && (plan.has('rentalExport') ? <ExportTab /> : <PlanFeatureNote feature="rentalExport" />)}
       </div>
     </div>
   )

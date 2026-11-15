@@ -16,6 +16,8 @@ import { localDate, equipmentOut, pickupsToday, daysOverdue } from '@/lib/adminD
 import type { EquipmentBookingDoc, InventoryProjectDoc, FoodBoxOrderDoc, MinivanBookingDoc, LessonDoc, AbsenceReportDoc, EquipmentDoc } from '@/types'
 import { needsService } from '@/lib/maintenance'
 import { useCohorts } from '@/lib/queries'
+import { PlanUsage } from '@/components/admin/PlanNotices'
+import { usePlan } from '@/hooks/usePlan'
 
 interface BugReport { id: string; status: string; description: string; displayName: string; page: string; createdAt?: Timestamp }
 interface ContactRequest { id: string; status: string; name: string; organisation: string | null; message: string; createdAt?: Timestamp }
@@ -79,6 +81,7 @@ export default function AdminDashboard() {
   const canInventory = useFeature('inventory')
   const canVehicles  = useFeature('vehicles')
   const canFoodBox   = useFeature('food_box')
+  const plan = usePlan()
   const academy      = useModuleGate('academy')
 
   const now = new Date()
@@ -138,7 +141,7 @@ export default function AdminDashboard() {
           {canEquipment && <ActionTile to="/admin/equipment?tab=bookings" icon={Package} label="Equipment requests" count={pending.length} detail="Waiting for a decision" />}
           {canInventory && <ActionTile to="/admin/inventory" icon={AlertTriangle} label="Overdue returns" count={eq.overdue.length} detail="Past their return date" />}
           {canInventory && <ActionTile to="/admin/inventory" icon={PenLine} label="Awaiting signatures" count={eq.awaitingSignatures.length} detail="Contracts not signed yet" />}
-          {canEquipment && <ActionTile to="/admin/equipment?tab=maintenance" icon={Wrench} label="Needs service" count={serviceCount} detail="In service or overdue" />}
+          {canEquipment && plan.has('maintenance') && <ActionTile to="/admin/equipment?tab=maintenance" icon={Wrench} label="Needs service" count={serviceCount} detail="In service or overdue" />}
           <ActionTile to="/admin/bug-reports" icon={Bug} label="Open bug reports" count={openBugs.length} detail="Reported by users" />
           <ActionTile to="/admin/contact-requests" icon={Inbox} label="Contact requests" count={newContacts.length} detail="New, not handled" />
           {canFoodBox && <ActionTile to="/admin/food-box-orders" icon={UtensilsCrossed} label="Food box orders" count={food.length} detail="Waiting for approval" />}
@@ -146,6 +149,8 @@ export default function AdminDashboard() {
           {academy && <ActionTile to="/admin/calendar-sync" icon={RefreshCw} label="Calendar sync" count={silentSyncs} detail="Outlook sync gone quiet" />}
         </div>
       </section>
+
+      <PlanUsage />
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* ── Equipment out ──────────────────────────────────────────────── */}

@@ -1045,6 +1045,12 @@ export interface SchoolDoc {
   publicShop?: boolean
   /** Plan name shown in the superadmin */
   planName?: string
+  /** Plan per module, from the order (functions/src/pricing.ts). Absent: no plan limits or plan features apply */
+  planSelection?: Partial<Record<'academy' | 'production' | 'rentalInventory', string>>
+  /** Asset limit (Rental & Inventory); absent = unlimited */
+  maxAssets?: number
+  /** Counted by functions (usage.ts) for schools with a plan */
+  usage?: { assets?: number; students?: number; countedAt?: Timestamp }
   shopPassword?: string
 }
 

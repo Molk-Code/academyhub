@@ -9,10 +9,12 @@ import {
 } from '@/lib/rentalSummary'
 import { money, rentalSummaryPdf } from '@/lib/rentalSummaryPdf'
 import { inp } from './adminEquipmentShared'
+import { usePlan } from '@/hooks/usePlan'
 
 // Rental summary of one booking or project: totals, an optional extra
 // discount, and downloads as PDF or CSV. Prices and seller details come from
-// the catalog and settings/rental_summary (Equipment → Export).
+// the catalog and settings/rental_summary (Equipment → Export). On Rental
+// & Inventory Plus (plan features, functions/src/pricing.ts).
 
 export function useSummaryConfig() {
   const { currency } = useSchool()
@@ -27,6 +29,7 @@ export function RentalSummaryButton({ input, catalog, style, className }: {
   className?: string
 }) {
   const [open, setOpen] = useState<SummaryInput | null>(null)
+  if (!usePlan().has('rentalExport')) return null
   return (
     <>
       <button type="button" onClick={() => setOpen(input())} style={style} className={className}>

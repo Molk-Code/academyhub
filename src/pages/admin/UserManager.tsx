@@ -10,6 +10,8 @@ import { db, functions } from '@/lib/firebase'
 import { useCollection } from '@/hooks/useFirestore'
 import { useAllUsers } from '@/hooks/useAllUsers'
 import CsvInvite from '@/components/admin/CsvInvite'
+import { LimitNotice, limitError } from '@/components/admin/PlanNotices'
+import { usePlan } from '@/hooks/usePlan'
 import type { UserDoc, ClassInviteDoc } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { Copy, Check, UserPlus, UserX, UserCheck, Mail, ShieldCheck, Trash2, KeyRound, X, Users, ClipboardCopy, ChevronDown, ChevronUp, RotateCcw, Link, QrCode, Download, Ban, Trophy } from 'lucide-react'
@@ -104,6 +106,7 @@ export default function UserManager() {
   })
 
   const role = watch('role')
+  const students = usePlan().limit('students')
 
   function showToast(msg: string) {
     setToastMsg(msg)
@@ -140,7 +143,7 @@ export default function UserManager() {
       showToast(emailSent ? 'Invite email sent & link copied!' : 'Invite link copied!')
       reset()
     } catch (err: any) {
-      alert(`Failed to create invite: ${err?.message ?? 'Unknown error'}`)
+      alert(`Failed to create invite: ${limitError(err, 'students')}`)
     } finally {
       setSaving(false)
     }
@@ -169,6 +172,8 @@ export default function UserManager() {
       }
       setBulkResults(results)
       setBulkEmails('')
+    } catch (err: any) {
+      alert(`Stopped: ${limitError(err, 'students')}`)
     } finally {
       setBulkSaving(false)
     }
@@ -407,6 +412,8 @@ export default function UserManager() {
           )} />
         </button>
       </div>
+
+      <LimitNotice info={students} />
 
       {/* Invite form */}
       <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 space-y-4 shadow-sm">

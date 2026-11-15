@@ -2,9 +2,10 @@
 // per organisation. The order page and Superadmin show it
 // (src/config/pricing.ts re-exports this file), and orders store the quote
 // computed here, so a price can't be changed in the browser.
-// Limits are soft (docs/claude-code-modules.md, "Plans, limits and Plus"):
-// counted and warned about, never blocking. Only maxStudents is stored on
-// the school today.
+// Limits (docs/claude-code-modules.md, "Plans, limits and Plus"): a warning
+// at WARN_PCT, new items blocked at BLOCK_PCT, existing data never deleted.
+// The setup copies the plan and its limits to the school doc (planSelection,
+// maxAssets, maxStudents), where the superadmin can override them.
 
 export const CURRENCY = 'EUR'
 /** Off the sum when all three modules are ordered */
@@ -20,7 +21,7 @@ export interface Plan {
   limits: string
   /** Students included (Academy plans): set as the school's maxStudents. Absent = unlimited */
   maxStudents?: number
-  /** Assets included (Rental & Inventory plans). Absent = unlimited. A soft limit (see docs/claude-code-modules.md) */
+  /** Assets included (Rental & Inventory plans): set as the school's maxAssets. Absent = unlimited */
   maxAssets?: number
   /** Not offered on the order page yet (customers can't pick it; the superadmin can) */
   hidden?: boolean
@@ -40,8 +41,8 @@ export const PLANS: Record<ModuleFlag, Plan[]> = {
     { id: 'plus',     name: 'Plus',     monthly: 149, limits: 'Unlimited users, advanced budgeting and exports, priority support', hidden: true },
   ],
   academy: [
-    { id: 'starter',  name: 'Starter',  monthly: 59,  limits: 'Up to 40 students', maxStudents: 40 },
-    { id: 'standard', name: 'Standard', monthly: 149, limits: 'Up to 100 students', maxStudents: 100 },
+    { id: 'starter',  name: 'Starter',  monthly: 59,  limits: 'Up to 30 students', maxStudents: 30 },
+    { id: 'standard', name: 'Standard', monthly: 149, limits: 'Up to 70 students', maxStudents: 70 },
     { id: 'plus',     name: 'Plus',     monthly: 299, limits: 'Unlimited students, several programs or classes, Microsoft sign-in, reports and analytics, branded login page, priority support' },
   ],
 }
@@ -103,4 +104,60 @@ export function planLabel(sel: PlanSelection): string {
 
 export function modulesFor(sel: PlanSelection): Record<ModuleFlag, boolean> {
   return { academy: !!sel.academy, production: !!sel.production, rentalInventory: !!sel.rentalInventory }
+}
+
+// ── Limits and plan features ─────────────────────────────────────────────────
+
+/** Admins see a warning from this share of the limit */
+export const WARN_PCT = 90
+/** New items are blocked from this share of the limit (existing ones are never touched) */
+export const BLOCK_PCT = 110
+
+export type LimitKind = 'assets' | 'students'
+export const LIMIT_FIELD: Record<LimitKind, 'maxAssets' | 'maxStudents'> = { assets: 'maxAssets', students: 'maxStudents' }
+export const LIMIT_MODULE: Record<LimitKind, ModuleFlag> = { assets: 'rentalInventory', students: 'academy' }
+
+export type LimitState = 'ok' | 'warn' | 'over' | 'blocked'
+
+/** Where usage stands against a limit; no limit (null) is always ok. Whole-number maths, as in firestore.rules */
+export function limitState(used: number, limit: number | null | undefined): LimitState {
+  if (limit == null) return 'ok'
+  if (used * 100 >= limit * BLOCK_PCT) return 'blocked'
+  if (used >= limit) return 'over'
+  if (used * 100 >= limit * WARN_PCT) return 'warn'
+  return 'ok'
+}
+
+/** Whether one more item may be added */
+export const canAddOne = (used: number, limit: number | null | undefined) => limitState(used, limit) !== 'blocked'
+
+/** The next plan up that raises the limit (null: none), to name in an upgrade message */
+export function upgradeFor(kind: LimitKind, planId: string | undefined): Plan | null {
+  const plans = PLANS[LIMIT_MODULE[kind]]
+  const field = LIMIT_FIELD[kind]
+  const i = plans.findIndex(p => p.id === planId)
+  const current = i >= 0 ? plans[i][field] : undefined
+  return plans.slice(i + 1).find(p => p[field] === undefined || (current !== undefined && p[field]! > current)) ?? null
+}
+
+/** Features that need a higher plan of their module (lower plans: the feature is hidden or read-only) */
+export const PLAN_FEATURES = {
+  kits:          { module: 'rentalInventory', plan: 'standard', label: 'Kits' },
+  maintenance:   { module: 'rentalInventory', plan: 'standard', label: 'Maintenance log' },
+  rentalExport:  { module: 'rentalInventory', plan: 'plus',     label: 'Rental summaries and CSV export' },
+  academyExport: { module: 'academy',         plan: 'standard', label: 'Term reports (PDF and CSV)' },
+} as const satisfies Record<string, { module: ModuleFlag; plan: string; label: string }>
+
+export type PlanFeature = keyof typeof PLAN_FEATURES
+
+/**
+ * Whether a school's plan includes a feature. Schools without a stored plan
+ * (every school set up before plans existed) keep everything.
+ */
+export function planHasFeature(selection: PlanSelection | null | undefined, feature: PlanFeature): boolean {
+  if (!selection) return true
+  const { module, plan } = PLAN_FEATURES[feature]
+  const plans = PLANS[module]
+  const have = plans.findIndex(p => p.id === selection[module])
+  return have >= 0 && have >= plans.findIndex(p => p.id === plan)
 }

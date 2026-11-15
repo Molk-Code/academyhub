@@ -24,6 +24,8 @@ const COHORT_COLORS = [
 import Avatar from '@/components/common/Avatar'
 import LoadingSpinner from '@/components/common/LoadingSpinner'
 import TermReports from '@/components/academy/TermReports'
+import { LimitNotice, limitError } from '@/components/admin/PlanNotices'
+import { usePlan } from '@/hooks/usePlan'
 
 const schema = z.object({
   name:  z.string().min(2, 'Name required'),
@@ -126,6 +128,7 @@ function UserPicker({
 export default function CohortDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const plan = usePlan()
   const [saving,       setSaving]       = useState(false)
   const [copiedToken,  setCopiedToken]  = useState<string | null>(null)
   const [showInvite,   setShowInvite]   = useState(false)
@@ -235,18 +238,23 @@ export default function CohortDetail() {
     if (!id) return
     setSaving(true)
     const token = nanoid(24)
-    await addDoc(collection(db, 'invitations'), {
-      token,
-      email:       data.email.trim().toLowerCase(),
-      role:        'student',
-      cohortId:    id,
-      displayName: data.name,
-      used:        false,
-      createdAt:   serverTimestamp(),
-      expiresAt:   Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
-    })
-    reset()
-    setSaving(false)
+    try {
+      await addDoc(collection(db, 'invitations'), {
+        token,
+        email:       data.email.trim().toLowerCase(),
+        role:        'student',
+        cohortId:    id,
+        displayName: data.name,
+        used:        false,
+        createdAt:   serverTimestamp(),
+        expiresAt:   Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+      })
+      reset()
+    } catch (err: any) {
+      alert(`Failed to create invite: ${limitError(err, 'students')}`)
+    } finally {
+      setSaving(false)
+    }
   }
 
   function copyInviteLink(invId: string) {
@@ -442,6 +450,7 @@ export default function CohortDetail() {
           </button>
         </div>
 
+        {showInvite && <LimitNotice info={plan.limit('students')} />}
         {showInvite && (
           <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end pt-1">
             <div>

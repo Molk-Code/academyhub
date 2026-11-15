@@ -8,6 +8,8 @@ import type { AbsenceReportDoc, AssignmentDoc, CohortDoc, LessonDoc, PointsLogDo
 import { termsFor, studentTermReport, studentCsv, cohortCsv, type ReportData, type StudentTermReport } from '@/lib/termReport'
 import { studentReportPdf, cohortReportPdf } from '@/lib/termReportPdf'
 import { downloadFile, fileSlug, type CsvFormat } from '@/lib/csv'
+import { usePlan } from '@/hooks/usePlan'
+import { PlanFeatureNote } from '@/components/admin/PlanNotices'
 
 // Term reports for one class: a summary per student and for the class, as PDF
 // or CSV, as a basis for report cards. Data is read when the panel opens,
@@ -36,7 +38,14 @@ async function loadReportData(cohortId: string, studentIds: string[]): Promise<R
   return { assignments, submissions, lessons, absences, checkIns, subjects: new Map(subjects.map(s => [s.id, { title: s.title }])) }
 }
 
-export default function TermReports({ cohort, students }: { cohort: CohortDoc; students: UserDoc[] }) {
+type Props = { cohort: CohortDoc; students: UserDoc[] }
+
+/** On Academy Standard and up (plan features, functions/src/pricing.ts) */
+export default function TermReports(props: Props) {
+  return usePlan().has('academyExport') ? <TermReportsPanel {...props} /> : <PlanFeatureNote feature="academyExport" />
+}
+
+function TermReportsPanel({ cohort, students }: Props) {
   const { name: school, currency } = useSchool()
   const { data: semester } = useDocument<SemesterSettingsDoc>('settings', 'semester')
   const terms = useMemo(() => termsFor(cohort, semester), [cohort, semester])

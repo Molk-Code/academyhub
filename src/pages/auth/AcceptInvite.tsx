@@ -10,6 +10,7 @@ import { createUserWithEmailAndPassword as createUser, signInWithEmailAndPasswor
 import { auth, db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
+import { usePlan } from '@/hooks/usePlan'
 
 const schema = z.object({
   displayName: z.string().trim().min(2, 'Enter your full name').max(80, 'Keep your name under 80 characters'),
@@ -60,6 +61,9 @@ export default function AcceptInvite() {
   // GDPR step: null = not yet decided, true = accepted, false = declined
   const [gdprAccepted, setGdprAccepted] = useState<boolean | null>(null)
   const [resumeNotice, setResumeNotice] = useState(false)
+  // The school's student limit (plan limits): checked before an account is made
+  const studentsBlocked = usePlan().limit('students').state === 'blocked'
+  const LIMIT_MSG = "Your school's plan has reached its student limit, so new student accounts can't be created right now. Please tell your teacher or school."
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, setValue } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -116,6 +120,7 @@ export default function AcceptInvite() {
     setError('')
     const role     = invite ? invite.role : 'student'
     const cohortId = invite ? invite.cohortId : classInvite!.cohortId
+    if (role === 'student' && studentsBlocked && !resumeNotice) { setError(LIMIT_MSG); return }
     // Firebase Auth normalizes token.email to lowercase — invitation update rule compares against it
     const normalizedEmail = data.email.trim().toLowerCase()
     let cred: Awaited<ReturnType<typeof createUser>> | null = null
@@ -235,7 +240,9 @@ export default function AcceptInvite() {
       if (cred && !resumed && ['update-auth-profile', 'orphan-cleanup', 'create-user-doc'].includes(stage)) {
         try { await cred.user.delete() } catch { /* best-effort cleanup */ }
       }
-      setError(stage === 'resume-sign-in' ? raw : `Signup failed at "${stage}": ${raw}`)
+      setError(stage === 'resume-sign-in' ? raw
+        : stage === 'create-user-doc' && code === 'permission-denied' && role === 'student' && studentsBlocked ? LIMIT_MSG
+        : `Signup failed at "${stage}": ${raw}`)
     }
   }
 

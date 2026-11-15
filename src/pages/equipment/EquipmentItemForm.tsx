@@ -129,7 +129,11 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
       if (existing) await updateDoc(doc(db, 'equipment', existing.id), payload)
       else await addDoc(collection(db, 'equipment'), { ...payload, createdAt: serverTimestamp() })
       onClose()
-    } catch (e: any) { setError(e?.message ?? 'Save failed') }
+    } catch (e: any) {
+      setError(!existing && e?.code === 'permission-denied'
+        ? "Not saved: the plan's asset limit may be reached (see the note above the catalog)."
+        : e?.message ?? 'Save failed')
+    }
     finally { setSaving(false) }
   }
 

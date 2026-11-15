@@ -27,7 +27,7 @@ export interface Order {
   school: { name: string; shortName: string }
   admin: { name: string; email: string }
   billing: { email: string; reference: string | null; address: string | null }
-  plan: { planName: string | null; modules: Record<string, boolean>; maxStudents: number | null; storageQuotaGB: number | null; quote?: Quote }
+  plan: { planName: string | null; modules: Record<string, boolean>; maxStudents: number | null; maxAssets?: number | null; storageQuotaGB: number | null; quote?: Quote }
   payment: { method: 'invoice' | 'card'; status: 'pending' | 'paid'; invoiceNumber: string | null }
   startPolicy: 'after_payment' | 'immediately'
   provisioning: {
@@ -80,7 +80,7 @@ const who = (by: Record<string, string>) => by.email ?? by.provider ?? (by.syste
 
 const EMPTY = {
   orgName: '', orgNumber: '', schoolName: '', shortName: '', adminName: '', adminEmail: '',
-  billingEmail: '', billingReference: '', billingAddress: '', maxStudents: '', storageGB: '',
+  billingEmail: '', billingReference: '', billingAddress: '', maxStudents: '', maxAssets: '', storageGB: '',
   selection: {} as PlanSelection,
   startPolicy: 'after_payment' as 'after_payment' | 'immediately', notes: '',
 }
@@ -117,7 +117,7 @@ function NewCustomerForm({ onDone }: { onDone: () => void }) {
         school: { name: f.schoolName, shortName: f.shortName },
         admin: { name: f.adminName, email: f.adminEmail },
         billing: { email: f.billingEmail, reference: f.billingReference, address: f.billingAddress },
-        plan: { selection: f.selection, maxStudents: num(f.maxStudents), storageQuotaGB: num(f.storageGB) },
+        plan: { selection: f.selection, maxStudents: num(f.maxStudents), maxAssets: num(f.maxAssets), storageQuotaGB: num(f.storageGB) },
         payment: { method: 'invoice' },
         startPolicy: f.startPolicy,
         notes: f.notes,
@@ -176,6 +176,7 @@ function NewCustomerForm({ onDone }: { onDone: () => void }) {
         <PlanPicker compact showHidden value={f.selection} onChange={v => set('selection', v)} />
         <div className="grid sm:grid-cols-2 gap-3">
           {field('Student limit (empty: from the Academy plan)', 'maxStudents', { type: 'number' })}
+          {field('Asset limit (empty: from the Rental & Inventory plan)', 'maxAssets', { type: 'number' })}
           {field('Storage (GB)', 'storageGB', { type: 'number' })}
         </div>
       </section>
@@ -254,8 +255,8 @@ function OrderDetails({ order }: { order: Order }) {
           {order.plan.quote && (
             <><dt className="text-zinc-500">Price</dt><dd>{eur(order.plan.quote.monthly)}/month · {eur(order.plan.quote.annual)} per year, excl. VAT{order.plan.quote.discountRate > 0 && ` (${Math.round(order.plan.quote.discountRate * 100)}% bundle discount)`}</dd></>
           )}
-          {(order.plan.maxStudents !== null || order.plan.storageQuotaGB !== null) && (
-            <><dt className="text-zinc-500">Limits</dt><dd>{[order.plan.maxStudents !== null && `${order.plan.maxStudents} students`, order.plan.storageQuotaGB !== null && `${order.plan.storageQuotaGB} GB`].filter(Boolean).join(' · ')}</dd></>
+          {(order.plan.maxStudents !== null || order.plan.maxAssets != null || order.plan.storageQuotaGB !== null) && (
+            <><dt className="text-zinc-500">Limits</dt><dd>{[order.plan.maxStudents !== null && `${order.plan.maxStudents} students`, order.plan.maxAssets != null && `${order.plan.maxAssets} assets`, order.plan.storageQuotaGB !== null && `${order.plan.storageQuotaGB} GB`].filter(Boolean).join(' · ')}</dd></>
           )}
           <dt className="text-zinc-500">Payment</dt>
           <dd>Invoice · {order.payment.status === 'paid' ? <span className="text-emerald-400">paid</span> : 'not paid'}{order.payment.invoiceNumber && ` · ${order.payment.invoiceNumber}`}</dd>

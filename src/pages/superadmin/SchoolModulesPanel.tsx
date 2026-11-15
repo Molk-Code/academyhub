@@ -11,6 +11,7 @@ import type { PublicConfig, FrontDoor } from '@/lib/publicConfig'
 import type { SchoolDoc } from '@/types'
 import { format } from 'date-fns'
 import { contrastRatio, readableTextOn } from '@/lib/contrast'
+import { PLANS, MODULE_NAMES, MODULE_ORDER, planFor, limitState, type PlanSelection } from '@/config/pricing'
 
 type ProfileForm = Required<Pick<PublicConfig, 'name' | 'shortName' | 'tagline' | 'primaryColor' | 'logoUrl'>> & { frontDoor: FrontDoor | '' }
 
@@ -63,6 +64,10 @@ export default function SchoolModulesPanel({ school }: { school: SchoolDoc }) {
   const [publicShop, setPublicShop] = useState(() => publicShopOpen(school))
   const [planName, setPlanName]     = useState(school.planName ?? '')
   const [maxStudents, setMaxStudents] = useState(school.maxStudents != null ? String(school.maxStudents) : '')
+  const [maxAssets, setMaxAssets] = useState(school.maxAssets != null ? String(school.maxAssets) : '')
+  // Plan per module: limits and plan features apply only with one (schools set up before plans have none)
+  const [plansOn, setPlansOn] = useState(!!school.planSelection)
+  const [selection, setSelection] = useState<PlanSelection>(school.planSelection ?? {})
   const [storageQuota, setStorageQuota] = useState(school.storageQuotaGB != null ? String(school.storageQuotaGB) : '')
   const [profile, setProfile] = useState<ProfileForm>({ name: '', shortName: '', tagline: '', primaryColor: '', logoUrl: '', frontDoor: '' })
   const [profileTouched, setProfileTouched] = useState(false)
@@ -112,6 +117,8 @@ export default function SchoolModulesPanel({ school }: { school: SchoolDoc }) {
         publicShop: modules.rentalInventory && publicShop,
         planName: planName.trim() || null,
         maxStudents: num(maxStudents),
+        maxAssets: num(maxAssets),
+        planSelection: plansOn ? Object.fromEntries(MODULE_ORDER.filter(m => modules[m]).map(m => [m, selection[m] ?? ''])) : null,
         storageQuotaGB: num(storageQuota),
         ...(ownSchool && profileTouched ? { profile } : {}),
       })
@@ -174,8 +181,49 @@ export default function SchoolModulesPanel({ school }: { school: SchoolDoc }) {
         </p>
       </section>
 
-      {/* ── Plan ── */}
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* ── Plan per module (plan limits and features) ── */}
+      <section className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm text-zinc-100">Plan limits and plan features</p>
+            <p className="text-xs text-zinc-500">
+              On: the plans below decide kits, maintenance and exports, and the limits warn from 90% and block new items from 110%.
+              Off: no limits and every feature, as for schools set up before plans.
+            </p>
+          </div>
+          <Toggle on={plansOn} onChange={setPlansOn} label="Plan limits and plan features" />
+        </div>
+        {plansOn && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {MODULE_ORDER.filter(m => modules[m]).map(m => (
+              <div key={m}>
+                <label className="label" htmlFor={`plan-${m}`}>{MODULE_NAMES[m]} plan</label>
+                <select id={`plan-${m}`} className="input w-full" value={selection[m] ?? ''} onChange={e => {
+                  const p = planFor(m, e.target.value)
+                  setSelection(s => ({ ...s, [m]: e.target.value }))
+                  // The plan's limits, which can then be overridden below
+                  if (m === 'academy') setMaxStudents(p?.maxStudents != null ? String(p.maxStudents) : '')
+                  if (m === 'rentalInventory') setMaxAssets(p?.maxAssets != null ? String(p.maxAssets) : '')
+                }}>
+                  <option value="">Choose…</option>
+                  {PLANS[m].map(p => <option key={p.id} value={p.id}>{p.name}{p.hidden ? ' (not on the order page)' : ''}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+        )}
+        {school.usage && (
+          <p className="text-xs text-zinc-500">
+            Counted: {[
+              school.usage.assets != null && `${school.usage.assets} assets${school.maxAssets != null ? ` of ${school.maxAssets} (${limitState(school.usage.assets, school.maxAssets)})` : ''}`,
+              school.usage.students != null && `${school.usage.students} students${school.maxStudents != null ? ` of ${school.maxStudents} (${limitState(school.usage.students, school.maxStudents)})` : ''}`,
+            ].filter(Boolean).join(' · ')}
+            {school.usage.countedAt && ` · ${format(school.usage.countedAt.toDate(), 'yyyy-MM-dd HH:mm')}`}
+          </p>
+        )}
+      </section>
+
+      <section className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <div>
           <label className="label">Plan name</label>
           <input className="input w-full" maxLength={60} value={planName} onChange={e => setPlanName(e.target.value)} placeholder="e.g. Academy + Production" />
@@ -183,6 +231,10 @@ export default function SchoolModulesPanel({ school }: { school: SchoolDoc }) {
         <div>
           <label className="label">Student / seat limit</label>
           <input className="input w-full" type="number" min={0} step={1} value={maxStudents} onChange={e => setMaxStudents(e.target.value)} placeholder="No limit" />
+        </div>
+        <div>
+          <label className="label">Asset limit</label>
+          <input className="input w-full" type="number" min={0} step={1} value={maxAssets} onChange={e => setMaxAssets(e.target.value)} placeholder="No limit" />
         </div>
         <div>
           <label className="label">Storage quota (GB)</label>

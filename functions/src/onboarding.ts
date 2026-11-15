@@ -76,6 +76,8 @@ export interface OrderInput {
     planName: string | null
     modules: { academy: boolean; production: boolean; rentalInventory: boolean }
     maxStudents: number | null
+    /** Assets included (Rental & Inventory); absent on orders made before asset limits */
+    maxAssets?: number | null
     storageQuotaGB: number | null
   }
   payment: { method: PaymentMethod }
@@ -133,8 +135,9 @@ export function validateOrderInput(data: unknown, opts: { selfService: boolean }
       if (planFor(m as ModuleFlag, id)?.hidden) throw bad('That plan is not available to order online yet. Please contact us.')
     }
   }
-  // Students included in the Academy plan, unless the superadmin sets a limit
+  // Students and assets included in the plan, unless the superadmin sets a limit
   const planStudents = planFor('academy', selection.academy)?.maxStudents ?? null
+  const planAssets = planFor('rentalInventory', selection.rentalInventory)?.maxAssets ?? null
 
   const method = d.payment?.method ?? 'invoice'
   if (!PAYMENT_METHODS.includes(method)) throw bad('Unknown payment method.')
@@ -158,6 +161,7 @@ export function validateOrderInput(data: unknown, opts: { selfService: boolean }
       planName: planLabel(selection).slice(0, 120),
       modules: modulesFor(selection),
       maxStudents: (opts.selfService ? null : intOrNull(d.plan?.maxStudents, 'Student limit', 100_000)) ?? planStudents,
+      maxAssets: (opts.selfService ? null : intOrNull(d.plan?.maxAssets, 'Asset limit', 1_000_000)) ?? planAssets,
       storageQuotaGB: opts.selfService ? null : intOrNull(d.plan?.storageQuotaGB, 'Storage quota', 100_000),
     },
     payment: { method },

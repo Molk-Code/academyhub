@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Timestamp } from 'firebase/firestore'
 import {
   Package, ArchiveRestore, Bug, Inbox, RefreshCw, UtensilsCrossed, Car, CalendarDays, UserX,
-  AlertTriangle, PenLine, ArrowRight, CheckCircle2, Users, GraduationCap,
+  AlertTriangle, PenLine, Wrench, ArrowRight, CheckCircle2, Users, GraduationCap,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, where } from '@/hooks/useFirestore'
@@ -13,7 +13,8 @@ import { useAllUsers } from '@/hooks/useAllUsers'
 import { useCalendarSyncAlert } from '@/hooks/useCalendarSyncAlert'
 import { cn } from '@/lib/utils'
 import { localDate, equipmentOut, pickupsToday, daysOverdue } from '@/lib/adminDashboard'
-import type { EquipmentBookingDoc, InventoryProjectDoc, FoodBoxOrderDoc, MinivanBookingDoc, LessonDoc, AbsenceReportDoc } from '@/types'
+import type { EquipmentBookingDoc, InventoryProjectDoc, FoodBoxOrderDoc, MinivanBookingDoc, LessonDoc, AbsenceReportDoc, EquipmentDoc } from '@/types'
+import { needsService } from '@/lib/maintenance'
 import { useCohorts } from '@/lib/queries'
 
 interface BugReport { id: string; status: string; description: string; displayName: string; page: string; createdAt?: Timestamp }
@@ -91,6 +92,8 @@ export default function AdminDashboard() {
     [where('status', 'in', ['active', 'checked-out'])], canInventory)
   const { data: bugs } = useCollection<BugReport>('bug_reports', [where('status', '==', 'open')])
   const { data: contacts } = useCollection<ContactRequest>('contact_requests', [where('status', '==', 'new')])
+  const { data: catalog } = useCollection<EquipmentDoc>('equipment', [], canEquipment)
+  const serviceCount = needsService(catalog, today)
   const { data: food } = useCollection<FoodBoxOrderDoc>('food_box_orders', [where('status', '==', 'pending')], canFoodBox)
   const { data: vans } = useCollection<MinivanBookingDoc>('minivan_bookings', [where('status', '==', 'pending')], canVehicles)
   const { data: lessons } = useCollection<LessonDoc>('lessons', [
@@ -135,6 +138,7 @@ export default function AdminDashboard() {
           {canEquipment && <ActionTile to="/admin/equipment?tab=bookings" icon={Package} label="Equipment requests" count={pending.length} detail="Waiting for a decision" />}
           {canInventory && <ActionTile to="/admin/inventory" icon={AlertTriangle} label="Overdue returns" count={eq.overdue.length} detail="Past their return date" />}
           {canInventory && <ActionTile to="/admin/inventory" icon={PenLine} label="Awaiting signatures" count={eq.awaitingSignatures.length} detail="Contracts not signed yet" />}
+          {canEquipment && <ActionTile to="/admin/equipment?tab=maintenance" icon={Wrench} label="Needs service" count={serviceCount} detail="In service or overdue" />}
           <ActionTile to="/admin/bug-reports" icon={Bug} label="Open bug reports" count={openBugs.length} detail="Reported by users" />
           <ActionTile to="/admin/contact-requests" icon={Inbox} label="Contact requests" count={newContacts.length} detail="New, not handled" />
           {canFoodBox && <ActionTile to="/admin/food-box-orders" icon={UtensilsCrossed} label="Food box orders" count={food.length} detail="Waiting for approval" />}

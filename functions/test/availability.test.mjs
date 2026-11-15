@@ -90,3 +90,12 @@ test('check-out: only free units, and a numbered unit out in one project only', 
   assert.deepEqual(rows.docs.map(d => d.data().equipmentName), ['Gaffer tape'])
   assert.equal(rows.docs[0].data().isManualEntry, true)
 })
+
+test('units away for service are never free', async () => {
+  await db.collection('equipment').doc('cam').update({ maintenanceUnits: 1 })
+  assert.equal((await av.availabilityFor(day(1), day(2), ['cam'])).cam, 1)
+  await booking(1, 2, 1)
+  await assert.rejects(booking(1, 1), refused, 'one unit in service, one booked')
+  await db.collection('equipment').doc('cam').update({ maintenanceUnits: 0 })
+  await booking(1, 1)
+})

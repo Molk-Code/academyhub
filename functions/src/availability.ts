@@ -135,7 +135,8 @@ async function catalog(read: { get: (r: FirebaseFirestore.DocumentReference) => 
   const out = new Map<string, { name: string; total: number }>()
   await Promise.all(ids.map(async id => {
     const s = await read.get(db.collection('equipment').doc(id))
-    if (s.exists) out.set(id, { name: String(s.data()?.name ?? id), total: Math.max(0, Number(s.data()?.totalQuantity) || 0) })
+    // Units away for service (maintenance log) are never free
+    if (s.exists) out.set(id, { name: String(s.data()?.name ?? id), total: Math.max(0, (Number(s.data()?.totalQuantity) || 0) - Math.max(0, Number(s.data()?.maintenanceUnits) || 0)) })
   }))
   return out
 }

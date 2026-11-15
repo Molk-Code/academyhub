@@ -646,6 +646,11 @@ service cloud.firestore {
       allow read: if ((isSignedIn() && (isAdmin() || tierHasFeature('equipment')))
         || publicShopOpen()) && moduleOn('rentalInventory');
       allow write: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))) && moduleOn('rentalInventory');
+
+      // Maintenance log: staff only (costs and notes aren't for borrowers)
+      match /maintenance/{logId} {
+        allow read, write: if (isTeacherOrAdmin() && (isAdmin() || tierHasFeature('equipment'))) && moduleOn('rentalInventory');
+      }
     }
 
     match /equipment_bookings/{bookingId} {

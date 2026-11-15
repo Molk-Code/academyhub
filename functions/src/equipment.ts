@@ -371,7 +371,8 @@ export async function recomputeEquipmentAvailable(equipmentId: string): Promise<
     const out = itemsSnap.docs.filter(d =>
       d.ref.parent.parent?.parent.id === 'inventory_projects' && OUT_STATUSES.includes(d.data().status),
     ).length
-    const total = Number(equipSnap.data()?.totalQuantity ?? 0)
+    // Units away for service (maintenance log) can't go out either
+    const total = Number(equipSnap.data()?.totalQuantity ?? 0) - Math.max(0, Number(equipSnap.data()?.maintenanceUnits ?? 0))
     const available = Math.max(0, total - out)
     if (equipSnap.data()?.available !== available) tx.update(equipRef, { available })
   })
@@ -586,3 +587,17 @@ export async function runSetBookingItems(uid: string, data: unknown): Promise<{ 
       : { title: '⚠️ Equipment not available', body: `${names.join(', ')} for "${b.projectName}" is not available — the rest of your booking stands`, url: `/my-bookings?focus=${bookingId}` })
   }
   return { status: result.status }}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// onEquipmentStockChanged — recount "available" when the number of units or
+// the units away for service change (the item counts change it otherwise)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const onEquipmentStockChanged = functions.region(REGION).runWith(LIMITS).firestore
+  .document('equipment/{equipmentId}')
+  .onUpdate(async (change, context) => {
+    const b = change.before.data(), a = change.after.data()
+    if (Number(b.totalQuantity ?? 0) === Number(a.totalQuantity ?? 0) && Number(b.maintenanceUnits ?? 0) === Number(a.maintenanceUnits ?? 0)) return null
+    await recomputeEquipmentAvailable(context.params.equipmentId)
+    return null
+  })

@@ -413,6 +413,9 @@ export interface EquipmentDoc {
   filmYear2Only: boolean
   allowedCohortIds?: string[]   // empty / absent = available to all
   requiresProduction?: boolean  // default true; false = bookable without a production
+  maintenanceUnits?: number     // units away for service: can't be booked or checked out
+  maintenanceNote?: string      // why they're away (shown in the maintenance list)
+  nextServiceDate?: string      // "YYYY-MM-DD": due for service from this day
   isActive: boolean
   createdAt?: Timestamp
   updatedAt?: Timestamp
@@ -532,6 +535,19 @@ export interface InventoryItemDoc {
   addonManager?: string
   isManualEntry?: boolean
   unit?: number          // physical unit scanned out (e.g. 1 for "#1"), when the code carries one
+}
+
+// equipment/{id}/maintenance/{logId}: what was done to an item, by whom
+export type MaintenanceType = 'service' | 'repair' | 'inspection' | 'cleaning' | 'other'
+export interface MaintenanceLogDoc {
+  id: string
+  date: string               // "YYYY-MM-DD"
+  type: MaintenanceType
+  note: string
+  cost?: number | null       // optional, in the school's currency
+  performedBy: string        // a name: staff, a service shop…
+  createdBy?: string         // uid of who logged it
+  createdAt?: Timestamp
 }
 
 // kits/{id}: a named set of catalog items booked and checked out together

@@ -57,13 +57,14 @@ export default function PlanPicker({ value, onChange, compact = false, showHidde
               const checked = value[m] === p.id
               return (
                 <label key={p.id} className={`rounded-xl border p-3 cursor-pointer space-y-0.5 ${checked ? 'border-brand-500 bg-brand-500/10' : 'border-white/10 bg-zinc-900 hover:border-white/20'}`}>
-                  <span className="flex items-center justify-between gap-2 text-sm">
+                  <span className="flex items-center justify-between gap-x-2 gap-y-0.5 flex-wrap text-sm">
                     <span className="flex items-center gap-2 font-medium text-white">
                       <input type="radio" name={`plan-${m}`} checked={checked} onChange={() => set(m, p.id)} />
-                      {p.name}{p.hidden && <span className="text-[10px] text-amber-300 font-normal">not on order page</span>}
+                      {p.name}
                     </span>
-                    <span className="text-zinc-200">{eur(p.monthly)}/mo</span>
+                    <span className="text-zinc-200 whitespace-nowrap">{eur(p.monthly)}/mo</span>
                   </span>
+                  {p.hidden && <span className="inline-block rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-px text-[10px] text-amber-300">Not on the order page</span>}
                   <span className="block text-xs text-zinc-400">{p.limits}</span>
                 </label>
               )

@@ -404,10 +404,12 @@ function OrderDetails({ order }: { order: Order }) {
             {order.appUpdate.logUrl && <a className="underline text-zinc-500 hover:text-zinc-300" href={order.appUpdate.logUrl} target="_blank" rel="noreferrer">Job log</a>}
           </p>
         )}
-        {changingPlan && <ChangePlanForm order={order} onClose={() => setChangingPlan(false)} />}
         {error && <p role="alert" className="text-rose-400 flex items-center gap-1.5"><AlertCircle className="w-4 h-4" /> {error}</p>}
         {removing && <RemoveCustomerDialog order={order} onClose={() => setRemoving(false)} />}
       </div>
+
+      {/* Full width: the plan cards need the room */}
+      {changingPlan && <div className="lg:col-span-2 lg:order-last"><ChangePlanForm order={order} onClose={() => setChangingPlan(false)} /></div>}
 
       <div className="space-y-4">
         <div>

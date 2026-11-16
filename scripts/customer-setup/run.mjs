@@ -5,7 +5,7 @@
 // which Superadmin → Customers shows live. Each step is safe to re-run.
 import { initializeApp, applicationDefault } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
-import { SETUP, remove } from './steps.mjs'
+import { SETUP, remove, changePlan } from './steps.mjs'
 
 const STEP_IDS = ['project', 'services', 'deploy', 'school', 'domain', 'signin_domain', 'invite']
 
@@ -20,7 +20,7 @@ const env = {
   RESEND_API_KEY: process.env.RESEND_API_KEY,
 }
 const orderId = need('ORDER_ID')
-const mode = process.env.MODE === 'remove' ? 'remove' : 'setup'
+const mode = ['remove', 'plan'].includes(process.env.MODE) ? process.env.MODE : 'setup'
 
 const controlDb = getFirestore(initializeApp({ credential: applicationDefault(), projectId: env.CONTROL_PROJECT }))
 const ref = controlDb.collection('customer_orders').doc(orderId)
@@ -46,6 +46,25 @@ async function fail(where, err) {
   await ref.update({ status: 'failed', 'provisioning.error': `${where}: ${message}`.slice(0, 1000), 'provisioning.note': null, updatedAt: FieldValue.serverTimestamp() })
   await event(mode === 'remove' ? 'removal_failed' : 'setup_failed', { step: where, error: message.slice(0, 500) })
   process.exit(1)
+}
+
+// A plan change for a live customer: its school record, then the order. The
+// order stays live whatever happens; only planChange reports the outcome.
+if (mode === 'plan') {
+  const plan = order.planChange?.plan
+  try {
+    if (!plan) throw new Error('No plan change on the order')
+    await changePlan(ctx, plan)
+  } catch (err) {
+    const message = (err instanceof Error ? err.message : String(err)).slice(0, 900)
+    console.error(err)
+    await ref.update({ 'planChange.status': 'failed', 'planChange.error': message, updatedAt: FieldValue.serverTimestamp() })
+    await event('plan_change_failed', { error: message.slice(0, 500) })
+    process.exit(1)
+  }
+  await ref.update({ plan, 'planChange.status': 'done', 'planChange.error': null, 'planChange.doneAt': FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() })
+  await event('plan_changed', { to: plan.planName })
+  process.exit(0)
 }
 
 if (mode === 'remove') {

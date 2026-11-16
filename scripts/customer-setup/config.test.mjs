@@ -1,7 +1,7 @@
 // node --test scripts/customer-setup/config.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { projectIdFor, relativeName, recordsToAdd, recordsForAddress, webEnv, functionsEnv, firebaseConfig } from './config.mjs'
+import { projectIdFor, relativeName, recordsToAdd, recordsForAddress, webEnv, functionsEnv, firebaseConfig, planFields } from './config.mjs'
 
 test('project ids: cf-<short name>-<4>, at most 30 characters, valid', () => {
   const id = projectIdFor('test-setup', () => 0.5)
@@ -64,4 +64,12 @@ test('generated files', () => {
   assert.equal(cfg.firestore.rules, 'firestore.s.rules')
   assert.equal(cfg.firestore.indexes, 'i.json')
   assert.ok(!('emulators' in cfg))
+})
+
+test('plan fields for schools/<id>: from the order plan, missing limits are null', () => {
+  const f = planFields({ modules: { academy: false, production: false, rentalInventory: true }, planName: 'Rental Plus', selection: { rentalInventory: 'plus' }, maxAssets: 1500 })
+  assert.deepEqual(f, {
+    modules: { academy: false, production: false, rentalInventory: true }, planName: 'Rental Plus',
+    planSelection: { rentalInventory: 'plus' }, maxStudents: null, maxAssets: 1500, storageQuotaGB: null,
+  })
 })

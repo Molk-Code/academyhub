@@ -12,7 +12,7 @@ import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { google, waitForOperation, sleep, hostupZoneId, hostupRecords, hostupAddRecord, hostupDeleteRecord } from './clients.mjs'
 import {
   REGION, FIRESTORE_LOCATION, STORAGE_LOCATION, BACKUP_LOCATION, APP_ENGINE_LOCATION, BACKUP_RETENTION_DAYS,
-  SERVICES, SERVICE_IDENTITIES, projectIdFor, recordsToAdd, recordsForAddress, webEnv, functionsEnv, firebaseConfig,
+  SERVICES, SERVICE_IDENTITIES, projectIdFor, recordsToAdd, recordsForAddress, webEnv, functionsEnv, firebaseConfig, planFields,
 } from './config.mjs'
 
 const CRM = 'https://cloudresourcemanager.googleapis.com/v3/'
@@ -260,10 +260,8 @@ export async function school(ctx) {
   const ref = db.collection('schools').doc(id)
   if (!(await ref.get()).exists) {
     await ref.set({
-      schoolId: id, name: order.school.name, shortName: order.school.name, modules, publicShop: false,
-      planName: order.plan.planName ?? null, maxStudents: order.plan.maxStudents ?? null, storageQuotaGB: order.plan.storageQuotaGB ?? null,
-      // The plan per module and its asset limit (plan limits and features, functions/src/pricing.ts)
-      planSelection: order.plan.selection ?? null, maxAssets: order.plan.maxAssets ?? null,
+      schoolId: id, name: order.school.name, shortName: order.school.name, publicShop: false,
+      ...planFields(order.plan),
       status: 'active', isBeta: false, currency: 'SEK', onboardingDate: FieldValue.serverTimestamp(),
     })
   }
@@ -271,6 +269,17 @@ export async function school(ctx) {
   if (!(await profile.get()).exists) await profile.set({ name: order.school.name, shortName: order.school.name, frontDoor })
   const email = (await controlDb.collection('email_config').doc('global').get()).data()
   if (email) await db.collection('email_config').doc('global').set(email, { merge: true })
+}
+
+/**
+ * A plan change for a live customer: the plan fields of schools/<id> (modules,
+ * plan per module, limits). Usage, data and everything else stay as they are.
+ */
+export async function changePlan(ctx, plan) {
+  const db = customerDb(ctx.state.projectId)
+  const ref = db.collection('schools').doc(ctx.order.school.shortName)
+  if (!(await ref.get()).exists) throw new Error(`schools/${ctx.order.school.shortName} not found in ${ctx.state.projectId}`)
+  await ref.update(planFields(plan))
 }
 
 /** https://<short name>.cineforge.se: Hosting custom domain, its records at Hostup, then wait for the certificate */

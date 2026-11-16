@@ -218,3 +218,43 @@ test('plans not on the order page yet: refused online, allowed for the superadmi
   assert.equal(ob.validateOrderInput(plus, { selfService: false }).plan.planName, 'Rental & Inventory Plus')
   assert.equal(ob.validateOrderInput({ ...valid, plan: { selection: { academy: 'plus' } } }, { selfService: true }).plan.planName, 'Academy Plus', 'Academy Plus stays orderable')
 })
+
+test('plan change: only for a live customer; validated; the plan job is MODE=plan', async () => {
+  const id = await ob.createOrder(ob.validateOrderInput({ ...valid, startPolicy: 'immediately' }, { selfService: false }), { source: 'superadmin', by: boss })
+  const change = { selection: { rentalInventory: 'plus' } }
+  await assert.rejects(ob.requestPlanChange(id, boss, change), e => e.code === 'failed-precondition', 'not live yet')
+  await db.collection('customer_orders').doc(id).update({ status: 'live', 'provisioning.state.projectId': 'cf-nordic-ab12' })
+  await assert.rejects(ob.requestPlanChange(id, boss, { selection: {} }), e => e.code === 'invalid-argument', 'no plan')
+  await assert.rejects(ob.requestPlanChange(id, boss, { selection: { rentalInventory: 'gold' } }), e => e.code === 'invalid-argument', 'unknown plan')
+
+  const saved = { ...process.env }
+  try {
+    Object.assign(process.env, { PROVISIONING_MODE: 'simulate', FUNCTIONS_EMULATOR: 'true' })
+    await ob.requestPlanChange(id, boss, change)
+  } finally {
+    for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]
+    Object.assign(process.env, saved)
+  }
+  const o = await order(id)
+  assert.equal(o.status, 'live', 'the order stays live')
+  assert.equal(o.planChange.status, 'done')
+  assert.deepEqual(o.plan.selection, { rentalInventory: 'plus' })
+  assert.deepEqual(o.plan.modules, { academy: false, production: false, rentalInventory: true }, 'modules follow the plans')
+  assert.equal(o.plan.maxStudents, null)
+  assert.equal(o.plan.maxAssets, null, 'Plus: no asset limit')
+  const actions = (await db.collection('customer_orders').doc(id).collection('events').get()).docs.map(d => d.data().action)
+  assert.ok(actions.includes('plan_change_requested') && actions.includes('plan_changed'))
+
+  // Switched off: the change is reported as failed, the order is untouched
+  await ob.requestPlanChange(id, boss, { selection: { academy: 'starter' } })
+  const off = await order(id)
+  assert.equal(off.planChange.status, 'failed')
+  assert.deepEqual(off.plan.selection, { rentalInventory: 'plus' })
+  assert.equal(off.status, 'live')
+
+  const cfg = { controlProject: 'ctl', folderId: '1', billingAccount: 'b', setupServiceAccount: 's@ctl.iam.gserviceaccount.com', superadminEmails: 'x', release: { bucket: 'b', object: 'o' } }
+  const req = ob.setupBuildRequest(id, 'plan', cfg)
+  assert.ok(req.steps[0].env.includes('MODE=plan'))
+  assert.match(req.steps[0].args[1], /^npm ci .*run\.mjs$/)
+  assert.equal(req.timeout, '1200s')
+})

@@ -114,3 +114,16 @@ export function firebaseConfig(euConfig, { mode, schoolId }) {
   c.firestore = { ...c.firestore, rules: `firestore.${schoolId}.rules`, predeploy: [`node scripts/build-rules.mjs ${schoolId}`] }
   return c
 }
+
+/** The plan fields of a customer's schools/<id>, from the order's plan (at setup and on a plan change) */
+export function planFields(plan) {
+  return {
+    modules: plan.modules,
+    planName: plan.planName ?? null,
+    // The plan per module and its limits (plan limits and features, functions/src/pricing.ts)
+    planSelection: plan.selection ?? null,
+    maxStudents: plan.maxStudents ?? null,
+    maxAssets: plan.maxAssets ?? null,
+    storageQuotaGB: plan.storageQuotaGB ?? null,
+  }
+}

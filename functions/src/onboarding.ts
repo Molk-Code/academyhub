@@ -126,19 +126,6 @@ export function validateOrderInput(data: unknown, opts: { selfService: boolean }
   const problem = shortNameProblem(shortName)
   if (problem) throw bad(problem)
 
-  const rawSel = (d.plan?.selection ?? {}) as Record<string, unknown>
-  const planProblem = selectionProblem(rawSel)
-  if (planProblem) throw bad(planProblem)
-  const selection = Object.fromEntries(Object.entries(rawSel).filter(([, v]) => typeof v === 'string' && v)) as PlanSelection
-  if (opts.selfService) {
-    for (const [m, id] of Object.entries(selection)) {
-      if (planFor(m as ModuleFlag, id)?.hidden) throw bad('That plan is not available to order online yet. Please contact us.')
-    }
-  }
-  // Students and assets included in the plan, unless the superadmin sets a limit
-  const planStudents = planFor('academy', selection.academy)?.maxStudents ?? null
-  const planAssets = planFor('rentalInventory', selection.rentalInventory)?.maxAssets ?? null
-
   const method = d.payment?.method ?? 'invoice'
   if (!PAYMENT_METHODS.includes(method)) throw bad('Unknown payment method.')
   if (method === 'card') throw bad('Card payment is not available yet.')
@@ -155,18 +142,46 @@ export function validateOrderInput(data: unknown, opts: { selfService: boolean }
       reference: str(d.billing?.reference, 'Invoice reference', 120, false),
       address: str(d.billing?.address, 'Invoice address', 300, false),
     },
-    plan: {
-      selection,
-      quote: quote(selection),
-      planName: planLabel(selection).slice(0, 120),
-      modules: modulesFor(selection),
-      maxStudents: (opts.selfService ? null : intOrNull(d.plan?.maxStudents, 'Student limit', 100_000)) ?? planStudents,
-      maxAssets: (opts.selfService ? null : intOrNull(d.plan?.maxAssets, 'Asset limit', 1_000_000)) ?? planAssets,
-      storageQuotaGB: opts.selfService ? null : intOrNull(d.plan?.storageQuotaGB, 'Storage quota', 100_000),
-    },
+    plan: validatePlanInput(d.plan, opts),
     payment: { method },
     startPolicy,
     notes: opts.selfService ? null : str(d.notes, 'Notes', 2000, false),
+  }
+}
+
+/**
+ * The plan part of an order, or of a plan change for a live customer:
+ * modules and price from the plans chosen, and the student and asset limits
+ * from those plans unless the superadmin sets them (not self-service).
+ */
+export function validatePlanInput(data: unknown, opts: { selfService: boolean }): OrderInput['plan'] {
+  const p = (data ?? {}) as Record<string, any>
+  const bad = (msg: string) => new functions.https.HttpsError('invalid-argument', msg)
+  const intOrNull = (v: unknown, label: string, max: number) => {
+    if (v === undefined || v === null || v === '') return null
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > max) throw bad(`${label} must be a whole number from 0 to ${max}.`)
+    return v
+  }
+  const rawSel = (p.selection ?? {}) as Record<string, unknown>
+  const planProblem = selectionProblem(rawSel)
+  if (planProblem) throw bad(planProblem)
+  const selection = Object.fromEntries(Object.entries(rawSel).filter(([, v]) => typeof v === 'string' && v)) as PlanSelection
+  if (opts.selfService) {
+    for (const [m, id] of Object.entries(selection)) {
+      if (planFor(m as ModuleFlag, id)?.hidden) throw bad('That plan is not available to order online yet. Please contact us.')
+    }
+  }
+  // Students and assets included in the plan, unless the superadmin sets a limit
+  const planStudents = planFor('academy', selection.academy)?.maxStudents ?? null
+  const planAssets = planFor('rentalInventory', selection.rentalInventory)?.maxAssets ?? null
+  return {
+    selection,
+    quote: quote(selection),
+    planName: planLabel(selection).slice(0, 120),
+    modules: modulesFor(selection),
+    maxStudents: (opts.selfService ? null : intOrNull(p.maxStudents, 'Student limit', 100_000)) ?? planStudents,
+    maxAssets: (opts.selfService ? null : intOrNull(p.maxAssets, 'Asset limit', 1_000_000)) ?? planAssets,
+    storageQuotaGB: opts.selfService ? null : intOrNull(p.storageQuotaGB, 'Storage quota', 100_000),
   }
 }
 
@@ -398,7 +413,7 @@ export function setupConfig(release: { bucket?: string; object?: string } | unde
 }
 
 /** The Cloud Build request for one order (pure, so it's tested) */
-export function setupBuildRequest(orderId: string, mode: 'setup' | 'remove', c: SetupConfig) {
+export function setupBuildRequest(orderId: string, mode: 'setup' | 'remove' | 'plan', c: SetupConfig) {
   const install = mode === 'setup' ? 'npm ci --no-audit --no-fund && npm --prefix functions ci --no-audit --no-fund' : 'npm ci --no-audit --no-fund'
   const secret = (name: string) => ({ versionName: `projects/${c.controlProject}/secrets/${name}/versions/latest`, env: name })
   return {
@@ -417,7 +432,7 @@ export function setupBuildRequest(orderId: string, mode: 'setup' | 'remove', c: 
     availableSecrets: { secretManager: [secret('HOSTUP_API_KEY'), secret('RESEND_API_KEY')] },
     serviceAccount: `projects/${c.controlProject}/serviceAccounts/${c.setupServiceAccount}`,
     options: { logging: 'CLOUD_LOGGING_ONLY', machineType: 'E2_HIGHCPU_8' },
-    timeout: '7200s',
+    timeout: mode === 'plan' ? '1200s' : '7200s',
     tags: ['customer-setup', mode, orderId.toLowerCase()],
   }
 }
@@ -472,9 +487,15 @@ export async function refreshOrder(orderId: string) {
   const ref = orders().doc(orderId)
   const o = (await ref.get()).data()
   if (!o) throw new functions.https.HttpsError('not-found', 'Order not found.')
+  const control = String(process.env.GCLOUD_PROJECT ?? process.env.GCP_PROJECT)
+  if (o.planChange?.status === 'running' && o.planChange.buildId) {
+    const build = await cloudBuild('GET', `projects/${control}/locations/${BUILDS_REGION}/builds/${o.planChange.buildId}`)
+    if (['FAILURE', 'INTERNAL_ERROR', 'TIMEOUT', 'CANCELLED', 'EXPIRED'].includes(build.status)) {
+      await ref.update({ 'planChange.status': 'failed', 'planChange.error': `The plan change job stopped (${build.status}): see its log.`, updatedAt: FieldValue.serverTimestamp() })
+    }
+  }
   const buildId = o.provisioning?.buildId
   if (!['provisioning', 'removing'].includes(o.status) || !buildId) return { status: o.status, build: null }
-  const control = String(process.env.GCLOUD_PROJECT ?? process.env.GCP_PROJECT)
   const build = await cloudBuild('GET', `projects/${control}/locations/${BUILDS_REGION}/builds/${buildId}`)
   const ended = ['FAILURE', 'INTERNAL_ERROR', 'TIMEOUT', 'CANCELLED', 'EXPIRED'].includes(build.status)
   if (ended) {
@@ -491,6 +512,42 @@ export async function requestRemoval(orderId: string, by: Actor, confirmName: un
     if (typeof confirmName !== 'string' || confirmName.trim() !== String(o.school?.name ?? '').trim()) throw precondition("The name typed doesn't match the school's name.")
     return { status: 'removing', removal: true }
   })
+}
+
+/**
+ * Changes a live customer's plan: upgrade, downgrade, or modules on and off.
+ * The customer's school record lives in its own project, so a short job
+ * (MODE=plan, as the setup account) writes it there and then the order. Nothing
+ * is deleted: over a lower limit, the school only can't add more.
+ */
+export async function requestPlanChange(orderId: string, by: { email: string }, input: unknown) {
+  const plan = validatePlanInput(input, { selfService: false })
+  const ref = orders().doc(orderId)
+  await transition(orderId, by, 'plan_change_requested', o => {
+    if (o.status !== 'live' || !o.provisioning?.state?.projectId) throw precondition('Only a live customer can change plan.')
+    if (o.planChange?.status === 'running') throw precondition('A plan change is already running.')
+    return { planChange: { plan, status: 'running', error: null, buildId: null, logUrl: null, by: by.email, requestedAt: FieldValue.serverTimestamp() } }
+  }, { to: plan.planName })
+  const mode = process.env.PROVISIONING_MODE
+  try {
+    if (mode === 'cloudbuild') {
+      const release = (await db.collection('platform').doc('release').get()).data() as { bucket?: string; object?: string } | undefined
+      const cfg = setupConfig(release)
+      if (typeof cfg === 'string') throw new Error(cfg)
+      const op = await cloudBuild('POST', `projects/${cfg.controlProject}/locations/${BUILDS_REGION}/builds`, setupBuildRequest(orderId, 'plan', cfg))
+      const build = op?.metadata?.build ?? {}
+      await ref.update({ 'planChange.buildId': build.id ?? null, 'planChange.logUrl': build.logUrl ?? null, updatedAt: FieldValue.serverTimestamp() })
+    } else if (mode === 'simulate' && process.env.FUNCTIONS_EMULATOR === 'true') {
+      // No customer project in the emulator: only the order changes
+      await ref.update({ plan, 'planChange.status': 'done', 'planChange.doneAt': FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() })
+      await newEvent(orderId).create({ at: FieldValue.serverTimestamp(), by: { system: 'setup' }, action: 'plan_changed', detail: { to: plan.planName } })
+    } else {
+      throw new Error('Setup jobs are switched off (PROVISIONING_MODE).')
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    await ref.update({ 'planChange.status': 'failed', 'planChange.error': `Couldn't start the plan change: ${message}`.slice(0, 600), updatedAt: FieldValue.serverTimestamp() })
+  }
 }
 
 // ── Superadmin callables ─────────────────────────────────────────────────────
@@ -521,6 +578,7 @@ export const startCustomerOrder = superadminCall(async (d, by) => { await startO
 export const cancelCustomerOrder = superadminCall(async (d, by) => { await cancelOrder(orderIdOf(d), by); return { ok: true } })
 export const retryCustomerOrder = superadminCall(async (d, by) => { await retryOrder(orderIdOf(d), by); return { ok: true } })
 export const refreshCustomerOrder = superadminCall(async d => refreshOrder(orderIdOf(d)))
+export const changeCustomerPlan = superadminCall(async (d, by) => { await requestPlanChange(orderIdOf(d), by, d.plan); return { ok: true } })
 export const removeCustomer = superadminCall(async (d, by) => { await requestRemoval(orderIdOf(d), by, d.confirmName); return { ok: true } })
 
 /** Whether a short name can be used; superadmin form checks as you type */

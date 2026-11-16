@@ -27,7 +27,9 @@ export interface Order {
   school: { name: string; shortName: string }
   admin: { name: string; email: string }
   billing: { email: string; reference: string | null; address: string | null }
-  plan: { planName: string | null; modules: Record<string, boolean>; maxStudents: number | null; maxAssets?: number | null; storageQuotaGB: number | null; quote?: Quote }
+  plan: { planName: string | null; selection?: PlanSelection; modules: Record<string, boolean>; maxStudents: number | null; maxAssets?: number | null; storageQuotaGB: number | null; quote?: Quote }
+  /** The latest plan change for a live customer (run by the plan job) */
+  planChange?: { plan: { planName: string | null }; status: 'running' | 'done' | 'failed'; error: string | null; logUrl?: string | null }
   payment: { method: 'invoice' | 'card'; status: 'pending' | 'paid'; invoiceNumber: string | null }
   startPolicy: 'after_payment' | 'immediately'
   provisioning: {
@@ -68,6 +70,7 @@ const EVENT_LABEL: Record<string, string> = {
   created: 'Order created', payment_confirmed: 'Payment recorded', started_before_payment: 'Setup started before payment',
   invoice_number: 'Invoice number set', cancelled: 'Cancelled', retry: 'Retried', setup_failed: 'Setup failed', live: 'Live',
   removal_requested: 'Removal requested', removal_failed: 'Removal failed', removed: 'Removed',
+  plan_change_requested: 'Plan change requested', plan_changed: 'Plan changed', plan_change_failed: 'Plan change failed',
 }
 
 function call<T = unknown>(name: string, data: Record<string, unknown>) {
@@ -211,6 +214,64 @@ function NewCustomerForm({ onDone }: { onDone: () => void }) {
   )
 }
 
+// ── Plan change (live customers) ─────────────────────────────────────────────
+
+/** Upgrade, downgrade or modules on/off: a short job writes it to the customer's own project */
+function ChangePlanForm({ order, onClose }: { order: Order; onClose: () => void }) {
+  const [selection, setSelection] = useState<PlanSelection>(order.plan.selection ?? {})
+  const [maxStudents, setMaxStudents] = useState('')
+  const [maxAssets, setMaxAssets] = useState('')
+  const [storageGB, setStorageGB] = useState(order.plan.storageQuotaGB != null ? String(order.plan.storageQuotaGB) : '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const num = (v: string) => (v.trim() === '' ? null : Number(v))
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true); setError('')
+    try {
+      await call('changeCustomerPlan', { orderId: order.id, plan: { selection, maxStudents: num(maxStudents), maxAssets: num(maxAssets), storageQuotaGB: num(storageGB) } })
+      onClose()
+    } catch (err: any) {
+      setError(err?.message ?? 'Could not change the plan.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={save} className="rounded-xl border border-white/10 bg-zinc-950/40 p-4 space-y-3">
+      <p className="text-sm font-semibold text-zinc-200">Change plan</p>
+      <PlanPicker compact showHidden value={selection} onChange={setSelection} />
+      <div className="grid sm:grid-cols-3 gap-3">
+        <label className="block space-y-1">
+          <span className="text-xs text-zinc-400">Student limit</span>
+          <input className="input w-full" type="number" min={0} value={maxStudents} onChange={e => setMaxStudents(e.target.value)} placeholder="From the plan" />
+        </label>
+        <label className="block space-y-1">
+          <span className="text-xs text-zinc-400">Asset limit</span>
+          <input className="input w-full" type="number" min={0} value={maxAssets} onChange={e => setMaxAssets(e.target.value)} placeholder="From the plan" />
+        </label>
+        <label className="block space-y-1">
+          <span className="text-xs text-zinc-400">Storage (GB)</span>
+          <input className="input w-full" type="number" min={0} value={storageGB} onChange={e => setStorageGB(e.target.value)} placeholder="No quota" />
+        </label>
+      </div>
+      <p className="text-xs text-zinc-500">
+        Takes effect in a minute or two. Nothing is deleted: a module turned off is hidden, and over a lower limit the school can&apos;t add more.
+        The invoice isn&apos;t changed here.
+      </p>
+      {error && <p role="alert" className="text-sm text-rose-400 flex items-center gap-1.5"><AlertCircle className="w-4 h-4" /> {error}</p>}
+      <div className="flex gap-2">
+        <button type="submit" className="btn-primary py-2 px-3 text-sm" disabled={busy || !Object.keys(selection).length}>
+          {busy && <Loader2 className="w-4 h-4 animate-spin" />} Change plan
+        </button>
+        <button type="button" className="btn-secondary py-2 px-3 text-sm" onClick={onClose}>Close</button>
+      </div>
+    </form>
+  )
+}
+
 // ── One order ─────────────────────────────────────────────────────────────────
 
 function StepIcon({ status }: { status: StepStatus }) {
@@ -227,6 +288,7 @@ function OrderDetails({ order }: { order: Order }) {
   const [error, setError] = useState('')
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [removing, setRemoving] = useState(false)
+  const [changingPlan, setChangingPlan] = useState(false)
 
   async function act(name: string, data: Record<string, unknown> = {}) {
     setBusy(name); setError('')
@@ -240,7 +302,8 @@ function OrderDetails({ order }: { order: Order }) {
   const projectId = order.provisioning.state?.projectId
   const cancellable = ['awaiting_payment', 'queued', 'failed'].includes(order.status) && !projectId
   const removable = order.status === 'live' || (order.status === 'failed' && !!projectId)
-  const running = ['provisioning', 'removing'].includes(order.status) && !!order.provisioning.buildId
+  const planRunning = order.planChange?.status === 'running'
+  const running = (['provisioning', 'removing'].includes(order.status) && !!order.provisioning.buildId) || planRunning
 
   return (
     <div className="px-5 pb-5 pt-1 grid lg:grid-cols-2 gap-6 text-sm">
@@ -294,6 +357,9 @@ function OrderDetails({ order }: { order: Order }) {
               {busy === 'refreshCustomerOrder' && <Loader2 className="w-4 h-4 animate-spin" />} Check the job
             </button>
           )}
+          {order.status === 'live' && !changingPlan && (
+            <button type="button" className="btn-secondary py-2 px-3 text-sm" disabled={planRunning} onClick={() => setChangingPlan(true)}>Change plan…</button>
+          )}
           {removable && (
             <button type="button" className="text-sm text-rose-300 hover:text-rose-200 px-2" onClick={() => setRemoving(true)}>Remove customer…</button>
           )}
@@ -308,6 +374,16 @@ function OrderDetails({ order }: { order: Order }) {
             <button type="button" className="text-sm text-rose-300 hover:text-rose-200 px-2" onClick={() => setConfirmCancel(true)}>Cancel order…</button>
           ))}
         </div>
+        {order.planChange && (
+          <p className={`text-xs flex items-center gap-1.5 ${order.planChange.status === 'failed' ? 'text-rose-400' : order.planChange.status === 'running' ? 'text-amber-300' : 'text-emerald-400'}`} aria-live="polite">
+            {order.planChange.status === 'running' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {order.planChange.status === 'running' ? `Changing plan to ${order.planChange.plan.planName}…`
+              : order.planChange.status === 'done' ? `Plan changed to ${order.planChange.plan.planName}.`
+              : `Plan change failed: ${order.planChange.error}`}
+            {order.planChange.logUrl && <a className="underline text-zinc-500 hover:text-zinc-300" href={order.planChange.logUrl} target="_blank" rel="noreferrer">Job log</a>}
+          </p>
+        )}
+        {changingPlan && <ChangePlanForm order={order} onClose={() => setChangingPlan(false)} />}
         {error && <p role="alert" className="text-rose-400 flex items-center gap-1.5"><AlertCircle className="w-4 h-4" /> {error}</p>}
         {removing && <RemoveCustomerDialog order={order} onClose={() => setRemoving(false)} />}
       </div>

@@ -357,10 +357,10 @@ export default function AdminLayout() {
       {/* ── Mobile top header ──────────────────────────────────────────────── */}
       <header className="mobile-header lg:hidden fixed top-0 left-0 right-0 z-40 bg-[var(--bg-surface)] border-b border-[var(--border)] shadow-lg">
         <div className="h-14 flex items-center justify-between px-4">
-          <Link to="/admin/dashboard" className="flex items-center gap-2.5">
-            <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain" />
-            <div>
-              <span className="text-sm font-bold text-white tracking-tight leading-none block">{shortName}</span>
+          <Link to="/admin/dashboard" className="flex items-center gap-2.5 min-w-0">
+            <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain flex-shrink-0" />
+            <div className="min-w-0">
+              <span className="text-sm font-bold text-white tracking-tight leading-none block truncate" title={shortName}>{shortName}</span>
               <span className="text-[10px] text-rose-400 leading-none">Admin Portal</span>
             </div>
           </Link>
@@ -391,10 +391,10 @@ export default function AdminLayout() {
           />
           <aside className="absolute left-0 top-0 bottom-0 w-72 bg-[var(--bg-surface)] flex flex-col shadow-2xl">
             <div className="h-14 flex items-center justify-between px-5 border-b border-[var(--border)] flex-shrink-0">
-              <Link to="/admin/dashboard" onClick={() => setDrawerOpen(false)} className="flex items-center gap-2.5">
-                <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain" />
-                <div>
-                  <span className="text-sm font-bold text-white block leading-none">{shortName}</span>
+              <Link to="/admin/dashboard" onClick={() => setDrawerOpen(false)} className="flex items-center gap-2.5 min-w-0">
+                <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain flex-shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-sm font-bold text-white leading-none block truncate" title={shortName}>{shortName}</span>
                   <span className="text-[10px] text-rose-400 leading-none">Admin Portal</span>
                 </div>
               </Link>
@@ -419,7 +419,7 @@ export default function AdminLayout() {
           <Link to="/admin/dashboard" className="flex items-center gap-3 flex-1 min-w-0">
             <img src={firePng} alt="CineForge" className="w-8 h-8 object-contain flex-shrink-0" />
             <div className="min-w-0">
-              <span className="text-base font-bold text-white tracking-tight">{shortName}</span>
+              <span className="text-base font-bold text-white tracking-tight block truncate" title={shortName}>{shortName}</span>
               <span className="block text-xs text-rose-400 -mt-0.5">Admin Portal</span>
             </div>
           </Link>

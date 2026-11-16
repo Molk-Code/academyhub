@@ -14,6 +14,7 @@ import { KitsTab } from './EquipmentKitsTab'
 import { MaintenanceTab } from './EquipmentMaintenanceTab'
 import { ExportTab } from './EquipmentExportTab'
 import { usePlan } from '@/hooks/usePlan'
+import { useModuleGate } from '@/hooks/useModules'
 import { PlanFeatureNote } from '@/components/admin/PlanNotices'
 import './molkom.css'
 
@@ -31,6 +32,7 @@ export default function AdminEquipmentPage() {
   const { data: categoriesRaw, loading: catsLoading } = useCollection<EquipmentCategoryDoc>('equipment_categories')
   const { mine: responsibility } = useEquipmentResponsibility()
   const plan = usePlan()
+  const hasProduction = useModuleGate('production')
   const pendingCount = useMemo(() => bookings.filter(b => myParts(b, responsibility).pending.length > 0).length, [bookings, responsibility])
 
   const categories = useMemo(() => {
@@ -121,7 +123,7 @@ export default function AdminEquipmentPage() {
                 )}
               </button>
             ))}
-            <button
+            {hasProduction && <button
               onClick={toggleRequireProduction}
               title={requireProduction ? 'Production required — click to disable' : 'Production not required — click to enable'}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 10, background: 'transparent', border: '1px solid #2a2a3a', cursor: 'pointer', fontSize: '.75rem', fontWeight: 600, color: requireProduction ? '#f59e0b' : '#4a4a60', transition: 'all .2s', whiteSpace: 'nowrap' }}
@@ -129,7 +131,7 @@ export default function AdminEquipmentPage() {
               {requireProduction ? <ToggleRight size={15} color="#f59e0b" /> : <ToggleLeft size={15} color="#4a4a60" />}
               <span className="hidden sm:inline">Require production</span>
               <span className="sm:hidden">Prod.</span>
-            </button>
+            </button>}
             <button
               onClick={togglePricing}
               title={pricingEnabled ? 'Prices shown — click to hide prices everywhere' : 'Prices hidden — click to show prices'}

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { collection, addDoc, updateDoc, serverTimestamp, query, where, orderBy, getDocs, getDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { useModuleGate } from '@/hooks/useModules'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, useDocument } from '@/hooks/useFirestore'
 import type { EquipmentDoc, EquipmentCategoryDoc, EquipmentBookingDoc, KitDoc, EquipmentBookingMessageDoc, CohortDoc, ProductionDoc, ProductionSceneDoc, ProductionCrewAssignmentDoc, ProductionCastDoc, ProductionLocationDoc, ProductionShootingDayDoc, CrewRoleDoc } from '@/types'
@@ -172,7 +173,8 @@ export default function EquipmentBookingPage() {
   const { data: categoryDocs } = useCollection<EquipmentCategoryDoc>('equipment_categories')
   const { data: cohort } = useDocument<CohortDoc>('cohorts', cohortId || null)
   const { data: navVis, loading: navVisLoading } = useDocument<{ id: string; student: Record<string, boolean> }>('settings', 'nav_visibility')
-  const productionNavEnabled = navVis?.student?.['production'] !== false
+  const productionModule = useModuleGate('production')
+  const productionNavEnabled = productionModule && navVis?.student?.['production'] !== false
   const { data: myBookings } = useCollection<EquipmentBookingDoc>(
     'equipment_bookings',
     profile?.uid ? [where('studentId', '==', profile.uid), orderBy('createdAt', 'desc')] : [],

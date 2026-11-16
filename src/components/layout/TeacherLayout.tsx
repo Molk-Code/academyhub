@@ -298,10 +298,10 @@ export default function TeacherLayout() {
       {/* ── Mobile top header ──────────────────────────────────────────────── */}
       <header className="mobile-header lg:hidden fixed top-0 left-0 right-0 z-40 border-b" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
         <div className="h-14 flex items-center justify-between px-4">
-          <Link to="/teacher" className="flex items-center gap-2.5">
-            <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain" />
-            <div>
-              <span className="text-sm font-bold text-zinc-100 tracking-tight leading-none block">{shortName}</span>
+          <Link to="/teacher" className="flex items-center gap-2.5 min-w-0">
+            <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain flex-shrink-0" />
+            <div className="min-w-0">
+              <span className="text-sm font-bold text-zinc-100 tracking-tight leading-none block truncate" title={shortName}>{shortName}</span>
               <span className="text-[10px] text-zinc-400 leading-none">Teacher Portal</span>
             </div>
           </Link>
@@ -332,10 +332,10 @@ export default function TeacherLayout() {
           />
           <aside className="absolute left-0 top-0 bottom-0 w-72 flex flex-col shadow-2xl" style={{ background: 'var(--bg-surface)', paddingTop: 'env(safe-area-inset-top)' }}>
             <div className="h-14 flex items-center justify-between px-5 border-b flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
-              <Link to="/teacher" onClick={() => setDrawerOpen(false)} className="flex items-center gap-2.5">
-                <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain" />
-                <div>
-                  <span className="text-sm font-bold text-zinc-100 block leading-none">{shortName}</span>
+              <Link to="/teacher" onClick={() => setDrawerOpen(false)} className="flex items-center gap-2.5 min-w-0">
+                <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain flex-shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-sm font-bold text-zinc-100 leading-none block truncate" title={shortName}>{shortName}</span>
                   <span className="text-[10px] text-zinc-400 leading-none">Teacher Portal</span>
                 </div>
               </Link>
@@ -360,7 +360,7 @@ export default function TeacherLayout() {
           <Link to="/teacher" className="flex items-center gap-3 flex-1 min-w-0">
             <img src={firePng} alt="CineForge" className="w-8 h-8 object-contain flex-shrink-0" />
             <div className="min-w-0">
-              <span className="text-base font-bold text-zinc-100 tracking-tight">{shortName}</span>
+              <span className="text-base font-bold text-zinc-100 tracking-tight block truncate" title={shortName}>{shortName}</span>
               <span className="block text-xs text-zinc-400 -mt-0.5">Teacher Portal</span>
             </div>
           </Link>

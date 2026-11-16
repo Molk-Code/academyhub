@@ -453,7 +453,7 @@ export default function StudentLayout() {
           <Link to="/dashboard" className="flex items-center gap-2.5 min-w-0 max-w-[calc(100vw-6rem)]">
             <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain flex-shrink-0" />
             <div className="min-w-0">
-              <p className="text-sm font-bold text-zinc-100 tracking-tight leading-none whitespace-nowrap">{shortName}</p>
+              <p className="text-sm font-bold text-zinc-100 tracking-tight leading-none truncate" title={shortName}>{shortName}</p>
               {schoolName && <p className="text-[9px] text-zinc-500 tracking-tight mt-[3px] leading-none whitespace-nowrap overflow-hidden text-ellipsis">{schoolName}</p>}
             </div>
           </Link>
@@ -482,7 +482,7 @@ export default function StudentLayout() {
               <Link to="/dashboard" onClick={() => setDrawerOpen(false)} className="flex items-center gap-2.5 min-w-0">
                 <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain flex-shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-zinc-100 tracking-tight leading-none whitespace-nowrap">{shortName}</p>
+                  <p className="text-sm font-bold text-zinc-100 tracking-tight leading-none truncate" title={shortName}>{shortName}</p>
                   {schoolName && <p className="text-[9px] text-zinc-500 tracking-tight mt-[3px] leading-none whitespace-nowrap overflow-hidden text-ellipsis">{schoolName}</p>}
                 </div>
               </Link>
@@ -507,7 +507,7 @@ export default function StudentLayout() {
           <Link to="/dashboard" className="flex items-center gap-3 flex-1 min-w-0">
             <img src={firePng} alt="CineForge" className="w-8 h-8 object-contain flex-shrink-0" />
             <div className="min-w-0">
-              <p className="text-base font-bold text-zinc-100 tracking-tight leading-none whitespace-nowrap">{shortName}</p>
+              <p className="text-base font-bold text-zinc-100 tracking-tight leading-none truncate" title={shortName}>{shortName}</p>
               {schoolName && <p className="text-[9px] text-zinc-500 tracking-tight mt-[3px] leading-none whitespace-nowrap overflow-hidden text-ellipsis">{schoolName}</p>}
             </div>
           </Link>

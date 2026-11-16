@@ -13,7 +13,7 @@ export const SERVICES = [
   'firebase.googleapis.com', 'firestore.googleapis.com', 'identitytoolkit.googleapis.com',
   'securetoken.googleapis.com', 'firebasestorage.googleapis.com', 'storage.googleapis.com',
   'firebasehosting.googleapis.com', 'firebaserules.googleapis.com', 'firebaseinstallations.googleapis.com',
-  'fcm.googleapis.com', 'cloudfunctions.googleapis.com', 'cloudbuild.googleapis.com',
+  'fcm.googleapis.com', 'fcmregistrations.googleapis.com', 'cloudfunctions.googleapis.com', 'cloudbuild.googleapis.com',
   'artifactregistry.googleapis.com', 'run.googleapis.com', 'eventarc.googleapis.com',
   'pubsub.googleapis.com', 'cloudscheduler.googleapis.com', 'secretmanager.googleapis.com',
   'appengine.googleapis.com', 'iam.googleapis.com', 'iamcredentials.googleapis.com',

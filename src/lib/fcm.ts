@@ -3,7 +3,9 @@ import { doc, setDoc, arrayUnion, arrayRemove } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from './firebase'
 
-const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined
+// Optional: without one the Messaging SDK uses Firebase's default web push key,
+// which works on any project (customer projects are set up without their own)
+const VAPID_KEY = (import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined) || undefined
 
 const FCM_TOKEN_KEY     = (uid: string) => `fcmTokenOk:${uid}`
 // Tokens live in push_tokens/{uid}, readable only by their owner
@@ -22,13 +24,12 @@ async function getMsg() {
   }
 }
 
-/** Returns 'ok', 'unsupported', 'denied', 'no-vapid', or an error message string */
+/** Returns 'ok', 'unsupported', 'denied', or an error message string */
 export async function initFCM(uid: string): Promise<string> {
   if (!('Notification' in window) || !('serviceWorker' in navigator)) {
     return 'unsupported'
   }
   if (Notification.permission === 'denied') return 'denied'
-  if (!VAPID_KEY) return 'no-vapid'
 
   try {
     const permission = Notification.permission === 'granted'
@@ -42,7 +43,7 @@ export async function initFCM(uid: string): Promise<string> {
     const msg = await getMsg()
     if (!msg) return 'unsupported'
 
-    const token = await msg.getToken(msg.messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg })
+    const token = await msg.getToken(msg.messaging, { ...(VAPID_KEY && { vapidKey: VAPID_KEY }), serviceWorkerRegistration: swReg })
     if (!token) return 'no-token'
 
     // Replace the old token for this device to prevent duplicate notifications

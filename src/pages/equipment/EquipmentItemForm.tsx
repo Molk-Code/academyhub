@@ -10,6 +10,7 @@ import {
 import { uploadEquipmentImage, inp, CategorySelect } from './adminEquipmentShared'
 import { equipmentImages } from './ImageGallery'
 import { useCohorts } from '@/lib/queries'
+import { useModuleGate } from '@/hooks/useModules'
 
 interface FormState {
   name: string; category: EquipmentCategory; description: string; notes: string
@@ -29,6 +30,7 @@ const lbl: React.CSSProperties = { fontSize: '.75rem', color: '#8a8aab', fontWei
 
 export function ItemForm({ existing, onClose, categories }: { existing: EquipmentDoc | null; onClose: () => void; categories: EquipmentCategoryDoc[] }) {
   const { data: cohorts } = useCohorts()
+  const hasProduction = useModuleGate('production')
   const sortedCohorts = useMemo(() => [...cohorts].sort((a, b) => a.name.localeCompare(b.name)), [cohorts])
   const { data: catalog } = useCollection<EquipmentDoc>('equipment')
   const catalogById = useMemo(() => new Map(catalog.map(e => [e.id, e])), [catalog])
@@ -375,8 +377,8 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
             )}
           </div>
 
-          {/* Production required toggle */}
-          <div>
+          {/* Production required toggle: only where the school has productions */}
+          {hasProduction && <div>
             <button onClick={() => set('requiresProduction', !form.requiresProduction)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#c0c0d5', fontSize: '.85rem' }}>
               {form.requiresProduction ? <ToggleRight size={20} color="#f59e0b" /> : <ToggleLeft size={20} color="#4a4a60" />}
               <span>
@@ -386,7 +388,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
                 </span>
               </span>
             </button>
-          </div>
+          </div>}
 
           {/* Active toggle */}
           <div>

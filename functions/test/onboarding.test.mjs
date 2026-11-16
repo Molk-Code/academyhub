@@ -333,3 +333,38 @@ test('plan change carries the shop override; it needs Rental & Inventory', async
   assert.equal(o.publicShopOverride, 'off')
   assert.equal(o.planChange.shopOverride, 'off')
 })
+
+test('shop address: Rental Plus, a valid address; connect, check, disconnect', async () => {
+  assert.equal(ob.shopDomainProblem('rent.example.com', 'cineforge.se'), null)
+  assert.match(ob.shopDomainProblem('rent.cineforge.se', 'cineforge.se'), /set up by CineForge/)
+  const id = await ob.createOrder(ob.validateOrderInput({ ...valid, startPolicy: 'immediately' }, { selfService: false }), { source: 'superadmin', by: boss })
+  await db.collection('customer_orders').doc(id).update({ status: 'live', 'provisioning.state.projectId': 'cf-nordic-ab12' })
+  await assert.rejects(ob.requestShopDomain(id, boss, 'connect', 'rent.example.com'), e => e.code === 'failed-precondition', 'not Plus')
+  await db.collection('customer_orders').doc(id).update({ 'plan.selection.rentalInventory': 'plus' })
+  await assert.rejects(ob.requestShopDomain(id, boss, 'connect', 'not a domain'), e => e.code === 'invalid-argument')
+  await assert.rejects(ob.requestShopDomain(id, boss, 'check'), e => e.code === 'failed-precondition', 'nothing to check')
+
+  const saved = { ...process.env }
+  try {
+    Object.assign(process.env, { PROVISIONING_MODE: 'simulate', FUNCTIONS_EMULATOR: 'true' })
+    await ob.requestShopDomain(id, boss, 'connect', 'Rent.Example.com')
+    let o = await order(id)
+    assert.equal(o.shopDomain.domain, 'rent.example.com')
+    assert.equal(o.shopDomain.status, 'waiting_dns')
+    await ob.requestShopDomain(id, boss, 'connect', 'shop.example.com')
+    o = await order(id)
+    assert.equal(o.shopDomain.domain, 'shop.example.com')
+    await db.collection('customer_orders').doc(id).update({ 'appUpdate.status': 'running' })
+    await assert.rejects(ob.requestShopDomain(id, boss, 'check'), e => e.code === 'failed-precondition', 'one job at a time')
+    await db.collection('customer_orders').doc(id).update({ 'appUpdate.status': 'done' })
+    await ob.requestShopDomain(id, boss, 'disconnect')
+    o = await order(id)
+    assert.equal(o.shopDomain.domain, null)
+    assert.equal(o.shopDomain.status, 'removed')
+  } finally {
+    for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]
+    Object.assign(process.env, saved)
+  }
+  const cfg = { controlProject: 'ctl', folderId: '1', billingAccount: 'b', setupServiceAccount: 's@ctl.iam.gserviceaccount.com', superadminEmails: 'x', release: { bucket: 'b', object: 'o' } }
+  assert.ok(ob.setupBuildRequest(id, 'shopdomain', cfg).steps[0].env.includes('MODE=shopdomain'))
+})

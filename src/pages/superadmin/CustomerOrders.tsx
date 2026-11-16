@@ -33,6 +33,11 @@ export interface Order {
   publicShopOverride?: 'on' | 'off' | null
   /** The latest plan change for a live customer (run by the plan job) */
   planChange?: { plan: { planName: string | null }; status: 'running' | 'done' | 'failed'; error: string | null; logUrl?: string | null }
+  /** The rental shop's own address (Rental Plus; run by the shop address job) */
+  shopDomain?: {
+    domain: string | null; status: 'running' | 'waiting_dns' | 'active' | 'removed' | 'failed'; error: string | null; logUrl?: string | null
+    records?: { type: string; name: string; value: string }[]; hostState?: string | null; ownershipState?: string | null; certState?: string | null
+  }
   /** The latest update to the current release (run by the update job) */
   appUpdate?: { release: string | null; status: 'running' | 'done' | 'failed'; error: string | null; logUrl?: string | null }
   payment: { method: 'invoice' | 'card'; status: 'pending' | 'paid'; invoiceNumber: string | null }
@@ -77,6 +82,8 @@ const EVENT_LABEL: Record<string, string> = {
   removal_requested: 'Removal requested', removal_failed: 'Removal failed', removed: 'Removed',
   plan_change_requested: 'Plan change requested', plan_changed: 'Plan changed', plan_change_failed: 'Plan change failed',
   update_requested: 'Update requested', updated: 'Updated to the latest release', update_failed: 'Update failed',
+  shop_domain_connect: 'Shop address requested', shop_domain_check: 'Shop address checked', shop_domain_disconnect: 'Shop address disconnected',
+  shop_domain: 'Shop address job done', shop_domain_failed: 'Shop address job failed',
 }
 
 function call<T = unknown>(name: string, data: Record<string, unknown>) {
@@ -285,6 +292,93 @@ function ChangePlanForm({ order, onClose }: { order: Order; onClose: () => void 
   )
 }
 
+// ── Rental shop address (live customers on Rental Plus) ──────────────────────
+
+const DOMAIN_STATUS: Record<string, { label: string; pill: string }> = {
+  running:     { label: 'Working…',          pill: 'bg-violet-900/50 text-violet-300 border-violet-800/50' },
+  waiting_dns: { label: 'Waiting for DNS',   pill: 'bg-amber-900/50 text-amber-300 border-amber-800/50' },
+  active:      { label: 'Active',            pill: 'bg-emerald-900/50 text-emerald-300 border-emerald-800/50' },
+  removed:     { label: 'Disconnected',      pill: 'bg-zinc-800 text-zinc-400 border-zinc-700' },
+  failed:      { label: 'Failed',            pill: 'bg-rose-900/50 text-rose-300 border-rose-800/50' },
+}
+
+/** The shop's own address on the customer's DNS: connect it, give them the records, check until it's active */
+function ShopDomainPanel({ order, blocked }: { order: Order; blocked: boolean }) {
+  const sd = order.shopDomain
+  const current = sd?.domain ?? null
+  const plus = order.plan.selection?.rentalInventory === 'plus'
+  const [domain, setDomain] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const running = sd?.status === 'running'
+
+  async function act(action: 'connect' | 'check' | 'disconnect') {
+    setBusy(true); setError('')
+    try {
+      await call('setCustomerShopDomain', { orderId: order.id, action, ...(action === 'connect' ? { domain } : {}) })
+      if (action === 'connect') setDomain('')
+    } catch (e: any) {
+      setError(e?.message ?? 'Something went wrong.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!plus && !current) return null
+  return (
+    <div className="rounded-xl border border-white/10 bg-zinc-950/40 p-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-zinc-200">Rental shop address</p>
+        {sd && sd.status !== 'removed' && current && <span className={`text-xs px-2 py-0.5 rounded-full border ${DOMAIN_STATUS[sd.status].pill}`}>{DOMAIN_STATUS[sd.status].label}</span>}
+      </div>
+      {current ? (
+        <>
+          <p className="text-sm text-zinc-300">
+            <span className="font-mono">{current}</span>
+            {sd?.status === 'active' && <> · <a className="underline text-zinc-400 hover:text-zinc-200" href={`https://${current}`} target="_blank" rel="noreferrer">open</a></>}
+          </p>
+          {sd?.status === 'waiting_dns' && (
+            <div className="space-y-2">
+              <p className="text-xs text-zinc-400">
+                Send these records to the customer to add at their DNS provider, then check again (the certificate can take an hour after that).
+                {sd.hostState && ` Now: host ${sd.hostState}, ownership ${sd.ownershipState ?? '…'}, certificate ${sd.certState ?? '…'}.`}
+              </p>
+              {sd.records?.length ? (
+                <table className="w-full text-xs">
+                  <thead><tr className="text-zinc-500 text-left"><th className="pr-3 font-normal">Type</th><th className="pr-3 font-normal">Name</th><th className="font-normal">Value</th></tr></thead>
+                  <tbody className="font-mono text-zinc-300">
+                    {sd.records.map(r => <tr key={`${r.type}${r.name}${r.value}`}><td className="pr-3 align-top">{r.type}</td><td className="pr-3 align-top break-all">{r.name}</td><td className="break-all">{r.value}</td></tr>)}
+                  </tbody>
+                </table>
+              ) : <p className="text-xs text-zinc-500">No records listed yet: check again in a minute.</p>}
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-secondary py-2 px-3 text-sm" disabled={busy || running || blocked} onClick={() => act('check')}>
+              {busy && <Loader2 className="w-4 h-4 animate-spin" />} Check again
+            </button>
+            <button type="button" className="text-sm text-rose-300 hover:text-rose-200 px-2" disabled={busy || running || blocked} onClick={() => act('disconnect')}>Disconnect</button>
+          </div>
+        </>
+      ) : (
+        <form className="flex flex-wrap items-end gap-2" onSubmit={e => { e.preventDefault(); act('connect') }}>
+          <label className="space-y-1">
+            <span className="block text-xs text-zinc-400">The customer&apos;s own address for the shop</span>
+            <input className="input w-64" value={domain} onChange={e => setDomain(e.target.value.trim())} placeholder="rent.example.com" autoComplete="off" />
+          </label>
+          <button type="submit" className="btn-secondary py-2 px-3 text-sm" disabled={busy || running || blocked || !domain}>
+            {busy && <Loader2 className="w-4 h-4 animate-spin" />} Connect
+          </button>
+        </form>
+      )}
+      {current && !plus && <p className="text-xs text-amber-300">Not on Rental Plus any more: disconnect it, or move them back to Plus.</p>}
+      {sd?.status === 'failed' && sd.error && <p className="text-xs text-rose-400">{sd.error}</p>}
+      {sd?.logUrl && <a className="text-xs underline text-zinc-500 hover:text-zinc-300" href={sd.logUrl} target="_blank" rel="noreferrer">Job log</a>}
+      {error && <p role="alert" className="text-sm text-rose-400 flex items-center gap-1.5"><AlertCircle className="w-4 h-4" /> {error}</p>}
+    </div>
+  )
+}
+
 // ── One order ─────────────────────────────────────────────────────────────────
 
 function StepIcon({ status }: { status: StepStatus }) {
@@ -317,7 +411,8 @@ function OrderDetails({ order }: { order: Order }) {
   const removable = order.status === 'live' || (order.status === 'failed' && !!projectId)
   const planRunning = order.planChange?.status === 'running'
   const updateRunning = order.appUpdate?.status === 'running'
-  const running = (['provisioning', 'removing'].includes(order.status) && !!order.provisioning.buildId) || planRunning || updateRunning
+  const domainRunning = order.shopDomain?.status === 'running'
+  const running = (['provisioning', 'removing'].includes(order.status) && !!order.provisioning.buildId) || planRunning || updateRunning || domainRunning
 
   return (
     <div className="px-5 pb-5 pt-1 grid lg:grid-cols-2 gap-6 text-sm">
@@ -376,10 +471,10 @@ function OrderDetails({ order }: { order: Order }) {
             </button>
           )}
           {order.status === 'live' && !changingPlan && (
-            <button type="button" className="btn-secondary py-2 px-3 text-sm" disabled={planRunning || updateRunning} onClick={() => setChangingPlan(true)}>Change plan or shop…</button>
+            <button type="button" className="btn-secondary py-2 px-3 text-sm" disabled={planRunning || updateRunning || domainRunning} onClick={() => setChangingPlan(true)}>Change plan or shop…</button>
           )}
           {order.status === 'live' && (
-            <button type="button" className="btn-secondary py-2 px-3 text-sm" disabled={!!busy || planRunning || updateRunning}
+            <button type="button" className="btn-secondary py-2 px-3 text-sm" disabled={!!busy || planRunning || updateRunning || domainRunning}
               title="Rules, functions and the app from the latest published release. Data is untouched."
               onClick={() => act('updateCustomerApp')}>
               {busy === 'updateCustomerApp' && <Loader2 className="w-4 h-4 animate-spin" />} Update app
@@ -421,6 +516,7 @@ function OrderDetails({ order }: { order: Order }) {
         {removing && <RemoveCustomerDialog order={order} onClose={() => setRemoving(false)} />}
       </div>
 
+      {order.status === 'live' && <div className="lg:col-span-2 lg:order-last"><ShopDomainPanel order={order} blocked={planRunning || updateRunning} /></div>}
       {/* Full width: the plan cards need the room */}
       {changingPlan && <div className="lg:col-span-2 lg:order-last"><ChangePlanForm order={order} onClose={() => setChangingPlan(false)} /></div>}
 

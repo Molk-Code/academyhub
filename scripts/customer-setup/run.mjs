@@ -5,7 +5,7 @@
 // which Superadmin → Customers shows live. Each step is safe to re-run.
 import { initializeApp, applicationDefault } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
-import { SETUP, remove, changePlan } from './steps.mjs'
+import { SETUP, remove, changePlan, shopDomain } from './steps.mjs'
 
 const STEP_IDS = ['project', 'services', 'deploy', 'school', 'domain', 'signin_domain', 'invite']
 
@@ -20,7 +20,7 @@ const env = {
   RESEND_API_KEY: process.env.RESEND_API_KEY,
 }
 const orderId = need('ORDER_ID')
-const mode = ['remove', 'plan', 'update'].includes(process.env.MODE) ? process.env.MODE : 'setup'
+const mode = ['remove', 'plan', 'update', 'shopdomain'].includes(process.env.MODE) ? process.env.MODE : 'setup'
 
 const controlDb = getFirestore(initializeApp({ credential: applicationDefault(), projectId: env.CONTROL_PROJECT }))
 const ref = controlDb.collection('customer_orders').doc(orderId)
@@ -87,6 +87,28 @@ if (mode === 'update') {
   await ref.update({ 'appUpdate.status': 'done', 'appUpdate.error': null, 'appUpdate.doneAt': FieldValue.serverTimestamp(), 'provisioning.release': release, 'provisioning.note': null, updatedAt: FieldValue.serverTimestamp() })
   await event('updated', { release })
   process.exit(0)
+}
+
+// The rental shop's own address for a live customer: connect, check or
+// disconnect. The order stays live; shopDomain reports the outcome.
+if (mode === 'shopdomain') {
+  const job = order.shopDomain ?? {}
+  try {
+    const r = await shopDomain(ctx, job.domain ?? null, job.previous ?? null)
+    await ref.update({
+      'shopDomain.status': r.status, 'shopDomain.records': r.records, 'shopDomain.error': null, 'shopDomain.previous': null,
+      'shopDomain.hostState': r.hostState ?? null, 'shopDomain.ownershipState': r.ownershipState ?? null, 'shopDomain.certState': r.certState ?? null,
+      'shopDomain.checkedAt': FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
+    })
+    await event('shop_domain', { domain: job.domain ?? null, status: r.status })
+    process.exit(0)
+  } catch (err) {
+    const message = (err instanceof Error ? err.message : String(err)).slice(0, 900)
+    console.error(err)
+    await ref.update({ 'shopDomain.status': 'failed', 'shopDomain.error': message, updatedAt: FieldValue.serverTimestamp() })
+    await event('shop_domain_failed', { error: message.slice(0, 500) })
+    process.exit(1)
+  }
 }
 
 if (mode === 'remove') {

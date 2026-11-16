@@ -1,7 +1,7 @@
 // node --test scripts/customer-setup/config.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { projectIdFor, relativeName, recordsToAdd, recordsForAddress, webEnv, functionsEnv, firebaseConfig, planFields } from './config.mjs'
+import { projectIdFor, relativeName, recordsToAdd, recordsForAddress, webEnv, functionsEnv, firebaseConfig, planFields, shopDomainProblem, customerDnsRecords } from './config.mjs'
 
 test('project ids: cf-<short name>-<4>, at most 30 characters, valid', () => {
   const id = projectIdFor('test-setup', () => 0.5)
@@ -72,4 +72,26 @@ test('plan fields for schools/<id>: from the order plan, missing limits are null
     modules: { academy: false, production: false, rentalInventory: true }, planName: 'Rental Plus',
     planSelection: { rentalInventory: 'plus' }, maxStudents: null, maxAssets: 1500, storageQuotaGB: null,
   })
+})
+
+test('shop address: a real hostname, not under our own zone', () => {
+  assert.equal(shopDomainProblem('rent.example.com', 'cineforge.se'), null)
+  assert.match(shopDomainProblem('', 'cineforge.se'), /Enter an address/)
+  assert.match(shopDomainProblem('https://rent.example.com', 'cineforge.se'), /not a valid/)
+  assert.match(shopDomainProblem('localhost', 'cineforge.se'), /not a valid/)
+  assert.match(shopDomainProblem('shop.cineforge.se', 'cineforge.se'), /set up by CineForge/)
+})
+
+test('shop address: the records to give the customer, full names, ADD only', () => {
+  const cd = {
+    requiredDnsUpdates: { desired: [
+      { domainName: 'rent.example.com', records: [{ type: 'A', rdata: '199.36.158.100', requiredAction: 'ADD' }, { type: 'A', rdata: '1.2.3.4', requiredAction: 'REMOVE' }] },
+      { domainName: 'other.example.com', records: [{ type: 'A', rdata: '9.9.9.9', requiredAction: 'ADD' }] },
+    ] },
+    cert: { verification: { dns: { desired: [{ domainName: '_acme-challenge.rent.example.com.', records: [{ type: 'TXT', rdata: '"tok"', requiredAction: 'ADD' }] }] } } },
+  }
+  assert.deepEqual(customerDnsRecords(cd, 'rent.example.com'), [
+    { type: 'A', name: 'rent.example.com', value: '199.36.158.100' },
+    { type: 'TXT', name: '_acme-challenge.rent.example.com', value: 'tok' },
+  ])
 })

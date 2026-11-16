@@ -12,7 +12,7 @@ import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { google, waitForOperation, sleep, hostupZoneId, hostupRecords, hostupAddRecord, hostupDeleteRecord } from './clients.mjs'
 import {
   REGION, FIRESTORE_LOCATION, STORAGE_LOCATION, BACKUP_LOCATION, APP_ENGINE_LOCATION, BACKUP_RETENTION_DAYS,
-  SERVICES, SERVICE_IDENTITIES, projectIdFor, recordsToAdd, recordsForAddress, webEnv, functionsEnv, firebaseConfig, planFields,
+  SERVICES, SERVICE_IDENTITIES, projectIdFor, recordsToAdd, recordsForAddress, webEnv, functionsEnv, firebaseConfig, planFields, customerDnsRecords,
 } from './config.mjs'
 
 const CRM = 'https://cloudresourcemanager.googleapis.com/v3/'
@@ -318,6 +318,42 @@ export async function domain(ctx) {
     await ctx.note(`Waiting for ${address}: host ${cur.hostState ?? '…'}, ownership ${cur.ownershipState ?? '…'}, certificate ${cur.cert?.state ?? '…'}`)
     if (Date.now() > until) throw new Error(`${address} isn't active after 90 minutes (host ${cur.hostState}, ownership ${cur.ownershipState}, certificate ${cur.cert?.state})`)
     await sleep(60_000)
+  }
+}
+
+/**
+ * The rental shop's own address (Rental Plus), on the customer's DNS: a Hosting
+ * custom domain, the records the customer must add, and, once it's active,
+ * public_config/main.shopDomain so that address opens on /shop. A previous
+ * address is disconnected first; wanted = null only disconnects. Doesn't wait
+ * for the customer's DNS: run again ("Check again") to see progress.
+ */
+export async function shopDomain(ctx, wanted, previous) {
+  const { projectId } = ctx.state
+  const base = `${HOSTING}projects/${projectId}/sites/${projectId}/customDomains`
+  const profile = customerDb(projectId).collection('public_config').doc('main')
+  if (previous && previous !== wanted) {
+    await google('DELETE', `${base}/${previous}`, undefined, { allow: [404] })
+    await profile.set({ shopDomain: FieldValue.delete() }, { merge: true })
+  }
+  if (!wanted) return { status: 'removed', records: [] }
+
+  let cd = await google('GET', `${base}/${wanted}`, undefined, { allow: [404] })
+  if (cd.__status === 404) await google('POST', `${base}?customDomainId=${wanted}`, {})
+  // Hosting needs a moment to say which records it wants
+  for (let i = 0; i < 10; i++) {
+    cd = await google('GET', `${base}/${wanted}`)
+    if (customerDnsRecords(cd, wanted).length || cd.hostState === 'HOST_ACTIVE') break
+    await sleep(15_000)
+  }
+  const certOk = ['CERT_ACTIVE', 'CERT_EXPIRING_SOON'].includes(cd.cert?.state)
+    || (cd.cert?.state === 'CERT_PROPAGATING' && await servesHttps(wanted))
+  const active = cd.hostState === 'HOST_ACTIVE' && cd.ownershipState === 'OWNERSHIP_ACTIVE' && certOk
+  await profile.set(active ? { shopDomain: wanted } : { shopDomain: FieldValue.delete() }, { merge: true })
+  return {
+    status: active ? 'active' : 'waiting_dns',
+    records: customerDnsRecords(cd, wanted),
+    hostState: cd.hostState ?? null, ownershipState: cd.ownershipState ?? null, certState: cd.cert?.state ?? null,
   }
 }
 

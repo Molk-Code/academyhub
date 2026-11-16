@@ -127,3 +127,33 @@ export function planFields(plan) {
     storageQuotaGB: plan.storageQuotaGB ?? null,
   }
 }
+
+/** A problem with a rental shop address (the customer's own domain), or null */
+export function shopDomainProblem(domain, zone) {
+  if (typeof domain !== 'string' || !domain) return 'Enter an address, like rent.example.com.'
+  const d = domain.toLowerCase()
+  if (d.length > 253 || !/^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(d)) return 'That is not a valid address, like rent.example.com.'
+  if (d === zone || d.endsWith(`.${zone}`)) return `Addresses under ${zone} are set up by CineForge, not here.`
+  return null
+}
+
+/**
+ * The DNS records the customer adds at their own DNS provider for a Hosting
+ * custom domain: what Hosting asks to ADD for the address and its certificate
+ * challenge, with full names (they're not in our zone).
+ */
+export function customerDnsRecords(customDomain, domain) {
+  const sets = [...(customDomain?.requiredDnsUpdates?.desired ?? []), ...(customDomain?.cert?.verification?.dns?.desired ?? [])]
+  const out = []
+  for (const set of sets) {
+    const name = String(set.domainName ?? '').replace(/\.$/, '').toLowerCase()
+    if (name !== domain && !name.endsWith(`.${domain}`)) continue
+    for (const r of set.records ?? []) {
+      if (r.requiredAction && r.requiredAction !== 'ADD') continue
+      if (!['A', 'AAAA', 'TXT', 'CNAME'].includes(r.type)) continue
+      const rec = { type: r.type, name, value: String(r.rdata).replace(/^"|"$/g, '') }
+      if (!out.some(o => o.type === rec.type && o.name === rec.name && o.value === rec.value)) out.push(rec)
+    }
+  }
+  return out
+}

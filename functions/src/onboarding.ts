@@ -413,7 +413,7 @@ export function setupConfig(release: { bucket?: string; object?: string } | unde
 }
 
 /** The Cloud Build request for one order (pure, so it's tested) */
-export function setupBuildRequest(orderId: string, mode: 'setup' | 'remove' | 'plan' | 'update', c: SetupConfig) {
+export function setupBuildRequest(orderId: string, mode: 'setup' | 'remove' | 'plan' | 'update' | 'shopdomain', c: SetupConfig) {
   const install = mode === 'setup' || mode === 'update' ? 'npm ci --no-audit --no-fund && npm --prefix functions ci --no-audit --no-fund' : 'npm ci --no-audit --no-fund'
   const secret = (name: string) => ({ versionName: `projects/${c.controlProject}/secrets/${name}/versions/latest`, env: name })
   return {
@@ -432,7 +432,7 @@ export function setupBuildRequest(orderId: string, mode: 'setup' | 'remove' | 'p
     availableSecrets: { secretManager: [secret('HOSTUP_API_KEY'), secret('RESEND_API_KEY')] },
     serviceAccount: `projects/${c.controlProject}/serviceAccounts/${c.setupServiceAccount}`,
     options: { logging: 'CLOUD_LOGGING_ONLY', machineType: 'E2_HIGHCPU_8' },
-    timeout: mode === 'plan' ? '1200s' : mode === 'update' ? '3600s' : '7200s',
+    timeout: mode === 'plan' || mode === 'shopdomain' ? '1200s' : mode === 'update' ? '3600s' : '7200s',
     tags: ['customer-setup', mode, orderId.toLowerCase()],
   }
 }
@@ -488,7 +488,7 @@ export async function refreshOrder(orderId: string) {
   const o = (await ref.get()).data()
   if (!o) throw new functions.https.HttpsError('not-found', 'Order not found.')
   const control = String(process.env.GCLOUD_PROJECT ?? process.env.GCP_PROJECT)
-  for (const [field, what] of [['planChange', 'plan change'], ['appUpdate', 'update']] as const) {
+  for (const [field, what] of [['planChange', 'plan change'], ['appUpdate', 'update'], ['shopDomain', 'shop address']] as const) {
     const job = o[field]
     if (job?.status !== 'running' || !job.buildId) continue
     const build = await cloudBuild('GET', `projects/${control}/locations/${BUILDS_REGION}/builds/${job.buildId}`)
@@ -531,7 +531,7 @@ export async function requestPlanChange(orderId: string, by: { email: string }, 
   const ref = orders().doc(orderId)
   await transition(orderId, by, 'plan_change_requested', o => {
     if (o.status !== 'live' || !o.provisioning?.state?.projectId) throw precondition('Only a live customer can change plan.')
-    if (o.planChange?.status === 'running' || o.appUpdate?.status === 'running') throw precondition('A job is already running for this customer.')
+    if (jobRunning(o)) throw precondition('A job is already running for this customer.')
     return { planChange: { plan, shopOverride, status: 'running', error: null, buildId: null, logUrl: null, by: by.email, requestedAt: FieldValue.serverTimestamp() } }
   }, { to: plan.planName, shop: shopOverride })
   await startLiveJob(orderId, 'planChange', 'plan', async () => {
@@ -551,7 +551,7 @@ export async function requestAppUpdate(orderId: string, by: { email: string }) {
   const ref = orders().doc(orderId)
   await transition(orderId, by, 'update_requested', o => {
     if (o.status !== 'live' || !o.provisioning?.state?.projectId) throw precondition('Only a live customer can be updated.')
-    if (o.appUpdate?.status === 'running' || o.planChange?.status === 'running') throw precondition('A job is already running for this customer.')
+    if (jobRunning(o)) throw precondition('A job is already running for this customer.')
     return { appUpdate: { status: 'running', release: release?.object ?? null, error: null, buildId: null, logUrl: null, by: by.email, requestedAt: FieldValue.serverTimestamp() } }
   }, { release: release?.object ?? null })
   await startLiveJob(orderId, 'appUpdate', 'update', async () => {
@@ -584,8 +584,52 @@ export async function requestAppUpdateAll(by: { email: string }) {
   return result
 }
 
+/** A plan change, update or shop address job is running for a live customer */
+const jobRunning = (o: FirebaseFirestore.DocumentData) => ['planChange', 'appUpdate', 'shopDomain'].some(f => o[f]?.status === 'running')
+
+/** Same as shopDomainProblem in scripts/customer-setup/config.mjs */
+export function shopDomainProblem(domain: unknown, zone = customerBaseDomain()): string | null {
+  if (typeof domain !== 'string' || !domain) return 'Enter an address, like rent.example.com.'
+  const d = domain.toLowerCase()
+  if (d.length > 253 || !/^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(d)) return 'That is not a valid address, like rent.example.com.'
+  if (d === zone || d.endsWith(`.${zone}`)) return `Addresses under ${zone} are set up by CineForge, not here.`
+  return null
+}
+
+/**
+ * The rental shop's own address (Rental Plus) for a live customer: 'connect'
+ * a domain, 'check' it again, or 'disconnect'. A job on the customer's project
+ * (MODE=shopdomain) does it and lists the DNS records the customer must add.
+ */
+export async function requestShopDomain(orderId: string, by: { email: string }, action: unknown, domainInput?: unknown) {
+  if (action !== 'connect' && action !== 'check' && action !== 'disconnect') throw new functions.https.HttpsError('invalid-argument', 'Unknown action.')
+  const domain = action === 'connect' ? String(domainInput ?? '').trim().toLowerCase() : null
+  if (action === 'connect') {
+    const problem = shopDomainProblem(domain)
+    if (problem) throw new functions.https.HttpsError('invalid-argument', problem)
+  }
+  const ref = orders().doc(orderId)
+  await transition(orderId, by, `shop_domain_${action}`, o => {
+    if (o.status !== 'live' || !o.provisioning?.state?.projectId) throw precondition('Only a live customer can have a shop address.')
+    if (jobRunning(o)) throw precondition('A job is already running for this customer.')
+    const current = o.shopDomain?.domain ?? null
+    if (action === 'connect' && o.plan?.selection?.rentalInventory !== 'plus') throw precondition('A shop address is part of Rental & Inventory Plus.')
+    if (action !== 'connect' && !current) throw precondition('This customer has no shop address.')
+    const wanted = action === 'connect' ? domain : action === 'check' ? current : null
+    return { shopDomain: {
+      domain: wanted, previous: current && current !== wanted ? current : null, status: 'running',
+      records: action === 'check' ? (o.shopDomain?.records ?? []) : [], error: null, buildId: null, logUrl: null,
+      by: by.email, requestedAt: FieldValue.serverTimestamp(),
+    } }
+  }, { domain })
+  await startLiveJob(orderId, 'shopDomain', 'shopdomain', async () => {
+    const o = (await ref.get()).data()!
+    await ref.update({ 'shopDomain.status': o.shopDomain.domain ? 'waiting_dns' : 'removed', 'shopDomain.previous': null, updatedAt: FieldValue.serverTimestamp() })
+  })
+}
+
 /** Submits a job for a live customer (or simulates it in the emulator); a failure to start lands on that job's field */
-async function startLiveJob(orderId: string, field: 'planChange' | 'appUpdate', mode: 'plan' | 'update', simulate: () => Promise<void>) {
+async function startLiveJob(orderId: string, field: 'planChange' | 'appUpdate' | 'shopDomain', mode: 'plan' | 'update' | 'shopdomain', simulate: () => Promise<void>) {
   const ref = orders().doc(orderId)
   const provisioning = process.env.PROVISIONING_MODE
   try {
@@ -638,6 +682,7 @@ export const refreshCustomerOrder = superadminCall(async d => refreshOrder(order
 export const changeCustomerPlan = superadminCall(async (d, by) => { await requestPlanChange(orderIdOf(d), by, d.plan, d.publicShopOverride); return { ok: true } })
 export const updateCustomerApp = superadminCall(async (d, by) => { await requestAppUpdate(orderIdOf(d), by); return { ok: true } })
 export const updateAllCustomerApps = superadminCall(async (_d, by) => requestAppUpdateAll(by))
+export const setCustomerShopDomain = superadminCall(async (d, by) => { await requestShopDomain(orderIdOf(d), by, d.action, d.domain); return { ok: true } })
 export const removeCustomer = superadminCall(async (d, by) => { await requestRemoval(orderIdOf(d), by, d.confirmName); return { ok: true } })
 
 /** Whether a short name can be used; superadmin form checks as you type */

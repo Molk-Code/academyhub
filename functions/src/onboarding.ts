@@ -413,8 +413,8 @@ export function setupConfig(release: { bucket?: string; object?: string } | unde
 }
 
 /** The Cloud Build request for one order (pure, so it's tested) */
-export function setupBuildRequest(orderId: string, mode: 'setup' | 'remove' | 'plan', c: SetupConfig) {
-  const install = mode === 'setup' ? 'npm ci --no-audit --no-fund && npm --prefix functions ci --no-audit --no-fund' : 'npm ci --no-audit --no-fund'
+export function setupBuildRequest(orderId: string, mode: 'setup' | 'remove' | 'plan' | 'update', c: SetupConfig) {
+  const install = mode === 'setup' || mode === 'update' ? 'npm ci --no-audit --no-fund && npm --prefix functions ci --no-audit --no-fund' : 'npm ci --no-audit --no-fund'
   const secret = (name: string) => ({ versionName: `projects/${c.controlProject}/secrets/${name}/versions/latest`, env: name })
   return {
     source: { storageSource: { bucket: c.release.bucket, object: c.release.object } },
@@ -432,7 +432,7 @@ export function setupBuildRequest(orderId: string, mode: 'setup' | 'remove' | 'p
     availableSecrets: { secretManager: [secret('HOSTUP_API_KEY'), secret('RESEND_API_KEY')] },
     serviceAccount: `projects/${c.controlProject}/serviceAccounts/${c.setupServiceAccount}`,
     options: { logging: 'CLOUD_LOGGING_ONLY', machineType: 'E2_HIGHCPU_8' },
-    timeout: mode === 'plan' ? '1200s' : '7200s',
+    timeout: mode === 'plan' ? '1200s' : mode === 'update' ? '3600s' : '7200s',
     tags: ['customer-setup', mode, orderId.toLowerCase()],
   }
 }
@@ -488,10 +488,12 @@ export async function refreshOrder(orderId: string) {
   const o = (await ref.get()).data()
   if (!o) throw new functions.https.HttpsError('not-found', 'Order not found.')
   const control = String(process.env.GCLOUD_PROJECT ?? process.env.GCP_PROJECT)
-  if (o.planChange?.status === 'running' && o.planChange.buildId) {
-    const build = await cloudBuild('GET', `projects/${control}/locations/${BUILDS_REGION}/builds/${o.planChange.buildId}`)
+  for (const [field, what] of [['planChange', 'plan change'], ['appUpdate', 'update']] as const) {
+    const job = o[field]
+    if (job?.status !== 'running' || !job.buildId) continue
+    const build = await cloudBuild('GET', `projects/${control}/locations/${BUILDS_REGION}/builds/${job.buildId}`)
     if (['FAILURE', 'INTERNAL_ERROR', 'TIMEOUT', 'CANCELLED', 'EXPIRED'].includes(build.status)) {
-      await ref.update({ 'planChange.status': 'failed', 'planChange.error': `The plan change job stopped (${build.status}): see its log.`, updatedAt: FieldValue.serverTimestamp() })
+      await ref.update({ [`${field}.status`]: 'failed', [`${field}.error`]: `The ${what} job stopped (${build.status}): see its log.`, updatedAt: FieldValue.serverTimestamp() })
     }
   }
   const buildId = o.provisioning?.buildId
@@ -525,28 +527,55 @@ export async function requestPlanChange(orderId: string, by: { email: string }, 
   const ref = orders().doc(orderId)
   await transition(orderId, by, 'plan_change_requested', o => {
     if (o.status !== 'live' || !o.provisioning?.state?.projectId) throw precondition('Only a live customer can change plan.')
-    if (o.planChange?.status === 'running') throw precondition('A plan change is already running.')
+    if (o.planChange?.status === 'running' || o.appUpdate?.status === 'running') throw precondition('A job is already running for this customer.')
     return { planChange: { plan, status: 'running', error: null, buildId: null, logUrl: null, by: by.email, requestedAt: FieldValue.serverTimestamp() } }
   }, { to: plan.planName })
-  const mode = process.env.PROVISIONING_MODE
+  await startLiveJob(orderId, 'planChange', 'plan', async () => {
+    // No customer project in the emulator: only the order changes
+    await ref.update({ plan, 'planChange.status': 'done', 'planChange.doneAt': FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() })
+    await newEvent(orderId).create({ at: FieldValue.serverTimestamp(), by: { system: 'setup' }, action: 'plan_changed', detail: { to: plan.planName } })
+  })
+}
+
+/**
+ * Moves a live customer to the latest release: APIs, rules, functions and the
+ * app, by re-running the setup's services and deploy steps (MODE=update). Data
+ * is untouched. New customers already get the latest release at setup.
+ */
+export async function requestAppUpdate(orderId: string, by: { email: string }) {
+  const release = (await db.collection('platform').doc('release').get()).data() as { object?: string } | undefined
+  const ref = orders().doc(orderId)
+  await transition(orderId, by, 'update_requested', o => {
+    if (o.status !== 'live' || !o.provisioning?.state?.projectId) throw precondition('Only a live customer can be updated.')
+    if (o.appUpdate?.status === 'running' || o.planChange?.status === 'running') throw precondition('A job is already running for this customer.')
+    return { appUpdate: { status: 'running', release: release?.object ?? null, error: null, buildId: null, logUrl: null, by: by.email, requestedAt: FieldValue.serverTimestamp() } }
+  }, { release: release?.object ?? null })
+  await startLiveJob(orderId, 'appUpdate', 'update', async () => {
+    await ref.update({ 'appUpdate.status': 'done', 'appUpdate.doneAt': FieldValue.serverTimestamp(), 'provisioning.release': release?.object ?? null, updatedAt: FieldValue.serverTimestamp() })
+    await newEvent(orderId).create({ at: FieldValue.serverTimestamp(), by: { system: 'setup' }, action: 'updated', detail: { release: release?.object ?? null } })
+  })
+}
+
+/** Submits a job for a live customer (or simulates it in the emulator); a failure to start lands on that job's field */
+async function startLiveJob(orderId: string, field: 'planChange' | 'appUpdate', mode: 'plan' | 'update', simulate: () => Promise<void>) {
+  const ref = orders().doc(orderId)
+  const provisioning = process.env.PROVISIONING_MODE
   try {
-    if (mode === 'cloudbuild') {
+    if (provisioning === 'cloudbuild') {
       const release = (await db.collection('platform').doc('release').get()).data() as { bucket?: string; object?: string } | undefined
       const cfg = setupConfig(release)
       if (typeof cfg === 'string') throw new Error(cfg)
-      const op = await cloudBuild('POST', `projects/${cfg.controlProject}/locations/${BUILDS_REGION}/builds`, setupBuildRequest(orderId, 'plan', cfg))
+      const op = await cloudBuild('POST', `projects/${cfg.controlProject}/locations/${BUILDS_REGION}/builds`, setupBuildRequest(orderId, mode, cfg))
       const build = op?.metadata?.build ?? {}
-      await ref.update({ 'planChange.buildId': build.id ?? null, 'planChange.logUrl': build.logUrl ?? null, updatedAt: FieldValue.serverTimestamp() })
-    } else if (mode === 'simulate' && process.env.FUNCTIONS_EMULATOR === 'true') {
-      // No customer project in the emulator: only the order changes
-      await ref.update({ plan, 'planChange.status': 'done', 'planChange.doneAt': FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() })
-      await newEvent(orderId).create({ at: FieldValue.serverTimestamp(), by: { system: 'setup' }, action: 'plan_changed', detail: { to: plan.planName } })
+      await ref.update({ [`${field}.buildId`]: build.id ?? null, [`${field}.logUrl`]: build.logUrl ?? null, updatedAt: FieldValue.serverTimestamp() })
+    } else if (provisioning === 'simulate' && process.env.FUNCTIONS_EMULATOR === 'true') {
+      await simulate()
     } else {
       throw new Error('Setup jobs are switched off (PROVISIONING_MODE).')
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    await ref.update({ 'planChange.status': 'failed', 'planChange.error': `Couldn't start the plan change: ${message}`.slice(0, 600), updatedAt: FieldValue.serverTimestamp() })
+    await ref.update({ [`${field}.status`]: 'failed', [`${field}.error`]: `Couldn't start the job: ${message}`.slice(0, 600), updatedAt: FieldValue.serverTimestamp() })
   }
 }
 
@@ -579,6 +608,7 @@ export const cancelCustomerOrder = superadminCall(async (d, by) => { await cance
 export const retryCustomerOrder = superadminCall(async (d, by) => { await retryOrder(orderIdOf(d), by); return { ok: true } })
 export const refreshCustomerOrder = superadminCall(async d => refreshOrder(orderIdOf(d)))
 export const changeCustomerPlan = superadminCall(async (d, by) => { await requestPlanChange(orderIdOf(d), by, d.plan); return { ok: true } })
+export const updateCustomerApp = superadminCall(async (d, by) => { await requestAppUpdate(orderIdOf(d), by); return { ok: true } })
 export const removeCustomer = superadminCall(async (d, by) => { await requestRemoval(orderIdOf(d), by, d.confirmName); return { ok: true } })
 
 /** Whether a short name can be used; superadmin form checks as you type */

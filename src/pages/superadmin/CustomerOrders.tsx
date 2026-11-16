@@ -30,11 +30,13 @@ export interface Order {
   plan: { planName: string | null; selection?: PlanSelection; modules: Record<string, boolean>; maxStudents: number | null; maxAssets?: number | null; storageQuotaGB: number | null; quote?: Quote }
   /** The latest plan change for a live customer (run by the plan job) */
   planChange?: { plan: { planName: string | null }; status: 'running' | 'done' | 'failed'; error: string | null; logUrl?: string | null }
+  /** The latest update to the current release (run by the update job) */
+  appUpdate?: { release: string | null; status: 'running' | 'done' | 'failed'; error: string | null; logUrl?: string | null }
   payment: { method: 'invoice' | 'card'; status: 'pending' | 'paid'; invoiceNumber: string | null }
   startPolicy: 'after_payment' | 'immediately'
   provisioning: {
     steps: Record<string, { status: StepStatus; error?: string }>; error: string | null; note: string | null; attempts: number
-    state?: { projectId?: string }; logUrl?: string | null; buildId?: string | null
+    state?: { projectId?: string }; logUrl?: string | null; buildId?: string | null; release?: string | null
   }
   removal?: boolean
   notes: string | null
@@ -71,6 +73,7 @@ const EVENT_LABEL: Record<string, string> = {
   invoice_number: 'Invoice number set', cancelled: 'Cancelled', retry: 'Retried', setup_failed: 'Setup failed', live: 'Live',
   removal_requested: 'Removal requested', removal_failed: 'Removal failed', removed: 'Removed',
   plan_change_requested: 'Plan change requested', plan_changed: 'Plan changed', plan_change_failed: 'Plan change failed',
+  update_requested: 'Update requested', updated: 'Updated to the latest release', update_failed: 'Update failed',
 }
 
 function call<T = unknown>(name: string, data: Record<string, unknown>) {
@@ -303,7 +306,8 @@ function OrderDetails({ order }: { order: Order }) {
   const cancellable = ['awaiting_payment', 'queued', 'failed'].includes(order.status) && !projectId
   const removable = order.status === 'live' || (order.status === 'failed' && !!projectId)
   const planRunning = order.planChange?.status === 'running'
-  const running = (['provisioning', 'removing'].includes(order.status) && !!order.provisioning.buildId) || planRunning
+  const updateRunning = order.appUpdate?.status === 'running'
+  const running = (['provisioning', 'removing'].includes(order.status) && !!order.provisioning.buildId) || planRunning || updateRunning
 
   return (
     <div className="px-5 pb-5 pt-1 grid lg:grid-cols-2 gap-6 text-sm">
@@ -324,6 +328,7 @@ function OrderDetails({ order }: { order: Order }) {
           <dt className="text-zinc-500">Payment</dt>
           <dd>Invoice · {order.payment.status === 'paid' ? <span className="text-emerald-400">paid</span> : 'not paid'}{order.payment.invoiceNumber && ` · ${order.payment.invoiceNumber}`}</dd>
           <dt className="text-zinc-500">Set up</dt><dd>{order.startPolicy === 'immediately' ? 'Right away' : 'When paid'}</dd>
+          {order.provisioning.release && (<><dt className="text-zinc-500">Release</dt><dd className="font-mono text-xs">{order.provisioning.release.replace(/^releases\//, '').replace(/\.tgz$/, '')}</dd></>)}
           {order.notes && (<><dt className="text-zinc-500">Notes</dt><dd className="whitespace-pre-line">{order.notes}</dd></>)}
         </dl>
 
@@ -358,7 +363,14 @@ function OrderDetails({ order }: { order: Order }) {
             </button>
           )}
           {order.status === 'live' && !changingPlan && (
-            <button type="button" className="btn-secondary py-2 px-3 text-sm" disabled={planRunning} onClick={() => setChangingPlan(true)}>Change plan…</button>
+            <button type="button" className="btn-secondary py-2 px-3 text-sm" disabled={planRunning || updateRunning} onClick={() => setChangingPlan(true)}>Change plan…</button>
+          )}
+          {order.status === 'live' && (
+            <button type="button" className="btn-secondary py-2 px-3 text-sm" disabled={!!busy || planRunning || updateRunning}
+              title="Rules, functions and the app from the latest published release. Data is untouched."
+              onClick={() => act('updateCustomerApp')}>
+              {busy === 'updateCustomerApp' && <Loader2 className="w-4 h-4 animate-spin" />} Update app
+            </button>
           )}
           {removable && (
             <button type="button" className="text-sm text-rose-300 hover:text-rose-200 px-2" onClick={() => setRemoving(true)}>Remove customer…</button>
@@ -381,6 +393,15 @@ function OrderDetails({ order }: { order: Order }) {
               : order.planChange.status === 'done' ? `Plan changed to ${order.planChange.plan.planName}.`
               : `Plan change failed: ${order.planChange.error}`}
             {order.planChange.logUrl && <a className="underline text-zinc-500 hover:text-zinc-300" href={order.planChange.logUrl} target="_blank" rel="noreferrer">Job log</a>}
+          </p>
+        )}
+        {order.appUpdate && (
+          <p className={`text-xs flex items-center gap-1.5 ${order.appUpdate.status === 'failed' ? 'text-rose-400' : order.appUpdate.status === 'running' ? 'text-amber-300' : 'text-emerald-400'}`} aria-live="polite">
+            {order.appUpdate.status === 'running' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {order.appUpdate.status === 'running' ? 'Updating to the latest release (about 10–20 minutes)…'
+              : order.appUpdate.status === 'done' ? `Updated to release ${(order.appUpdate.release ?? '').replace(/^releases\//, '').replace(/\.tgz$/, '')}.`
+              : `Update failed: ${order.appUpdate.error}`}
+            {order.appUpdate.logUrl && <a className="underline text-zinc-500 hover:text-zinc-300" href={order.appUpdate.logUrl} target="_blank" rel="noreferrer">Job log</a>}
           </p>
         )}
         {changingPlan && <ChangePlanForm order={order} onClose={() => setChangingPlan(false)} />}

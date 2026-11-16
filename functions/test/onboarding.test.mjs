@@ -258,3 +258,32 @@ test('plan change: only for a live customer; validated; the plan job is MODE=pla
   assert.match(req.steps[0].args[1], /^npm ci .*run\.mjs$/)
   assert.equal(req.timeout, '1200s')
 })
+
+test('update: only for a live customer, one job at a time; MODE=update installs functions too', async () => {
+  const id = await ob.createOrder(ob.validateOrderInput({ ...valid, startPolicy: 'immediately' }, { selfService: false }), { source: 'superadmin', by: boss })
+  await assert.rejects(ob.requestAppUpdate(id, boss), e => e.code === 'failed-precondition', 'not live yet')
+  await db.collection('customer_orders').doc(id).update({ status: 'live', 'provisioning.state.projectId': 'cf-nordic-ab12' })
+  await db.collection('platform').doc('release').set({ bucket: 'b', object: 'releases/abc.tgz' })
+
+  await db.collection('customer_orders').doc(id).update({ 'planChange.status': 'running' })
+  await assert.rejects(ob.requestAppUpdate(id, boss), e => e.code === 'failed-precondition', 'a plan change is running')
+  await db.collection('customer_orders').doc(id).update({ 'planChange.status': 'done' })
+
+  const saved = { ...process.env }
+  try {
+    Object.assign(process.env, { PROVISIONING_MODE: 'simulate', FUNCTIONS_EMULATOR: 'true' })
+    await ob.requestAppUpdate(id, boss)
+  } finally {
+    for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]
+    Object.assign(process.env, saved)
+  }
+  const o = await order(id)
+  assert.equal(o.status, 'live')
+  assert.equal(o.appUpdate.status, 'done')
+  assert.equal(o.provisioning.release, 'releases/abc.tgz')
+
+  const cfg = { controlProject: 'ctl', folderId: '1', billingAccount: 'b', setupServiceAccount: 's@ctl.iam.gserviceaccount.com', superadminEmails: 'x', release: { bucket: 'b', object: 'o' } }
+  const req = ob.setupBuildRequest(id, 'update', cfg)
+  assert.ok(req.steps[0].env.includes('MODE=update'))
+  assert.match(req.steps[0].args[1], /npm --prefix functions ci/)
+})

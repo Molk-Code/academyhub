@@ -20,7 +20,7 @@ const env = {
   RESEND_API_KEY: process.env.RESEND_API_KEY,
 }
 const orderId = need('ORDER_ID')
-const mode = ['remove', 'plan'].includes(process.env.MODE) ? process.env.MODE : 'setup'
+const mode = ['remove', 'plan', 'update'].includes(process.env.MODE) ? process.env.MODE : 'setup'
 
 const controlDb = getFirestore(initializeApp({ credential: applicationDefault(), projectId: env.CONTROL_PROJECT }))
 const ref = controlDb.collection('customer_orders').doc(orderId)
@@ -64,6 +64,28 @@ if (mode === 'plan') {
   }
   await ref.update({ plan, 'planChange.status': 'done', 'planChange.error': null, 'planChange.doneAt': FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() })
   await event('plan_changed', { to: plan.planName })
+  process.exit(0)
+}
+
+// An update for a live customer: the setup's project, services and deploy steps again,
+// from this release. The order stays live; appUpdate reports the outcome.
+if (mode === 'update') {
+  try {
+    if (!state.projectId || !state.webConfig) throw new Error('The customer has no project to update')
+    await ctx.note('Updating: APIs, then rules, functions and the app…')
+    await SETUP.project(ctx)
+    await SETUP.services(ctx)
+    await SETUP.deploy(ctx)
+  } catch (err) {
+    const message = (err instanceof Error ? err.message : String(err)).slice(0, 900)
+    console.error(err)
+    await ref.update({ 'appUpdate.status': 'failed', 'appUpdate.error': message, 'provisioning.note': null, updatedAt: FieldValue.serverTimestamp() })
+    await event('update_failed', { error: message.slice(0, 500) })
+    process.exit(1)
+  }
+  const release = order.appUpdate?.release ?? null
+  await ref.update({ 'appUpdate.status': 'done', 'appUpdate.error': null, 'appUpdate.doneAt': FieldValue.serverTimestamp(), 'provisioning.release': release, 'provisioning.note': null, updatedAt: FieldValue.serverTimestamp() })
+  await event('updated', { release })
   process.exit(0)
 }
 

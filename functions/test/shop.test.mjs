@@ -83,3 +83,16 @@ test('locked catalog: active items only, without internal fields', async () => {
   assert.deepEqual(c.equipment, [{ id: 'cam', name: 'FX6', category: 'CAMERA', isActive: true, priceInclVat: 900 }])
   assert.equal(c.categories.length, 1)
 })
+
+test('guest emails: what the request is, escaped; a staff reply is included', () => {
+  const b = { isGuest: true, guestName: 'Sam <b>', guestEmail: 'sam@example.test', projectName: 'Short film', checkoutDate: '2026-12-01', returnDate: '2026-12-03',
+    items: [{ equipmentName: 'FX6', quantity: 1 }, { equipmentName: 'Tripod', quantity: 2 }] }
+  const r = shop.guestEmailContent('received', b, 'Nordic Rentals')
+  assert.equal(r.subject, 'Your request to Nordic Rentals is received')
+  assert.match(r.html, /Sam &lt;b&gt;/)
+  assert.match(r.html, /2026-12-01 – 2026-12-03/)
+  assert.match(r.html, /Tripod × 2/)
+  const m = shop.guestEmailContent('message', b, 'Nordic Rentals', 'Pick up at 9\n<script>')
+  assert.match(m.html, /Pick up at 9\n&lt;script&gt;/)
+  assert.match(shop.guestEmailContent('denied', b, 'X').subject, /couldn't be confirmed/)
+})

@@ -1,6 +1,7 @@
 import { functions, db, admin, requireTeacherOrAdmin, LIMITS, allow, REGION } from './lib'
 import { sendPush, saveNotifications, tokensFor } from './notifications-core'
 import { Timestamp } from 'firebase-admin/firestore'
+import { emailGuest } from './shop'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Booking parts — each catalog category of a booking is accepted or denied by
@@ -79,64 +80,71 @@ async function pushAndSave(studentId: string, tokens: string[], opts: { title: s
 // onEquipmentBookingCreated — notify teachers/admins of new equipment requests
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onEquipmentBookingCreated = functions.region(REGION).runWith(LIMITS).firestore
+export const onEquipmentBookingCreated = functions.region(REGION).runWith({ ...LIMITS, secrets: ['RESEND_API_KEY'] }).firestore
   .document('equipment_bookings/{bookingId}')
   .onCreate(async (snap) => {
     const booking = snap.data()
+    // A request from the public rental shop: no account, so no student checks;
+    // the guest gets an email and the staff a push like any request
+    const guest = booking.isGuest === true
 
-    // Rate limit: max 5 pending bookings per student
-    const pendingSnap = await db.collection('equipment_bookings')
-      .where('studentId', '==', booking.studentId)
-      .where('status', '==', 'pending')
-      .get()
-    if (pendingSnap.size >= 5) {
-      // Notify the student before deleting so they know why it was rejected
-      const studentSnap = await db.collection('users').doc(booking.studentId as string).get()
-      const tokens: string[] = await tokensFor([studentSnap.id])
-      await pushAndSave(booking.studentId as string, tokens, {
-        title: '⚠️ Equipment booking limit reached',
-        body: 'You already have 5 pending requests. Cancel or wait for one to be confirmed before adding more.',
-        url: '/booking/equipment',
-        tag: 'equipment-booking',
-      })
-      await snap.ref.delete()
-      return null
+    // Rate limit: max 5 pending bookings per student (guests: per IP, in createEquipmentBooking)
+    if (!guest) {
+      const pendingSnap = await db.collection('equipment_bookings')
+        .where('studentId', '==', booking.studentId)
+        .where('status', '==', 'pending')
+        .get()
+      if (pendingSnap.size >= 5) {
+        // Notify the student before deleting so they know why it was rejected
+        const studentSnap = await db.collection('users').doc(booking.studentId as string).get()
+        const tokens: string[] = await tokensFor([studentSnap.id])
+        await pushAndSave(booking.studentId as string, tokens, {
+          title: '⚠️ Equipment booking limit reached',
+          body: 'You already have 5 pending requests. Cancel or wait for one to be confirmed before adding more.',
+          url: '/booking/equipment',
+          tag: 'equipment-booking',
+        })
+        await snap.ref.delete()
+        return null
+      }
     }
 
     // Enforce equipment access restrictions (filmYear2Only / allowedCohortIds)
-    const studentSnap2 = await db.collection('users').doc(booking.studentId as string).get()
-    const studentData = studentSnap2.data()
-    const items: { equipmentId: string }[] = booking.items ?? []
-    for (const item of items) {
-      if (!item.equipmentId) continue
-      const equipSnap = await db.collection('equipment').doc(item.equipmentId).get()
-      if (!equipSnap.exists) continue
-      const equip = equipSnap.data()!
-      const cohortSnap = studentData?.cohortId
-        ? await db.collection('cohorts').doc(studentData.cohortId).get()
-        : null
-      const programYear: number = cohortSnap?.data()?.programYear ?? 1
-      if (equip.filmYear2Only && programYear !== 2) {
-        await snap.ref.delete()
-        const tokens: string[] = await tokensFor([booking.studentId as string])
-        await pushAndSave(booking.studentId as string, tokens, {
-          title: '🚫 Booking rejected',
-          body: `"${equip.name}" is only available to Year 2 students`,
-          url: '/booking/equipment',
-          tag: 'equipment-booking',
-        })
-        return null
-      }
-      if (equip.allowedCohortIds?.length > 0 && studentData?.cohortId && !equip.allowedCohortIds.includes(studentData.cohortId)) {
-        await snap.ref.delete()
-        const tokens: string[] = await tokensFor([booking.studentId as string])
-        await pushAndSave(booking.studentId as string, tokens, {
-          title: '🚫 Booking rejected',
-          body: `"${equip.name}" is not available for your class`,
-          url: '/booking/equipment',
-          tag: 'equipment-booking',
-        })
-        return null
+    if (!guest) {
+      const studentSnap2 = await db.collection('users').doc(booking.studentId as string).get()
+      const studentData = studentSnap2.data()
+      const items: { equipmentId: string }[] = booking.items ?? []
+      for (const item of items) {
+        if (!item.equipmentId) continue
+        const equipSnap = await db.collection('equipment').doc(item.equipmentId).get()
+        if (!equipSnap.exists) continue
+        const equip = equipSnap.data()!
+        const cohortSnap = studentData?.cohortId
+          ? await db.collection('cohorts').doc(studentData.cohortId).get()
+          : null
+        const programYear: number = cohortSnap?.data()?.programYear ?? 1
+        if (equip.filmYear2Only && programYear !== 2) {
+          await snap.ref.delete()
+          const tokens: string[] = await tokensFor([booking.studentId as string])
+          await pushAndSave(booking.studentId as string, tokens, {
+            title: '🚫 Booking rejected',
+            body: `"${equip.name}" is only available to Year 2 students`,
+            url: '/booking/equipment',
+            tag: 'equipment-booking',
+          })
+          return null
+        }
+        if (equip.allowedCohortIds?.length > 0 && studentData?.cohortId && !equip.allowedCohortIds.includes(studentData.cohortId)) {
+          await snap.ref.delete()
+          const tokens: string[] = await tokensFor([booking.studentId as string])
+          await pushAndSave(booking.studentId as string, tokens, {
+            title: '🚫 Booking rejected',
+            body: `"${equip.name}" is not available for your class`,
+            url: '/booking/equipment',
+            tag: 'equipment-booking',
+          })
+          return null
+        }
       }
     }
 
@@ -154,11 +162,12 @@ export const onEquipmentBookingCreated = functions.region(REGION).runWith(LIMITS
     // otherwise push every staff phone each time (the doc itself is kept)
     // Signed-out rental guests share one budget
     const who = (booking.studentId as string) || 'rental-guests'
+    if (guest) await emailGuest(booking, 'received')
     if (!(await allow(who, 'booking-notify', booking.studentId ? 5 : 10))) return null
     await pushToResponsibleStaff(
       categories,
-      '📦 Equipment booking request',
-      `${booking.studentName} requested equipment for "${booking.projectName}"`,
+      guest ? '🛒 Rental shop request' : '📦 Equipment booking request',
+      `${guest ? booking.guestName : booking.studentName} requested equipment for "${booking.projectName}"`,
       `/admin/equipment?tab=bookings&focus=${snap.id}`,
     )
     return null
@@ -168,7 +177,7 @@ export const onEquipmentBookingCreated = functions.region(REGION).runWith(LIMITS
 // onEquipmentBookingMessageCreated — notify the other side of a reply
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onEquipmentBookingMessageCreated = functions.region(REGION).runWith(LIMITS).firestore
+export const onEquipmentBookingMessageCreated = functions.region(REGION).runWith({ ...LIMITS, secrets: ['RESEND_API_KEY'] }).firestore
   .document('equipment_bookings/{bookingId}/messages/{messageId}')
   .onCreate(async (snap, context) => {
     const message = snap.data()
@@ -184,6 +193,9 @@ export const onEquipmentBookingMessageCreated = functions.region(REGION).runWith
         `${message.senderName} — "${booking.projectName}": ${message.text}`,
         `/admin/equipment?tab=bookings&focus=${context.params.bookingId}`,
       )
+    } else if (booking.isGuest) {
+      // A shop guest has no account: the reply goes by email
+      await emailGuest(booking, 'message', String(message.text ?? ''))
     } else {
       const studentSnap = await db.collection('users').doc(booking.studentId as string).get()
       const tokens: string[] = await tokensFor([studentSnap.id])
@@ -204,12 +216,19 @@ export const onEquipmentBookingMessageCreated = functions.region(REGION).runWith
 // onEquipmentBookingUpdated — notify student when booking status changes
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const onEquipmentBookingUpdated = functions.region(REGION).runWith(LIMITS).firestore
+export const onEquipmentBookingUpdated = functions.region(REGION).runWith({ ...LIMITS, secrets: ['RESEND_API_KEY'] }).firestore
   .document('equipment_bookings/{bookingId}')
   .onUpdate(async (change) => {
     const before = change.before.data()
     const after  = change.after.data()
     if (before.status === after.status) return null
+    // A shop guest hears about the decision by email (however it was decided)
+    if (after.isGuest) {
+      if (after.status === 'confirmed' || after.status === 'denied' || after.status === 'cancelled') {
+        await emailGuest(after, after.status, after.teacherNotes || undefined)
+      }
+      return null
+    }
     // Part-by-part decisions notify from decideEquipmentBookingParts instead
     if ((after.status === 'confirmed' || after.status === 'denied') && after.categoryDecisions) return null
     // Closed because its inventory project was archived — the project's own

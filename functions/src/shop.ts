@@ -1,7 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore'
 import { scrypt, randomBytes, timingSafeEqual } from 'crypto'
 import { promisify } from 'util'
-import { functions, db, LIMITS, REGION, SCHOOL_ID, allow } from './lib'
+import { functions, db, LIMITS, REGION, SCHOOL_ID, allow, escapeHtml, getEmailConfig, sendEmailOrThrow } from './lib'
 import { hashIp, clientIp } from './contact'
 
 // The public rental shop (/shop): who decides whether it's open, and its
@@ -142,3 +142,43 @@ export const shopCatalog = functions.region(REGION).runWith({ ...LIMITS, maxInst
   await requireShopAccess(s, (data as Record<string, unknown> | null)?.password, clientIp(context.rawRequest as never))
   return lockedShopCatalog()
 })
+
+// ── Emails to shop guests (they have no account, so no push or inbox) ──
+
+export type GuestEmailKind = 'received' | 'confirmed' | 'denied' | 'cancelled' | 'message'
+
+/** Subject and body for a guest's email about their request (pure, so it's tested) */
+export function guestEmailContent(kind: GuestEmailKind, b: FirebaseFirestore.DocumentData, shopName: string, extra?: string) {
+  const items = ((b.items ?? []) as { equipmentName?: string; quantity?: number }[])
+    .map(i => `${escapeHtml(i.equipmentName ?? '')}${(i.quantity ?? 1) > 1 ? ` × ${i.quantity}` : ''}`).join('<br>')
+  const when = `${escapeHtml(b.checkoutDate)} – ${escapeHtml(b.returnDate)}`
+  const head = {
+    received: [`Your request to ${shopName} is received`, `Thanks, ${escapeHtml(b.guestName)}. We have your request and will get back to you.`],
+    confirmed: [`Your request to ${shopName} is confirmed`, `Your equipment is booked.`],
+    denied: [`Your request to ${shopName} couldn't be confirmed`, `Sorry, we can't confirm this request.`],
+    cancelled: [`Your request to ${shopName} is cancelled`, `This request has been cancelled.`],
+    message: [`A message about your request to ${shopName}`, ''],
+  }[kind]
+  const note = extra ? `<div style="white-space:pre-wrap;margin:12px 0">${escapeHtml(extra)}</div>` : ''
+  return {
+    subject: head[0].replace(/[\r\n]+/g, ' ').slice(0, 200),
+    html: [head[1] && `<p>${head[1]}</p>`, note, `<p><b>${escapeHtml(b.projectName || 'Your request')}</b><br>${when}</p>`, `<p>${items}</p>`]
+      .filter(Boolean).join(''),
+  }
+}
+
+/** Emails a shop guest; a failure is logged, never thrown (the booking itself is fine) */
+export async function emailGuest(b: FirebaseFirestore.DocumentData, kind: GuestEmailKind, extra?: string) {
+  const to = typeof b.guestEmail === 'string' ? b.guestEmail : ''
+  if (!b.isGuest || !to) return
+  try {
+    const [cfg, school] = await Promise.all([getEmailConfig(), db.collection('schools').doc(SCHOOL_ID).get()])
+    const fromEmail = cfg?.fromEmail
+    if (!fromEmail || fromEmail === 'onboarding@resend.dev') throw new Error('No sender address set up (email_config/global)')
+    const shopName = String(school.data()?.name ?? cfg?.fromName ?? 'the rental shop')
+    const { subject, html } = guestEmailContent(kind, b, escapeHtml(shopName), extra)
+    await sendEmailOrThrow({ from: `${cfg?.fromName || shopName} <${fromEmail}>`, to: [to], subject, html })
+  } catch (err) {
+    console.error(`Shop guest email (${kind}) failed:`, err)
+  }
+}

@@ -122,6 +122,9 @@ describe('public shop', () => {
     expect(publicShopOpen({ modules: rental })).toBe(false)
     expect(publicShopOpen({ modules: rental, publicShop: true })).toBe(true)
     expect(publicShopOpen({ modules: { ...rental, rentalInventory: false }, publicShop: true })).toBe(false)
+    expect(publicShopOpen({ modules: rental, publicShop: true, publicShopOverride: 'off' })).toBe(false)
+    expect(publicShopOpen({ modules: rental, publicShop: false, publicShopOverride: 'on' })).toBe(true)
+    expect(publicShopOpen({ modules: { ...rental, rentalInventory: false }, publicShopOverride: 'on' })).toBe(false)
   })
 })
 

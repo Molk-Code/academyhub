@@ -273,13 +273,15 @@ export async function school(ctx) {
 
 /**
  * A plan change for a live customer: the plan fields of schools/<id> (modules,
- * plan per module, limits). Usage, data and everything else stay as they are.
+ * plan per module, limits) and the shop override. Usage, data and everything
+ * else stay as they are.
  */
-export async function changePlan(ctx, plan) {
+export async function changePlan(ctx, plan, shopOverride = null) {
   const db = customerDb(ctx.state.projectId)
   const ref = db.collection('schools').doc(ctx.order.school.shortName)
   if (!(await ref.get()).exists) throw new Error(`schools/${ctx.order.school.shortName} not found in ${ctx.state.projectId}`)
-  await ref.update(planFields(plan))
+  // The superadmin's override of the public shop: absent leaves it to the school admin
+  await ref.update({ ...planFields(plan), publicShopOverride: shopOverride ?? FieldValue.delete() })
 }
 
 /** https://<short name>.cineforge.se: Hosting custom domain, its records at Hostup, then wait for the certificate */

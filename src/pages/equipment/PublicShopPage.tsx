@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   collection, getDocs, query, where, getDoc, doc,
 } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { httpsCallable } from 'firebase/functions'
+import { db, functions } from '@/lib/firebase'
 import { createEquipmentBooking, bookingErrorMessage } from '@/lib/equipmentAvailability'
 import { SCHOOL_ID } from '@/lib/school'
 import type { EquipmentDoc, EquipmentCategoryDoc } from '@/types'
@@ -51,10 +52,15 @@ function todayStr() {
 
 export default function PublicShopPage() {
   // ── Password gate state ────────────────────────────────────────────────────
-  const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem('shop_unlocked') === '1')
+  // A shop with a password (schools.shopLocked) isn't publicly readable: its
+  // catalog comes from shopCatalog, and bookings carry the password, both
+  // checked on the server (functions/src/shop.ts). Kept for this tab only.
+  const [password, setPassword] = useState(() => { try { return sessionStorage.getItem('shop_pw') ?? '' } catch { return '' } })
+  const [unlocked, setUnlocked] = useState(false)
   const [pin, setPin] = useState('')
-  const [pinError, setPinError] = useState(false)
-  const [shopPassword, setShopPassword] = useState<string | null>(null)
+  const [pinError, setPinError] = useState('')
+  const [checkingPin, setCheckingPin] = useState(false)
+  const [locked, setLocked] = useState<boolean | null>(null)
   const [shopName, setShopName] = useState('Equipment Shop')
   const [passwordLoading, setPasswordLoading] = useState(true)
 
@@ -79,27 +85,46 @@ export default function PublicShopPage() {
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof CheckoutForm, string>>>({})
   const [submitError, setSubmitError] = useState('')
 
-  // ── Load school doc for password ───────────────────────────────────────────
+  // ── Load school doc: name, and whether it has a password ──────────────────
   useEffect(() => {
     getDoc(doc(db, 'schools', SCHOOL_ID)).then(snap => {
-      if (snap.exists()) {
-        const data = snap.data()
-        setShopPassword(data.shopPassword ?? null)
-        setShopName(data.name ?? 'Equipment Shop')
-      }
+      const data = snap.exists() ? snap.data() : {}
+      setLocked(data.shopLocked === true)
+      setShopName(data.name ?? 'Equipment Shop')
       setPasswordLoading(false)
     }).catch(() => {
+      setLocked(false)
       setPasswordLoading(false)
     })
   }, [])
 
   // ── Load equipment + categories ────────────────────────────────────────────
-  useEffect(() => {
-    if (!unlocked && shopPassword !== null) return // wait until unlocked
+  async function loadLocked(pw: string): Promise<boolean> {
+    try {
+      const r = await httpsCallable<{ password: string }, { equipment: EquipmentDoc[]; categories: EquipmentCategoryDoc[] }>(functions, 'shopCatalog')({ password: pw })
+      setEquipment(r.data.equipment)
+      setCategories([...r.data.categories].sort((a, b) => a.order - b.order))
+      setPassword(pw)
+      try { sessionStorage.setItem('shop_pw', pw) } catch { /* private mode */ }
+      setUnlocked(true)
+      return true
+    } catch (err: any) {
+      try { sessionStorage.removeItem('shop_pw') } catch { /* private mode */ }
+      setPinError(String(err?.code).endsWith('permission-denied') ? 'Wrong password' : (err?.message ?? 'Could not open the shop'))
+      return false
+    }
+  }
 
+  useEffect(() => {
+    if (locked === null) return
     async function load() {
       setLoading(true)
       try {
+        if (locked) {
+          // A password from earlier in this tab: try it once
+          if (password) await loadLocked(password)
+          return
+        }
         const [equipSnap, catSnap] = await Promise.all([
           getDocs(query(collection(db, 'equipment'), where('isActive', '==', true))),
           getDocs(collection(db, 'equipment_categories')),
@@ -111,18 +136,16 @@ export default function PublicShopPage() {
       }
     }
     load()
-  }, [unlocked, shopPassword])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locked])
 
-  // ── PIN check ──────────────────────────────────────────────────────────────
-  function checkPin() {
-    if (pin === shopPassword) {
-      sessionStorage.setItem('shop_unlocked', '1')
-      setUnlocked(true)
-      setPinError(false)
-    } else {
-      setPinError(true)
-      setPin('')
-    }
+  // ── Password check (on the server) ─────────────────────────────────────────
+  async function checkPin() {
+    if (!pin) return
+    setCheckingPin(true); setPinError('')
+    const ok = await loadLocked(pin)
+    setCheckingPin(false)
+    if (!ok) setPin('')
   }
 
   // ── Cart helpers ───────────────────────────────────────────────────────────
@@ -199,6 +222,7 @@ export default function PublicShopPage() {
         studentName: form.name.trim(),
         studentEmail: form.email.trim(),
         cohortId: '',
+        ...(locked ? { shopPassword: password } : {}),
       })
       setView('success')
       setCart([])
@@ -219,31 +243,33 @@ export default function PublicShopPage() {
     )
   }
 
-  // ── PIN gate ───────────────────────────────────────────────────────────────
-  if (shopPassword && !unlocked) {
+  // ── Password gate ──────────────────────────────────────────────────────────
+  if (locked && !unlocked) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-950">
-        <div className="bg-zinc-900 rounded-2xl border border-white/10 p-8 max-w-sm w-full text-center space-y-4">
-          <p className="text-4xl">🔒</p>
+      <div className="min-h-screen flex items-center justify-center bg-zinc-950 px-4">
+        <form onSubmit={e => { e.preventDefault(); checkPin() }} className="bg-zinc-900 rounded-2xl border border-white/10 p-8 max-w-sm w-full text-center space-y-4">
+          <p className="text-4xl" aria-hidden="true">🔒</p>
           <h1 className="text-xl font-bold text-white">{shopName}</h1>
-          <p className="text-zinc-400 text-sm">Enter the access code to browse equipment</p>
+          <p className="text-zinc-400 text-sm">Enter the password to browse equipment</p>
           <input
             type="password"
             value={pin}
-            onChange={e => { setPin(e.target.value); setPinError(false) }}
-            onKeyDown={e => e.key === 'Enter' && checkPin()}
-            placeholder="Access code"
-            className="w-full bg-white/10 rounded-xl px-4 py-3 text-white text-center text-2xl tracking-widest border border-white/10 focus:border-orange-500 outline-none transition-colors"
+            onChange={e => { setPin(e.target.value); setPinError('') }}
+            placeholder="Password"
+            aria-label="Shop password"
+            autoComplete="current-password"
+            className="w-full bg-white/10 rounded-xl px-4 py-3 text-white text-center text-lg border border-white/10 focus:border-orange-500 outline-none transition-colors"
             autoFocus
           />
-          {pinError && <p className="text-rose-400 text-sm">Incorrect access code</p>}
+          {pinError && <p role="alert" className="text-rose-400 text-sm">{pinError}</p>}
           <button
-            onClick={checkPin}
-            className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-xl transition-colors"
+            type="submit"
+            disabled={checkingPin || !pin}
+            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold py-3 rounded-xl transition-colors"
           >
-            Enter
+            {checkingPin ? 'Checking…' : 'Enter'}
           </button>
-        </div>
+        </form>
       </div>
     )
   }

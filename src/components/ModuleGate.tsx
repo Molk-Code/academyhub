@@ -21,9 +21,9 @@ export default function ModuleGate({ module, children, redirectTo = '/' }: Props
   return <>{children}</>
 }
 
-/** /shop: module-based schools need Rental & Inventory with the public shop switched on */
+/** /shop: module-based schools need Rental & Inventory with the public shop open */
 export function PublicShopGate({ children }: { children: React.ReactNode }) {
-  const { modules, productType, publicShop } = useSchool()
-  if (modules && !publicShopOpen({ modules, productType, publicShop })) return <Navigate to="/login" replace />
+  const { modules, productType, publicShop, publicShopOverride } = useSchool()
+  if (modules && !publicShopOpen({ modules, productType, publicShop, publicShopOverride })) return <Navigate to="/login" replace />
   return <>{children}</>
 }

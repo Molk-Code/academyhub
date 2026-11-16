@@ -29,8 +29,8 @@ type FormData = z.infer<typeof schema>
 export default function Login() {
   usePageMeta(`${LEGAL.appName} · Sign in`, `Sign in to ${LEGAL.appName}, the platform for film school classes, productions and equipment booking.`)
   const { signIn, user, role, loading } = useAuth()
-  const { shortName, modules, productType, publicShop } = useSchool()
-  const shopOpen = publicShopOpen({ modules, productType, publicShop })
+  const { shortName, modules, productType, publicShop, publicShopOverride } = useSchool()
+  const shopOpen = publicShopOpen({ modules, productType, publicShop, publicShopOverride })
   // Login page profile (public_config/main); without one, the built-in look
   const { config: profile, loading: profileLoading } = usePublicConfig()
   const displayName = profile?.shortName || profile?.name || shortName

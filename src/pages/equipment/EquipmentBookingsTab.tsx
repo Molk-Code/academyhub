@@ -256,7 +256,17 @@ export function BookingsTab() {
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: col, flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 120 }}>
                     <p style={{ fontWeight: 700, fontSize: '.9rem', color: '#f0f0f5', margin: 0 }}>{b.projectName}</p>
-                    <p style={{ fontSize: '.75rem', color: '#6a6a80', margin: '2px 0 0' }}>{b.studentName}</p>
+                    <p style={{ fontSize: '.75rem', color: '#6a6a80', margin: '2px 0 0' }}>
+                      {b.isGuest && <span style={{ fontSize: '.65rem', fontWeight: 700, color: '#38bdf8', border: '1px solid #38bdf850', borderRadius: 20, padding: '1px 7px', marginRight: 6 }}>Rental shop</span>}
+                      {b.isGuest ? b.guestName ?? b.studentName : b.studentName}
+                      {/* A shop guest has no account: their contact details */}
+                      {b.isGuest && (b.guestEmail || b.guestPhone) && (
+                        <span onClick={e => e.stopPropagation()}>
+                          {b.guestEmail && <> · <a href={`mailto:${b.guestEmail}`} style={{ color: '#8a8aab' }}>{b.guestEmail}</a></>}
+                          {b.guestPhone && <> · <a href={`tel:${b.guestPhone}`} style={{ color: '#8a8aab' }}>{b.guestPhone}</a></>}
+                        </span>
+                      )}
+                    </p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '.75rem', color: '#8a8aab' }}>
                     <Calendar size={12} />

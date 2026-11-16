@@ -54,7 +54,7 @@ if (mode === 'plan') {
   const plan = order.planChange?.plan
   try {
     if (!plan) throw new Error('No plan change on the order')
-    await changePlan(ctx, plan)
+    await changePlan(ctx, plan, order.planChange.shopOverride ?? null)
   } catch (err) {
     const message = (err instanceof Error ? err.message : String(err)).slice(0, 900)
     console.error(err)
@@ -62,7 +62,7 @@ if (mode === 'plan') {
     await event('plan_change_failed', { error: message.slice(0, 500) })
     process.exit(1)
   }
-  await ref.update({ plan, 'planChange.status': 'done', 'planChange.error': null, 'planChange.doneAt': FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() })
+  await ref.update({ plan, publicShopOverride: order.planChange.shopOverride ?? null, 'planChange.status': 'done', 'planChange.error': null, 'planChange.doneAt': FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() })
   await event('plan_changed', { to: plan.planName })
   process.exit(0)
 }

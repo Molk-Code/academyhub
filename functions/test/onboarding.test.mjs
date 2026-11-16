@@ -315,3 +315,21 @@ test('update all: live customers not on the latest release; the rest are reporte
   assert.deepEqual(r.skipped.map(x => x.name), ['Busy'])
   assert.equal((await order(old)).provisioning.release, 'releases/new.tgz')
 })
+
+test('plan change carries the shop override; it needs Rental & Inventory', async () => {
+  const id = await ob.createOrder(ob.validateOrderInput({ ...valid, startPolicy: 'immediately' }, { selfService: false }), { source: 'superadmin', by: boss })
+  await db.collection('customer_orders').doc(id).update({ status: 'live', 'provisioning.state.projectId': 'cf-nordic-ab12' })
+  await assert.rejects(ob.requestPlanChange(id, boss, { selection: { academy: 'starter' } }, 'on'), e => e.code === 'invalid-argument', 'no rental module')
+  await assert.rejects(ob.requestPlanChange(id, boss, { selection: { rentalInventory: 'starter' } }, 'sometimes'), e => e.code === 'invalid-argument')
+  const saved = { ...process.env }
+  try {
+    Object.assign(process.env, { PROVISIONING_MODE: 'simulate', FUNCTIONS_EMULATOR: 'true' })
+    await ob.requestPlanChange(id, boss, { selection: { rentalInventory: 'starter' } }, 'off')
+  } finally {
+    for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]
+    Object.assign(process.env, saved)
+  }
+  const o = await order(id)
+  assert.equal(o.publicShopOverride, 'off')
+  assert.equal(o.planChange.shopOverride, 'off')
+})

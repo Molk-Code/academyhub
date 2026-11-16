@@ -6,7 +6,8 @@ import { functions } from '@/lib/firebase'
 import { SCHOOL_ID } from '@/lib/school'
 import { useCollection, useDocument, orderBy } from '@/hooks/useFirestore'
 import { MODULE_INFO } from '@/config/modules'
-import { effectiveModules, publicShopOpen, tierFromModules, MODULE_FLAG, MODULE_IDS, type ModuleFlags } from '@/lib/features'
+import { effectiveModules, tierFromModules, MODULE_FLAG, MODULE_IDS, type ModuleFlags } from '@/lib/features'
+import ShopOverrideSelect, { type ShopOverride } from './ShopOverrideSelect'
 import type { PublicConfig, FrontDoor } from '@/lib/publicConfig'
 import type { SchoolDoc } from '@/types'
 import { format } from 'date-fns'
@@ -61,7 +62,7 @@ export default function SchoolModulesPanel({ school }: { school: SchoolDoc }) {
 
   // Start from what the school gets today, so an untouched save changes nothing
   const [modules, setModules]       = useState<ModuleFlags>(() => effectiveModules(school))
-  const [publicShop, setPublicShop] = useState(() => publicShopOpen(school))
+  const [shopOverride, setShopOverride] = useState<ShopOverride>(school.publicShopOverride ?? null)
   const [planName, setPlanName]     = useState(school.planName ?? '')
   const [maxStudents, setMaxStudents] = useState(school.maxStudents != null ? String(school.maxStudents) : '')
   const [maxAssets, setMaxAssets] = useState(school.maxAssets != null ? String(school.maxAssets) : '')
@@ -85,7 +86,7 @@ export default function SchoolModulesPanel({ school }: { school: SchoolDoc }) {
   const setProfileField = (k: keyof ProfileForm, v: string) => { setProfileTouched(true); setProfile(p => ({ ...p, [k]: v })) }
   const setModule = (flag: keyof ModuleFlags, on: boolean) => {
     setModules(m => ({ ...m, [flag]: on }))
-    if (flag === 'rentalInventory' && !on) setPublicShop(false)
+    if (flag === 'rentalInventory' && !on) setShopOverride(null)
   }
 
   const closestTier = tierFromModules(modules)
@@ -114,7 +115,7 @@ export default function SchoolModulesPanel({ school }: { school: SchoolDoc }) {
       await updateSchoolModules({
         schoolId: school.id,
         modules,
-        publicShop: modules.rentalInventory && publicShop,
+        publicShopOverride: modules.rentalInventory || shopOverride !== 'on' ? shopOverride : null,
         planName: planName.trim() || null,
         maxStudents: num(maxStudents),
         maxAssets: num(maxAssets),
@@ -158,12 +159,9 @@ export default function SchoolModulesPanel({ school }: { school: SchoolDoc }) {
             </div>
           )
         })}
-        <div className="flex items-start justify-between gap-3 pl-4 border-l border-white/10">
-          <div>
-            <p className="text-sm text-zinc-100">Public rental shop</p>
-            <p className="text-xs text-zinc-500">Signed-out visitors can browse equipment and send booking requests at /shop. Off by default.</p>
-          </div>
-          <Toggle on={modules.rentalInventory && publicShop} onChange={setPublicShop} disabled={!modules.rentalInventory} label="Public rental shop" />
+        <div className="pl-4 border-l border-white/10">
+          <ShopOverrideSelect value={modules.rentalInventory ? shopOverride : null} onChange={setShopOverride}
+            disabled={!modules.rentalInventory} adminOpen={school.publicShop === true} />
         </div>
         {warnings.length > 0 && (
           <ul className="space-y-1.5">

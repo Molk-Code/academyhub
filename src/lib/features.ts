@@ -164,13 +164,18 @@ export function deriveProductType(school: FeatureSource & { productType?: Produc
 }
 
 /**
- * Whether signed-out visitors may use the public rental shop (/shop).
- * Module-based schools: the publicShop flag, off unless switched on.
- * Legacy schools: exactly as before — open only in rental mode.
+ * Whether signed-out visitors may use the public rental shop (/shop); same as
+ * shopOpen in functions/src/shop.ts. Module-based schools, only with Rental &
+ * Inventory: the superadmin's override ('on'/'off') wins, else the school
+ * admin's publicShop. Legacy schools: exactly as before — open only in rental mode.
+ * A password (shopLocked) doesn't close it: visitors are asked for it.
  */
-export function publicShopOpen(school: FeatureSource & { productType?: ProductType | null; publicShop?: boolean | null }): boolean {
-  if (school.modules) return school.modules.rentalInventory === true && school.publicShop === true
-  return school.productType === 'rental'
+export function publicShopOpen(school: FeatureSource & { productType?: ProductType | null; publicShop?: boolean | null; publicShopOverride?: 'on' | 'off' | null }): boolean {
+  if (!school.modules) return school.productType === 'rental'
+  if (school.modules.rentalInventory !== true) return false
+  if (school.publicShopOverride === 'on') return true
+  if (school.publicShopOverride === 'off') return false
+  return school.publicShop === true
 }
 
 /** The legacy tier closest to a set of modules, for screens still reading `tier` (null: none matches) */

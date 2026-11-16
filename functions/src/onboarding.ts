@@ -522,17 +522,21 @@ export async function requestRemoval(orderId: string, by: Actor, confirmName: un
  * (MODE=plan, as the setup account) writes it there and then the order. Nothing
  * is deleted: over a lower limit, the school only can't add more.
  */
-export async function requestPlanChange(orderId: string, by: { email: string }, input: unknown) {
+export async function requestPlanChange(orderId: string, by: { email: string }, input: unknown, shopOverrideInput?: unknown) {
   const plan = validatePlanInput(input, { selfService: false })
+  // The superadmin's master switch for the public shop (functions/src/shop.ts)
+  const shopOverride = shopOverrideInput ?? null
+  if (shopOverride !== null && shopOverride !== 'on' && shopOverride !== 'off') throw new functions.https.HttpsError('invalid-argument', "The shop setting must be 'on', 'off' or none.")
+  if (shopOverride === 'on' && !plan.modules.rentalInventory) throw new functions.https.HttpsError('invalid-argument', 'The public shop needs Rental & Inventory.')
   const ref = orders().doc(orderId)
   await transition(orderId, by, 'plan_change_requested', o => {
     if (o.status !== 'live' || !o.provisioning?.state?.projectId) throw precondition('Only a live customer can change plan.')
     if (o.planChange?.status === 'running' || o.appUpdate?.status === 'running') throw precondition('A job is already running for this customer.')
-    return { planChange: { plan, status: 'running', error: null, buildId: null, logUrl: null, by: by.email, requestedAt: FieldValue.serverTimestamp() } }
-  }, { to: plan.planName })
+    return { planChange: { plan, shopOverride, status: 'running', error: null, buildId: null, logUrl: null, by: by.email, requestedAt: FieldValue.serverTimestamp() } }
+  }, { to: plan.planName, shop: shopOverride })
   await startLiveJob(orderId, 'planChange', 'plan', async () => {
     // No customer project in the emulator: only the order changes
-    await ref.update({ plan, 'planChange.status': 'done', 'planChange.doneAt': FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() })
+    await ref.update({ plan, publicShopOverride: shopOverride, 'planChange.status': 'done', 'planChange.doneAt': FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() })
     await newEvent(orderId).create({ at: FieldValue.serverTimestamp(), by: { system: 'setup' }, action: 'plan_changed', detail: { to: plan.planName } })
   })
 }
@@ -631,7 +635,7 @@ export const startCustomerOrder = superadminCall(async (d, by) => { await startO
 export const cancelCustomerOrder = superadminCall(async (d, by) => { await cancelOrder(orderIdOf(d), by); return { ok: true } })
 export const retryCustomerOrder = superadminCall(async (d, by) => { await retryOrder(orderIdOf(d), by); return { ok: true } })
 export const refreshCustomerOrder = superadminCall(async d => refreshOrder(orderIdOf(d)))
-export const changeCustomerPlan = superadminCall(async (d, by) => { await requestPlanChange(orderIdOf(d), by, d.plan); return { ok: true } })
+export const changeCustomerPlan = superadminCall(async (d, by) => { await requestPlanChange(orderIdOf(d), by, d.plan, d.publicShopOverride); return { ok: true } })
 export const updateCustomerApp = superadminCall(async (d, by) => { await requestAppUpdate(orderIdOf(d), by); return { ok: true } })
 export const updateAllCustomerApps = superadminCall(async (_d, by) => requestAppUpdateAll(by))
 export const removeCustomer = superadminCall(async (d, by) => { await requestRemoval(orderIdOf(d), by, d.confirmName); return { ok: true } })

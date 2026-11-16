@@ -7,6 +7,7 @@ import { MODULE_INFO } from '@/config/modules'
 import { MODULE_FLAG, MODULE_IDS } from '@/lib/features'
 import { format } from 'date-fns'
 import RemoveCustomerDialog from './RemoveCustomerDialog'
+import ShopOverrideSelect, { type ShopOverride } from './ShopOverrideSelect'
 import PlanPicker, { eur } from '@/pages/order/PlanPicker'
 import type { PlanSelection, Quote } from '@/config/pricing'
 import { Plus, X, ChevronDown, ChevronUp, Loader2, CheckCircle2, AlertCircle, Circle, CircleDot, XCircle } from 'lucide-react'
@@ -28,6 +29,8 @@ export interface Order {
   admin: { name: string; email: string }
   billing: { email: string; reference: string | null; address: string | null }
   plan: { planName: string | null; selection?: PlanSelection; modules: Record<string, boolean>; maxStudents: number | null; maxAssets?: number | null; storageQuotaGB: number | null; quote?: Quote }
+  /** The superadmin's override of the customer's public shop (set by the plan job) */
+  publicShopOverride?: 'on' | 'off' | null
   /** The latest plan change for a live customer (run by the plan job) */
   planChange?: { plan: { planName: string | null }; status: 'running' | 'done' | 'failed'; error: string | null; logUrl?: string | null }
   /** The latest update to the current release (run by the update job) */
@@ -225,7 +228,9 @@ function ChangePlanForm({ order, onClose }: { order: Order; onClose: () => void 
   const [maxStudents, setMaxStudents] = useState('')
   const [maxAssets, setMaxAssets] = useState('')
   const [storageGB, setStorageGB] = useState(order.plan.storageQuotaGB != null ? String(order.plan.storageQuotaGB) : '')
+  const [shopOverride, setShopOverride] = useState<ShopOverride>(order.publicShopOverride ?? null)
   const [busy, setBusy] = useState(false)
+  const rental = !!selection.rentalInventory
   const [error, setError] = useState('')
   const num = (v: string) => (v.trim() === '' ? null : Number(v))
 
@@ -233,7 +238,11 @@ function ChangePlanForm({ order, onClose }: { order: Order; onClose: () => void 
     e.preventDefault()
     setBusy(true); setError('')
     try {
-      await call('changeCustomerPlan', { orderId: order.id, plan: { selection, maxStudents: num(maxStudents), maxAssets: num(maxAssets), storageQuotaGB: num(storageGB) } })
+      await call('changeCustomerPlan', {
+        orderId: order.id,
+        plan: { selection, maxStudents: num(maxStudents), maxAssets: num(maxAssets), storageQuotaGB: num(storageGB) },
+        publicShopOverride: rental ? shopOverride : null,
+      })
       onClose()
     } catch (err: any) {
       setError(err?.message ?? 'Could not change the plan.')
@@ -244,7 +253,7 @@ function ChangePlanForm({ order, onClose }: { order: Order; onClose: () => void 
 
   return (
     <form onSubmit={save} className="rounded-xl border border-white/10 bg-zinc-950/40 p-4 space-y-3">
-      <p className="text-sm font-semibold text-zinc-200">Change plan</p>
+      <p className="text-sm font-semibold text-zinc-200">Change plan and shop</p>
       <PlanPicker compact showHidden value={selection} onChange={setSelection} />
       <div className="grid sm:grid-cols-3 gap-3">
         <label className="block space-y-1">
@@ -260,6 +269,7 @@ function ChangePlanForm({ order, onClose }: { order: Order; onClose: () => void 
           <input className="input w-full" type="number" min={0} value={storageGB} onChange={e => setStorageGB(e.target.value)} placeholder="No quota" />
         </label>
       </div>
+      <ShopOverrideSelect value={rental ? shopOverride : null} onChange={setShopOverride} disabled={!rental} />
       <p className="text-xs text-zinc-500">
         Takes effect in a minute or two. Nothing is deleted: a module turned off is hidden, and over a lower limit the school can&apos;t add more.
         The invoice isn&apos;t changed here.
@@ -319,6 +329,9 @@ function OrderDetails({ order }: { order: Order }) {
           <dt className="text-zinc-500">Invoice to</dt><dd>{order.billing.email}{order.billing.reference && ` · ref ${order.billing.reference}`}</dd>
           {order.billing.address && (<><dt className="text-zinc-500">Invoice address</dt><dd className="whitespace-pre-line">{order.billing.address}</dd></>)}
           <dt className="text-zinc-500">Plan</dt><dd>{order.plan.planName || modules}</dd>
+          {order.plan.modules.rentalInventory && (
+            <><dt className="text-zinc-500">Public shop</dt><dd>{order.publicShopOverride === 'on' ? 'Always open (your override)' : order.publicShopOverride === 'off' ? 'Always closed (your override)' : 'The school admin decides'}</dd></>
+          )}
           {order.plan.quote && (
             <><dt className="text-zinc-500">Price</dt><dd>{eur(order.plan.quote.monthly)}/month · {eur(order.plan.quote.annual)} per year, excl. VAT{order.plan.quote.discountRate > 0 && ` (${Math.round(order.plan.quote.discountRate * 100)}% bundle discount)`}</dd></>
           )}
@@ -363,7 +376,7 @@ function OrderDetails({ order }: { order: Order }) {
             </button>
           )}
           {order.status === 'live' && !changingPlan && (
-            <button type="button" className="btn-secondary py-2 px-3 text-sm" disabled={planRunning || updateRunning} onClick={() => setChangingPlan(true)}>Change plan…</button>
+            <button type="button" className="btn-secondary py-2 px-3 text-sm" disabled={planRunning || updateRunning} onClick={() => setChangingPlan(true)}>Change plan or shop…</button>
           )}
           {order.status === 'live' && (
             <button type="button" className="btn-secondary py-2 px-3 text-sm" disabled={!!busy || planRunning || updateRunning}

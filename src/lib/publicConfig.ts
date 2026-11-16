@@ -21,6 +21,8 @@ export interface PublicConfig {
   frontDoor?: FrontDoor
   /** Provider details; each one set here replaces the value in src/config/legal.ts */
   legal?: PublicLegal
+  /** The rental shop's own address (Rental Plus), e.g. rent.example.com: its front page is /shop */
+  shopDomain?: string
 }
 
 const CACHE_KEY = 'public_config_main'

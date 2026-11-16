@@ -24,8 +24,12 @@ interface SchoolConfig {
   productType: ProductType | null
   /** Absent on legacy schools — then tier decides */
   modules: ModuleFlags | null
-  /** Public rental shop for signed-out visitors (module-based schools) */
+  /** Public rental shop for signed-out visitors (module-based schools): the school admin's choice */
   publicShop: boolean | null
+  /** The superadmin's override of it: 'on'/'off' wins, null leaves it to the school admin */
+  publicShopOverride: 'on' | 'off' | null
+  /** The shop has a password (checked by the shop functions) */
+  shopLocked: boolean
   /** Plan per module; null: no plan limits or plan features apply (schools set up before plans) */
   planSelection: PlanSelection | null
   /** Limits as stored (null = unlimited); maxStudents above keeps its old default */
@@ -50,6 +54,8 @@ const defaultConfig: SchoolConfig = {
   productType: null,
   modules: null,
   publicShop: null,
+  publicShopOverride: null,
+  shopLocked: false,
   planSelection: null,
   limits: { assets: null, students: null },
   usage: null,

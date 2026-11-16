@@ -15,10 +15,12 @@ import { MaintenanceTab } from './EquipmentMaintenanceTab'
 import { ExportTab } from './EquipmentExportTab'
 import { usePlan } from '@/hooks/usePlan'
 import { useModuleGate } from '@/hooks/useModules'
+import { useSchool } from '@/contexts/SchoolContext'
+import PublicShopSettings, { useShopState } from './PublicShopSettings'
 import { PlanFeatureNote } from '@/components/admin/PlanNotices'
 import './molkom.css'
 
-type AdminTab = 'catalog' | 'bookings' | 'categories' | 'kits' | 'maintenance' | 'export'
+type AdminTab = 'catalog' | 'bookings' | 'categories' | 'kits' | 'maintenance' | 'export' | 'shop'
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
@@ -26,13 +28,15 @@ export default function AdminEquipmentPage() {
   // ?tab=bookings opens a tab directly (the admin dashboard links there)
   const [tab, setTab] = useState<AdminTab>(() => {
     const t = new URLSearchParams(window.location.search).get('tab')
-    return t === 'bookings' || t === 'categories' || t === 'kits' || t === 'maintenance' || t === 'export' ? t : 'catalog'
+    return t === 'bookings' || t === 'categories' || t === 'kits' || t === 'maintenance' || t === 'export' || t === 'shop' ? t : 'catalog'
   })
   const { data: bookings } = useCollection<EquipmentBookingDoc>('equipment_bookings')
   const { data: categoriesRaw, loading: catsLoading } = useCollection<EquipmentCategoryDoc>('equipment_categories')
   const { mine: responsibility } = useEquipmentResponsibility()
   const plan = usePlan()
   const hasProduction = useModuleGate('production')
+  const { modules } = useSchool()
+  const shop = useShopState()
   const pendingCount = useMemo(() => bookings.filter(b => myParts(b, responsibility).pending.length > 0).length, [bookings, responsibility])
 
   const categories = useMemo(() => {
@@ -82,6 +86,8 @@ export default function AdminEquipmentPage() {
     { id: 'kits',       label: 'Kits' },
     { id: 'maintenance', label: 'Maintenance' },
     { id: 'export',     label: 'Export' },
+    // Schools on modules: the admin opens and closes the public shop here
+    ...(modules ? [{ id: 'shop' as const, label: shop.open ? 'Public shop · open' : 'Public shop' }] : []),
   ]
 
   return (
@@ -153,6 +159,7 @@ export default function AdminEquipmentPage() {
         {tab === 'kits'        && (plan.has('kits') ? <KitsTab /> : <PlanFeatureNote feature="kits" />)}
         {tab === 'maintenance' && (plan.has('maintenance') ? <MaintenanceTab /> : <PlanFeatureNote feature="maintenance" />)}
         {tab === 'export'      && (plan.has('rentalExport') ? <ExportTab /> : <PlanFeatureNote feature="rentalExport" />)}
+        {tab === 'shop'        && modules && <PublicShopSettings />}
       </div>
     </div>
   )

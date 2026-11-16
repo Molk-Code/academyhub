@@ -1049,8 +1049,12 @@ export interface SchoolDoc {
   productType?: 'education' | 'rental'
   /** Sellable modules; absent on legacy schools (tier decides) */
   modules?: { rentalInventory: boolean; production: boolean; academy: boolean }
-  /** Public rental shop open to signed-out visitors (module-based schools; default off) */
+  /** Public rental shop open to signed-out visitors: the school admin's choice (module-based schools; default off) */
   publicShop?: boolean
+  /** The superadmin's override of the shop: 'on'/'off' wins over publicShop; absent leaves it to the school admin */
+  publicShopOverride?: 'on' | 'off'
+  /** The shop has a password (its hash is in shop_private/config, functions only) */
+  shopLocked?: boolean
   /** Plan name shown in the superadmin */
   planName?: string
   /** Plan per module, from the order (functions/src/pricing.ts). Absent: no plan limits or plan features apply */
@@ -1059,6 +1063,7 @@ export interface SchoolDoc {
   maxAssets?: number
   /** Counted by functions (usage.ts) for schools with a plan */
   usage?: { assets?: number; students?: number; countedAt?: Timestamp }
+  /** Old client-side shop password, no longer used (it was readable by anyone) */
   shopPassword?: string
 }
 

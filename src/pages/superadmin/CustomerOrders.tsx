@@ -459,16 +459,48 @@ export default function CustomerOrders() {
   const [showForm, setShowForm] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
   const [created, setCreated] = useState(false)
+  const [updating, setUpdating] = useState<'confirm' | 'busy' | null>(null)
+  const [updateResult, setUpdateResult] = useState<{ ok: boolean; text: string } | null>(null)
+  const liveCount = orders.filter(o => o.status === 'live').length
+
+  async function updateAll() {
+    setUpdating('busy'); setUpdateResult(null)
+    try {
+      const r = await call<{ started: string[]; upToDate: string[]; skipped: { name: string; reason: string }[] }>('updateAllCustomerApps', {})
+      const parts = [
+        r.started.length ? `Updating ${r.started.length}: ${r.started.join(', ')}.` : 'Nothing to update.',
+        r.upToDate.length ? `Already on the latest release: ${r.upToDate.join(', ')}.` : '',
+        ...r.skipped.map(x => `${x.name} skipped: ${x.reason}`),
+      ]
+      setUpdateResult({ ok: !r.skipped.length, text: parts.filter(Boolean).join(' ') })
+    } catch (err: any) {
+      setUpdateResult({ ok: false, text: err?.message ?? 'Could not start the updates.' })
+    } finally {
+      setUpdating(null)
+    }
+  }
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-zinc-100">Customers</h2>
           <p className="text-xs text-zinc-500">New customers are orders: paid by invoice, then set up on their own address.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link to="/order" className="text-sm text-zinc-400 hover:text-zinc-200">Order page (preview)</Link>
+          {liveCount > 0 && (updating === 'confirm' ? (
+            <>
+              <button type="button" className="btn-primary py-2 px-3 text-sm" onClick={updateAll}>Yes, update {liveCount === 1 ? 'the live customer' : `all ${liveCount} live customers`}</button>
+              <button type="button" className="btn-secondary py-2 px-3 text-sm" onClick={() => setUpdating(null)}>Cancel</button>
+            </>
+          ) : (
+            <button type="button" className="btn-secondary py-2 px-3 text-sm" disabled={updating === 'busy'}
+              title="Every live customer not on the latest published release gets its rules, functions and app updated. Data is untouched."
+              onClick={() => setUpdating('confirm')}>
+              {updating === 'busy' && <Loader2 className="w-4 h-4 animate-spin" />} Update all
+            </button>
+          ))}
           {created && <span className="text-sm text-emerald-400 flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> Order created</span>}
           <button type="button" onClick={() => setShowForm(s => !s)} className="flex items-center gap-2 btn bg-brand-600 text-white hover:bg-brand-500 py-2 text-sm">
             {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />} {showForm ? 'Cancel' : 'New customer'}
@@ -476,6 +508,11 @@ export default function CustomerOrders() {
         </div>
       </div>
 
+      {updateResult && (
+        <p role="status" className={`text-sm flex items-start gap-1.5 ${updateResult.ok ? 'text-emerald-400' : 'text-amber-300'}`}>
+          {updateResult.ok ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /> : <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />} {updateResult.text}
+        </p>
+      )}
       {showForm && <NewCustomerForm onDone={() => { setShowForm(false); setCreated(true); setTimeout(() => setCreated(false), 4000) }} />}
 
       <div className="bg-zinc-900 border border-white/10 rounded-2xl divide-y divide-white/8">

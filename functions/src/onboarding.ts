@@ -556,6 +556,30 @@ export async function requestAppUpdate(orderId: string, by: { email: string }) {
   })
 }
 
+/**
+ * Update app for every live customer not on the latest release yet. Each one
+ * is its own job (they run side by side); one that can't start is reported
+ * and the rest go ahead.
+ */
+export async function requestAppUpdateAll(by: { email: string }) {
+  const release = (await db.collection('platform').doc('release').get()).data() as { object?: string } | undefined
+  if (!release?.object) throw precondition('No release published yet: run scripts/publish-release.mjs.')
+  const live = await orders().where('status', '==', 'live').get()
+  const result = { started: [] as string[], upToDate: [] as string[], skipped: [] as { name: string; reason: string }[] }
+  for (const d of live.docs) {
+    const o = d.data()
+    const name = String(o.school?.name ?? d.id)
+    if (o.provisioning?.release === release.object) { result.upToDate.push(name); continue }
+    try {
+      await requestAppUpdate(d.id, by)
+      result.started.push(name)
+    } catch (err) {
+      result.skipped.push({ name, reason: err instanceof Error ? err.message : String(err) })
+    }
+  }
+  return result
+}
+
 /** Submits a job for a live customer (or simulates it in the emulator); a failure to start lands on that job's field */
 async function startLiveJob(orderId: string, field: 'planChange' | 'appUpdate', mode: 'plan' | 'update', simulate: () => Promise<void>) {
   const ref = orders().doc(orderId)
@@ -609,6 +633,7 @@ export const retryCustomerOrder = superadminCall(async (d, by) => { await retryO
 export const refreshCustomerOrder = superadminCall(async d => refreshOrder(orderIdOf(d)))
 export const changeCustomerPlan = superadminCall(async (d, by) => { await requestPlanChange(orderIdOf(d), by, d.plan); return { ok: true } })
 export const updateCustomerApp = superadminCall(async (d, by) => { await requestAppUpdate(orderIdOf(d), by); return { ok: true } })
+export const updateAllCustomerApps = superadminCall(async (_d, by) => requestAppUpdateAll(by))
 export const removeCustomer = superadminCall(async (d, by) => { await requestRemoval(orderIdOf(d), by, d.confirmName); return { ok: true } })
 
 /** Whether a short name can be used; superadmin form checks as you type */

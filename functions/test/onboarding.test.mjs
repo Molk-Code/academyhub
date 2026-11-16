@@ -287,3 +287,31 @@ test('update: only for a live customer, one job at a time; MODE=update installs 
   assert.ok(req.steps[0].env.includes('MODE=update'))
   assert.match(req.steps[0].args[1], /npm --prefix functions ci/)
 })
+
+test('update all: live customers not on the latest release; the rest are reported', async () => {
+  const make = async (name, patch) => {
+    const id = await ob.createOrder(ob.validateOrderInput({ ...valid, school: { name, shortName: name.toLowerCase() }, startPolicy: 'immediately' }, { selfService: false }), { source: 'superadmin', by: boss })
+    await db.collection('customer_orders').doc(id).update(patch)
+    return id
+  }
+  await assert.rejects(ob.requestAppUpdateAll(boss), e => e.code === 'failed-precondition', 'no release')
+  await db.collection('platform').doc('release').set({ bucket: 'b', object: 'releases/new.tgz' })
+  const old = await make('Oldie', { status: 'live', 'provisioning.state.projectId': 'cf-oldie-1234', 'provisioning.release': 'releases/old.tgz' })
+  await make('Fresh', { status: 'live', 'provisioning.state.projectId': 'cf-fresh-1234', 'provisioning.release': 'releases/new.tgz' })
+  await make('Busy', { status: 'live', 'provisioning.state.projectId': 'cf-busy-1234', 'planChange.status': 'running' })
+  await make('Waiting', { status: 'awaiting_payment' })
+
+  const saved = { ...process.env }
+  let r
+  try {
+    Object.assign(process.env, { PROVISIONING_MODE: 'simulate', FUNCTIONS_EMULATOR: 'true' })
+    r = await ob.requestAppUpdateAll(boss)
+  } finally {
+    for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]
+    Object.assign(process.env, saved)
+  }
+  assert.deepEqual(r.started, ['Oldie'])
+  assert.deepEqual(r.upToDate, ['Fresh'])
+  assert.deepEqual(r.skipped.map(x => x.name), ['Busy'])
+  assert.equal((await order(old)).provisioning.release, 'releases/new.tgz')
+})

@@ -190,7 +190,7 @@ test("rules: a school admin can't change the plan, limits, usage or modules", as
 test('superadmin input: a plan for every module that is on; omitted fields unchanged; audited', async () => {
   process.env.SUPERADMIN_EMAILS ||= 'boss@example.test'
   const { validateModulesInput, applySchoolUpdate } = await import('../lib/school-admin.js')
-  const base = { modules: { academy: true, production: false, rentalInventory: true }, publicShop: false, planName: null, maxStudents: 30, storageQuotaGB: null }
+  const base = { modules: { academy: true, production: false, rentalInventory: true }, publicShopOverride: null, planName: null, maxStudents: 30, storageQuotaGB: null }
   assert.throws(() => validateModulesInput({ ...base, planSelection: { academy: 'starter' } }), /every module that is on/)
   assert.throws(() => validateModulesInput({ ...base, planSelection: { academy: 'gold', rentalInventory: 'starter' } }), /Unknown plan/)
   const v = validateModulesInput({ ...base, maxAssets: 60, planSelection: { academy: 'starter', rentalInventory: 'standard', production: 'plus' } })

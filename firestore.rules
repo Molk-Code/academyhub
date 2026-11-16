@@ -112,14 +112,19 @@ service cloud.firestore {
       return modules == null || modules.get(flag, false) == true;
     }
 
-    // Public rental shop (/shop) for signed-out visitors. Legacy schools: open
-    // exactly when it was (rental mode). Module-based schools: the publicShop
-    // flag — off unless switched on — and only with Rental & Inventory.
+    // Public rental shop (/shop) for signed-out visitors (functions/src/shop.ts).
+    // Legacy schools: open exactly when it was (rental mode). Module-based
+    // schools, only with Rental & Inventory: the superadmin's override
+    // (publicShopOverride 'on'/'off') wins, else the school admin's publicShop.
+    // A shop with a password (shopLocked) isn't readable here at all: its
+    // catalog comes from shopCatalog, which checks the password.
     function publicShopOpen() {
       let school = schoolDoc();
-      return school.get('modules', null) == null
+      let override = school.get('publicShopOverride', null);
+      return school.get('shopLocked', false) != true && (school.get('modules', null) == null
         ? school.get('productType', null) == 'rental'
-        : school.get('publicShop', false) == true && school.modules.get('rentalInventory', false) == true;
+        : school.modules.get('rentalInventory', false) == true
+          && (override == 'on' || (override != 'off' && school.get('publicShop', false) == true)));
     }
 
     // settings/{docId} also matches the module-owned settings documents —
@@ -997,10 +1002,12 @@ service cloud.firestore {
         && request.resource.data.schoolId == schoolId
         && !exists(/databases/$(database)/documents/schools/$(schoolId));
       // School admins can't change the plan, its limits, the counted usage or
-      // the modules: those come from the order and the superadmin (functions)
+      // the modules: those come from the order and the superadmin (functions).
+      // The shop's open/closed and password go through setShopSettings.
       allow update: if isSignedIn() && (isSuperAdmin() || (isAdmin()
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'planSelection', 'maxAssets', 'maxStudents', 'usage', 'modules', 'publicShop', 'planName', 'storageQuotaGB'])));
+          'planSelection', 'maxAssets', 'maxStudents', 'usage', 'modules', 'publicShop', 'planName', 'storageQuotaGB',
+          'publicShopOverride', 'shopLocked', 'shopPassword'])));
       allow delete: if false;
     }
 
@@ -1044,6 +1051,11 @@ service cloud.firestore {
     }
 
     // ── Login page profile (public, read before sign-in) ─────────────────────
+
+    // The shop password's hash: functions only (functions/src/shop.ts)
+    match /shop_private/{docId} {
+      allow read, write: if false;
+    }
 
     match /public_config/{docId} {
       allow read: if true;

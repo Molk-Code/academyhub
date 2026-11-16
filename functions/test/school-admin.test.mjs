@@ -14,7 +14,7 @@ const { validateModulesInput, applySchoolUpdate, requireSuperAdmin, validateLogo
 
 const valid = {
   modules: { academy: true, production: false, rentalInventory: true },
-  publicShop: true, planName: 'Academy + Rental', maxStudents: 250, storageQuotaGB: 50,
+  publicShopOverride: 'on', planName: 'Academy + Rental', maxStudents: 250, storageQuotaGB: 50,
   profile: { name: 'Nordic Film Academy', primaryColor: '#0ea5e9', frontDoor: 'academy', tagline: 'Film education' },
 }
 const ctx = (email, verified = true) => ({ auth: { uid: 'u1', token: { email, email_verified: verified } } })
@@ -44,7 +44,8 @@ test('input is validated strictly', () => {
   bad({ modules: { academy: true, production: false } })
   bad({ modules: { academy: 'yes', production: false, rentalInventory: true } })
   bad({ modules: { academy: true, production: false, rentalInventory: true, billing: true } })
-  bad({ modules: { academy: true, production: false, rentalInventory: false }, publicShop: true })
+  bad({ modules: { academy: true, production: false, rentalInventory: false }, publicShopOverride: 'on' })
+  bad({ publicShopOverride: 'maybe' })
   bad({ planName: 'p'.repeat(61) })
   bad({ maxStudents: -1 })
   bad({ maxStudents: 2.5 })
@@ -64,7 +65,8 @@ test('a save writes the school, the login profile and an audit entry with before
 
   const school = (await db.collection('schools').doc('molkom').get()).data()
   assert.deepEqual(school.modules, valid.modules)
-  assert.equal(school.publicShop, true)
+  assert.equal(school.publicShopOverride, 'on')
+  assert.equal(school.publicShop, undefined, "the school admin's own choice isn't touched")
   assert.equal(school.planName, 'Academy + Rental')
   assert.equal(school.maxStudents, 250)
   assert.equal(school.storageQuotaGB, 50)

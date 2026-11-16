@@ -1,6 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore'
 import { functions, db, LIMITS, REGION, SCHOOL_ID, allow } from './lib'
 import { hashIp, clientIp } from './contact'
+import { requireShopAccess } from './shop'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Equipment availability per date, enforced on the server.
@@ -156,9 +157,6 @@ function equipmentFeatureOn(s: FirebaseFirestore.DocumentData) {
   const tier = s.tier ?? null
   return tier == null || tier === 'studio'
 }
-function shopOpen(s: FirebaseFirestore.DocumentData) {
-  return s.modules == null ? s.productType === 'rental' : s.publicShop === true && s.modules?.rentalInventory === true
-}
 
 const bad = (msg: string) => new functions.https.HttpsError('invalid-argument', msg)
 
@@ -181,7 +179,7 @@ export async function availabilityFor(from: Day, to: Day, equipmentIds?: string[
 export const equipmentAvailability = functions.region(REGION).runWith({ ...LIMITS, maxInstances: 5 }).https.onCall(async (data, context) => {
   const s = await schoolDoc()
   if (!rentalOn(s)) throw new functions.https.HttpsError('failed-precondition', 'Equipment booking is not on for this school.')
-  if (!context.auth && !shopOpen(s)) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  if (!context.auth) await requireShopAccess(s, (data as Record<string, unknown> | null)?.shopPassword, clientIp(context.rawRequest as never))
   const who = context.auth?.uid ?? `ip_${await hashIp(clientIp(context.rawRequest as never))}`
   if (!(await allow(who, 'availability', 30))) throw new functions.https.HttpsError('resource-exhausted', 'Too many requests. Wait a minute and try again.')
   const d = (data ?? {}) as Record<string, unknown>
@@ -257,8 +255,8 @@ export const createEquipmentBooking = functions.region(REGION).runWith({ ...LIMI
     return { bookingId: id }
   }
 
-  // Signed-out guest in the public rental shop
-  if (!shopOpen(s)) throw new functions.https.HttpsError('unauthenticated', 'Sign in required.')
+  // Signed-out guest in the public rental shop (with its password, when it has one)
+  await requireShopAccess(s, d.shopPassword, clientIp(context.rawRequest as never))
   const guestEmail = typeof d.guestEmail === 'string' ? d.guestEmail.trim() : ''
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(guestEmail)) throw bad('A valid email address is required.')
   const ipHash = await hashIp(clientIp(context.rawRequest as never))

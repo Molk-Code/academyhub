@@ -66,7 +66,8 @@ export interface ModulesInput {
   /** Defaults to this deployment's school */
   schoolId: string
   modules: { academy: boolean; production: boolean; rentalInventory: boolean }
-  publicShop: boolean
+  /** Superadmin override of the public shop: 'on'/'off' wins over the school admin, null leaves it to them */
+  publicShopOverride: 'on' | 'off' | null
   planName: string | null
   maxStudents: number | null
   /** Asset limit (Rental & Inventory). Omitted: unchanged */
@@ -88,9 +89,9 @@ export function validateModulesInput(data: unknown): ModulesInput {
     if (typeof m[k] !== 'boolean') throw bad(`modules.${k} must be true or false.`)
   }
   if (Object.keys(m).some(k => !['academy', 'production', 'rentalInventory'].includes(k))) throw bad('Unknown module.')
-  const publicShop = d.publicShop ?? false
-  if (typeof publicShop !== 'boolean') throw bad('publicShop must be true or false.')
-  if (publicShop && !m.rentalInventory) throw bad('The public shop needs Rental & Inventory.')
+  const publicShopOverride = d.publicShopOverride ?? null
+  if (publicShopOverride !== null && publicShopOverride !== 'on' && publicShopOverride !== 'off') throw bad("publicShopOverride must be 'on', 'off' or null.")
+  if (publicShopOverride === 'on' && !m.rentalInventory) throw bad('The public shop needs Rental & Inventory.')
 
   const planName = d.planName === undefined || d.planName === null || d.planName === '' ? null : d.planName
   if (planName !== null && (typeof planName !== 'string' || planName.trim().length > 60)) throw bad('Plan name: up to 60 characters.')
@@ -144,7 +145,7 @@ export function validateModulesInput(data: unknown): ModulesInput {
   return {
     schoolId,
     modules: { academy: m.academy, production: m.production, rentalInventory: m.rentalInventory },
-    publicShop,
+    publicShopOverride,
     planName: planName === null ? null : planName.trim(),
     maxStudents: intOrNull(d.maxStudents, 'Student limit', 100_000),
     ...(d.maxAssets !== undefined ? { maxAssets: intOrNull(d.maxAssets, 'Asset limit', 1_000_000) } : {}),
@@ -154,7 +155,7 @@ export function validateModulesInput(data: unknown): ModulesInput {
   }
 }
 
-const SCHOOL_FIELDS = ['modules', 'publicShop', 'planName', 'planSelection', 'maxStudents', 'maxAssets', 'storageQuotaGB'] as const
+const SCHOOL_FIELDS = ['modules', 'publicShopOverride', 'planName', 'planSelection', 'maxStudents', 'maxAssets', 'storageQuotaGB'] as const
 const pick = (o: Record<string, unknown> | undefined, keys: readonly string[]) =>
   Object.fromEntries(keys.map(k => [k, o?.[k] ?? null]))
 
@@ -172,7 +173,7 @@ export async function applySchoolUpdate(input: ModulesInput, actor: { uid: strin
     const profileKeys = input.profile ? Object.keys(input.profile) : []
     const before = { school: pick(school.data(), SCHOOL_FIELDS), profile: pick(profile.data(), profileKeys) }
 
-    const schoolUpdate: Record<string, unknown> = { modules: input.modules, publicShop: input.publicShop }
+    const schoolUpdate: Record<string, unknown> = { modules: input.modules, publicShopOverride: input.publicShopOverride ?? FieldValue.delete() }
     for (const k of ['planName', 'maxStudents', 'storageQuotaGB', 'maxAssets', 'planSelection'] as const) {
       if (input[k] !== undefined) schoolUpdate[k] = input[k] === null ? FieldValue.delete() : input[k]
     }
@@ -183,7 +184,7 @@ export async function applySchoolUpdate(input: ModulesInput, actor: { uid: strin
     if (profileKeys.length) tx.set(profileRef, profileUpdate, { merge: true })
 
     const after = {
-      school: { ...pick(school.data(), SCHOOL_FIELDS), modules: input.modules, publicShop: input.publicShop,
+      school: { ...pick(school.data(), SCHOOL_FIELDS), modules: input.modules, publicShopOverride: input.publicShopOverride,
         planName: input.planName, maxStudents: input.maxStudents, storageQuotaGB: input.storageQuotaGB,
         ...(input.maxAssets !== undefined ? { maxAssets: input.maxAssets } : {}),
         ...(input.planSelection !== undefined ? { planSelection: input.planSelection } : {}) },

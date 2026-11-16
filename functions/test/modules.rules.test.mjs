@@ -195,6 +195,31 @@ test('public shop: module-based schools are closed until publicShop is switched 
   assert.deepEqual(Object.values(await shopRequests()), [403, 403, 403], 'flag without Rental & Inventory: closed')
 })
 
+test('public shop: the superadmin override wins over the school admin; a password closes public reads', async () => {
+  const rentalOnly = modules(false, false, true)
+  const open = { categories: 200, equipment: 200, guestBooking: 403 }
+  await seed({ ...rentalOnly, publicShop: { booleanValue: true }, publicShopOverride: str('off') })
+  assert.deepEqual(Object.values(await shopRequests()), [403, 403, 403], 'admin open, superadmin off: closed')
+  await seed({ ...rentalOnly, publicShop: { booleanValue: false }, publicShopOverride: str('on') })
+  assert.deepEqual(await shopRequests(), open, 'admin closed, superadmin on: open')
+  await seed({ ...rentalOnly, publicShop: { booleanValue: true }, shopLocked: { booleanValue: true } })
+  assert.deepEqual(Object.values(await shopRequests()), [403, 403, 403], 'password: no public reads (the function serves it)')
+  await seed({ ...modules(true, true, false), publicShopOverride: str('on') })
+  assert.deepEqual(Object.values(await shopRequests()), [403, 403, 403], 'override without Rental & Inventory: closed')
+})
+
+test('public shop: school admins change it only through the function; the password hash is never readable', async () => {
+  await seed(modules(false, false, true))
+  for (const field of ['publicShop', 'publicShopOverride', 'shopLocked']) {
+    const value = field === 'publicShopOverride' ? str('on') : { booleanValue: true }
+    assert.equal(await call('PATCH', `${DOCS}/schools/molkom?updateMask.fieldPaths=${field}`, WHO.admin, { fields: { [field]: value } }), 403, `admin writes ${field}`)
+  }
+  await owner('PATCH', 'shop_private/config', { fields: { hash: str('x'), salt: str('y') } })
+  for (const who of [WHO.admin, null]) {
+    assert.equal(await call('GET', `${DOCS}/shop_private/config`, who), 403, 'hash read')
+  }
+})
+
 test('school_audit: readable only by the superadmin, writable by nobody', async () => {
   await seed(LEGACY)
   await owner('PATCH', 'school_audit/a1', { fields: { schoolId: str('molkom') } })

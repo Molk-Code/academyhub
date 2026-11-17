@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { startCameraScan, savedScanKind, saveScanKind, type ScanKind } from '@/lib/cameraScanner'
 import { ScanKindToggle, BarcodeGuide } from './ScanKindToggle'
 import { Scan, Check, X, Wifi, WifiOff, LogIn, AlertTriangle } from 'lucide-react'
-import { parseScanText, checkoutScan, matchCheckinScan } from './inventoryShared'
+import { parseScanText, scannedUnit, checkoutScan, matchCheckinScan } from './inventoryShared'
 import { ScanFlash, useScanFlash } from './ScanFeedback'
 
 const COOLDOWN_MS = 2500 // ms to block re-scan after a successful scan
@@ -61,6 +61,8 @@ export default function ScanPage() {
   const cooldownRef = useRef(false)          // fast ref to block scans during cooldown
   const sessionRef = useRef<ScanSession | null>(null)
   const equipmentCacheRef = useRef<Record<string, string>>({})
+  // What scannedUnit needs per item: whether its plain label is unit #1
+  const unitLabelRef = useRef<Record<string, { plainLabelIsUnit1?: boolean; totalQuantity?: number }>>({})
   const gtinCacheRef = useRef<Record<number, string>>({})   // EAN-14 equipment number → id
   const imageCacheRef = useRef<Record<string, string>>({})  // equipment id → image
   // The project's items, so scans can fill booked rows and refuse bad check-ins here
@@ -112,6 +114,7 @@ export default function ScanPage() {
     getDocs(collection(db, 'equipment')).then(snap => {
       snap.docs.forEach(d => {
         equipmentCacheRef.current[d.id] = (d.data() as any).name ?? d.id
+        unitLabelRef.current[d.id] = { plainLabelIsUnit1: (d.data() as any).plainLabelIsUnit1, totalQuantity: (d.data() as any).totalQuantity }
         const gtinNo = (d.data() as any).gtinNo
         if (gtinNo) gtinCacheRef.current[gtinNo] = d.id
         const imageUrl = (d.data() as any).imageUrl
@@ -153,8 +156,9 @@ export default function ScanPage() {
     // Individual-unit codes carry a unit number (see parseScanText) so a scan
     // can be traced back to a specific physical unit.
     const parsed = parseScanText(text)
-    const unit = parsed.unit
     const base = (parsed.gtinNo && gtinCacheRef.current[parsed.gtinNo]) || parsed.base
+    // A first label without a number can be unit #1 (see scannedUnit)
+    const unit = scannedUnit(unitLabelRef.current[base], parsed.unit)
     const baseName = equipmentCacheRef.current[base] ?? base
     const equipmentName = unit ? `${baseName} #${unit}` : baseName
     const equipmentId = equipmentCacheRef.current[base] ? base : ''

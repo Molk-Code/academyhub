@@ -32,6 +32,14 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
   const { data: catalog } = useCollection<EquipmentDoc>('equipment')
   const catalogById = useMemo(() => new Map(catalog.map(e => [e.id, e])), [catalog])
   const [accessorySearch, setAccessorySearch] = useState('')
+  // Whether the label without a unit number is unit #1 (see scannedUnit). Until
+  // the admin chooses: yes for an item that was a single item (its one label
+  // becomes #1 when copies are added), no for one created with several copies
+  // (a label without a number stays shared by all of them)
+  const [unit1Choice, setUnit1Choice] = useState<boolean | null>(null)
+  const defaultUnit1 = (quantity: number) => existing
+    ? existing.plainLabelIsUnit1 ?? existing.totalQuantity <= 1
+    : quantity <= 1
 
   const [form, setForm] = useState<FormState>(() => existing ? {
     name: existing.name, category: existing.category,
@@ -93,6 +101,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
     if (!form.name.trim()) { setError('Name is required'); return }
     setSaving(true); setError('')
     const totalQuantity = parseInt(form.totalQuantity) || 1
+    const plainLabelIsUnit1 = unit1Choice ?? defaultUnit1(totalQuantity)
     // "Available" isn't hand-entered — it's the total minus whatever's currently
     // checked out or missing. On create, nothing is out yet, so all units are
     // available. On edit, preserve however many are currently out and just apply
@@ -114,7 +123,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
       allowedCohortIds: form.allowedCohortIds,
       requiresProduction: form.requiresProduction,
       filmYear2Only: false,
-      isActive: form.isActive, updatedAt: serverTimestamp(),
+      isActive: form.isActive, plainLabelIsUnit1, updatedAt: serverTimestamp(),
     }
     try {
       if (existing) await updateDoc(doc(db, 'equipment', existing.id), payload)
@@ -182,6 +191,13 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
             <div>
               <label style={lbl}>Total Quantity</label>
               <input style={inp} type="number" min={1} value={form.totalQuantity} onChange={e => set('totalQuantity', e.target.value)} />
+              {(parseInt(form.totalQuantity) || 1) > 1 && (
+                <label style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginTop: 6, fontSize: '.72rem', color: '#8a8aab', cursor: 'pointer' }}>
+                  <input type="checkbox" style={{ marginTop: 2 }} checked={unit1Choice ?? defaultUnit1(parseInt(form.totalQuantity) || 1)}
+                    onChange={e => setUnit1Choice(e.target.checked)} />
+                  <span>The label without a number is <b style={{ color: '#c0c0d5' }}>#1</b> (the one printed while there was one). Untick if it&apos;s a shared label for all copies.</span>
+                </label>
+              )}
             </div>
             <div>
               <label style={lbl}>Storage Location</label>

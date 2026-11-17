@@ -14,7 +14,7 @@ import { startCameraScan, savedScanKind, saveScanKind, type ScanKind } from '@/l
 import { ScanKindToggle, BarcodeGuide } from './ScanKindToggle'
 import { QRCodeSVG } from 'qrcode.react'
 import { buildEquipmentContractHtml } from '@/lib/equipmentContract'
-import { isOverdue, formatDate, overdueDays, parseScanText, beep, itemDisplayName, checkoutScan, matchCheckinScan } from './inventoryShared'
+import { isOverdue, formatDate, overdueDays, parseScanText, scannedUnit, beep, itemDisplayName, checkoutScan, matchCheckinScan } from './inventoryShared'
 import { EquipmentPicker } from './EquipmentPicker'
 import { ContractSignatures } from './ContractSignatures'
 import { ScanFlash, useScanFlash, NotInProjectModal, type NotInProjectData } from './ScanFeedback'
@@ -297,12 +297,14 @@ export function ProjectDetail({
     const time = new Date().toLocaleTimeString()
     const log = (name: string, note: string, warn = false) =>
       setScanEntries(prev => [{ name, time, note, warn }, ...prev.slice(0, 19)])
-    const { base, unit, gtinNo } = parseScanText(text)
+    const { base, unit: codeUnit, gtinNo } = parseScanText(text)
     const lower = base.toLowerCase()
     const matchedEquip = (gtinNo ? equipmentAll.find(e => e.gtinNo === gtinNo) : undefined)
       ?? equipmentAll.find(e => e.id === base || e.qrCode === base || e.name === base)
       // Caps Lock flips the case of everything a scanner types
       ?? equipmentAll.find(e => e.id.toLowerCase() === lower || (e.qrCode ?? '').toLowerCase() === lower)
+    // A first label without a number can be unit #1 (see scannedUnit)
+    const unit = scannedUnit(matchedEquip, codeUnit)
     const displayName = matchedEquip
       ? (unit ? `${matchedEquip.name} #${unit}` : matchedEquip.name)
       : text

@@ -81,6 +81,17 @@ export function parseScanText(raw: string): { base: string; unit: number | null;
   return { base: text, unit: null }
 }
 
+/**
+ * The unit a scan refers to. An item that started as a single item has a
+ * label without a unit number; once more copies are added that label is #1
+ * (plainLabelIsUnit1), so it never has to be reprinted. Other items' plain
+ * labels stay shared: a scan means "one of them" (no unit).
+ */
+export function scannedUnit(equip: { plainLabelIsUnit1?: boolean; totalQuantity?: number } | null | undefined, unit: number | null): number | null {
+  if (unit != null) return unit
+  return equip?.plainLabelIsUnit1 && (equip.totalQuantity ?? 0) > 1 ? 1 : null
+}
+
 // ── Matching scans against a project's item rows ─────────────────────────────
 // Items imported from a booking arrive as generic "pending" rows — "2x Godox
 // TL60 Kit 2-kit" becomes two rows of that name. A checkout scan of a unit

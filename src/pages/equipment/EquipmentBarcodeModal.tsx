@@ -246,6 +246,13 @@ export function BarcodeModal({ item, onClose }: { item: EquipmentDoc; onClose: (
           </div>
         )}
 
+        {hasMultiple && item.plainLabelIsUnit1 && (mode === 'shared' || unit === 1) && (
+          <p style={{ fontSize: '.72rem', color: '#8a8aab', marginBottom: '.75rem' }}>
+            {mode === 'shared'
+              ? 'For this item, the label without a number counts as #1.'
+              : "#1 doesn't need a new label: the one printed while there was a single item counts as #1."}
+          </p>
+        )}
         <p style={{ fontWeight: 600, fontSize: '.9rem', color: '#f0f0f5', marginBottom: '.75rem' }}>{label}</p>
         <div ref={ref} style={{ background: '#fff', borderRadius: 10, padding: 8, marginBottom: '1rem', overflowX: 'auto' }}>
           {spec

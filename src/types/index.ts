@@ -407,6 +407,7 @@ export interface EquipmentDoc {
   imageUrls?: string[]          // every image in display order; absent on older items
   qrCode: string
   gtinNo?: number               // equipment number inside its EAN-14 code (assigned on first EAN-14 label)
+  plainLabelIsUnit1?: boolean   // the item's label without a unit number (from when it was a single item) is unit #1
   included: string[]
   linkUrl?: string              // product page elsewhere on the web, opened in a new tab
   accessoryIds?: string[]       // catalog items suggested when this one is added to the cart

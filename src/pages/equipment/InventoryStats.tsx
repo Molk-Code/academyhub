@@ -114,12 +114,25 @@ function EquipmentStatusTab({
     const catalogNames = new Set(equipment.map(e => e.name))
     const linksTo = (i: Item, e: EquipmentDoc) =>
       i.equipmentId ? i.equipmentId === e.id : !i.isManualEntry && i.equipmentName === e.name
+    // Status order: overdue, damaged, missing, pending, checked out, available
+    const STATUS_ORDER = ['Overdue', 'Damaged', 'Missing', 'Pending Checkout', 'Checked Out', 'Available']
+    const statusRank = (r: { activeItem?: Item; proj?: InventoryProjectDoc }) =>
+      STATUS_ORDER.indexOf(getStatusDisplay(r.activeItem, r.proj).label)
     const catalogRows = filtered.map(e => {
       const matching = open.filter(i => linksTo(i, e))
-      const activeItem = matching[0]
+      // Units of one item can be out on several projects: list each (with how
+      // many units it has) and show the most urgent unit's status
+      const counts = new Map<string, number>()
+      matching.forEach(i => counts.set(i.projectId, (counts.get(i.projectId) ?? 0) + 1))
+      const projects = [...counts]
+        .map(([id, count]) => ({ proj: projectMap[id], count }))
+        .filter((p): p is { proj: InventoryProjectDoc; count: number } => !!p.proj)
+        .sort((a, b) => a.proj.name.localeCompare(b.proj.name, 'sv'))
+      const activeItem = [...matching].sort((a, b) =>
+        statusRank({ activeItem: a, proj: projectMap[a.projectId] }) - statusRank({ activeItem: b, proj: projectMap[b.projectId] }))[0]
       return {
         key: e.id, name: e.name, category: e.category, manual: false,
-        activeItem, proj: activeItem ? projectMap[activeItem.projectId] : undefined,
+        activeItem, proj: activeItem ? projectMap[activeItem.projectId] : undefined, projects,
         checkedOutCount: matching.filter(i => i.status === 'checked-out').length,
       }
     })
@@ -137,11 +150,8 @@ function EquipmentStatusTab({
       .map(i => ({
         key: `manual-${i.projectId}-${i.id}`, name: i.equipmentName, category: guessCategory(i.equipmentName), manual: true,
         activeItem: i, proj: projectMap[i.projectId], checkedOutCount: 0,
+        projects: projectMap[i.projectId] ? [{ proj: projectMap[i.projectId], count: 1 }] : [],
       }))
-    // Status order: overdue, damaged, missing, pending, checked out, available
-    const STATUS_ORDER = ['Overdue', 'Damaged', 'Missing', 'Pending Checkout', 'Checked Out', 'Available']
-    const statusRank = (r: { activeItem?: Item; proj?: InventoryProjectDoc }) =>
-      STATUS_ORDER.indexOf(getStatusDisplay(r.activeItem, r.proj).label)
     const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'sv')
     // Empty categories and projects sort last whichever way the column runs
     const byText = (x: string, y: string) => !x === !y ? x.localeCompare(y, 'sv') * sort.dir : x ? -1 : 1
@@ -149,7 +159,7 @@ function EquipmentStatusTab({
       switch (sort.key) {
         case 'name':     return byName(a, b) * sort.dir
         case 'category': return byText(a.category, b.category) || byName(a, b)
-        case 'project':  return byText(a.proj?.name ?? '', b.proj?.name ?? '') || byName(a, b)
+        case 'project':  return byText(a.projects[0]?.proj.name ?? '', b.projects[0]?.proj.name ?? '') || byName(a, b)
         default:         return (statusRank(a) - statusRank(b)) * sort.dir || byName(a, b)
       }
     })
@@ -195,7 +205,7 @@ function EquipmentStatusTab({
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ key, name, category, manual, activeItem, proj, checkedOutCount }) => {
+            {rows.map(({ key, name, category, manual, activeItem, proj, projects, checkedOutCount }) => {
               const { dot, label, color } = getStatusDisplay(activeItem, proj)
               return (
                 <tr key={key} style={{ borderBottom: '1px solid #1a1a25' }}>
@@ -210,10 +220,15 @@ function EquipmentStatusTab({
                   <td style={{ padding: '.5rem .75rem', color: '#f97316', fontSize: '.7rem', fontWeight: 700 }}>{category || '—'}</td>
                   <td style={{ padding: '.5rem .75rem', whiteSpace: 'nowrap' }}><span style={{ color }}>{dot} {label}</span></td>
                   <td style={{ padding: '.5rem .75rem', color: '#6a6a80' }}>
-                    {proj
-                      ? <button onClick={() => onOpenProject(proj.id)} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>{proj.name}</button>
-                      : '—'
-                    }
+                    {projects.length === 0 ? '—' : (
+                      <span style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
+                        {projects.map(({ proj: p, count }) => (
+                          <button key={p.id} onClick={() => onOpenProject(p.id)} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}>
+                            {p.name}{projects.length > 1 && count > 1 && <span style={{ color: '#6a6a80', fontWeight: 700 }}> ×{count}</span>}
+                          </button>
+                        ))}
+                      </span>
+                    )}
                   </td>
                 </tr>
               )

@@ -195,7 +195,7 @@ function ContractSignPanel({ project, items, uid, accountName }: {
     uid,
   )
   const sig = latestByUid(sigs).get(uid)
-  const state = signatureState(project, items, sig)
+  const state = signatureState(project, items, sig, uid)
   const [open, setOpen] = useState(false)
   const [accepted, setAccepted] = useState(false)
   const [name, setName] = useState('')

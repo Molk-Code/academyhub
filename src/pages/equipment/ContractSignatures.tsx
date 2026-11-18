@@ -36,7 +36,7 @@ export function ContractSignatures({ project, items }: { project: InventoryProje
   const rows = borrowerIds.map(uid => {
     const sig = latest.get(uid)
     const user = users.find(u => u.id === uid)
-    return { uid, name: user?.displayName ?? sig?.accountName ?? 'Unknown student', sig, state: signatureState(project, items, sig) }
+    return { uid, name: user?.displayName ?? sig?.accountName ?? 'Unknown student', sig, state: signatureState(project, items, sig, uid) }
   })
   // Borrowers typed in by name only (no CineForge account) can't e-sign
   const accountNames = new Set(users.map(u => u.displayName))
@@ -84,7 +84,7 @@ export function ContractSignatures({ project, items }: { project: InventoryProje
         )}
         {rows.length > 0 && unsigned > 0 && (
           <button className="secondary-btn" disabled={sending} onClick={send} style={{ padding: '.4rem .8rem', fontSize: '.8rem' }}>
-            <Send size={14} /> {sending ? 'Sending…' : project.signatureRequest ? 'Send reminder' : 'Send for signing'}
+            <Send size={14} /> {sending ? 'Sending…' : rows.some(r => r.state === 'not-requested') ? 'Send for signing' : 'Send reminder'}
           </button>
         )}
         </span>

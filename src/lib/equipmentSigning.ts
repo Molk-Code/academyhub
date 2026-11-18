@@ -28,13 +28,19 @@ export function stillMatches(sig: EquipmentSignatureDoc, project: InventoryProje
   return now.length === then.length && now.every((v, i) => v === then[i])
 }
 
+// A borrower added after the contract was sent hasn't been asked yet: only
+// those on pendingSignatureUids are (older projects without the list: everyone
+// once a request went out).
 export function signatureState(
   project: InventoryProjectDoc,
   items: InventoryItemDoc[],
   sig: EquipmentSignatureDoc | undefined,
+  uid?: string,
 ): SignatureState {
   if (sig) return stillMatches(sig, project, items) ? 'signed' : 'changed'
-  return project.signatureRequest ? 'requested' : 'not-requested'
+  if (!project.signatureRequest) return 'not-requested'
+  if (uid && project.pendingSignatureUids) return project.pendingSignatureUids.includes(uid) ? 'requested' : 'not-requested'
+  return 'requested'
 }
 
 function fmt(d: string) {

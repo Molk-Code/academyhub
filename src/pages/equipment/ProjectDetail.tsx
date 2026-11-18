@@ -16,6 +16,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { buildEquipmentContractHtml } from '@/lib/equipmentContract'
 import { isOverdue, formatDate, overdueDays, parseScanText, scannedUnit, beep, itemDisplayName, checkoutScan, matchCheckinScan } from './inventoryShared'
 import { EquipmentPicker } from './EquipmentPicker'
+import { BorrowerPicker, borrowerIdsFor, useBorrowerCandidates } from './BorrowerPicker'
 import { ContractSignatures } from './ContractSignatures'
 import { ScanFlash, useScanFlash, NotInProjectModal, type NotInProjectData } from './ScanFeedback'
 
@@ -110,6 +111,9 @@ export function ProjectDetail({
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState(project.name)
   const [editReturn, setEditReturn] = useState(project.returnDate)
+  const [editBorrowers, setEditBorrowers] = useState<string[]>(project.borrowers ?? [])
+  const [savingEdit, setSavingEdit] = useState(false)
+  const borrowerCandidates = useBorrowerCandidates()
 
   // Remote scanner session
   const [remoteSessionId, setRemoteSessionId] = useState<string | null>(null)
@@ -493,9 +497,27 @@ export function ProjectDetail({
     setActionState('idle')
   }
 
+  function startEdit() {
+    setEditName(project.name)
+    setEditReturn(project.returnDate)
+    setEditBorrowers(project.borrowers ?? [])
+    setEditing(true)
+  }
+
   async function saveEdit() {
-    await onUpdate({ name: editName, returnDate: editReturn })
-    setEditing(false)
+    setSavingEdit(true)
+    try {
+      const borrowerIds = borrowerIdsFor(editBorrowers, borrowerCandidates, project.borrowerIds ?? [])
+      await onUpdate({
+        name: editName, returnDate: editReturn, borrowers: editBorrowers, borrowerIds,
+        // Someone removed is no longer asked to sign; someone added is asked
+        // with Send for signing under Contract signatures
+        ...(project.pendingSignatureUids && { pendingSignatureUids: project.pendingSignatureUids.filter(id => borrowerIds.includes(id)) }),
+      })
+      setEditing(false)
+    } finally {
+      setSavingEdit(false)
+    }
   }
 
   function generateContract() {
@@ -565,7 +587,11 @@ export function ProjectDetail({
                 onChange={e => setEditReturn(e.target.value)}
                 style={{ width: 160 }}
               />
-              <button className="manual-add-btn" onClick={saveEdit}>Save</button>
+              <div className="form-group" style={{ flexBasis: '100%', margin: 0 }}>
+                <span style={{ display: 'block', fontSize: '.75rem', color: '#8a8aab', fontWeight: 600, marginBottom: 4 }}>Borrowers</span>
+                <BorrowerPicker borrowers={editBorrowers} onChange={setEditBorrowers} candidates={borrowerCandidates} />
+              </div>
+              <button className="manual-add-btn" onClick={saveEdit} disabled={savingEdit}>{savingEdit ? 'Saving…' : 'Save'}</button>
               <button className="secondary-btn" style={{ padding: '.4rem .8rem' }} onClick={() => setEditing(false)}>Cancel</button>
             </div>
           ) : (
@@ -585,7 +611,7 @@ export function ProjectDetail({
             </>
           )}
         </div>
-        <button className="secondary-btn" style={{ padding: '.4rem .75rem' }} onClick={() => setEditing(!editing)}>
+        <button className="secondary-btn" style={{ padding: '.4rem .75rem' }} onClick={() => editing ? setEditing(false) : startEdit()} aria-label={editing ? 'Stop editing project' : 'Edit project'} aria-expanded={editing}>
           <Edit2 size={14} />
         </button>
       </div>

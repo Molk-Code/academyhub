@@ -125,7 +125,7 @@ export default function LessonBlocks() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="page-title">Lesson Blocks</h1>
           <p className="text-zinc-500 text-sm mt-1">

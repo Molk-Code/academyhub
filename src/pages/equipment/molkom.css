@@ -122,10 +122,10 @@
 .molkom-app .dates-value{font-size:.95rem;font-weight:600;color:#dfe2eb;display:block}
 .molkom-app .year2-warning{display:flex;align-items:center;gap:.4rem;color:#ff4757;font-size:.8rem;font-weight:500;margin-top:.4rem}
 .molkom-app .checkout-buttons{display:flex;gap:.75rem;margin-top:.5rem}
-.molkom-app .primary-btn{display:inline-flex;align-items:center;gap:.4rem;padding:.75rem 1.5rem;background:#ff6b35;color:#000;font-size:.9rem;font-weight:700;border-radius:10px;border:none;cursor:pointer;transition:all .25s ease;text-decoration:none}
+.molkom-app .primary-btn{white-space:nowrap;display:inline-flex;align-items:center;gap:.4rem;padding:.75rem 1.5rem;background:#ff6b35;color:#000;font-size:.9rem;font-weight:700;border-radius:10px;border:none;cursor:pointer;transition:all .25s ease;text-decoration:none}
 .molkom-app .primary-btn:hover:not(:disabled){background:#f25c24;transform:translateY(-1px)}
 .molkom-app .primary-btn:disabled{opacity:.5;cursor:not-allowed}
-.molkom-app .secondary-btn{display:inline-flex;align-items:center;gap:.4rem;padding:.75rem 1.5rem;background:#262a31;border:1px solid #31353c;color:#a9aeb8;font-size:.9rem;font-weight:600;border-radius:10px;cursor:pointer;transition:all .25s ease}
+.molkom-app .secondary-btn{white-space:nowrap;display:inline-flex;align-items:center;gap:.4rem;padding:.75rem 1.5rem;background:#262a31;border:1px solid #31353c;color:#a9aeb8;font-size:.9rem;font-weight:600;border-radius:10px;cursor:pointer;transition:all .25s ease}
 .molkom-app .secondary-btn:hover:not(:disabled){border-color:#454a52;color:#dfe2eb}
 .molkom-app .checkout-summary{background:#262a31;border:1px solid #31353c;border-radius:10px;padding:1.25rem;align-self:flex-start;position:sticky;top:80px}
 .molkom-app .checkout-summary h3{font-size:1rem;font-weight:600;margin:0 0 1rem;padding-bottom:.75rem;border-bottom:1px solid #31353c;color:#dfe2eb}
@@ -329,7 +329,7 @@
 .molkom-app .form-input{background:#262a31;border:1px solid #31353c;border-radius:8px;color:#dfe2eb;padding:.45rem .65rem;font-size:.85rem;width:100%;outline:none;font-family:inherit}
 .molkom-app .form-input:focus{border-color:#ff6b35}
 @media(max-width:768px){
-  .molkom-app .inv-stats-row{grid-template-columns:repeat(2,1fr)}
+  .molkom-app .inv-stats-row{grid-template-columns:repeat(2,1fr)}.molkom-app .inv-stat-card{padding:.875rem 1rem;gap:.6rem}.molkom-app .inv-stat-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .molkom-app .project-grid{grid-template-columns:1fr}
   .molkom-app .project-actions{flex-direction:column}
   .molkom-app .return-summary-bar{flex-wrap:wrap;gap:.4rem}

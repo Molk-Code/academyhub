@@ -1021,10 +1021,10 @@ export default function EquipmentBookingPage() {
                     {readinessLoading ? (
                       <p style={{ fontSize: '.82rem', color: '#8c919b' }}>Loading productions…</p>
                     ) : userProductions.length === 0 ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
                         <p style={{ fontSize: '.82rem', color: '#8c919b' }}>You have no productions yet.</p>
                         {productionNavEnabled && (
-                          <Link to="/production" style={{ background: '#ff6b35', color: '#10141a', fontWeight: 700, fontSize: '.8rem', padding: '7px 14px', borderRadius: 10, textDecoration: 'none' }}>
+                          <Link to="/production" style={{ background: '#ff6b35', color: '#10141a', fontWeight: 700, fontSize: '.8rem', padding: '7px 14px', borderRadius: 10, textDecoration: 'none', whiteSpace: 'nowrap' }}>
                             Go to Productions →
                           </Link>
                         )}

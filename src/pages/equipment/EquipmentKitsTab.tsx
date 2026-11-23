@@ -70,7 +70,7 @@ export function KitsTab() {
     <div style={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <p style={{ color: '#a9aeb8', fontSize: '.85rem' }}>A kit is booked and checked out as one line. It's only free when every item in it is.</p>
-        {editing === null && <button style={{ ...btn, background: '#4cd964', color: '#000', border: 'none' }} onClick={startNew}><Plus size={14} /> New kit</button>}
+        {editing === null && <button style={{ ...btn, background: '#4cd964', color: '#000', border: 'none', whiteSpace: 'nowrap', flexShrink: 0 }} onClick={startNew}><Plus size={14} /> New kit</button>}
       </div>
 
       {editing !== null && (

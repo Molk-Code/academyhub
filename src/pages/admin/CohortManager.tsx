@@ -83,7 +83,7 @@ export default function CohortManager() {
         />
       )}
       {copyPlanTo && <CopyPlanDialog toCohortId={copyPlanTo} onClose={() => setCopyPlanTo(null)} />}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="page-title">Class Manager</h1>
           <p className="text-zinc-400 text-sm mt-1">Organise students into year groups and assign teachers. At the end of the school year, use <b>End of year</b> on each class.</p>
@@ -136,8 +136,9 @@ export default function CohortManager() {
           const classPoints = cohortStudents.reduce((sum, s) => sum + (s.totalPoints ?? 0), 0)
           return (
             <div key={cohort.id} className="bg-slate-800 rounded-2xl p-5 space-y-4">
-              <div className="flex items-start justify-between">
-                <div>
+              {/* Phones: the actions wrap under the name instead of squeezing it */}
+              <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+                <div className="min-w-0 flex-1 basis-56">
                   <h3 className="font-bold text-white text-base">{cohort.name}</h3>
                   <p className="text-xs text-zinc-400 mt-0.5">
                     {(() => {
@@ -150,7 +151,7 @@ export default function CohortManager() {
                     })()}
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <div className="flex items-center gap-1.5 text-sm text-amber-400 font-semibold" title="Total class points">
                     <Sparkles className="w-4 h-4" />
                     {classPoints}
@@ -168,7 +169,7 @@ export default function CohortManager() {
                   </button>
                   <button
                     onClick={() => navigate(`/admin/cohorts/${cohort.id}`)}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-500 transition-colors font-medium"
+                    className="text-xs px-3 py-1.5 min-h-[32px] rounded-lg bg-brand-600 text-white hover:bg-brand-500 transition-colors font-medium"
                   >
                     Manage
                   </button>

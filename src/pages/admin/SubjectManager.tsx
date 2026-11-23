@@ -99,7 +99,7 @@ export default function SubjectManager() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="page-title">Subjects</h1>
           <p className="text-zinc-400 text-sm mt-1">Manage the curriculum subjects for each programme year.</p>

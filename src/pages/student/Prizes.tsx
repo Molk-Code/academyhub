@@ -59,7 +59,7 @@ export default function Prizes() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="page-title">Prize Shop</h1>
           <p className="text-zinc-500 text-sm mt-1">Spend your hard-earned points on real rewards.</p>

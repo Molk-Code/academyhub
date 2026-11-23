@@ -252,8 +252,8 @@ export default function BookingHub() {
         className="bg-zinc-900 rounded-xl border border-white/8 overflow-hidden"
         style={{ borderLeft: '4px solid #10b981' }}
       >
-        <div className="px-5 py-4 flex items-center gap-4">
-          <div className="flex-1 min-w-0">
+        <div className="px-5 py-4 flex flex-wrap items-center gap-4">
+          <div className="flex-1 min-w-0 basis-56">
             <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold mb-1">Room Display URL</p>
             <p className="font-mono text-sm text-zinc-200 truncate">{`${window.location.origin}/room-display`}</p>
           </div>

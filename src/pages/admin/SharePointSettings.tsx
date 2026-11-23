@@ -137,8 +137,8 @@ export default function SharePointSettings() {
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-zinc-500 flex-1">Sign in to test the connection and resolve the site ID.</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-zinc-500 flex-1 basis-48">Sign in to test the connection and resolve the site ID.</p>
             <button
               onClick={() => signInWithMicrosoft().catch(e => setError(e.message))}
               className="flex items-center gap-1.5 text-sm font-medium text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-lg transition-colors"

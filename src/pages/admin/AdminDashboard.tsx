@@ -185,7 +185,7 @@ export default function AdminDashboard() {
 
       <PlanUsage />
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* ── Equipment out ──────────────────────────────────────────────── */}
         {canInventory && (
           <Panel title={`Equipment out (${eq.out.length})`} icon={ArchiveRestore} to="/admin/inventory" linkLabel="Inventory">

@@ -221,7 +221,7 @@ export function BookingsTab() {
               key={s}
               onClick={() => setStatusFilter(s)}
               style={{
-                padding: '5px 14px', borderRadius: 20, fontSize: '.75rem', fontWeight: 700,
+                padding: '5px 14px', borderRadius: 20, fontSize: '.75rem', fontWeight: 700, whiteSpace: 'nowrap',
                 textTransform: 'capitalize', cursor: 'pointer', letterSpacing: '.04em',
                 background: active ? col + '25' : '#262a31',
                 border: `1px solid ${active ? col + '80' : '#31353c'}`,

@@ -114,7 +114,7 @@ export default function PrizeManager() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="page-title">Prize Manager</h1>
           <p className="text-zinc-400 text-sm mt-1">Create rewards students can redeem with their points.</p>
@@ -228,7 +228,7 @@ export default function PrizeManager() {
                 <img src={prize.imageUrl} alt={prize.title} className="w-full h-32 object-cover" />
               )}
               <div className="p-4 space-y-2">
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-4">
                   <h3 className="font-semibold text-white text-sm">{prize.title}</h3>
                   <div className="flex items-center gap-1 text-amber-400 text-xs font-bold">
                     <Sparkles className="w-3 h-3" />

@@ -87,13 +87,64 @@ function MostBorrowedTab({ allItems }: { allItems: Item[] }) {
 }
 
 type StatusSortKey = 'name' | 'category' | 'status' | 'project'
-// In column order — also feeds the table headers
-const STATUS_SORTS: { key: StatusSortKey; label: string; header: string }[] = [
-  { key: 'name',     label: 'A–Z',      header: 'Equipment' },
-  { key: 'category', label: 'Category', header: 'Category' },
-  { key: 'status',   label: 'Status',   header: 'Status' },
-  { key: 'project',  label: 'Project',  header: 'Project' },
+const STATUS_SORTS: { key: StatusSortKey; label: string }[] = [
+  { key: 'status',   label: 'Status' },
+  { key: 'name',     label: 'A–Z' },
+  { key: 'category', label: 'Category' },
+  { key: 'project',  label: 'Project' },
 ]
+// Table columns; the ones with a sort key sort when their header is clicked
+const STATUS_COLUMNS: { header: string; sort?: StatusSortKey }[] = [
+  { header: 'Equipment', sort: 'name' },
+  { header: 'Units' },
+  { header: 'Status', sort: 'status' },
+  { header: 'Where', sort: 'project' },
+]
+
+type UnitState = 'Overdue' | 'Damaged' | 'Missing' | 'Pending Checkout' | 'Checked Out'
+type StatusLabel = UnitState | 'Available'
+// Most urgent first; also the sort order of the Status column
+const STATUS_ORDER: StatusLabel[] = ['Overdue', 'Damaged', 'Missing', 'Pending Checkout', 'Checked Out', 'Available']
+
+// Ember status colours (index.css): text and its 12% tint
+const STATUS_STYLE: Record<StatusLabel, { color: string; bg: string }> = {
+  'Overdue':          { color: '#ffb4ab', bg: 'rgba(255,180,171,.12)' },
+  'Damaged':          { color: '#f6ae2d', bg: 'rgba(246,174,45,.12)' },
+  'Missing':          { color: '#c8ccd5', bg: 'rgba(200,204,213,.12)' },
+  'Pending Checkout': { color: '#ff8a5c', bg: 'rgba(255,107,53,.12)' },
+  'Checked Out':      { color: '#b4c5ff', bg: 'rgba(180,197,255,.12)' },
+  'Available':        { color: '#4edea3', bg: 'rgba(78,222,163,.12)' },
+}
+
+type StatusFilter = 'all' | 'out' | 'Overdue' | 'Damaged' | 'Missing' | 'available'
+const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'out', label: 'Out' },
+  { key: 'Overdue', label: 'Overdue' },
+  { key: 'Damaged', label: 'Damaged' },
+  { key: 'Missing', label: 'Missing' },
+  { key: 'available', label: 'Available' },
+]
+
+/** Status word for a row: the most urgent unit's state, counted ("2 overdue"), or Out / Available */
+function statusText(worst: StatusLabel, n: number) {
+  if (worst === 'Available') return 'Available'
+  if (worst === 'Checked Out') return 'Out'
+  if (worst === 'Pending Checkout') return `${n} pending`
+  return `${n} ${worst.toLowerCase()}`
+}
+
+// Shape beside the status word, so status never rests on colour alone
+function StatusIcon({ label }: { label: StatusLabel }) {
+  const common = { width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'aria-hidden': true as const }
+  if (label === 'Overdue') return <svg {...common} strokeWidth={2.6}><path d="M12 8v5M12 17h.01" /><circle cx="12" cy="12" r="9" /></svg>
+  if (label === 'Damaged') return <svg {...common} strokeWidth={2.4}><path d="M12 3 2 20h20zM12 10v4M12 17h.01" /></svg>
+  if (label === 'Missing') return <svg {...common} strokeWidth={2.4}><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h.01" /></svg>
+  if (label === 'Available') return <svg {...common} strokeWidth={2.8}><path d="M20 6 9 17l-5-5" /></svg>
+  return <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 99, background: 'currentColor', flexShrink: 0 }} />
+}
+
+const UNIT_BAR_MAX = 24
 
 function EquipmentStatusTab({
   equipment, allItems, projectMap, onOpenProject,
@@ -104,38 +155,41 @@ function EquipmentStatusTab({
   onOpenProject: (id: string) => void
 }) {
   const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<StatusFilter>('all')
   const [sort, setSort] = useState<{ key: StatusSortKey; dir: 1 | -1 }>({ key: 'status', dir: 1 })
   const filtered = equipment.filter(e => e.name?.toLowerCase().includes(search.toLowerCase()))
 
-  const rows = useMemo(() => {
+  const allRows = useMemo(() => {
     const open = allItems.filter(i => i.status !== 'returned')
     // Old items saved without an id still match the catalog by name; items
     // typed by hand never do, so they don't count against a catalog item
     const catalogNames = new Set(equipment.map(e => e.name))
     const linksTo = (i: Item, e: EquipmentDoc) =>
       i.equipmentId ? i.equipmentId === e.id : !i.isManualEntry && i.equipmentName === e.name
-    // Status order: overdue, damaged, missing, pending, checked out, available
-    const STATUS_ORDER = ['Overdue', 'Damaged', 'Missing', 'Pending Checkout', 'Checked Out', 'Available']
-    const statusRank = (r: { activeItem?: Item; proj?: InventoryProjectDoc }) =>
-      STATUS_ORDER.indexOf(getStatusDisplay(r.activeItem, r.proj).label)
-    const catalogRows = filtered.map(e => {
-      const matching = open.filter(i => linksTo(i, e))
-      // Units of one item can be out on several projects: list each (with how
-      // many units it has) and show the most urgent unit's status
-      const counts = new Map<string, number>()
-      matching.forEach(i => counts.set(i.projectId, (counts.get(i.projectId) ?? 0) + 1))
-      const projects = [...counts]
-        .map(([id, count]) => ({ proj: projectMap[id], count }))
-        .filter((p): p is { proj: InventoryProjectDoc; count: number } => !!p.proj)
-        .sort((a, b) => a.proj.name.localeCompare(b.proj.name, 'sv'))
-      const activeItem = [...matching].sort((a, b) =>
-        statusRank({ activeItem: a, proj: projectMap[a.projectId] }) - statusRank({ activeItem: b, proj: projectMap[b.projectId] }))[0]
-      return {
-        key: e.id, name: e.name, category: e.category, manual: false,
-        activeItem, proj: activeItem ? projectMap[activeItem.projectId] : undefined, projects,
-        checkedOutCount: matching.filter(i => i.status === 'checked-out').length,
-      }
-    })
+    const rank = (l: StatusLabel) => STATUS_ORDER.indexOf(l)
+    const stateOf = (i: Item) => getStatusDisplay(i, projectMap[i.projectId]).label as UnitState
+    // Units of one item can be out on several projects: one chip per project
+    // with its unit numbers (#1 #2), or a count when units weren't scanned
+    const summarise = (matching: Item[], total: number) => {
+      const units = matching.map(stateOf).sort((a, b) => rank(a) - rank(b))
+      const worst: StatusLabel = units[0] ?? 'Available'
+      const byProject = new Map<string, Item[]>()
+      matching.forEach(i => byProject.set(i.projectId, [...(byProject.get(i.projectId) ?? []), i]))
+      const projects = [...byProject]
+        .map(([id, items]) => ({
+          proj: projectMap[id],
+          count: items.length,
+          unitNos: items.map(i => i.unit).filter((u): u is number => typeof u === 'number').sort((a, b) => a - b),
+          worst: items.map(stateOf).sort((a, b) => rank(a) - rank(b))[0],
+        }))
+        .filter((p): p is typeof p & { proj: InventoryProjectDoc } => !!p.proj)
+        .sort((a, b) => rank(a.worst) - rank(b.worst) || a.proj.name.localeCompare(b.proj.name, 'sv'))
+      return { units, total: Math.max(total, units.length), worst, worstCount: units.filter(u => u === worst).length, projects }
+    }
+    const catalogRows = filtered.map(e => ({
+      key: e.id, name: e.name, category: e.category, manual: false, location: e.location ?? '',
+      ...summarise(open.filter(i => linksTo(i, e)), e.totalQuantity ?? 1),
+    }))
     // Hand-typed items carry no category: borrow one from a catalog item with
     // the same name (any case), and "(BOOK) …" titles count as books
     const categoryByName = new Map(equipment.map(e => [e.name.trim().toLowerCase(), e.category]))
@@ -148,86 +202,168 @@ function EquipmentStatusTab({
       .filter(i => !i.equipmentId && (i.isManualEntry || !catalogNames.has(i.equipmentName)))
       .filter(i => i.equipmentName.toLowerCase().includes(q))
       .map(i => ({
-        key: `manual-${i.projectId}-${i.id}`, name: i.equipmentName, category: guessCategory(i.equipmentName), manual: true,
-        activeItem: i, proj: projectMap[i.projectId], checkedOutCount: 0,
-        projects: projectMap[i.projectId] ? [{ proj: projectMap[i.projectId], count: 1 }] : [],
+        key: `manual-${i.projectId}-${i.id}`, name: i.equipmentName, category: guessCategory(i.equipmentName), manual: true, location: '',
+        ...summarise([i], 1),
       }))
+    return [...catalogRows, ...manualRows]
+  }, [filtered, equipment, allItems, projectMap, search])
+
+  const matches = (r: typeof allRows[number], f: StatusFilter) =>
+    f === 'all' ? true
+    : f === 'out' ? r.units.length > 0
+    : f === 'available' ? r.units.length < r.total
+    : r.units.includes(f)
+  const filterCounts = Object.fromEntries(STATUS_FILTERS.map(f => [f.key, allRows.filter(r => matches(r, f.key)).length])) as Record<StatusFilter, number>
+
+  const rows = useMemo(() => {
     const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'sv')
     // Empty categories and projects sort last whichever way the column runs
     const byText = (x: string, y: string) => !x === !y ? x.localeCompare(y, 'sv') * sort.dir : x ? -1 : 1
-    return [...catalogRows, ...manualRows].sort((a, b) => {
+    const rank = (l: StatusLabel) => STATUS_ORDER.indexOf(l)
+    return allRows.filter(r => matches(r, filter)).sort((a, b) => {
       switch (sort.key) {
         case 'name':     return byName(a, b) * sort.dir
         case 'category': return byText(a.category, b.category) || byName(a, b)
         case 'project':  return byText(a.projects[0]?.proj.name ?? '', b.projects[0]?.proj.name ?? '') || byName(a, b)
-        default:         return (statusRank(a) - statusRank(b)) * sort.dir || byName(a, b)
+        default:         return (rank(a.worst) - rank(b.worst)) * sort.dir || byName(a, b)
       }
     })
-  }, [filtered, equipment, allItems, projectMap, search, sort])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRows, filter, sort])
 
   const toggleSort = (key: StatusSortKey) =>
     setSort(s => s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: 1 })
+
+  const th: React.CSSProperties = { textAlign: 'left', padding: 0, fontSize: '.75rem', fontWeight: 600, color: '#a9aeb8', whiteSpace: 'nowrap' }
+  const td: React.CSSProperties = { padding: '14px 16px', verticalAlign: 'top' }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
         <input
+          type="search"
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search equipment…"
+          aria-label="Search equipment"
           className="manual-add-input"
-          style={{ maxWidth: 320, flex: '1 1 200px' }}
+          style={{ maxWidth: 320, flex: '1 1 200px', minHeight: 44 }}
         />
         <select
           value={sort.key}
           onChange={e => setSort({ key: e.target.value as StatusSortKey, dir: 1 })}
           className="manual-add-input"
-          style={{ width: 'auto' }}
+          style={{ width: 'auto', minHeight: 44 }}
           aria-label="Sort by"
         >
           {STATUS_SORTS.map(s => <option key={s.key} value={s.key}>Sort: {s.label}</option>)}
         </select>
       </div>
-      <div style={{ background: '#1c2026', border: '1px solid #31353c', borderRadius: 12, overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
+      <div role="group" aria-label="Filter by status" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {STATUS_FILTERS.map(f => {
+          const on = filter === f.key
+          const tone = f.key === 'Overdue' && filterCounts.Overdue > 0 ? STATUS_STYLE.Overdue.color : undefined
+          return (
+            <button
+              key={f.key}
+              type="button"
+              aria-pressed={on}
+              onClick={() => setFilter(f.key)}
+              style={{
+                minHeight: 36, padding: '0 14px', borderRadius: 18, cursor: 'pointer', fontSize: '.8rem', fontWeight: on ? 600 : 500,
+                background: on ? 'rgba(255,107,53,.16)' : '#1c2026',
+                color: on ? '#ffb59d' : tone ?? '#c8ccd5',
+                border: `1px solid ${on ? 'rgba(255,107,53,.5)' : tone ? 'rgba(255,180,171,.3)' : 'rgba(223,226,235,.12)'}`,
+              }}
+            >
+              {f.label} · {filterCounts[f.key]}
+            </button>
+          )
+        })}
+      </div>
+      <div style={{ background: '#1c2026', border: '1px solid rgba(223,226,235,.08)', borderRadius: 16, overflowX: 'auto' }}>
+        <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse', fontSize: '.875rem' }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid #31353c' }}>
-              {STATUS_SORTS.map(({ key, header }) => (
-                <th key={key} aria-sort={sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined} style={{ textAlign: 'left', padding: 0 }}>
-                  <button
-                    onClick={() => toggleSort(key)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '.5rem .75rem', color: sort.key === key ? '#ff6b35' : '#979ca7', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}
-                  >
-                    {header}{sort.key === key ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
-                  </button>
+            <tr style={{ borderBottom: '1px solid rgba(223,226,235,.1)' }}>
+              {STATUS_COLUMNS.map(({ header, sort: key }) => (
+                <th key={header} scope="col" aria-sort={key && sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined} style={th}>
+                  {key ? (
+                    <button
+                      onClick={() => toggleSort(key)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '12px 16px', font: 'inherit', color: sort.key === key ? '#ffb59d' : '#a9aeb8' }}
+                    >
+                      {header}{sort.key === key ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
+                    </button>
+                  ) : <span style={{ display: 'block', padding: '12px 16px' }}>{header}</span>}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ key, name, category, manual, activeItem, proj, projects, checkedOutCount }) => {
-              const { label, color } = getStatusDisplay(activeItem, proj)
+            {rows.map(({ key, name, category, manual, location, units, total, worst, worstCount, projects }) => {
+              const st = STATUS_STYLE[worst]
+              const free = total - units.length
               return (
-                <tr key={key} style={{ borderBottom: '1px solid #262a31' }}>
-                  <td style={{ padding: '.5rem .75rem', color: '#dfe2eb', fontWeight: 600 }}>
-                    {name}{checkedOutCount > 1 ? <span style={{ color: '#979ca7', fontWeight: 700 }}> ×{checkedOutCount}</span> : ''}
-                    {manual && (
-                      <span style={{ marginLeft: 8, fontSize: '.6875rem', fontWeight: 700, color: '#a1a1aa', border: '1px solid #454a52', borderRadius: 8, padding: '1px 6px', verticalAlign: 'middle' }}>
-                        MANUAL
+                <tr key={key} style={{ borderBottom: '1px solid rgba(223,226,235,.06)' }}>
+                  <td style={td}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ color: '#f6f7f9', fontWeight: 600 }}>
+                        {name}
+                        {manual && (
+                          <span style={{ marginLeft: 8, fontSize: '.6875rem', fontWeight: 700, color: '#a9aeb8', border: '1px solid #454a52', borderRadius: 8, padding: '1px 6px', verticalAlign: 'middle' }}>
+                            MANUAL
+                          </span>
+                        )}
                       </span>
-                    )}
+                      {category && <span style={{ fontSize: '.75rem', fontWeight: 600, color: '#ff8a5c', letterSpacing: '.04em' }}>{category}</span>}
+                    </div>
                   </td>
-                  <td style={{ padding: '.5rem .75rem', color: '#ff6b35', fontSize: '.7rem', fontWeight: 700 }}>{category || '—'}</td>
-                  <td style={{ padding: '.5rem .75rem', whiteSpace: 'nowrap' }}><span style={{ color, display: 'inline-flex', alignItems: 'center', gap: 6 }}><span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 99, background: color, flexShrink: 0 }} />{label}</span></td>
-                  <td style={{ padding: '.5rem .75rem', color: '#979ca7' }}>
-                    {projects.length === 0 ? '—' : (
-                      <span style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
-                        {projects.map(({ proj: p, count }) => (
-                          <button key={p.id} onClick={() => onOpenProject(p.id)} style={{ color: '#ff6b35', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}>
-                            {p.name}{projects.length > 1 && count > 1 && <span style={{ color: '#979ca7', fontWeight: 700 }}> ×{count}</span>}
-                          </button>
-                        ))}
-                      </span>
+                  <td style={td}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: 140 }}>
+                      <span style={{ color: '#f6f7f9', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{units.length} of {total} out</span>
+                      {total <= UNIT_BAR_MAX && (
+                        <div style={{ display: 'flex', gap: 3 }} aria-hidden="true">
+                          {Array.from({ length: total }, (_, i) => (
+                            <span key={i} style={{ flex: 1, height: 6, borderRadius: 3, background: units[i] ? STATUS_STYLE[units[i]].color : '#31353c' }} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td style={td}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 13, background: st.bg, color: st.color, fontSize: '.75rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      <StatusIcon label={worst} />{statusText(worst, worstCount)}
+                    </span>
+                  </td>
+                  <td style={td}>
+                    {projects.length === 0 ? <span style={{ color: '#a9aeb8' }}>{location || '—'}</span> : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {projects.map(({ proj: p, count, unitNos, worst: pw }) => {
+                          const late = pw === 'Overdue'
+                          return (
+                            <button
+                              key={p.id}
+                              onClick={() => onOpenProject(p.id)}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 28, padding: '0 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                                background: late ? 'rgba(255,180,171,.1)' : '#262a31', color: late ? '#ffcdc7' : '#dfe2eb', fontSize: '.8rem', fontWeight: 500,
+                              }}
+                            >
+                              {p.name}
+                              {(unitNos.length > 0 || count > 1) && (
+                                <span style={{ color: late ? '#ffb4ab' : '#a9aeb8', fontWeight: 700 }}>
+                                  {unitNos.length === count ? unitNos.map(u => `#${u}`).join(' ') : `×${count}`}
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })}
+                        {!manual && free > 0 && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', minHeight: 28, padding: '0 10px', borderRadius: 8, border: '1px dashed rgba(78,222,163,.45)', color: '#4edea3', fontSize: '.8rem', fontWeight: 500 }}>
+                            {free} on shelf
+                          </span>
+                        )}
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -235,23 +371,25 @@ function EquipmentStatusTab({
             })}
           </tbody>
         </table>
-        {rows.length === 0 && <div style={{ textAlign: 'center', padding: '2.5rem', color: '#8c919b', fontSize: '.85rem' }}>No equipment found</div>}
+        {rows.length === 0 && <div style={{ textAlign: 'center', padding: '2.5rem', color: '#a9aeb8', fontSize: '.85rem' }}>No equipment found</div>}
       </div>
+      <p style={{ margin: 0, fontSize: '.8rem', color: '#a9aeb8' }}>
+        The bar shows each copy: red overdue, amber damaged, blue out, grey on the shelf.
+      </p>
     </div>
   )
 }
 
-function getStatusDisplay(item?: Item, proj?: InventoryProjectDoc) {
-  if (!item) return { label: 'Available', color: '#4ade80' }
-  if (item.status === 'damaged')     return { label: 'Damaged',    color: '#fbbf24' }
-  if (item.status === 'missing')     return { label: 'Missing',    color: '#a1a1aa' }
-  if (item.status === 'pending')     return { label: 'Pending Checkout', color: '#ff6b35' }
+function getStatusDisplay(item?: Item, proj?: InventoryProjectDoc): { label: StatusLabel } {
+  if (!item) return { label: 'Available' }
+  if (item.status === 'damaged')     return { label: 'Damaged' }
+  if (item.status === 'missing')     return { label: 'Missing' }
+  if (item.status === 'pending')     return { label: 'Pending Checkout' }
   if (item.status === 'checked-out') {
     const overdue = proj && proj.returnDate < today()
-    if (overdue) return { label: 'Overdue',     color: '#f87171' }
-    return           { label: 'Checked Out',  color: '#60a5fa' }
+    return { label: overdue ? 'Overdue' : 'Checked Out' }
   }
-  return { label: 'Available', color: '#4ade80' }
+  return { label: 'Available' }
 }
 
 function SimpleItemsTab({

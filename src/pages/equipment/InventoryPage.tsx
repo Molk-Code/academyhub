@@ -644,6 +644,7 @@ export default function InventoryPage() {
   useEffect(() => {
     const bookingId = searchParams.get('fromBooking')
     const openProjectId = searchParams.get('openProject')
+    const startNew = searchParams.get('new') === '1'   // "New project" on the admin dashboard
     // Which parts can be set up depends on who's signed in — wait for the profile
     if (bookingId && !profile) return
     if (bookingId) {
@@ -652,9 +653,11 @@ export default function InventoryPage() {
       })
     } else if (openProjectId) {
       setSelectedProjectId(openProjectId)
+    } else if (startNew) {
+      setCreateProject(true)
     }
-    if (bookingId || openProjectId) {
-      setSearchParams(prev => { prev.delete('fromBooking'); prev.delete('openProject'); return prev }, { replace: true })
+    if (bookingId || openProjectId || startNew) {
+      setSearchParams(prev => { prev.delete('fromBooking'); prev.delete('openProject'); prev.delete('new'); return prev }, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.uid])

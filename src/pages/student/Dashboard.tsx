@@ -19,6 +19,7 @@ import { SectionHeader, SectionLink, ShortcutPill, LessonSlateCard } from '@/com
 import LoadingSpinner   from '@/components/common/LoadingSpinner'
 import EmptyState       from '@/components/common/EmptyState'
 import Avatar           from '@/components/common/Avatar'
+import ContractsToSign  from '@/components/dashboard/ContractsToSign'
 import { useViewCohortId, useCohortLessons } from '@/lib/queries'
 
 interface PointsLogEntry { id: string; studentId: string; points: number; reason: string; createdAt: any }
@@ -544,8 +545,11 @@ export default function StudentDashboard() {
   if (!cohortId) {
     const firstName = profile?.displayName?.split(' ')[0] ?? profile?.email?.split('@')[0] ?? 'there'
     return (
+      <div className="space-y-6">
+      {/* Borrowers without a class can still have contracts to sign */}
+      <ContractsToSign />
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
-        <div className="text-5xl">🎬</div>
+        <div className="text-5xl" aria-hidden="true">🎬</div>
         <div>
           <h1 className="text-2xl font-bold text-zinc-100 mb-2">Welcome, {firstName}!</h1>
           <p className="text-zinc-400 text-sm max-w-xs leading-relaxed">
@@ -554,20 +558,25 @@ export default function StudentDashboard() {
           </p>
         </div>
       </div>
+      </div>
     )
   }
 
   if (navVis?.student?.['dashboard'] === false) {
     const firstName = profile?.displayName?.split(' ')[0] ?? profile?.email?.split('@')[0] ?? 'Student'
     return (
+      <div className="space-y-6">
+      {/* Borrowers without a class can still have contracts to sign */}
+      <ContractsToSign />
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
-        <div className="text-5xl">🎬</div>
+        <div className="text-5xl" aria-hidden="true">🎬</div>
         <div>
           <h1 className="text-2xl font-bold text-zinc-100 mb-2">Welcome, {firstName}</h1>
           <p className="text-zinc-400 text-sm max-w-xs leading-relaxed">
             Your dashboard is currently hidden. Open the menu to access your features.
           </p>
         </div>
+      </div>
       </div>
     )
   }
@@ -584,6 +593,7 @@ export default function StudentDashboard() {
 
   return (
     <div className="space-y-7">
+      <ContractsToSign />
       {/* ── Shooting today banner ───────────────────────────────────────────── */}
       {todayShoot && (
         <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-4 flex items-center justify-between gap-3">

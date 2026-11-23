@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import {
   LayoutDashboard, Calendar, BookOpen,
   Trophy, LogOut, ArrowLeft, QrCode, ClipboardList, DoorOpen,
-  MessageSquare, Clapperboard, Film, FolderOpen, Menu, X, ListChecks, User, ChevronDown, CalendarRange, Package,
+  MessageSquare, Clapperboard, Film, FolderOpen, Menu, X, ListChecks, User, ChevronDown, CalendarRange, Package, MoreHorizontal,
   Car, UtensilsCrossed, RefreshCw, ArrowDown, ClipboardCheck, Bug, UserRound,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -616,8 +616,18 @@ export default function StudentLayout() {
           {navVis?.student?.['dashboard'] !== false && <BottomTab to="/dashboard" icon={LayoutDashboard} label="Home" />}
           {navVis?.student?.['calendar']  !== false && <BottomTab to="/calendar"  icon={Calendar}        label="Calendar" badge={calendarBadge} />}
           {academyGate && navVis?.student?.['checkin']   !== false && <BottomTab to="/checkin"   icon={QrCode}          label="Check In" />}
+          {!academyGate && rentalGate && canEquipment && navVis?.student?.['equipment'] !== false && <BottomTab to="/booking/equipment" icon={Package} label="Book" />}
           {navVis?.student?.['chat']      !== false && <BottomTab to="/chat"      icon={MessageSquare}   label="Chat" badge={chatUnread} />}
-          {navVis?.student?.['profile']   !== false && <BottomTab to="/profile"   icon={User}            label="Profile" />}
+          {/* Everything else (profile included) is in the menu */}
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            aria-expanded={drawerOpen}
+            className="flex flex-col items-center justify-center gap-0.5 flex-1 max-w-[80px] min-h-[52px] rounded-xl text-[11px] font-medium text-zinc-400 hover:text-zinc-200 transition-all active:scale-95"
+          >
+            <MoreHorizontal className="w-[22px] h-[22px]" aria-hidden="true" />
+            <span>More</span>
+          </button>
         </div>
       </nav>
       </div>{/* end content column */}
@@ -652,14 +662,14 @@ function BottomTab({ to, icon: Icon, label, badge = 0 }: {
     <NavLink
       to={to}
       className={({ isActive }) => cn(
-        'flex flex-col items-center justify-center gap-0.5 w-16 h-12 rounded-xl text-[11px] transition-all active:scale-95',
+        'flex flex-col items-center justify-center gap-0.5 flex-1 max-w-[80px] min-h-[52px] rounded-xl text-[11px] transition-all active:scale-95',
         isActive ? 'text-brand-500 font-semibold' : 'text-zinc-400 font-medium hover:text-zinc-200',
       )}
     >
       <div className="relative">
-        <Icon className="w-[22px] h-[22px]" />
+        <Icon className="w-[22px] h-[22px]" aria-hidden="true" />
         {badge > 0 && (
-          <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] flex items-center justify-center rounded-full bg-brand-500 text-white text-[8px] font-bold px-1 leading-none shadow-[0_0_8px_rgba(255,107,53,0.8)]">
+          <span className="absolute -top-1 -right-2 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-brand-500 text-zinc-950 text-[10px] font-bold px-1 leading-none">
             {badge > 9 ? '9+' : badge}
           </span>
         )}

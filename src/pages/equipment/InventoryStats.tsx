@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { calcRentalDays, billableDays } from '@/lib/productionBudget'
 import { isDueThisWeek } from './inventoryShared'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, UserDoc, CohortDoc } from '@/types'
 import './molkom.css'
 import { clickableRow } from '@/lib/a11y'
@@ -157,6 +158,8 @@ function EquipmentStatusTab({
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<StatusFilter>('all')
   const [sort, setSort] = useState<{ key: StatusSortKey; dir: 1 | -1 }>({ key: 'status', dir: 1 })
+  // Phones get one card per item instead of a table that scrolls sideways
+  const narrow = useMediaQuery('(max-width: 640px)')
   const filtered = equipment.filter(e => e.name?.toLowerCase().includes(search.toLowerCase()))
 
   const allRows = useMemo(() => {
@@ -234,6 +237,69 @@ function EquipmentStatusTab({
   const toggleSort = (key: StatusSortKey) =>
     setSort(s => s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: 1 })
 
+  type Row = typeof rows[number]
+  const nameCell = ({ name, manual, category }: Row) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+      <span style={{ color: '#f6f7f9', fontWeight: 600, overflowWrap: 'anywhere' }}>
+        {name}
+        {manual && (
+          <span style={{ marginLeft: 8, fontSize: '.6875rem', fontWeight: 700, color: '#a9aeb8', border: '1px solid #454a52', borderRadius: 8, padding: '1px 6px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+            MANUAL
+          </span>
+        )}
+      </span>
+      {category && <span style={{ fontSize: '.75rem', fontWeight: 600, color: '#ff8a5c', letterSpacing: '.04em' }}>{category}</span>}
+    </div>
+  )
+  const unitsCell = ({ units, total }: Row, width: number | string = 140) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width }}>
+      <span style={{ color: '#f6f7f9', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{units.length} of {total} out</span>
+      {total <= UNIT_BAR_MAX && (
+        <div style={{ display: 'flex', gap: 3 }} aria-hidden="true">
+          {Array.from({ length: total }, (_, i) => (
+            <span key={i} style={{ flex: 1, height: 6, borderRadius: 3, background: units[i] ? STATUS_STYLE[units[i]].color : '#31353c' }} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+  const statusPill = ({ worst, worstCount }: Row) => (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 13, background: STATUS_STYLE[worst].bg, color: STATUS_STYLE[worst].color, fontSize: '.75rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+      <StatusIcon label={worst} />{statusText(worst, worstCount)}
+    </span>
+  )
+  const whereCell = ({ projects, manual, location, units, total }: Row) => projects.length === 0
+    ? <span style={{ color: '#a9aeb8' }}>{location || '—'}</span>
+    : (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {projects.map(({ proj: p, count, unitNos, worst: pw }) => {
+          const late = pw === 'Overdue'
+          return (
+            <button
+              key={p.id}
+              onClick={() => onOpenProject(p.id)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 32, padding: '0 10px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left',
+                background: late ? 'rgba(255,180,171,.1)' : '#262a31', color: late ? '#ffcdc7' : '#dfe2eb', fontSize: '.8rem', fontWeight: 500,
+              }}
+            >
+              {p.name}
+              {(unitNos.length > 0 || count > 1) && (
+                <span style={{ color: late ? '#ffb4ab' : '#a9aeb8', fontWeight: 700 }}>
+                  {unitNos.length === count ? unitNos.map(u => `#${u}`).join(' ') : `×${count}`}
+                </span>
+              )}
+            </button>
+          )
+        })}
+        {!manual && total - units.length > 0 && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', minHeight: 32, padding: '0 10px', borderRadius: 8, border: '1px dashed rgba(78,222,163,.45)', color: '#4edea3', fontSize: '.8rem', fontWeight: 500 }}>
+            {total - units.length} on shelf
+          </span>
+        )}
+      </div>
+    )
+
   const th: React.CSSProperties = { textAlign: 'left', padding: 0, fontSize: '.75rem', fontWeight: 600, color: '#a9aeb8', whiteSpace: 'nowrap' }
   const td: React.CSSProperties = { padding: '14px 16px', verticalAlign: 'top' }
 
@@ -247,7 +313,7 @@ function EquipmentStatusTab({
           placeholder="Search equipment…"
           aria-label="Search equipment"
           className="manual-add-input"
-          style={{ maxWidth: 320, flex: '1 1 200px', minHeight: 44 }}
+          style={{ maxWidth: narrow ? 'none' : 320, flex: '1 1 200px', minHeight: 44 }}
         />
         <select
           value={sort.key}
@@ -259,7 +325,10 @@ function EquipmentStatusTab({
           {STATUS_SORTS.map(s => <option key={s.key} value={s.key}>Sort: {s.label}</option>)}
         </select>
       </div>
-      <div role="group" aria-label="Filter by status" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      <div role="group" aria-label="Filter by status"
+        style={narrow
+          ? { display: 'flex', gap: 8, overflowX: 'auto', margin: '0 -1rem', padding: '0 1rem 2px', scrollbarWidth: 'none' }
+          : { display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {STATUS_FILTERS.map(f => {
           const on = filter === f.key
           const tone = f.key === 'Overdue' && filterCounts.Overdue > 0 ? STATUS_STYLE.Overdue.color : undefined
@@ -270,7 +339,7 @@ function EquipmentStatusTab({
               aria-pressed={on}
               onClick={() => setFilter(f.key)}
               style={{
-                minHeight: 36, padding: '0 14px', borderRadius: 18, cursor: 'pointer', fontSize: '.8rem', fontWeight: on ? 600 : 500,
+                minHeight: 36, padding: '0 14px', borderRadius: 18, cursor: 'pointer', fontSize: '.8rem', fontWeight: on ? 600 : 500, whiteSpace: 'nowrap', flexShrink: 0,
                 background: on ? 'rgba(255,107,53,.16)' : '#1c2026',
                 color: on ? '#ffb59d' : tone ?? '#c8ccd5',
                 border: `1px solid ${on ? 'rgba(255,107,53,.5)' : tone ? 'rgba(255,180,171,.3)' : 'rgba(223,226,235,.12)'}`,
@@ -281,6 +350,21 @@ function EquipmentStatusTab({
           )
         })}
       </div>
+      {narrow ? (
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {rows.map(r => (
+            <li key={r.key} style={{ background: '#1c2026', border: '1px solid rgba(223,226,235,.08)', borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                {nameCell(r)}
+                <span style={{ flexShrink: 0 }}>{statusPill(r)}</span>
+              </div>
+              {unitsCell(r, '100%')}
+              {whereCell(r)}
+            </li>
+          ))}
+          {rows.length === 0 && <li style={{ textAlign: 'center', padding: '2.5rem', color: '#a9aeb8', fontSize: '.85rem' }}>No equipment found</li>}
+        </ul>
+      ) : (
       <div style={{ background: '#1c2026', border: '1px solid rgba(223,226,235,.08)', borderRadius: 16, overflowX: 'auto' }}>
         <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse', fontSize: '.875rem' }}>
           <thead>
@@ -300,79 +384,19 @@ function EquipmentStatusTab({
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ key, name, category, manual, location, units, total, worst, worstCount, projects }) => {
-              const st = STATUS_STYLE[worst]
-              const free = total - units.length
-              return (
-                <tr key={key} style={{ borderBottom: '1px solid rgba(223,226,235,.06)' }}>
-                  <td style={td}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ color: '#f6f7f9', fontWeight: 600 }}>
-                        {name}
-                        {manual && (
-                          <span style={{ marginLeft: 8, fontSize: '.6875rem', fontWeight: 700, color: '#a9aeb8', border: '1px solid #454a52', borderRadius: 8, padding: '1px 6px', verticalAlign: 'middle' }}>
-                            MANUAL
-                          </span>
-                        )}
-                      </span>
-                      {category && <span style={{ fontSize: '.75rem', fontWeight: 600, color: '#ff8a5c', letterSpacing: '.04em' }}>{category}</span>}
-                    </div>
-                  </td>
-                  <td style={td}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: 140 }}>
-                      <span style={{ color: '#f6f7f9', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{units.length} of {total} out</span>
-                      {total <= UNIT_BAR_MAX && (
-                        <div style={{ display: 'flex', gap: 3 }} aria-hidden="true">
-                          {Array.from({ length: total }, (_, i) => (
-                            <span key={i} style={{ flex: 1, height: 6, borderRadius: 3, background: units[i] ? STATUS_STYLE[units[i]].color : '#31353c' }} />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td style={td}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 13, background: st.bg, color: st.color, fontSize: '.75rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                      <StatusIcon label={worst} />{statusText(worst, worstCount)}
-                    </span>
-                  </td>
-                  <td style={td}>
-                    {projects.length === 0 ? <span style={{ color: '#a9aeb8' }}>{location || '—'}</span> : (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {projects.map(({ proj: p, count, unitNos, worst: pw }) => {
-                          const late = pw === 'Overdue'
-                          return (
-                            <button
-                              key={p.id}
-                              onClick={() => onOpenProject(p.id)}
-                              style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 28, padding: '0 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                                background: late ? 'rgba(255,180,171,.1)' : '#262a31', color: late ? '#ffcdc7' : '#dfe2eb', fontSize: '.8rem', fontWeight: 500,
-                              }}
-                            >
-                              {p.name}
-                              {(unitNos.length > 0 || count > 1) && (
-                                <span style={{ color: late ? '#ffb4ab' : '#a9aeb8', fontWeight: 700 }}>
-                                  {unitNos.length === count ? unitNos.map(u => `#${u}`).join(' ') : `×${count}`}
-                                </span>
-                              )}
-                            </button>
-                          )
-                        })}
-                        {!manual && free > 0 && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', minHeight: 28, padding: '0 10px', borderRadius: 8, border: '1px dashed rgba(78,222,163,.45)', color: '#4edea3', fontSize: '.8rem', fontWeight: 500 }}>
-                            {free} on shelf
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
+            {rows.map(r => (
+              <tr key={r.key} style={{ borderBottom: '1px solid rgba(223,226,235,.06)' }}>
+                <td style={td}>{nameCell(r)}</td>
+                <td style={td}>{unitsCell(r)}</td>
+                <td style={td}>{statusPill(r)}</td>
+                <td style={td}>{whereCell(r)}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
         {rows.length === 0 && <div style={{ textAlign: 'center', padding: '2.5rem', color: '#a9aeb8', fontSize: '.85rem' }}>No equipment found</div>}
       </div>
+      )}
       <p style={{ margin: 0, fontSize: '.8rem', color: '#a9aeb8' }}>
         The bar shows each copy: red overdue, amber damaged, blue out, grey on the shelf.
       </p>

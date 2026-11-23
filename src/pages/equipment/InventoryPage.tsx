@@ -730,18 +730,16 @@ export default function InventoryPage() {
     <div className="molkom-app" style={{ background: '#10141a', minHeight: '100vh' }}>
       <div className="inv-page">
         {/* Page title + new project button */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+        <div className="inv-page-head">
           <div className="inv-page-title">
             <ArchiveRestore size={22} color="#4cd964" />
             Inventory
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="inv-page-actions">
             {/* Phones: join a computer's scanning session from here (already signed in) */}
-            <span className="sm:hidden">
-              <Link to="/scan" className="secondary-btn" style={{ padding: '.75rem 1rem' }}>
-                <ScanLine size={16} aria-hidden="true" /> Phone scanner
-              </Link>
-            </span>
+            <Link to="/scan" className="secondary-btn sm:hidden">
+              <ScanLine size={16} aria-hidden="true" /> Phone scanner
+            </Link>
             <button className="primary-btn" onClick={() => setCreateProject(true)}>
               <Plus size={16} /> New Project
             </button>

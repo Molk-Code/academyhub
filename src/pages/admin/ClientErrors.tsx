@@ -94,7 +94,7 @@ export default function ClientErrors() {
             {expanded === g.key && (
               <div className="px-4 pb-4 space-y-3 border-t border-white/5 pt-3">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">URLs</p>
+                  <p className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">URLs</p>
                   <div className="flex flex-wrap gap-1">
                     {[...g.urls].map(u => (
                       <span key={u} className="text-[11px] text-zinc-400 bg-zinc-800 rounded px-1.5 py-0.5 font-mono truncate max-w-full">{u}</span>
@@ -103,12 +103,12 @@ export default function ClientErrors() {
                 </div>
                 {g.sample.stack && (
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">Stack (sample)</p>
-                    <pre className="text-[10px] text-zinc-400 bg-zinc-950 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">{g.sample.stack}</pre>
+                    <p className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">Stack (sample)</p>
+                    <pre className="text-[11px] text-zinc-400 bg-zinc-950 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">{g.sample.stack}</pre>
                   </div>
                 )}
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">User agent (sample)</p>
+                  <p className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">User agent (sample)</p>
                   <p className="text-[11px] text-zinc-500 font-mono break-all">{g.sample.ua}</p>
                 </div>
                 <button

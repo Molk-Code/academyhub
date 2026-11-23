@@ -765,7 +765,7 @@ export function ProjectDetail({
             <p style={{ fontSize: '.8rem', color: '#979ca7', textAlign: 'center', maxWidth: 280 }}>
               Scan this QR code on a mobile device to start scanning equipment into this project.
             </p>
-            <p style={{ fontSize: '.65rem', color: '#8c919b', fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center', maxWidth: 320 }}>
+            <p style={{ fontSize: '.6875rem', color: '#8c919b', fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center', maxWidth: 320 }}>
               {window.location.origin}/scan/{remoteSessionId}
             </p>
           </div>

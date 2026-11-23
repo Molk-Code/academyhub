@@ -86,12 +86,12 @@ export function DeadlineCard({ assignment, subject, isOverdue, isDueToday }: Dea
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-semibold text-zinc-100 truncate">{assignment.title}</p>
           {isOverdue && (
-            <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-rose-300 bg-rose-500/15 px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap">
+            <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-rose-300 bg-rose-500/15 px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap">
               <AlertTriangle className="w-3 h-3" /> Overdue
             </span>
           )}
           {isDueToday && !isOverdue && (
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-brand-300 bg-brand-500/15 px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-300 bg-brand-500/15 px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap">
               Due today
             </span>
           )}

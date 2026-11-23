@@ -215,7 +215,7 @@ export default function EquipmentRequests() {
           >
             {label}
             {id === 'pending' && pendingCount > 0 && (
-              <span className="ml-1.5 text-[10px] bg-amber-500 text-white rounded-full px-1.5 py-px font-bold">{pendingCount}</span>
+              <span className="ml-1.5 text-[11px] bg-amber-500 text-white rounded-full px-1.5 py-px font-bold">{pendingCount}</span>
             )}
           </button>
         ))}
@@ -237,7 +237,7 @@ export default function EquipmentRequests() {
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-semibold text-zinc-100">{booking.projectName}</p>
-                    <span className={cn('text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full border capitalize', STATUS_STYLE[booking.status])}>
+                    <span className={cn('text-[11px] font-bold tracking-wider px-2 py-0.5 rounded-full border capitalize', STATUS_STYLE[booking.status])}>
                       {booking.status.replace('-', ' ')}
                     </span>
                   </div>

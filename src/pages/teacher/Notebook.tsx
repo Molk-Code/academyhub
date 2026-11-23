@@ -270,7 +270,7 @@ export default function Notebook() {
                 </button>
               </div>
               <p className="text-xs text-zinc-500 truncate mt-0.5">{note.body || 'No content'}</p>
-              <p className="text-[10px] text-zinc-600 mt-1">{timeAgo(note.updatedAt)}</p>
+              <p className="text-[11px] text-zinc-600 mt-1">{timeAgo(note.updatedAt)}</p>
             </button>
           ))}
         </div>

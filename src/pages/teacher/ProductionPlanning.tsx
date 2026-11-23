@@ -91,15 +91,15 @@ export default function TeacherProductionPlanning() {
                       <p className="font-semibold text-zinc-100 truncate group-hover:text-brand-400 transition-colors text-sm">{prod.title}</p>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         {prod.isPublic
-                          ? <span className="text-[10px] text-emerald-500 flex items-center gap-0.5"><Globe className="w-2.5 h-2.5" />Shared</span>
-                          : <span className="text-[10px] text-zinc-600 flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" />Private</span>
+                          ? <span className="text-[11px] text-emerald-500 flex items-center gap-0.5"><Globe className="w-2.5 h-2.5" />Shared</span>
+                          : <span className="text-[11px] text-zinc-600 flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" />Private</span>
                         }
-                        {creator && <span className="text-[10px] text-zinc-500">by {creator.displayName}</span>}
-                        {collabCount > 0 && <span className="text-[10px] text-zinc-600">+{collabCount} editor{collabCount !== 1 ? 's' : ''}</span>}
+                        {creator && <span className="text-[11px] text-zinc-500">by {creator.displayName}</span>}
+                        {collabCount > 0 && <span className="text-[11px] text-zinc-600">+{collabCount} editor{collabCount !== 1 ? 's' : ''}</span>}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 text-[10px] text-zinc-500">
+                  <div className="flex items-center gap-1 text-[11px] text-zinc-500">
                     <Clock className="w-3 h-3" />
                     {relTime(prod.updatedAt ?? prod.createdAt)}
                   </div>

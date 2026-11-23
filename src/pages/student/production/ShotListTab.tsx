@@ -121,7 +121,7 @@ function SortableShotCard({ shot, canEdit, get, setLocal, save, deleteShot, hand
         )}
       </div>
       <div>
-        <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Subject</p>
+        <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Subject</p>
         {canEdit ? (
           <AutoGrowInput
             value={get(shot.id, 'subject', shot.subject)}
@@ -135,20 +135,20 @@ function SortableShotCard({ shot, canEdit, get, setLocal, save, deleteShot, hand
       </div>
       <div className="grid grid-cols-3 gap-2">
         <div>
-          <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Size</p>
+          <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Size</p>
           <SelectField id={shot.id} field="size" value={shot.size} displayValue={get(shot.id, 'size', shot.size)} options={SIZE_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
         </div>
         <div>
-          <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Angle</p>
+          <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Angle</p>
           <SelectField id={shot.id} field="angle" value={shot.angle} displayValue={get(shot.id, 'angle', shot.angle)} options={ANGLE_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
         </div>
         <div>
-          <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Movement</p>
+          <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Movement</p>
           <SelectField id={shot.id} field="movement" value={shot.movement} displayValue={get(shot.id, 'movement', shot.movement)} options={MOVEMENT_OPTS} canEdit={canEdit} onChange={handleSelectChange} />
         </div>
       </div>
       <div>
-        <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Notes</p>
+        <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Notes</p>
         {canEdit ? (
           <AutoGrowInput
             value={get(shot.id, 'notes', shot.notes)}

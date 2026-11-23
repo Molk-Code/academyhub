@@ -102,19 +102,19 @@ export function CallSheetPreviewModal({
           {/* Date + timing */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-zinc-800/60 rounded-xl px-3 py-2.5">
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Date</p>
+              <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Date</p>
               <p className="text-zinc-100 font-medium text-xs">{dateStr}</p>
             </div>
             <div className="bg-zinc-800/60 rounded-xl px-3 py-2.5">
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Working Hours</p>
+              <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Working Hours</p>
               <p className="text-zinc-100 font-medium text-xs">{workHrsStr}</p>
             </div>
             <div className="bg-zinc-800/60 rounded-xl px-3 py-2.5">
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">RTS</p>
+              <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">RTS</p>
               <p className="text-emerald-400 font-bold text-xs">{rts}</p>
             </div>
             <div className="bg-zinc-800/60 rounded-xl px-3 py-2.5">
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Lunch</p>
+              <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Lunch</p>
               <p className="text-amber-400 font-medium text-xs">
                 {day.lunchStart ? `${day.lunchStart}${lunchMin ? ` (${lunchMin} min)` : ''}` : '—'}
               </p>
@@ -123,13 +123,13 @@ export function CallSheetPreviewModal({
           {/* Notes */}
           {day.notes && (
             <div className="bg-zinc-800/60 rounded-xl px-3 py-2.5">
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Notes</p>
+              <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Notes</p>
               <p className="text-zinc-300 text-xs italic">{day.notes}</p>
             </div>
           )}
           {/* Scenes */}
           <div>
-            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Scenes ({dayScenes.length})</p>
+            <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-2">Scenes ({dayScenes.length})</p>
             {dayScenes.length === 0
               ? <p className="text-zinc-500 text-xs italic">No scenes scheduled.</p>
               : (
@@ -157,7 +157,7 @@ export function CallSheetPreviewModal({
           {/* Cast */}
           {daysCast.length > 0 && (
             <div>
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Cast ({daysCast.length})</p>
+              <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-2">Cast ({daysCast.length})</p>
               <div className="grid grid-cols-2 gap-1">
                 {daysCast.map(c => (
                   <div key={c.castId} className="flex items-center gap-2 px-2.5 py-1.5 bg-zinc-800/40 rounded-lg text-xs">
@@ -172,7 +172,7 @@ export function CallSheetPreviewModal({
           {/* Crew */}
           {orderedCrew.length > 0 && (
             <div>
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Crew ({orderedCrew.length})</p>
+              <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-2">Crew ({orderedCrew.length})</p>
               <div className="grid grid-cols-2 gap-1">
                 {orderedCrew.map((c, i) => (
                   <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 bg-zinc-800/40 rounded-lg text-xs">

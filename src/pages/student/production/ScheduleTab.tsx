@@ -605,12 +605,12 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
         )}
       >
         <span className="font-mono text-zinc-300 w-5 flex-shrink-0 mt-0.5">{scene.sceneNumber}</span>
-        <span className={cn('px-1 rounded text-[10px] font-bold flex-shrink-0 mt-0.5', scene.intExt === 'INT' ? 'bg-sky-900/60 text-sky-300' : 'bg-green-900/50 text-green-300')}>{scene.intExt}</span>
-        <span className={cn('px-1 rounded text-[10px] font-bold flex-shrink-0 mt-0.5', scene.dayNight === 'Night' ? 'bg-indigo-900/60 text-indigo-300' : 'bg-amber-900/40 text-amber-300')}>{scene.dayNight === 'Day' ? 'D' : 'N'}</span>
+        <span className={cn('px-1 rounded text-[11px] font-bold flex-shrink-0 mt-0.5', scene.intExt === 'INT' ? 'bg-sky-900/60 text-sky-300' : 'bg-green-900/50 text-green-300')}>{scene.intExt}</span>
+        <span className={cn('px-1 rounded text-[11px] font-bold flex-shrink-0 mt-0.5', scene.dayNight === 'Night' ? 'bg-indigo-900/60 text-indigo-300' : 'bg-amber-900/40 text-amber-300')}>{scene.dayNight === 'Day' ? 'D' : 'N'}</span>
         <div className="flex-1 min-w-0">
           <div className="text-zinc-300 truncate">{scene.location || scene.description || '—'}</div>
           {linkedLoc && [linkedLoc.address, linkedLoc.zipCode, linkedLoc.state].filter(Boolean).length > 0 && (
-            <div className="text-zinc-500 text-[10px] truncate mt-0.5">
+            <div className="text-zinc-500 text-[11px] truncate mt-0.5">
               {[linkedLoc.address, linkedLoc.zipCode, linkedLoc.state].filter(Boolean).join(', ')}
             </div>
           )}
@@ -632,7 +632,7 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-zinc-400">Unscheduled Scenes</h3>
-            {canEdit && <span className="text-[10px] text-zinc-600">drag into a day below</span>}
+            {canEdit && <span className="text-[11px] text-zinc-600">drag into a day below</span>}
           </div>
           <div
             className={cn('bg-zinc-900/50 border border-white/10 rounded-xl p-3 flex flex-wrap gap-2 min-h-[3rem] transition-colors', draggingSceneId && 'border-brand-700/50', draggingFromDayId && 'bg-brand-900/10')}
@@ -698,10 +698,10 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
                 {ss && (
                   <div className="flex flex-wrap items-center gap-2 mb-2">
                     <span className="flex items-center gap-1 text-xs text-amber-300 bg-amber-950/40 border border-amber-800/40 rounded-lg px-2.5 py-1">
-                      🌅 <span className="font-semibold">{ss.sunrise}</span> <span className="text-amber-500/70 text-[10px]">sunrise</span>
+                      🌅 <span className="font-semibold">{ss.sunrise}</span> <span className="text-amber-500/70 text-[11px]">sunrise</span>
                     </span>
                     <span className="flex items-center gap-1 text-xs text-sky-300 bg-sky-950/40 border border-sky-800/40 rounded-lg px-2.5 py-1">
-                      🌇 <span className="font-semibold">{ss.sunset}</span> <span className="text-sky-500/70 text-[10px]">sunset</span>
+                      🌇 <span className="font-semibold">{ss.sunset}</span> <span className="text-sky-500/70 text-[11px]">sunset</span>
                     </span>
                     {(ss.weather || ss.temp) && (
                       <span className="flex items-center gap-1 text-xs text-zinc-300 bg-zinc-800/60 border border-white/10 rounded-lg px-2.5 py-1">
@@ -739,14 +739,14 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-emerald-500 tracking-widest w-8 flex-shrink-0">RTS</span>
+                        <span className="text-[11px] font-bold text-emerald-500 tracking-widest w-8 flex-shrink-0">RTS</span>
                         <input type="time" className="bg-zinc-800/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 w-24 [color-scheme:dark]"
                           value={get(day.id, 'rtsTime', day.rtsTime ?? '')}
                           onChange={e => setLocal(day.id, 'rtsTime', e.target.value)}
                           onBlur={e => saveDay(day.id, 'rtsTime', e.target.value)} />
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-amber-400 tracking-widest w-12 flex-shrink-0">LUNCH</span>
+                        <span className="text-[11px] font-bold text-amber-400 tracking-widest w-12 flex-shrink-0">LUNCH</span>
                         <input type="time" className="bg-zinc-800/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-amber-500/30 w-24 [color-scheme:dark]"
                           placeholder="Start"
                           value={get(day.id, 'lunchStart', day.lunchStart ?? '')}
@@ -758,7 +758,7 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
                           value={get(day.id, 'lunchDuration', day.lunchDuration != null ? String(day.lunchDuration) : '')}
                           onChange={e => setLocal(day.id, 'lunchDuration', e.target.value)}
                           onBlur={e => saveDay(day.id, 'lunchDuration', e.target.value ? Number(e.target.value) : '')} />
-                        <span className="text-[10px] text-zinc-500">min</span>
+                        <span className="text-[11px] text-zinc-500">min</span>
                       </div>
                       <AutoGrowInput
                         className="bg-zinc-800/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-brand-500/30 w-full sm:flex-1"
@@ -883,7 +883,7 @@ export function ScheduleTab({ productionId, canEdit, productionTitle }: Props) {
                         return <MoveForm onSave={(m, n) => saveLocationMove(day.id, scene.id, m, n)} onCancel={() => setAddMoveKey(null)} />
                       if (canEdit && idx < dayScenes.length - 1)
                         return (
-                          <button onClick={() => setAddMoveKey(key)} className="flex items-center gap-1 text-[10px] text-zinc-600 hover:text-amber-400 transition-colors ml-1">
+                          <button onClick={() => setAddMoveKey(key)} className="flex items-center gap-1 text-[11px] text-zinc-600 hover:text-amber-400 transition-colors ml-1">
                             <MapPin className="w-3 h-3" /><span>Add location move</span>
                           </button>
                         )

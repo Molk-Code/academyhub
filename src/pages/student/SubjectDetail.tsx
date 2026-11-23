@@ -194,7 +194,7 @@ export default function StudentSubjectDetail() {
               <span className="text-[11px] font-mono text-white/70 font-medium">
                 Year {subject.programYear} • {curriculum.length} topic{curriculum.length !== 1 ? 's' : ''} • {subjectAssignments.length} assignment{subjectAssignments.length !== 1 ? 's' : ''}
               </span>
-              <span className={cn('px-2 py-0.5 text-[10px] font-semibold rounded border backdrop-blur-md', badge.cls)}>{badge.label}</span>
+              <span className={cn('px-2 py-0.5 text-[11px] font-semibold rounded border backdrop-blur-md', badge.cls)}>{badge.label}</span>
             </div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-white tracking-tight">{subject.title}</h1>
             {subject.description && <p className="text-white/75 text-sm line-clamp-2 max-w-2xl">{subject.description}</p>}
@@ -342,7 +342,7 @@ export default function StudentSubjectDetail() {
                         </div>
                       </div>
                       {video.duration > 0 && (
-                        <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] font-mono px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                        <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[11px] font-mono px-1.5 py-0.5 rounded flex items-center gap-0.5">
                           <Clock className="w-2.5 h-2.5" />{Math.floor(video.duration / 60)}:{String(video.duration % 60).padStart(2, '0')}
                         </div>
                       )}
@@ -396,7 +396,7 @@ export default function StudentSubjectDetail() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-semibold text-sm text-zinc-100">{t.name}</span>
-                          {t.isGuest && <span className="text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/25 px-1.5 py-0.5 rounded">Guest</span>}
+                          {t.isGuest && <span className="text-[11px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/25 px-1.5 py-0.5 rounded">Guest</span>}
                         </div>
                         {t.title && <p className="text-xs text-brand-300 font-medium mt-0.5">{t.title}</p>}
                         {t.description && <p className="text-xs text-zinc-500 mt-1 leading-relaxed line-clamp-3">{t.description}</p>}

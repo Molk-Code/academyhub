@@ -934,7 +934,7 @@ export default function StudentCalendar() {
           <div
             ref={calendarCardRef}
             style={{ touchAction: 'pan-y' }}
-            className="fc-student-cal hidden sm:block card p-0 overflow-hidden [&_.fc-toolbar]:flex-wrap [&_.fc-toolbar]:gap-y-2 [&_.fc-toolbar-title]:text-base [&_.fc-button]:text-xs [&_.fc-button]:px-2 [&_.fc-button]:py-1 sm:[&_.fc-button]:text-sm sm:[&_.fc-button]:px-3 sm:[&_.fc-button]:py-1.5 [&_.fc-timegrid-slot-label-cushion]:text-[10px] [&_.fc-timegrid-axis-cushion]:text-[10px] [&_.fc-timegrid-axis]:w-8 [&_.fc-col-header-cell-cushion]:text-xs [&_.fc-timegrid-axis-frame]:items-start [&_.fc-timegrid-axis-frame]:pt-1 [&_.fc-daygrid-week-number]:text-[9px] [&_.fc-daygrid-week-number]:leading-tight [&_.fc-daygrid-week-number]:p-0.5 [&_.fc-week-number]:w-5 [&_.fc-view-harness]:overflow-visible"
+            className="fc-student-cal hidden sm:block card p-0 overflow-hidden [&_.fc-toolbar]:flex-wrap [&_.fc-toolbar]:gap-y-2 [&_.fc-toolbar-title]:text-base [&_.fc-button]:text-xs [&_.fc-button]:px-2 [&_.fc-button]:py-1 sm:[&_.fc-button]:text-sm sm:[&_.fc-button]:px-3 sm:[&_.fc-button]:py-1.5 [&_.fc-timegrid-slot-label-cushion]:text-[11px] [&_.fc-timegrid-axis-cushion]:text-[11px] [&_.fc-timegrid-axis]:w-8 [&_.fc-col-header-cell-cushion]:text-xs [&_.fc-timegrid-axis-frame]:items-start [&_.fc-timegrid-axis-frame]:pt-1 [&_.fc-daygrid-week-number]:text-[11px] [&_.fc-daygrid-week-number]:leading-tight [&_.fc-daygrid-week-number]:p-0.5 [&_.fc-week-number]:w-5 [&_.fc-view-harness]:overflow-visible"
           >
             <style>{`
               .fc-student-cal .fc-daygrid-more-link { font-size: 10px !important; font-weight: 600 !important; }
@@ -1380,7 +1380,7 @@ export default function StudentCalendar() {
                         className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-colors text-left ${selected ? 'bg-brand-600/20' : 'hover:bg-white/5'}`}
                       >
                         <span className="flex-1" style={{ color: selected ? 'var(--brand)' : 'var(--text-primary)' }}>{g.displayName}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${roleLabel === 'teacher' ? 'bg-amber-900/50 text-amber-400' : 'bg-zinc-800 text-zinc-500'}`}>{roleLabel}</span>
+                        <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium ${roleLabel === 'teacher' ? 'bg-amber-900/50 text-amber-400' : 'bg-zinc-800 text-zinc-500'}`}>{roleLabel}</span>
                         {selected && <Check className="w-3.5 h-3.5 text-brand-400 flex-shrink-0" />}
                       </button>
                     )
@@ -1470,7 +1470,7 @@ export default function StudentCalendar() {
                         className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-colors text-left ${isSelected ? 'bg-brand-600/20' : 'hover:bg-white/5'}`}
                       >
                         <span className="flex-1" style={{ color: isSelected ? 'var(--brand)' : 'var(--text-primary)' }}>{g.displayName}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${roleLabel === 'teacher' ? 'bg-amber-900/50 text-amber-400' : 'bg-zinc-800 text-zinc-500'}`}>{roleLabel}</span>
+                        <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium ${roleLabel === 'teacher' ? 'bg-amber-900/50 text-amber-400' : 'bg-zinc-800 text-zinc-500'}`}>{roleLabel}</span>
                         {isSelected && <Check className="w-3.5 h-3.5 text-brand-400 flex-shrink-0" />}
                       </button>
                     )

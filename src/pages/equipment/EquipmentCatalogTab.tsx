@@ -162,7 +162,7 @@ export function CatalogTab({ categories, pricingEnabled }: { categories: Equipme
                     {item.allowedCohortIds.map(id => {
                       const c = cohorts.find(x => x.id === id)
                       return c ? (
-                        <span key={id} style={{ fontSize: '.65rem', fontWeight: 700, background: 'rgba(251,191,36,.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,.25)', borderRadius: 10, padding: '1px 6px' }}>
+                        <span key={id} style={{ fontSize: '.6875rem', fontWeight: 700, background: 'rgba(251,191,36,.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,.25)', borderRadius: 10, padding: '1px 6px' }}>
                           {c.name}
                         </span>
                       ) : null

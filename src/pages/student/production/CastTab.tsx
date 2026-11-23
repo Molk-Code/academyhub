@@ -131,7 +131,7 @@ export function CastTab({ productionId, canEdit }: Props) {
               </div>
               <div className="space-y-2">
                 <div>
-                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Character</p>
+                  <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Character</p>
                   <EditField
                     value={get(member.id, 'characterName', member.characterName)}
                     placeholder="Character name"
@@ -141,7 +141,7 @@ export function CastTab({ productionId, canEdit }: Props) {
                   />
                 </div>
                 <div>
-                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Actor / Actress</p>
+                  <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Actor / Actress</p>
                   <EditField
                     value={get(member.id, 'actorName', member.actorName)}
                     placeholder="Actor name"
@@ -151,7 +151,7 @@ export function CastTab({ productionId, canEdit }: Props) {
                   />
                 </div>
                 <div>
-                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Scenes</p>
+                  <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Scenes</p>
                   {memberScenes.length === 0 ? (
                     <span className="text-xs text-zinc-600">Not assigned to scenes</span>
                   ) : (

@@ -289,7 +289,7 @@ export default function BookingOverview() {
                             className="w-full rounded-xl px-2 py-3.5 text-xs font-medium transition-all border bg-rose-950/40 border-rose-800/50 text-rose-700 hover:bg-rose-100 hover:border-rose-300 active:bg-rose-200"
                           >
                             <div className="font-semibold truncate">{booking.studentName.split(' ')[0]}</div>
-                            <div className="opacity-60 text-[10px] mt-0.5 truncate">{booking.studentName.split(' ').slice(1).join(' ')}</div>
+                            <div className="opacity-60 text-[11px] mt-0.5 truncate">{booking.studentName.split(' ').slice(1).join(' ')}</div>
                           </button>
                         ) : (
                           <button

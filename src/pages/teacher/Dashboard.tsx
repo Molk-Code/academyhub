@@ -307,8 +307,8 @@ export default function TeacherDashboard() {
                 >
                   <div className="flex items-start justify-between mb-2">
                     {active
-                      ? <span className="px-2 py-0.5 rounded-full bg-ember-tertiary/15 text-ember-tertiary text-[10px] font-semibold animate-pulse">Active now</span>
-                      : <span className="px-2 py-0.5 rounded-full bg-ember-secondary/15 text-ember-secondary text-[10px] font-semibold">
+                      ? <span className="px-2 py-0.5 rounded-full bg-ember-tertiary/15 text-ember-tertiary text-[11px] font-semibold animate-pulse">Active now</span>
+                      : <span className="px-2 py-0.5 rounded-full bg-ember-secondary/15 text-ember-secondary text-[11px] font-semibold">
                           {days === 0 ? 'Starts today' : days === 1 ? 'Tomorrow' : `in ${days} days`}
                         </span>}
                     <span className="w-2.5 h-2.5 rounded-full mt-1" style={{ backgroundColor: dotColor, boxShadow: `0 0 8px ${dotColor}` }} />
@@ -345,7 +345,7 @@ export default function TeacherDashboard() {
                   </p>
                   {r.reason && <p className="text-xs text-zinc-400 mt-0.5 line-clamp-1">{r.reason}</p>}
                 </div>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                <span className={`text-[11px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
                   r.status === 'reviewed' ? 'bg-emerald-900/40 text-emerald-400' : 'bg-amber-900/40 text-amber-400'
                 }`}>
                   {r.status === 'reviewed' ? 'Reviewed' : 'Pending'}
@@ -383,7 +383,7 @@ export default function TeacherDashboard() {
                     </p>
                     <p className="text-xs text-zinc-500 truncate">Assignment submission</p>
                   </div>
-                  <span className="flex-shrink-0 px-2.5 py-1 rounded-full bg-brand-500/15 text-brand-300 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap">Needs grading</span>
+                  <span className="flex-shrink-0 px-2.5 py-1 rounded-full bg-brand-500/15 text-brand-300 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Needs grading</span>
                 </Link>
               )
             })}

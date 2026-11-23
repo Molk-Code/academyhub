@@ -151,7 +151,7 @@ export default function AdminDashboard() {
                           <p className="text-[11px] text-zinc-500 truncate">{p.borrowers?.join(', ') || '—'}</p>
                         </div>
                         {(p.pendingSignatureUids?.length ?? 0) > 0 && (
-                          <span className="text-[10px] font-semibold text-amber-300 bg-amber-500/10 rounded-full px-2 py-0.5">Unsigned</span>
+                          <span className="text-[11px] font-semibold text-amber-300 bg-amber-500/10 rounded-full px-2 py-0.5">Unsigned</span>
                         )}
                         <span className={cn('text-[11px] font-semibold whitespace-nowrap',
                           late ? 'text-rose-400' : p.returnDate === today ? 'text-amber-300' : 'text-zinc-500')}>

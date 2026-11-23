@@ -226,7 +226,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
                   <div key={url + i} style={{ position: 'relative', width: 84 }}>
                     <img src={optimizeImageUrl(url)} alt={`Image ${i + 1}`} style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 8, border: `2px solid ${i === 0 ? '#4cd964' : '#2a2a3a'}`, display: 'block' }} />
                     {i === 0 && (
-                      <span style={{ position: 'absolute', top: 4, left: 4, fontSize: '.6rem', fontWeight: 700, background: '#4cd964', color: '#000', borderRadius: 6, padding: '1px 5px' }}>MAIN</span>
+                      <span style={{ position: 'absolute', top: 4, left: 4, fontSize: '.6875rem', fontWeight: 700, background: '#4cd964', color: '#000', borderRadius: 6, padding: '1px 5px' }}>MAIN</span>
                     )}
                     <button
                       type="button"
@@ -329,7 +329,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
                         ? <img src={optimizeImageUrl(e.imageUrl)} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 6 }} />
                         : <Package size={16} color="#8c919b" />}
                       <span style={{ flex: 1 }}>{e.name}</span>
-                      <span style={{ fontSize: '.65rem', color: '#979ca7', fontWeight: 700 }}>{e.category}</span>
+                      <span style={{ fontSize: '.6875rem', color: '#979ca7', fontWeight: 700 }}>{e.category}</span>
                     </button>
                   ))}
                 </div>
@@ -368,7 +368,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
                     >
                       {checked && <Check size={11} />}
                       {cohort.name}
-                      <span style={{ fontSize: '.65rem', opacity: .6 }}>
+                      <span style={{ fontSize: '.6875rem', opacity: .6 }}>
                         (Year {cohort.programYear})
                       </span>
                     </button>

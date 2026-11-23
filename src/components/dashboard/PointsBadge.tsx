@@ -38,15 +38,15 @@ export default function PointsBadge({ totalPoints, pointsRedeemed = 0, classPoin
         </div>
         <div className="flex items-center gap-2 mt-0.5">
           {pointsRedeemed > 0 && (
-            <p className="text-[10px] text-amber-600 leading-none">{available} available</p>
+            <p className="text-[11px] text-amber-600 leading-none">{available} available</p>
           )}
           {classPoints !== undefined && (
-            <p className="text-[10px] text-sky-500 leading-none">
+            <p className="text-[11px] text-sky-500 leading-none">
               {pointsRedeemed > 0 ? '·' : ''} class: <AnimatedNumber value={classPoints} />
             </p>
           )}
           {pointsRedeemed === 0 && classPoints === undefined && (
-            <p className="text-[10px] text-amber-600 leading-none">earned total</p>
+            <p className="text-[11px] text-amber-600 leading-none">earned total</p>
           )}
         </div>
       </div>

@@ -397,7 +397,7 @@ export default function BookingHub() {
                               className="w-full rounded-xl px-2 py-3.5 text-xs font-medium transition-all border bg-rose-500 border-rose-600 text-white hover:bg-rose-600 active:bg-rose-700 disabled:cursor-default"
                             >
                               <div className="font-semibold truncate">{booking.studentName.split(' ')[0]}</div>
-                              <div className="opacity-75 text-[10px] mt-0.5 truncate">{booking.studentName.split(' ').slice(1).join(' ')}</div>
+                              <div className="opacity-75 text-[11px] mt-0.5 truncate">{booking.studentName.split(' ').slice(1).join(' ')}</div>
                             </button>
                           ) : (
                             <button
@@ -494,7 +494,7 @@ export default function BookingHub() {
                             <div key={w.id} className="space-y-1.5">
                               <div className="flex items-center gap-1 flex-wrap">
                                 {DAYS_ORDER.filter(d => sortedDays.includes(d)).map(d => (
-                                  <span key={d} className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-brand-100 text-brand-700">
+                                  <span key={d} className="px-1.5 py-0.5 rounded-md text-[11px] font-semibold bg-brand-100 text-brand-700">
                                     {DAY_LABELS[d]}
                                   </span>
                                 ))}

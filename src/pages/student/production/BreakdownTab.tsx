@@ -384,7 +384,7 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
               type="button"
               title="Click to reveal character name"
               onClick={() => toggleRevealCast(key)}
-              className="text-[10px] bg-brand-900/50 text-brand-300 px-1 rounded font-mono hover:bg-brand-800/70 transition-colors max-w-[90px] truncate"
+              className="text-[11px] bg-brand-900/50 text-brand-300 px-1 rounded font-mono hover:bg-brand-800/70 transition-colors max-w-[90px] truncate"
             >{revealed && name ? name : cid}</button>
           )
         })}
@@ -392,7 +392,7 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
           <button
             ref={el => { castBtnRefs.current[scene.id] = el }}
             onClick={() => openCastDropdown(scene.id)}
-            className="text-[10px] text-zinc-500 hover:text-zinc-300 px-1 rounded border border-dashed border-zinc-700 hover:border-zinc-500"
+            className="text-[11px] text-zinc-500 hover:text-zinc-300 px-1 rounded border border-dashed border-zinc-700 hover:border-zinc-500"
           >{sel.length === 0 ? '+ cast' : '±'}</button>
         )}
       </div>
@@ -407,7 +407,7 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
     return (
       <div className="flex flex-wrap gap-0.5 items-center">
         {selectedItems.map(it => (
-          <span key={it.id} title={it.characterName} className="text-[10px] bg-zinc-800 text-zinc-300 px-1 rounded max-w-[90px] truncate">
+          <span key={it.id} title={it.characterName} className="text-[11px] bg-zinc-800 text-zinc-300 px-1 rounded max-w-[90px] truncate">
             {it.characterName || '—'}
           </span>
         ))}
@@ -415,7 +415,7 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
           <button
             ref={el => { itemBtnRefs.current[`${field}-${scene.id}`] = el }}
             onClick={() => openItemPicker(field, scene.id)}
-            className="text-[10px] text-zinc-500 hover:text-zinc-300 px-1 rounded border border-dashed border-zinc-700 hover:border-zinc-500"
+            className="text-[11px] text-zinc-500 hover:text-zinc-300 px-1 rounded border border-dashed border-zinc-700 hover:border-zinc-500"
           >{sel.length === 0 ? `+ ${kindLabel}` : '±'}</button>
         )}
       </div>
@@ -437,7 +437,7 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
               const addr = [linkedLoc.address, linkedLoc.zipCode, linkedLoc.state].filter(Boolean).join(', ')
               return (
                 <div className="px-2 pb-2 mb-1.5 border-b border-white/10">
-                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Address</p>
+                  <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Address</p>
                   <p className="text-sm text-zinc-200 font-medium">{linkedLoc.name}</p>
                   {addr && <p className="text-xs text-zinc-400 mt-0.5">{addr}</p>}
                 </div>
@@ -598,7 +598,7 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
               {isExpanded && (
                 <div className="border-t border-white/10 px-3 py-3 space-y-2.5">
                   <div>
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Pages</p>
+                    <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Pages</p>
                     {canEdit ? (
                       <select
                         className="bg-zinc-800/60 border border-white/10 rounded-lg px-2 py-1 text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-brand-500/30"
@@ -613,17 +613,17 @@ export function BreakdownTab({ productionId, canEdit }: Props) {
                     )}
                   </div>
                   <div>
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Cast</p>
+                    <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Cast</p>
                     {castCell(scene)}
                   </div>
                   {ITEM_KINDS.map(k => (
                     <div key={k.field}>
-                      <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">{k.label}</p>
+                      <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">{k.label}</p>
                       {itemCell(scene, k.field)}
                     </div>
                   ))}
                   <div>
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Notes</p>
+                    <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Notes</p>
                     <EditTextarea value={get(scene.id, 'notes', scene.notes)} canEdit={canEdit}
                       onChange={v => setLocal(scene.id, 'notes', v)} onBlur={v => save(scene.id, 'notes', v)} />
                   </div>

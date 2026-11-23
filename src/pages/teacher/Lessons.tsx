@@ -1799,7 +1799,7 @@ export default function Lessons() {
                         <label className="block text-xs text-zinc-400 mb-1">Guest teachers</label>
                         {syncedEditSubjectGuestTeachers.length > 0 && (
                           <div className="mb-1.5">
-                            <p className="text-[10px] text-zinc-500 mb-1">For this subject:</p>
+                            <p className="text-[11px] text-zinc-500 mb-1">For this subject:</p>
                             <div className="flex flex-wrap gap-1.5">
                               {syncedEditSubjectGuestTeachers.map(g => {
                                 const active = syncedEditGuestTeachers.includes(g.id)
@@ -2031,12 +2031,12 @@ export default function Lessons() {
                     <div className="w-16 text-xs text-amber-600 font-medium shrink-0">{b.startTime}–{b.endTime}</div>
                     <div className="flex-1">
                       <p className="text-xs text-amber-700 font-medium">{b.name}</p>
-                      {hasLesson && <p className="text-[10px] text-amber-500">lesson scheduled</p>}
+                      {hasLesson && <p className="text-[11px] text-amber-500">lesson scheduled</p>}
                     </div>
                     {!hasLesson && (
                       <button
                         onClick={() => { navigate(`/teacher/lessons/new?date=${dayDetail.dateStr}&start=${b.startTime}&end=${b.endTime}`); setDayDetail(null) }}
-                        className="text-[10px] text-amber-600 hover:text-amber-800 border border-amber-300 rounded-md px-2 py-0.5 hover:bg-amber-100 transition-colors shrink-0"
+                        className="text-[11px] text-amber-600 hover:text-amber-800 border border-amber-300 rounded-md px-2 py-0.5 hover:bg-amber-100 transition-colors shrink-0"
                       >
                         + Schedule
                       </button>
@@ -2116,7 +2116,7 @@ export default function Lessons() {
                   onClick={() => setAddEventMode('personal')}
                 >
                   <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: myCalendarColor }}>
-                    <span className="text-[10px] text-white font-bold">P</span>
+                    <span className="text-[11px] text-white font-bold">P</span>
                   </div>
                   <div className="text-left">
                     <p className="font-semibold">Personal Event</p>
@@ -2211,7 +2211,7 @@ export default function Lessons() {
                           className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-colors text-left ${selected ? 'bg-brand-600/20' : 'hover:bg-white/5'}`}
                         >
                           <span className="flex-1" style={{ color: selected ? 'var(--brand)' : 'var(--text-primary)' }}>{g.displayName}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${roleLabel === 'teacher' ? 'bg-amber-900/50 text-amber-400' : 'bg-zinc-800 text-zinc-500'}`}>{roleLabel}</span>
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium ${roleLabel === 'teacher' ? 'bg-amber-900/50 text-amber-400' : 'bg-zinc-800 text-zinc-500'}`}>{roleLabel}</span>
                           {selected && <Check className="w-3.5 h-3.5 text-brand-400 flex-shrink-0" />}
                         </button>
                       )
@@ -2304,7 +2304,7 @@ export default function Lessons() {
                         className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-colors text-left ${isSelected ? 'bg-brand-600/20' : 'hover:bg-white/5'}`}
                       >
                         <span className="flex-1" style={{ color: isSelected ? 'var(--brand)' : 'var(--text-primary)' }}>{g.displayName}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${roleLabel === 'teacher' ? 'bg-amber-900/50 text-amber-400' : 'bg-zinc-800 text-zinc-500'}`}>{roleLabel}</span>
+                        <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium ${roleLabel === 'teacher' ? 'bg-amber-900/50 text-amber-400' : 'bg-zinc-800 text-zinc-500'}`}>{roleLabel}</span>
                         {isSelected && <Check className="w-3.5 h-3.5 text-brand-400 flex-shrink-0" />}
                       </button>
                     )

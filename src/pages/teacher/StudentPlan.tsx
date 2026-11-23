@@ -156,7 +156,7 @@ export default function StudentPlan() {
                     {step.label}
                   </span>
                   {commentCount > 0 && (
-                    <span className={`absolute -top-1 -right-1 min-w-[16px] h-4 flex items-center justify-center rounded-full text-white text-[9px] font-bold px-1 ${step.colors.bg}`}>
+                    <span className={`absolute -top-1 -right-1 min-w-[16px] h-4 flex items-center justify-center rounded-full text-white text-[10px] font-bold px-1 ${step.colors.bg}`}>
                       {commentCount}
                     </span>
                   )}

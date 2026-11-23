@@ -129,7 +129,7 @@ function FeedbackPanel({
           <div key={f.id} className="bg-zinc-800/60 rounded-xl p-3 space-y-1">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-brand-400">{f.teacherName}</span>
-              <span className="text-[10px] text-zinc-500">{relTime(f.createdAt)}</span>
+              <span className="text-[11px] text-zinc-500">{relTime(f.createdAt)}</span>
             </div>
             <p className="text-sm text-zinc-200 leading-relaxed">{f.comment}</p>
           </div>
@@ -176,7 +176,7 @@ function CollaboratorRow({
       <Avatar uid={uid} name={user?.displayName ?? uid} avatarUrl={user?.avatarUrl ?? null} size="xs" />
       <span className="text-sm text-zinc-300 flex-1 truncate">
         {user?.displayName ?? uid}
-        {isCreator && <span className="ml-1 text-[10px] text-zinc-500">(creator)</span>}
+        {isCreator && <span className="ml-1 text-[11px] text-zinc-500">(creator)</span>}
       </span>
       {canRemove && !isCreator && (
         <button
@@ -605,7 +605,7 @@ export default function ProductionEditor() {
                     <div className="flex items-center gap-1.5">
                       <UserPlus className="w-3.5 h-3.5 text-brand-400" />
                       <p className="text-xs font-semibold text-zinc-300">Editors</p>
-                      <span className="text-[10px] text-zinc-500 ml-auto">can edit</span>
+                      <span className="text-[11px] text-zinc-500 ml-auto">can edit</span>
                     </div>
                     <div className="space-y-1.5">
                       {allCollabIds.map(uid => (
@@ -638,7 +638,7 @@ export default function ProductionEditor() {
                                   className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-zinc-800 transition-colors disabled:opacity-40"
                                 >
                                   <span className="text-xs text-zinc-200 flex-1 truncate">{u.displayName}</span>
-                                  <span className="text-[10px] text-zinc-500 capitalize">{u.role}</span>
+                                  <span className="text-[11px] text-zinc-500 capitalize">{u.role}</span>
                                 </button>
                               ))}
                             </div>
@@ -657,7 +657,7 @@ export default function ProductionEditor() {
                       <div className="flex items-center gap-1.5">
                         <Eye className="w-3.5 h-3.5 text-amber-400" />
                         <p className="text-xs font-semibold text-zinc-300">Crew Viewers</p>
-                        <span className="text-[10px] text-zinc-500 ml-auto">view only</span>
+                        <span className="text-[11px] text-zinc-500 ml-auto">view only</span>
                       </div>
 
                       {/* Currently shared teams */}
@@ -692,7 +692,7 @@ export default function ProductionEditor() {
                       {/* Add team */}
                       {unsharedTeams.length > 0 && (
                         <div className="space-y-1">
-                          <p className="text-[10px] text-zinc-500">Share with a crew:</p>
+                          <p className="text-[11px] text-zinc-500">Share with a crew:</p>
                           {unsharedTeams.map(team => (
                             <button
                               key={team.id}
@@ -719,7 +719,7 @@ export default function ProductionEditor() {
                       <div className="flex items-center gap-1.5">
                         <Globe className="w-3.5 h-3.5 text-emerald-400" />
                         <p className="text-xs font-semibold text-zinc-300">Classes</p>
-                        <span className="text-[10px] text-zinc-500 ml-auto">view only</span>
+                        <span className="text-[11px] text-zinc-500 ml-auto">view only</span>
                       </div>
 
                       {/* Currently shared classes */}
@@ -748,7 +748,7 @@ export default function ProductionEditor() {
                         const unsharedCohorts = allCohorts.filter(c => !sharedIds.has(c.id))
                         return unsharedCohorts.length > 0 ? (
                           <div className="space-y-1">
-                            <p className="text-[10px] text-zinc-500">Share with a class:</p>
+                            <p className="text-[11px] text-zinc-500">Share with a class:</p>
                             {unsharedCohorts.map(cohort => (
                               <button
                                 key={cohort.id}
@@ -784,7 +784,7 @@ export default function ProductionEditor() {
                         </div>
                       ) : (
                         <div className="space-y-1">
-                          <p className="text-[10px] text-zinc-500">Add to a production period:</p>
+                          <p className="text-[11px] text-zinc-500">Add to a production period:</p>
                           {productionPeriods.map(period => (
                             <button
                               key={period.id}
@@ -792,13 +792,13 @@ export default function ProductionEditor() {
                               className="w-full flex items-center gap-2 px-2.5 py-1.5 bg-zinc-800/60 hover:bg-zinc-800 rounded-lg text-xs text-zinc-300 transition-colors text-left"
                             >
                               <span className="flex-1">{period.title}</span>
-                              <span className="text-zinc-500 text-[10px]">{period.startDate} – {period.endDate}</span>
+                              <span className="text-zinc-500 text-[11px]">{period.startDate} – {period.endDate}</span>
                             </button>
                           ))}
                         </div>
                       )}
                       {!production.periodId && (
-                        <p className="text-[10px] text-zinc-600">Productions not linked to a period are hidden from the production schedule.</p>
+                        <p className="text-[11px] text-zinc-600">Productions not linked to a period are hidden from the production schedule.</p>
                       )}
                     </div>
                   )}

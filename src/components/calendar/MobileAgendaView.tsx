@@ -290,7 +290,7 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
         )}
       >
         {!compact && (
-          <span className={cn('text-[10px] font-medium', sel ? 'text-brand-900 font-semibold uppercase tracking-wider' : weekend ? 'text-zinc-600' : 'text-zinc-400')}>
+          <span className={cn('text-[11px] font-medium', sel ? 'text-brand-900 font-semibold uppercase tracking-wider' : weekend ? 'text-zinc-600' : 'text-zinc-400')}>
             {format(day, 'EEE', { locale: enGB })}
           </span>
         )}
@@ -328,7 +328,7 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
               {format(referenceMonth, 'MMMM yyyy', { locale: enGB })}
             </span>
             {(!isExpanded || isDesktop) && (
-              <span className="px-2 py-0.5 rounded-full bg-zinc-700 text-zinc-300 text-[10px] font-medium whitespace-nowrap">
+              <span className="px-2 py-0.5 rounded-full bg-zinc-700 text-zinc-300 text-[11px] font-medium whitespace-nowrap">
                 Week {format(isExpanded ? selectedDate : currentWeekStart, 'w', { locale: enGB, weekStartsOn: 1, firstWeekContainsDate: 4 })}
               </span>
             )}
@@ -350,7 +350,7 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
         {isExpanded && (
           <div className="flex items-center">
             {DAY_LETTERS.map((l, i) => (
-              <div key={i} className="flex-1 text-center text-[10px] font-semibold text-zinc-500 pb-1">{l}</div>
+              <div key={i} className="flex-1 text-center text-[11px] font-semibold text-zinc-500 pb-1">{l}</div>
             ))}
           </div>
         )}
@@ -468,7 +468,7 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
                     >
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}` }} />
                       <p className="flex-1 min-w-0 text-sm font-semibold text-zinc-100 truncate">{cleanTitle(ev)}</p>
-                      <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-500 flex-shrink-0">
+                      <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-500 flex-shrink-0">
                         {kindOf(ev) === 'assignment' ? 'Due' : 'All day'}
                       </span>
                     </button>
@@ -529,7 +529,7 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
                         {status === 'current' && subject && (
                           <SubjectCover subject={subject} className="h-28">
                             {loc && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/50 backdrop-blur text-brand-300 text-[10px] font-semibold uppercase tracking-wider">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/50 backdrop-blur text-brand-300 text-[11px] font-semibold uppercase tracking-wider">
                                 <MapPin className="w-3 h-3" /> {loc}
                               </span>
                             )}
@@ -555,7 +555,7 @@ export default function MobileAgendaView({ events, onEventClick, onAddClick, ini
                             )}
                           </div>
                           {kind !== 'lesson' && (
-                            <span className="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 text-[10px] font-medium flex-shrink-0">{KIND_LABEL[kind].replace(/s$/, '')}</span>
+                            <span className="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 text-[11px] font-medium flex-shrink-0">{KIND_LABEL[kind].replace(/s$/, '')}</span>
                           )}
                         </div>
                       </button>

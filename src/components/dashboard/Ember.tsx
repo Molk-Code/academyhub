@@ -62,7 +62,7 @@ export function KpiCard({ icon: Icon, iconClass = 'text-zinc-400', value, label,
         <span className={cn('font-display text-3xl font-bold leading-none tracking-tight block', highlight ? 'text-brand-300' : 'text-zinc-100')}>
           {value}
         </span>
-        <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider block mt-1.5">{label}</span>
+        <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider block mt-1.5">{label}</span>
       </div>
     </Link>
   )
@@ -103,7 +103,7 @@ export function LessonSlateCard({ lesson, subject, to, footer }: {
           </span>
         </SubjectCover>
         {(lesson.classroom || lesson.isOnline) && (
-          <span className="absolute top-2.5 right-2.5 max-w-[60%] px-2 py-0.5 rounded-full bg-black/45 backdrop-blur-md text-ember-tertiary text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1">
+          <span className="absolute top-2.5 right-2.5 max-w-[60%] px-2 py-0.5 rounded-full bg-black/45 backdrop-blur-md text-ember-tertiary text-[11px] font-semibold uppercase tracking-wider flex items-center gap-1">
             {lesson.isOnline ? <Globe className="w-3 h-3 flex-shrink-0" /> : <MapPin className="w-3 h-3 flex-shrink-0" />}
             <span className="truncate">{lesson.isOnline ? 'Online' : lesson.classroom}</span>
           </span>

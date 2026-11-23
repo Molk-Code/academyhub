@@ -89,7 +89,7 @@ function AttendanceOverlay() {
           </span>
           <div className="text-left">
             <p className="text-xs font-bold leading-none">Attendance Active</p>
-            <p className="text-[10px] text-violet-300 mt-0.5 leading-none">{externalDeviceName}</p>
+            <p className="text-[11px] text-violet-300 mt-0.5 leading-none">{externalDeviceName}</p>
           </div>
         </button>
       )}
@@ -195,22 +195,22 @@ export default function TeacherLayout() {
                 <Icon className={cn('w-5 h-5 flex-shrink-0', isActive ? 'text-brand-400' : 'text-zinc-500')} />
                 <span className="flex-1">{label}</span>
                 {showUnread && chatUnread > 0 && (
-                  <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-brand-600 text-white text-[10px] font-bold px-1 leading-none">
+                  <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-brand-600 text-white text-[11px] font-bold px-1 leading-none">
                     {chatUnread}
                   </span>
                 )}
                 {showBooking && roomBookingBadge > 0 && (
-                  <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[10px] font-bold px-1 leading-none">
+                  <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[11px] font-bold px-1 leading-none">
                     {roomBookingBadge}
                   </span>
                 )}
                 {showCalendarBadge && calendarBadge > 0 && (
-                  <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-brand-600 text-white text-[10px] font-bold px-1 leading-none">
+                  <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-brand-600 text-white text-[11px] font-bold px-1 leading-none">
                     {calendarBadge}
                   </span>
                 )}
                 {showEquipmentBadge && bookingDetail.equipment > 0 && (
-                  <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold px-1 leading-none">
+                  <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[11px] font-bold px-1 leading-none">
                     {bookingDetail.equipment}
                   </span>
                 )}
@@ -232,7 +232,7 @@ export default function TeacherLayout() {
             <>
               <Film className={cn('w-5 h-5 flex-shrink-0', isActive ? 'text-gold-400' : 'text-gold-400/70')} />
               <span className="flex-1">Video Lab 🎬</span>
-              <span className="text-[10px] font-bold bg-gold-400/10 text-gold-400 px-1.5 py-0.5 rounded-full border border-gold-400/30 leading-none">Beta</span>
+              <span className="text-[11px] font-bold bg-gold-400/10 text-gold-400 px-1.5 py-0.5 rounded-full border border-gold-400/30 leading-none">Beta</span>
             </>
           )}
         </NavLink>}
@@ -302,7 +302,7 @@ export default function TeacherLayout() {
             <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain flex-shrink-0" />
             <div className="min-w-0">
               <span className="text-sm font-bold text-zinc-100 tracking-tight leading-none block truncate" title={shortName}>{shortName}</span>
-              <span className="text-[10px] text-zinc-400 leading-none">Teacher Portal</span>
+              <span className="text-[11px] text-zinc-400 leading-none">Teacher Portal</span>
             </div>
           </Link>
           <div className="flex items-center gap-1">
@@ -314,7 +314,7 @@ export default function TeacherLayout() {
             >
               <Menu className="w-5 h-5" />
               {totalBadge > 0 && (
-                <span className="absolute top-1 right-1 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold px-1 leading-none">
+                <span className="absolute top-1 right-1 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-rose-500 text-white text-[10px] font-bold px-1 leading-none">
                   {totalBadge > 99 ? '99+' : totalBadge}
                 </span>
               )}
@@ -336,7 +336,7 @@ export default function TeacherLayout() {
                 <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain flex-shrink-0" />
                 <div className="min-w-0">
                   <span className="text-sm font-bold text-zinc-100 leading-none block truncate" title={shortName}>{shortName}</span>
-                  <span className="text-[10px] text-zinc-400 leading-none">Teacher Portal</span>
+                  <span className="text-[11px] text-zinc-400 leading-none">Teacher Portal</span>
                 </div>
               </Link>
               <button aria-label="Close menu"

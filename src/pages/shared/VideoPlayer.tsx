@@ -482,11 +482,11 @@ export default function VideoPlayer() {
                         <span className="text-xs font-semibold text-zinc-200">{c.userName}</span>
                         <button
                           onClick={e => { e.stopPropagation(); setSeekTarget(c.timestamp); setCaptureTs(Math.round(c.timestamp)) }}
-                          className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium hover:bg-amber-200 transition-colors flex-shrink-0"
+                          className="text-[11px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium hover:bg-amber-200 transition-colors flex-shrink-0"
                         >
                           {formatTime(c.timestamp)}
                         </button>
-                        <span className="text-[10px] text-zinc-400 capitalize">{c.userRole}</span>
+                        <span className="text-[11px] text-zinc-400 capitalize">{c.userRole}</span>
                       </div>
                       <p className="text-xs text-zinc-300 leading-relaxed">{c.text}</p>
                     </div>

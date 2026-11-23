@@ -239,7 +239,7 @@ export default function AdminLayout() {
                           <Icon className={cn('w-4 h-4 flex-shrink-0', isActive ? 'text-white' : 'text-zinc-500')} />
                           <span className="flex-1">{label}</span>
                           {badgeCount > 0 && (
-                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-brand-500 text-white text-[10px] font-bold px-1 leading-none">{badgeCount}</span>
+                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-brand-500 text-white text-[11px] font-bold px-1 leading-none">{badgeCount}</span>
                           )}
                         </>
                       )}
@@ -265,7 +265,7 @@ export default function AdminLayout() {
             <>
               <Film className={cn('w-5 h-5 flex-shrink-0', isActive ? 'text-amber-300' : 'text-amber-500')} />
               <span className="flex-1">Video Lab 🎬</span>
-              <span className="text-[10px] font-bold bg-amber-900/30 text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-700/40 leading-none">Beta</span>
+              <span className="text-[11px] font-bold bg-amber-900/30 text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-700/40 leading-none">Beta</span>
             </>
           )}
         </NavLink>}
@@ -315,8 +315,8 @@ export default function AdminLayout() {
         {storageQuotaGB && (
           <div className="mx-0 mb-1 px-3 py-2 rounded-xl bg-white/5">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] text-zinc-400 font-medium">Storage</span>
-              <span className="text-[10px] text-zinc-500">{fmtB(storageUsedBytes)} / {storageQuotaGB} GB</span>
+              <span className="text-[11px] text-zinc-400 font-medium">Storage</span>
+              <span className="text-[11px] text-zinc-500">{fmtB(storageUsedBytes)} / {storageQuotaGB} GB</span>
             </div>
             <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
               <div className={`h-full rounded-full transition-all ${storageBarColor}`} style={{ width: `${storageQuotaPct}%` }} />
@@ -362,7 +362,7 @@ export default function AdminLayout() {
             <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain flex-shrink-0" />
             <div className="min-w-0">
               <span className="text-sm font-bold text-white tracking-tight leading-none block truncate" title={shortName}>{shortName}</span>
-              <span className="text-[10px] text-rose-400 leading-none">Admin Portal</span>
+              <span className="text-[11px] text-rose-400 leading-none">Admin Portal</span>
             </div>
           </Link>
           <div className="flex items-center gap-1">
@@ -374,7 +374,7 @@ export default function AdminLayout() {
             >
               <Menu className="w-5 h-5" />
               {totalBadge > 0 && (
-                <span className="absolute top-1 right-1 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold px-1 leading-none">
+                <span className="absolute top-1 right-1 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-rose-500 text-white text-[10px] font-bold px-1 leading-none">
                   {totalBadge > 99 ? '99+' : totalBadge}
                 </span>
               )}
@@ -396,7 +396,7 @@ export default function AdminLayout() {
                 <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain flex-shrink-0" />
                 <div className="min-w-0">
                   <span className="text-sm font-bold text-white leading-none block truncate" title={shortName}>{shortName}</span>
-                  <span className="text-[10px] text-rose-400 leading-none">Admin Portal</span>
+                  <span className="text-[11px] text-rose-400 leading-none">Admin Portal</span>
                 </div>
               </Link>
               <button aria-label="Close menu"

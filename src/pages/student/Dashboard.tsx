@@ -331,7 +331,7 @@ function DashboardTodoWidget({ uid, rawTodos }: { uid: string; rawTodos: TodoDoc
                 </button>
                 <span className={`flex-1 text-sm text-zinc-200 ${fading ? 'line-through text-zinc-500' : ''}`}>{t.title}</span>
                 {t.category === 'urgent' && (
-                  <span className="text-[10px] font-bold bg-rose-950/40 text-rose-300 px-1.5 py-0.5 rounded-full border border-rose-800/50 flex-shrink-0">Urgent</span>
+                  <span className="text-[11px] font-bold bg-rose-950/40 text-rose-300 px-1.5 py-0.5 rounded-full border border-rose-800/50 flex-shrink-0">Urgent</span>
                 )}
               </div>
             )
@@ -812,7 +812,7 @@ export default function StudentDashboard() {
                   <p className="text-sm font-bold text-orange-400 leading-none">
                     {hasCustomLevels ? (currentExpLevel?.name ?? expLevels[0]?.name ?? '—') : `Level ${lvl}`}
                   </p>
-                  <p className="text-[10px] text-zinc-500 mt-0.5">
+                  <p className="text-[11px] text-zinc-500 mt-0.5">
                     {hasCustomLevels
                       ? nextExpLevel
                         ? `${nextExpLevel.pointsRequired - total} pts to ${nextExpLevel.name}`
@@ -896,7 +896,7 @@ export default function StudentDashboard() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-zinc-200 truncate">{b.label}</p>
                     {b.timeModified && (
-                      <p className="text-[10px] font-bold text-amber-600 mt-0.5">⏰ Time updated by admin</p>
+                      <p className="text-[11px] font-bold text-amber-600 mt-0.5">⏰ Time updated by admin</p>
                     )}
                   </div>
                   <span className={cn('inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border flex-shrink-0', statusColor)}>

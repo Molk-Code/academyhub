@@ -271,7 +271,7 @@ export default function SubjectList() {
             />
             {query
               ? <button onClick={() => setQuery('')} aria-label="Clear search" className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-200"><X className="w-3.5 h-3.5" /></button>
-              : <kbd className="hidden sm:block absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700 pointer-events-none">{isMac ? '⌘K' : 'Ctrl K'}</kbd>}
+              : <kbd className="hidden sm:block absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-mono text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700 pointer-events-none">{isMac ? '⌘K' : 'Ctrl K'}</kbd>}
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 -mx-4 px-4 sm:mx-0 sm:px-0 min-w-0 w-full sm:w-auto sm:flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -367,7 +367,7 @@ export default function SubjectList() {
                           {subject.title}
                         </h2>
                       </div>
-                      <span className={cn('px-2 py-0.5 text-[10px] font-semibold rounded border flex-shrink-0', badge.cls)}>{badge.label}</span>
+                      <span className={cn('px-2 py-0.5 text-[11px] font-semibold rounded border flex-shrink-0', badge.cls)}>{badge.label}</span>
                     </div>
                     <p className="text-xs text-zinc-400 mt-2 line-clamp-2 min-h-[2rem]">{blurb}</p>
                     <div className="flex items-center gap-2 mt-4 text-[11px] text-zinc-400 min-w-0">
@@ -430,7 +430,7 @@ export default function SubjectList() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 min-w-0">
                     <p className="font-display text-sm font-semibold text-zinc-100 truncate group-hover:text-brand-400 transition-colors">{subject.title}</p>
-                    <span className={cn('hidden sm:inline px-1.5 py-0.5 rounded border text-[9px] font-semibold flex-shrink-0', badge.cls)}>{badge.label}</span>
+                    <span className={cn('hidden sm:inline px-1.5 py-0.5 rounded border text-[11px] font-semibold flex-shrink-0', badge.cls)}>{badge.label}</span>
                   </div>
                   <p className="text-xs text-zinc-500 truncate flex items-center gap-1.5">
                     <UserCheck className="w-3 h-3 flex-shrink-0" />
@@ -449,7 +449,7 @@ export default function SubjectList() {
                       ? <div className={cn('h-full rounded-full', STATUS_BAR[status])} style={{ width: `${pct}%` }} />
                       : <div className="h-full w-full bg-[repeating-linear-gradient(90deg,#353940_0_6px,transparent_6px_10px)]" />}
                   </div>
-                  <p className="text-[10px] text-zinc-500 text-right font-mono">{cp ? `${cp.covered}/${cp.total} · ${pct}%` : 'No topics'}</p>
+                  <p className="text-[11px] text-zinc-500 text-right font-mono">{cp ? `${cp.covered}/${cp.total} · ${pct}%` : 'No topics'}</p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-200 flex-shrink-0" />
               </Link>

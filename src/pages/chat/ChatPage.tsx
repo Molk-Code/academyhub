@@ -696,7 +696,7 @@ export default function ChatPage() {
                             {/* Avatar / grouped timestamp */}
                             <div className="w-10 flex-shrink-0 pt-0.5 flex justify-center">
                               {grouped ? (
-                                <span className="text-[10px] text-zinc-400 tabular-nums opacity-0 group-hover:opacity-100 transition-opacity leading-5 mt-0.5">
+                                <span className="text-[11px] text-zinc-400 tabular-nums opacity-0 group-hover:opacity-100 transition-opacity leading-5 mt-0.5">
                                   {msgTime ? format(msgTime, 'HH:mm') : ''}
                                 </span>
                               ) : (
@@ -887,7 +887,7 @@ export default function ChatPage() {
                     <Send className={cn('w-4 h-4', sending && 'animate-pulse')} />
                   </button>
                 </div>
-                <p className="text-[10px] text-zinc-400 mt-1 px-1">Enter to send · Shift+Enter for new line</p>
+                <p className="text-[11px] text-zinc-400 mt-1 px-1">Enter to send · Shift+Enter for new line</p>
               </div>
             </>
           )}

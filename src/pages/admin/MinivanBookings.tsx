@@ -154,7 +154,7 @@ function BookingRow({ b }: { b: MinivanBookingDoc }) {
               <span className="text-zinc-400">at</span>
               <TimeEditor label={effectiveTimeFrom} value={effectiveTimeFrom} type="time" onSave={saveTimeFrom} />
               {b.scheduleModified && (
-                <span className="text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">Admin updated</span>
+                <span className="text-[11px] font-bold bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">Admin updated</span>
               )}
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">

@@ -256,12 +256,12 @@ function EventCard({
           <div className="flex items-start justify-between gap-2">
             <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{ev.title}</p>
             {active && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 bg-emerald-900/40 text-emerald-400 border border-emerald-700/40">
+              <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 bg-emerald-900/40 text-emerald-400 border border-emerald-700/40">
                 Active
               </span>
             )}
             {!active && !past && days <= 14 && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 bg-amber-900/40 text-amber-400 border border-amber-700/40">
+              <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 bg-amber-900/40 text-amber-400 border border-amber-700/40">
                 {days}d
               </span>
             )}

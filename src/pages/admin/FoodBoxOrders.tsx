@@ -147,7 +147,7 @@ function OrderRow({ order }: { order: FoodBoxOrderDoc }) {
               ) : (
                 <span className="flex items-center gap-2">
                   <span>{effectiveDate}</span>
-                  {order.adminDate && <span className="text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">Admin updated</span>}
+                  {order.adminDate && <span className="text-[11px] font-bold bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">Admin updated</span>}
                   <button onClick={() => { setDateInput(effectiveDate); setEditingDate(true) }} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 text-xs font-medium hover:bg-brand-500/15 hover:text-brand-400 transition-colors">
                     <Pencil className="w-3 h-3" /> Edit date
                   </button>
@@ -179,7 +179,7 @@ function OrderRow({ order }: { order: FoodBoxOrderDoc }) {
                 <span className="flex items-center gap-2 flex-wrap">
                   <span>{effectivePickupTime ?? '–'}</span>
                   {order.pickupTimeModified && (
-                    <span className="text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">Admin updated</span>
+                    <span className="text-[11px] font-bold bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">Admin updated</span>
                   )}
                   <button
                     onClick={() => { setTimeInput(effectivePickupTime ?? ''); setEditingTime(true) }}

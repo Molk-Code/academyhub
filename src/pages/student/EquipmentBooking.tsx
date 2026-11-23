@@ -69,7 +69,7 @@ function EquipmentCard({ item, cartQty, isYear2, onAdd, onRemove }: {
           </div>
         )}
         <span className={cn(
-          'absolute top-2 left-2 text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full border',
+          'absolute top-2 left-2 text-[11px] font-bold tracking-wider px-2 py-0.5 rounded-full border',
           CATEGORY_STYLE[item.category],
         )}>
           {item.category}
@@ -78,13 +78,13 @@ function EquipmentCard({ item, cartQty, isYear2, onAdd, onRemove }: {
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
             <div className="flex flex-col items-center gap-1">
               <Lock className="w-5 h-5 text-amber-400" />
-              <span className="text-[10px] font-bold text-amber-300">Year 2 Only</span>
+              <span className="text-[11px] font-bold text-amber-300">Year 2 Only</span>
             </div>
           </div>
         )}
         {soldOut && !locked && (
           <div className="absolute bottom-2 right-2">
-            <span className="text-[10px] font-bold text-rose-300 bg-rose-900/80 border border-rose-700/50 px-2 py-0.5 rounded-full">
+            <span className="text-[11px] font-bold text-rose-300 bg-rose-900/80 border border-rose-700/50 px-2 py-0.5 rounded-full">
               Unavailable
             </span>
           </div>
@@ -414,7 +414,7 @@ function MyBookingsTab({ uid }: { uid: string }) {
                   {booking.checkoutDate} → {booking.returnDate}
                 </p>
               </div>
-              <span className={cn('flex items-center gap-1.5 text-[10px] font-bold tracking-wider px-2.5 py-1 rounded-full border flex-shrink-0', cfg?.style)}>
+              <span className={cn('flex items-center gap-1.5 text-[11px] font-bold tracking-wider px-2.5 py-1 rounded-full border flex-shrink-0', cfg?.style)}>
                 <Icon className="w-3 h-3" />
                 {cfg?.label}
               </span>
@@ -545,7 +545,7 @@ export default function EquipmentBooking() {
           <ShoppingCart className="w-4 h-4" />
           <span className="text-sm font-medium hidden sm:block">Cart</span>
           {cartCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 flex items-center justify-center rounded-full bg-brand-600 text-white text-[10px] font-bold px-1">
+            <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 flex items-center justify-center rounded-full bg-brand-600 text-white text-[11px] font-bold px-1">
               {cartCount}
             </span>
           )}

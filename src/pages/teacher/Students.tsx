@@ -364,7 +364,7 @@ export default function Students() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <Avatar uid={student.uid} name={student.displayName} avatarUrl={student.avatarUrl} size="sm" enlargeable />
-                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                    <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
                       student.isActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
                     }`}>
                       {student.isActive ? 'Active' : 'Inactive'}
@@ -388,8 +388,8 @@ export default function Students() {
                   </div>
                   {hasAnyLessonToday && (
                     <div className="flex items-center gap-1">
-                      {isPresent === true  && <span className="badge badge-green text-[10px]">Present</span>}
-                      {isPresent === false && <span className="badge badge-rose text-[10px]">Absent</span>}
+                      {isPresent === true  && <span className="badge badge-green text-[11px]">Present</span>}
+                      {isPresent === false && <span className="badge badge-rose text-[11px]">Absent</span>}
                     </div>
                   )}
                 </Link>

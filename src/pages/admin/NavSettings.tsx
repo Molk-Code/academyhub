@@ -343,7 +343,7 @@ export default function NavSettings() {
                     </div>
                     <div className="flex items-center gap-1.5 mr-3">
                       {link.roles.map(r => (
-                        <span key={r} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-white/10 capitalize">
+                        <span key={r} className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-white/10 capitalize">
                           {r}s
                         </span>
                       ))}

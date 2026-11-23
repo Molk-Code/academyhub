@@ -190,7 +190,7 @@ function ReportCard({ report }: { report: BugReportDoc }) {
           {(report.elementPath || report.elementText) && (
             <div className="bg-zinc-800/60 border border-white/5 rounded-xl px-3 py-2.5 space-y-1.5">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">Element</p>
+                <p className="text-[11px] uppercase tracking-wider text-zinc-600 font-medium">Element</p>
                 {report.elementSelector && (
                   <button
                     onClick={goToElement}
@@ -213,7 +213,7 @@ function ReportCard({ report }: { report: BugReportDoc }) {
           {/* Device info */}
           {report.deviceType && (
             <div className="bg-zinc-800/60 border border-white/5 rounded-xl px-3 py-2.5 space-y-1">
-              <p className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">Device</p>
+              <p className="text-[11px] uppercase tracking-wider text-zinc-600 font-medium">Device</p>
               <p className="text-xs text-zinc-300 capitalize">
                 {report.deviceType}
                 {report.viewportWidth ? ` · ${report.viewportWidth}×${report.viewportHeight}` : ''}
@@ -226,13 +226,13 @@ function ReportCard({ report }: { report: BugReportDoc }) {
 
           {/* Full description */}
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium mb-1.5">Description</p>
+            <p className="text-[11px] uppercase tracking-wider text-zinc-600 font-medium mb-1.5">Description</p>
             <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">{report.description}</p>
           </div>
 
           {/* Messages to reporter */}
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium mb-1.5 flex items-center gap-1.5">
+            <p className="text-[11px] uppercase tracking-wider text-zinc-600 font-medium mb-1.5 flex items-center gap-1.5">
               <MessageCircle className="w-3 h-3" /> Messages to {report.displayName}
             </p>
             {report.messages && report.messages.length > 0 && (
@@ -276,7 +276,7 @@ function ReportCard({ report }: { report: BugReportDoc }) {
 
           {/* Claude Code prompt */}
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium mb-1.5">Claude Code prompt</p>
+            <p className="text-[11px] uppercase tracking-wider text-zinc-600 font-medium mb-1.5">Claude Code prompt</p>
             <pre className="text-xs text-zinc-400 bg-zinc-800/60 border border-white/5 rounded-xl p-3 overflow-x-auto whitespace-pre-wrap leading-relaxed font-mono">
               {buildClaudePrompt(report)}
             </pre>

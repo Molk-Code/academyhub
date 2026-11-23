@@ -859,7 +859,7 @@ export default function EquipmentBookingPage() {
                     {totalPrice.toLocaleString('sv-SE')} / {budgetInfo.equipmentBudget.toLocaleString('sv-SE')} SEK
                   </div>
                   {totalPrice > budgetInfo.equipmentBudget && (
-                    <div style={{ fontSize: '.68rem', color: '#f87171', marginTop: 2 }}>⚠ Exceeds equipment budget</div>
+                    <div style={{ fontSize: '.6875rem', color: '#f87171', marginTop: 2 }}>⚠ Exceeds equipment budget</div>
                   )}
                 </div>
               )}
@@ -1048,8 +1048,8 @@ export default function EquipmentBookingPage() {
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                                 <p style={{ fontWeight: 600, fontSize: '.85rem', color: '#f0f0f5', margin: 0 }}>{prod.title}</p>
                                 {r?.isReady
-                                  ? <span style={{ fontSize: '.65rem', fontWeight: 700, background: 'rgba(16,185,129,.2)', color: '#34d399', border: '1px solid rgba(16,185,129,.3)', borderRadius: 20, padding: '2px 7px' }}>✓ Ready</span>
-                                  : <span style={{ fontSize: '.65rem', fontWeight: 700, background: 'rgba(255,255,255,.08)', color: '#979ca7', borderRadius: 20, padding: '2px 7px' }}>{r?.score ?? 0}%</span>
+                                  ? <span style={{ fontSize: '.6875rem', fontWeight: 700, background: 'rgba(16,185,129,.2)', color: '#34d399', border: '1px solid rgba(16,185,129,.3)', borderRadius: 20, padding: '2px 7px' }}>✓ Ready</span>
+                                  : <span style={{ fontSize: '.6875rem', fontWeight: 700, background: 'rgba(255,255,255,.08)', color: '#979ca7', borderRadius: 20, padding: '2px 7px' }}>{r?.score ?? 0}%</span>
                                 }
                               </div>
                               <div style={{ height: 3, background: 'rgba(255,255,255,.08)', borderRadius: 99, overflow: 'hidden', marginBottom: 6 }}>
@@ -1075,7 +1075,7 @@ export default function EquipmentBookingPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontSize: '1.5rem' }}>🎬</span>
                     <div>
-                      <p style={{ fontSize: '.65rem', color: '#34d399', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', margin: 0 }}>Booking for production</p>
+                      <p style={{ fontSize: '.6875rem', color: '#34d399', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', margin: 0 }}>Booking for production</p>
                       <p style={{ fontWeight: 700, color: '#f0f0f5', margin: 0, fontSize: '.9rem' }}>{selectedProduction?.title}</p>
                     </div>
                   </div>
@@ -1087,16 +1087,16 @@ export default function EquipmentBookingPage() {
                   <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 12, padding: '12px 16px' }}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: 8 }}>
                       <div>
-                        <p style={{ fontSize: '.6rem', color: '#979ca7', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Total budget</p>
+                        <p style={{ fontSize: '.6875rem', color: '#979ca7', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Total budget</p>
                         <p style={{ fontSize: '.95rem', fontWeight: 700, color: '#f0f0f5', margin: 0 }}>{budgetInfo.limit.toLocaleString('sv-SE')} <span style={{ fontWeight: 400, color: '#979ca7', fontSize: '.75rem' }}>SEK</span></p>
                       </div>
                       <div>
-                        <p style={{ fontSize: '.6rem', color: '#979ca7', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Salaries</p>
+                        <p style={{ fontSize: '.6875rem', color: '#979ca7', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Salaries</p>
                         <p style={{ fontSize: '.95rem', fontWeight: 700, color: '#60a5fa', margin: 0 }}>{budgetInfo.salaryCost.toLocaleString('sv-SE')} <span style={{ fontWeight: 400, color: '#979ca7', fontSize: '.75rem' }}>/ {budgetInfo.limit.toLocaleString('sv-SE')} SEK</span></p>
                       </div>
                       {pricingEnabled && (
                         <div>
-                          <p style={{ fontSize: '.6rem', color: '#979ca7', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Equipment budget</p>
+                          <p style={{ fontSize: '.6875rem', color: '#979ca7', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Equipment budget</p>
                           <p style={{ fontSize: '.95rem', fontWeight: 700, color: totalPrice > budgetInfo.equipmentBudget ? '#f87171' : '#34d399', margin: 0 }}>
                             {(budgetInfo.equipmentBudget - totalPrice).toLocaleString('sv-SE')} <span style={{ fontWeight: 400, color: '#979ca7', fontSize: '.75rem' }}>/ {budgetInfo.equipmentBudget.toLocaleString('sv-SE')} SEK remaining</span>
                           </p>
@@ -1111,9 +1111,9 @@ export default function EquipmentBookingPage() {
                       )}
                     </div>
                     <div style={{ display: 'flex', gap: '1rem', marginTop: 5 }}>
-                      <span style={{ fontSize: '.65rem', color: '#3b82f6' }}>■ Salaries</span>
-                      {pricingEnabled && <span style={{ fontSize: '.65rem', color: '#10b981' }}>■ Equipment in cart</span>}
-                      <span style={{ fontSize: '.65rem', color: '#3a3a4a' }}>■ Available</span>
+                      <span style={{ fontSize: '.6875rem', color: '#3b82f6' }}>■ Salaries</span>
+                      {pricingEnabled && <span style={{ fontSize: '.6875rem', color: '#10b981' }}>■ Equipment in cart</span>}
+                      <span style={{ fontSize: '.6875rem', color: '#3a3a4a' }}>■ Available</span>
                     </div>
                   </div>
                 )}
@@ -1203,7 +1203,7 @@ export default function EquipmentBookingPage() {
                         />
                         <span className="product-category-tag">{item.category}</span>
                         {equipmentImages(item).length > 1 && (
-                          <span style={{ position: 'absolute', bottom: 8, right: 8, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '.65rem', fontWeight: 700, background: 'rgba(14,14,22,.8)', color: '#fff', borderRadius: 10, padding: '2px 7px' }}>
+                          <span style={{ position: 'absolute', bottom: 8, right: 8, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '.6875rem', fontWeight: 700, background: 'rgba(14,14,22,.8)', color: '#fff', borderRadius: 10, padding: '2px 7px' }}>
                             <Images size={11} /> {equipmentImages(item).length}
                           </span>
                         )}

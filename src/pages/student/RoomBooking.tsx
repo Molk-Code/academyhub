@@ -346,12 +346,12 @@ export default function RoomBooking({ standalone = false }: { standalone?: boole
                           ) : isMine ? (
                             <div>
                               <div className="font-semibold">You</div>
-                              <div className="opacity-60 text-[10px] mt-0.5">tap to cancel</div>
+                              <div className="opacity-60 text-[11px] mt-0.5">tap to cancel</div>
                             </div>
                           ) : isBooked ? (
                             <div>
                               <div className="font-medium">Taken</div>
-                              <div className="opacity-50 text-[10px] mt-0.5 truncate">{booking.studentName.split(' ')[0]}</div>
+                              <div className="opacity-50 text-[11px] mt-0.5 truncate">{booking.studentName.split(' ')[0]}</div>
                             </div>
                           ) : isLimitHit ? (
                             <div className="font-medium">—</div>

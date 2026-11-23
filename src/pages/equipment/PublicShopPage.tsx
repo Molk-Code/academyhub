@@ -461,7 +461,7 @@ export default function PublicShopPage() {
             <ShoppingCart className="w-4 h-4" />
             <span>Cart</span>
             {cartCount > 0 && (
-              <span className="ml-1 bg-white text-orange-600 text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+              <span className="ml-1 bg-white text-orange-600 text-[11px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
                 {cartCount}
               </span>
             )}
@@ -548,7 +548,7 @@ export default function PublicShopPage() {
 
                   <div className="p-3 flex flex-col gap-2 flex-1">
                     {/* Category badge */}
-                    <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">{item.category}</span>
+                    <span className="text-[11px] font-bold text-orange-400 uppercase tracking-wider">{item.category}</span>
                     {/* Name */}
                     <p className="text-sm font-semibold text-white leading-tight line-clamp-2">{item.name}</p>
                     {/* Price */}

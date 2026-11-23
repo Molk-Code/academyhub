@@ -19,7 +19,7 @@ export function PartStatusBadge({ booking, category, catalog }: { booking: Equip
   const items = bookingParts(booking, catalog).find(p => p.category === category)?.items ?? []
   const missing = st === 'confirmed' ? items.filter(it => isItemUnavailable(booking, it)).length : 0
   return (
-    <span className={cn('inline-flex items-center gap-1 text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-full border whitespace-nowrap', STATUS[st].cls)}>
+    <span className={cn('inline-flex items-center gap-1 text-[11px] font-bold tracking-wide px-2 py-0.5 rounded-full border whitespace-nowrap', STATUS[st].cls)}>
       {st === 'pending' ? <Clock className="w-3 h-3" /> : st === 'denied' ? <X className="w-3 h-3" /> : <Check className="w-3 h-3" />}
       {STATUS[st].label}{missing ? ` · ${missing} not available` : ''}{by && (st === 'confirmed' || st === 'denied') ? ` · ${by}` : ''}
     </span>
@@ -34,7 +34,7 @@ function ItemLine({ booking, item, children }: { booking: EquipmentBookingDoc; i
       <span className={cn('min-w-0 break-words', off ? 'text-zinc-500 line-through' : 'text-zinc-300')}>
         {item.equipmentName}
         {item.kitName && <span className="ml-1.5 text-[11px] text-zinc-500">{item.kitName}</span>}
-        {off && <span className="ml-1.5 no-underline inline-block text-[10px] font-bold text-rose-300 not-italic" style={{ textDecoration: 'none' }}>Not available</span>}
+        {off && <span className="ml-1.5 no-underline inline-block text-[11px] font-bold text-rose-300 not-italic" style={{ textDecoration: 'none' }}>Not available</span>}
       </span>
       <span className="flex items-center gap-2 flex-shrink-0">
         <span className="text-zinc-500">×{item.quantity}</span>
@@ -175,7 +175,7 @@ export function BookingPartsSummary({ booking }: { booking: EquipmentBookingDoc 
       {parts.map(p => (
         <div key={p.category} className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">{p.category}</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">{p.category}</span>
             <PartStatusBadge booking={booking} category={p.category} />
           </div>
           <BookingItemsInline booking={booking} items={p.items} />

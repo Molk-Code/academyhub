@@ -257,7 +257,7 @@ export function BookingsTab() {
                   <div style={{ flex: 1, minWidth: 120 }}>
                     <p style={{ fontWeight: 700, fontSize: '.9rem', color: '#f0f0f5', margin: 0 }}>{b.projectName}</p>
                     <p style={{ fontSize: '.75rem', color: '#979ca7', margin: '2px 0 0' }}>
-                      {b.isGuest && <span style={{ fontSize: '.65rem', fontWeight: 700, color: '#38bdf8', border: '1px solid #38bdf850', borderRadius: 20, padding: '1px 7px', marginRight: 6 }}>Rental shop</span>}
+                      {b.isGuest && <span style={{ fontSize: '.6875rem', fontWeight: 700, color: '#38bdf8', border: '1px solid #38bdf850', borderRadius: 20, padding: '1px 7px', marginRight: 6 }}>Rental shop</span>}
                       {b.isGuest ? b.guestName ?? b.studentName : b.studentName}
                       {/* A shop guest has no account: their contact details */}
                       {b.isGuest && (b.guestEmail || b.guestPhone) && (

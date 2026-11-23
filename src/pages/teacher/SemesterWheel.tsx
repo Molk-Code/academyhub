@@ -505,7 +505,7 @@ function EventCard({
               {ev.title}
             </p>
             {active && (
-              <span className="animate-pulse text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              <span className="animate-pulse text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                 Active now
               </span>
             )}
@@ -520,18 +520,18 @@ function EventCard({
           )}
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             <span
-              className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+              className="text-[11px] px-2 py-0.5 rounded-full font-medium"
               style={{ backgroundColor: `${color}22`, color, border: `1px solid ${color}44` }}
             >
               {ev.category}
             </span>
             {!active && past && (
-              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
                 {ago === 0 ? 'Ended today' : ago === 1 ? 'Ended yesterday' : `Ended ${ago} days ago`}
               </span>
             )}
             {!active && !past && (
-              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
                 {days === 0 ? 'Starts today' : days === 1 ? 'Tomorrow' : `In ${days} days`}
               </span>
             )}

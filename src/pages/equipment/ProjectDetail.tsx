@@ -835,7 +835,7 @@ export function ProjectDetail({
               Scan this QR code on a mobile device to start scanning equipment into this project.
               In the installed app you can also choose Inventory → Phone scanner, then scan the code (no extra sign-in).
             </p>
-            <p style={{ fontSize: '.65rem', color: '#8c919b', fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center', maxWidth: 320 }}>
+            <p style={{ fontSize: '.6875rem', color: '#8c919b', fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center', maxWidth: 320 }}>
               {window.location.origin}/scan/{remoteSessionId}
             </p>
           </div>

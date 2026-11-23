@@ -41,7 +41,7 @@ export default function EmojiPicker({ value, onChange }: Props) {
         <div className="absolute top-full left-0 mt-1 z-30 bg-zinc-900 rounded-2xl border border-white/10 shadow-xl w-72 max-h-72 overflow-y-auto p-3 space-y-3">
           {EMOJI_GROUPS.map(group => (
             <div key={group.label}>
-              <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">{group.label}</p>
+              <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">{group.label}</p>
               <div className="flex flex-wrap gap-0.5">
                 {group.emojis.map(e => (
                   <button

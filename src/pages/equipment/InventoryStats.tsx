@@ -54,7 +54,7 @@ function CohortBadge({ cohortId, cohorts }: { cohortId: string; cohorts: Record<
   const name = cohorts[cohortId] ?? cohortId
   if (!name) return null
   return (
-    <span style={{ fontSize: '.65rem', fontWeight: 700, background: 'rgba(249,115,22,.12)', color: '#f97316', border: '1px solid rgba(249,115,22,.25)', borderRadius: 10, padding: '2px 7px' }}>
+    <span style={{ fontSize: '.6875rem', fontWeight: 700, background: 'rgba(249,115,22,.12)', color: '#f97316', border: '1px solid rgba(249,115,22,.25)', borderRadius: 10, padding: '2px 7px' }}>
       {name}
     </span>
   )
@@ -212,7 +212,7 @@ function EquipmentStatusTab({
                   <td style={{ padding: '.5rem .75rem', color: '#f0f0f5', fontWeight: 600 }}>
                     {name}{checkedOutCount > 1 ? <span style={{ color: '#979ca7', fontWeight: 700 }}> ×{checkedOutCount}</span> : ''}
                     {manual && (
-                      <span style={{ marginLeft: 8, fontSize: '.62rem', fontWeight: 700, color: '#a1a1aa', border: '1px solid #3a3a4a', borderRadius: 8, padding: '1px 6px', verticalAlign: 'middle' }}>
+                      <span style={{ marginLeft: 8, fontSize: '.6875rem', fontWeight: 700, color: '#a1a1aa', border: '1px solid #3a3a4a', borderRadius: 8, padding: '1px 6px', verticalAlign: 'middle' }}>
                         MANUAL
                       </span>
                     )}
@@ -418,7 +418,7 @@ function ProjectsTab({
         <td style={{ padding: '.5rem .75rem', color: '#979ca7', fontSize: '.78rem' }}>{(p.borrowers ?? []).slice(0, 3).join(', ')}{(p.borrowers?.length ?? 0) > 3 ? ` +${p.borrowers!.length - 3}` : ''}</td>
         <td style={{ padding: '.5rem .75rem', color: '#979ca7', fontSize: '.75rem', whiteSpace: 'nowrap' }}>{formatRange(p.checkoutDate, p.returnDate)}</td>
         <td style={{ padding: '.5rem .75rem' }}>
-          <span style={{ fontSize: '.65rem', fontWeight: 700, color: statusColor, background: statusColor + '18', border: `1px solid ${statusColor}40`, borderRadius: 10, padding: '2px 7px' }}>
+          <span style={{ fontSize: '.6875rem', fontWeight: 700, color: statusColor, background: statusColor + '18', border: `1px solid ${statusColor}40`, borderRadius: 10, padding: '2px 7px' }}>
             {p.status}
           </span>
         </td>

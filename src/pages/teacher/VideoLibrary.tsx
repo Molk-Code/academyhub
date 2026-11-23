@@ -149,11 +149,11 @@ export default function TeacherVideoLibrary() {
                   {/* Status */}
                   <div className="absolute top-2 right-2">
                     {video.reviewStatus === 'reviewed' ? (
-                      <span className="flex items-center gap-1 text-[10px] font-semibold bg-emerald-500 text-white px-1.5 py-0.5 rounded-full">
+                      <span className="flex items-center gap-1 text-[11px] font-semibold bg-emerald-500 text-white px-1.5 py-0.5 rounded-full">
                         <CheckCircle2 className="w-2.5 h-2.5" /> Reviewed
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-[10px] font-semibold bg-amber-500 text-white px-1.5 py-0.5 rounded-full">
+                      <span className="flex items-center gap-1 text-[11px] font-semibold bg-amber-500 text-white px-1.5 py-0.5 rounded-full">
                         <Clock className="w-2.5 h-2.5" /> Pending
                       </span>
                     )}

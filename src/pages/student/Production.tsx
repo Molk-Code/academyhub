@@ -308,10 +308,10 @@ export default function StudentProduction() {
             <p className="font-semibold text-zinc-100 truncate group-hover:text-brand-400 transition-colors text-sm">{prod.title}</p>
             <div className="flex items-center gap-1.5 mt-0.5">
               {isCustom
-                ? <span className="text-[10px] text-zinc-500">Custom project</span>
+                ? <span className="text-[11px] text-zinc-500">Custom project</span>
                 : prod.isPublic
-                  ? <span className="text-[10px] text-emerald-500 flex items-center gap-0.5"><Globe className="w-2.5 h-2.5" />Shared</span>
-                  : <span className="text-[10px] text-zinc-600 flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" />Private</span>
+                  ? <span className="text-[11px] text-emerald-500 flex items-center gap-0.5"><Globe className="w-2.5 h-2.5" />Shared</span>
+                  : <span className="text-[11px] text-zinc-600 flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" />Private</span>
               }
             </div>
           </div>
@@ -319,7 +319,7 @@ export default function StudentProduction() {
         {isCustom && prod.description && (
           <p className="text-xs text-zinc-500 line-clamp-2 mb-2">{prod.description}</p>
         )}
-        <div className="flex items-center gap-1 text-[10px] text-zinc-500">
+        <div className="flex items-center gap-1 text-[11px] text-zinc-500">
           <Clock className="w-3 h-3" />
           {relTime(prod.updatedAt ?? prod.createdAt)}
           {prod.createdBy !== profile?.uid && (

@@ -748,23 +748,23 @@ export default function UserManager() {
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-sm font-medium text-zinc-100 truncate">{user.displayName}</p>
                 {user.disabled
-                  ? <span className="badge badge-rose text-[10px] py-0">Disabled</span>
+                  ? <span className="badge badge-rose text-[11px] py-0">Disabled</span>
                   : user.isActive
-                    ? <span className="badge badge-green text-[10px] py-0">Active</span>
-                    : <span className="badge badge-slate text-[10px] py-0">Inactive</span>
+                    ? <span className="badge badge-green text-[11px] py-0">Active</span>
+                    : <span className="badge badge-slate text-[11px] py-0">Inactive</span>
                 }
               </div>
               <p className="text-xs text-zinc-500 truncate">{user.email}</p>
               <div className="flex items-center gap-1.5 flex-wrap mt-1">
                 {(user.roles?.length ? user.roles : [user.role]).map(r => (
-                  <span key={r} className={`badge text-[10px] py-0 ${
+                  <span key={r} className={`badge text-[11px] py-0 ${
                     r === 'admin' ? 'badge-rose' : r === 'teacher' ? 'badge-blue' : 'badge-indigo'
                   }`}>{r}</span>
                 ))}
                 <button
                   onClick={() => switchPrimaryRole(user, user.role === 'student' ? 'teacher' : 'student')}
                   title={`Switch to ${user.role === 'student' ? 'teacher' : 'student'}`}
-                  className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 text-zinc-500 hover:text-zinc-300 hover:border-white/20 transition-colors"
+                  className="text-[11px] px-1.5 py-0.5 rounded border border-white/10 text-zinc-500 hover:text-zinc-300 hover:border-white/20 transition-colors"
                 >
                   → {user.role === 'student' ? 'teacher' : 'student'}
                 </button>

@@ -18,13 +18,13 @@ function StudentRow({ student, days, colorMap }: {
       <div className="flex flex-wrap gap-1 justify-end">
         {days.sort((a, b) => a.date.localeCompare(b.date)).map(a => (
           <span key={a.id}
-            className="text-[10px] px-1.5 py-0.5 rounded-md font-medium"
+            className="text-[11px] px-1.5 py-0.5 rounded-md font-medium"
             style={{ background: (colorMap[a.productionId] ?? '#6366f1') + '33', color: colorMap[a.productionId] ?? '#6366f1' }}
           >
             {format(parseISO(a.date), 'd MMM')}
           </span>
         ))}
-        {days.length === 0 && <span className="text-[10px] text-zinc-600">No days assigned</span>}
+        {days.length === 0 && <span className="text-[11px] text-zinc-600">No days assigned</span>}
       </div>
     </div>
   )

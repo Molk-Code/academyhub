@@ -249,13 +249,13 @@ export default function StudentLayout() {
             <Icon className={cn('w-5 h-5 flex-shrink-0', isActive ? 'text-brand-400' : 'text-zinc-500')} />
             <span className="flex-1">{label}</span>
             {su && chatUnread > 0 && (
-              <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-brand-600 text-white text-[10px] font-bold px-1 leading-none">{chatUnread}</span>
+              <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-brand-600 text-white text-[11px] font-bold px-1 leading-none">{chatUnread}</span>
             )}
             {sb && bookingBadge > 0 && (
-              <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[10px] font-bold px-1 leading-none">{bookingBadge}</span>
+              <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-rose-500 text-white text-[11px] font-bold px-1 leading-none">{bookingBadge}</span>
             )}
             {sc && calendarBadge > 0 && (
-              <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-brand-600 text-white text-[10px] font-bold px-1 leading-none">{calendarBadge}</span>
+              <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-brand-600 text-white text-[11px] font-bold px-1 leading-none">{calendarBadge}</span>
             )}
           </>
         )}
@@ -298,7 +298,7 @@ export default function StudentLayout() {
                   <>
                     <Film className={cn('w-5 h-5 flex-shrink-0', isActive ? 'text-amber-500' : 'text-amber-400')} />
                     <span className="flex-1">Video Lab 🎬</span>
-                    <span className="text-[10px] font-bold bg-amber-900/30 text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-700/40 leading-none">Beta</span>
+                    <span className="text-[11px] font-bold bg-amber-900/30 text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-700/40 leading-none">Beta</span>
                   </>
                 )}
               </NavLink>
@@ -455,7 +455,7 @@ export default function StudentLayout() {
             <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain flex-shrink-0" />
             <div className="min-w-0">
               <p className="text-sm font-bold text-zinc-100 tracking-tight leading-none truncate" title={shortName}>{shortName}</p>
-              {schoolName && <p className="text-[9px] text-zinc-500 tracking-tight mt-[3px] leading-none whitespace-nowrap overflow-hidden text-ellipsis">{schoolName}</p>}
+              {schoolName && <p className="text-[11px] text-zinc-500 tracking-tight mt-[3px] leading-none whitespace-nowrap overflow-hidden text-ellipsis">{schoolName}</p>}
             </div>
           </Link>
           <div className="flex items-center gap-1">
@@ -484,7 +484,7 @@ export default function StudentLayout() {
                 <img src={firePng} alt="CineForge" className="w-7 h-7 object-contain flex-shrink-0" />
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-zinc-100 tracking-tight leading-none truncate" title={shortName}>{shortName}</p>
-                  {schoolName && <p className="text-[9px] text-zinc-500 tracking-tight mt-[3px] leading-none whitespace-nowrap overflow-hidden text-ellipsis">{schoolName}</p>}
+                  {schoolName && <p className="text-[11px] text-zinc-500 tracking-tight mt-[3px] leading-none whitespace-nowrap overflow-hidden text-ellipsis">{schoolName}</p>}
                 </div>
               </Link>
               <button aria-label="Close menu"
@@ -509,7 +509,7 @@ export default function StudentLayout() {
             <img src={firePng} alt="CineForge" className="w-8 h-8 object-contain flex-shrink-0" />
             <div className="min-w-0">
               <p className="text-base font-bold text-zinc-100 tracking-tight leading-none truncate" title={shortName}>{shortName}</p>
-              {schoolName && <p className="text-[9px] text-zinc-500 tracking-tight mt-[3px] leading-none whitespace-nowrap overflow-hidden text-ellipsis">{schoolName}</p>}
+              {schoolName && <p className="text-[11px] text-zinc-500 tracking-tight mt-[3px] leading-none whitespace-nowrap overflow-hidden text-ellipsis">{schoolName}</p>}
             </div>
           </Link>
           <BugReportButton />
@@ -652,7 +652,7 @@ function BottomTab({ to, icon: Icon, label, badge = 0 }: {
     <NavLink
       to={to}
       className={({ isActive }) => cn(
-        'flex flex-col items-center justify-center gap-0.5 w-16 h-12 rounded-xl text-[10px] transition-all active:scale-95',
+        'flex flex-col items-center justify-center gap-0.5 w-16 h-12 rounded-xl text-[11px] transition-all active:scale-95',
         isActive ? 'text-brand-500 font-semibold' : 'text-zinc-400 font-medium hover:text-zinc-200',
       )}
     >

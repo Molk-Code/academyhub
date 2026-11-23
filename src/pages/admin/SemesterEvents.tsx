@@ -408,7 +408,7 @@ function CategoriesPanel({ categories, loading }: {
                   className="absolute left-0 top-full mt-1 z-20 rounded-xl border p-3 shadow-xl"
                   style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)', minWidth: 200 }}
                 >
-                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
                     Pick colour for "{cat.name}"
                   </p>
                   <ColorSwatches

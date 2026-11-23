@@ -849,10 +849,10 @@ export default function GuestTeacherBank() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 flex-nowrap">
                           {visibleExps.map(e => (
-                            <span key={e} className="text-[10px] bg-brand-600/20 text-brand-300 px-1.5 py-0.5 rounded-full whitespace-nowrap">{e}</span>
+                            <span key={e} className="text-[11px] bg-brand-600/20 text-brand-300 px-1.5 py-0.5 rounded-full whitespace-nowrap">{e}</span>
                           ))}
                           {extraExps > 0 && (
-                            <span className="text-[10px] bg-zinc-700 text-zinc-400 px-1.5 py-0.5 rounded-full whitespace-nowrap">+{extraExps}</span>
+                            <span className="text-[11px] bg-zinc-700 text-zinc-400 px-1.5 py-0.5 rounded-full whitespace-nowrap">+{extraExps}</span>
                           )}
                         </div>
                       </td>
@@ -957,7 +957,7 @@ export default function GuestTeacherBank() {
                     {toExpertiseArray(g.expertise).length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {toExpertiseArray(g.expertise).map(e => (
-                          <span key={e} className="text-[10px] bg-brand-600/20 text-brand-300 px-1.5 py-0.5 rounded-full whitespace-nowrap">{e}</span>
+                          <span key={e} className="text-[11px] bg-brand-600/20 text-brand-300 px-1.5 py-0.5 rounded-full whitespace-nowrap">{e}</span>
                         ))}
                       </div>
                     )}
@@ -1109,7 +1109,7 @@ export default function GuestTeacherBank() {
                           const label = isToday(dayDate) ? 'Today' : isTomorrow(dayDate) ? 'Tomorrow' : format(dayDate, 'EEE d MMM')
                           return (
                             <div key={day}>
-                              <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">{label}</p>
+                              <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">{label}</p>
                               <div className="space-y-1">
                                 {grouped[day].map(l => {
                                   const st = l.startTime?.toDate?.()

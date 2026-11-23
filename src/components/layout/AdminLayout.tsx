@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, Suspense } from 'react'
+import { useCallback, useEffect, useRef, useState, Suspense } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Users, GraduationCap, Eye, LogOut, ArrowLeftRight, Clock,
   CalendarCheck, MessageSquare, BookOpen, Share2, BookMarked, Film, Menu, X,
-  UtensilsCrossed, Car, Mail, SlidersHorizontal, ChevronDown, CircleDot, Tv, Shield, Package, ArchiveRestore, ClipboardList, BarChart2, RefreshCw, ArrowDown, Bug as BugIcon, Inbox, LayoutDashboard, School, Settings,
+  UtensilsCrossed, Car, Mail, SlidersHorizontal, ChevronDown, CircleDot, Tv, Shield, Package, ArchiveRestore, ClipboardList, BarChart2, RefreshCw, ArrowDown, Bug as BugIcon, Inbox, LayoutDashboard, Settings,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
@@ -25,25 +25,34 @@ import NotificationPermissionBanner from '@/components/NotificationPermissionBan
 import OfflineBanner from '@/components/OfflineBanner'
 import NotificationInbox from '@/components/NotificationInbox'
 import BugReportButton from '@/components/BugReportButton'
+import CommandPalette, { JumpButton, useJumpShortcut, type JumpItem } from './CommandPalette'
 
 interface NavItem { to: string; icon: React.ComponentType<{ className?: string }>; label: string; showBadge?: boolean; showUnread?: boolean }
-interface NavGroup { id: string; label: string; icon: React.ComponentType<{ className?: string }>; items: NavItem[]; defaultOpen?: boolean }
+interface NavGroup { id: string; label: string; icon: React.ComponentType<{ className?: string }>; items: NavItem[]; defaultOpen?: boolean; flat?: boolean }
 
+// Most-used first; a flat group has no header and is always open. Everything
+// is also one ⌘K away (CommandPalette).
 const NAV_GROUPS: NavGroup[] = [
   {
-    id: 'school', label: 'School', icon: School, defaultOpen: true,
+    id: 'main', label: 'Overview', icon: LayoutDashboard, flat: true,
     items: [
-      { to: '/admin/dashboard',   icon: LayoutDashboard, label: 'Dashboard'            },
-      { to: '/admin/school-info', icon: Clock,        label: 'School Info'             },
-      { to: '/admin/guide',       icon: BookMarked,   label: 'School Guide'            },
-      { to: '/admin/chat',        icon: MessageSquare, label: 'Chat', showUnread: true  },
+      { to: '/admin/dashboard',   icon: LayoutDashboard, label: 'Dashboard'                  },
+      { to: '/admin/chat',        icon: MessageSquare,   label: 'Chat', showUnread: true     },
     ],
   },
   {
-    id: 'people', label: 'People', icon: Users, defaultOpen: true,
+    id: 'rental', label: 'Rental & inventory', icon: Package, defaultOpen: true,
     items: [
-      { to: '/admin/users',   icon: Users,        label: 'Users'   },
-      { to: '/admin/cohorts', icon: GraduationCap, label: 'Classes' },
+      { to: '/admin/equipment',   icon: Package,         label: 'Equipment',       showBadge: true   },
+      { to: '/admin/inventory',   icon: ArchiveRestore,  label: 'Inventory'                          },
+    ],
+  },
+  {
+    id: 'booking', label: 'Booking', icon: CalendarCheck, defaultOpen: false,
+    items: [
+      { to: '/admin/bookings',    icon: CalendarCheck,   label: 'Room Booking'                        },
+      { to: '/admin/minivan',     icon: Car,             label: 'Vehicles',        showBadge: true   },
+      { to: '/admin/food-box-orders', icon: UtensilsCrossed, label: 'Food Box Orders', showBadge: true   },
     ],
   },
   {
@@ -57,18 +66,17 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    id: 'booking', label: 'Booking', icon: Package, defaultOpen: false,
+    id: 'people', label: 'People', icon: Users, defaultOpen: true,
     items: [
-      { to: '/admin/bookings',    icon: CalendarCheck,   label: 'Room Booking'                        },
-      { to: '/admin/minivan',     icon: Car,             label: 'Vehicles',        showBadge: true   },
-      { to: '/admin/food-box-orders', icon: UtensilsCrossed, label: 'Food Box Orders', showBadge: true   },
-      { to: '/admin/equipment',   icon: Package,         label: 'Equipment',       showBadge: true   },
-      { to: '/admin/inventory',   icon: ArchiveRestore,  label: 'Inventory'                          },
+      { to: '/admin/users',   icon: Users,        label: 'Users'   },
+      { to: '/admin/cohorts', icon: GraduationCap, label: 'Classes' },
     ],
   },
   {
-    id: 'settings', label: 'Settings', icon: Settings, defaultOpen: false,
+    id: 'settings', label: 'School & settings', icon: Settings, defaultOpen: false,
     items: [
+      { to: '/admin/school-info', icon: Clock,             label: 'School Info'  },
+      { to: '/admin/guide',       icon: BookMarked,        label: 'School Guide' },
       { to: '/admin/email-config', icon: Mail,             label: 'Email Config' },
       { to: '/admin/sharepoint',   icon: Share2,           label: 'SharePoint'   },
       { to: '/admin/calendar-sync', icon: RefreshCw,       label: 'Calendar Sync', showBadge: true },
@@ -79,6 +87,19 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
 ]
+
+// Rental mode (legacy schools): equipment pages only
+const RENTAL_NAV_ITEMS: NavItem[] = [
+  { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/admin/equipment', icon: Package, label: 'Equipment' },
+  { to: '/admin/inventory', icon: ArchiveRestore, label: 'Inventory' },
+]
+
+const navItemClass = (isActive: boolean, extra = '') => cn(
+  'flex items-center gap-3 px-3 py-2 min-h-[40px] rounded-xl text-sm font-medium transition-all', extra,
+  isActive ? 'bg-brand-500/15 text-brand-200' : 'text-zinc-400 hover:bg-[var(--bg-elevated)] hover:text-white',
+)
+const navIconClass = (isActive: boolean, size = 'w-4 h-4') => cn(size, 'flex-shrink-0', isActive ? 'text-brand-300' : 'text-zinc-500')
 
 function AdminContentSkeleton() {
   return (
@@ -136,6 +157,38 @@ export default function AdminLayout() {
     mainRef.current?.scrollTo({ top: 0, behavior: 'instant' })
   }, [pathname])
 
+  const ROUTE_FEATURE_GATE: Record<string, boolean> = {
+    '/admin/qr-devices':        canCheckinDevices,
+    '/admin/equipment':         canEquipment,
+    '/admin/inventory':         canInventory,
+    '/admin/bookings':          canBooking,
+    '/admin/minivan':           canVehicles,
+    '/admin/food-box-orders':   canFoodBox,
+    // No feature gate before modules: hidden only for schools with explicit modules
+    '/admin/lessons':           academyGate,
+    '/admin/semester-events':   academyGate,
+    '/admin/experience-levels': academyGate,
+    '/admin/production-roles':  productionGate,
+  }
+  const visibleGroups = NAV_GROUPS
+    .map(g => ({ ...g, items: g.items.filter(item => ROUTE_FEATURE_GATE[item.to] !== false) }))
+    .filter(g => g.items.length > 0)
+  const badgeFor = (item: NavItem) => item.showBadge
+    ? (item.to === '/admin/food-box-orders' ? bookingDetail.food : item.to === '/admin/equipment' ? bookingDetail.equipment : item.to === '/admin/bug-reports' ? bugReportBadge : item.to === '/admin/contact-requests' ? contactBadge : item.to === '/admin/calendar-sync' ? calendarSyncAlert : bookingDetail.van)
+    : item.showUnread ? chatUnread : 0
+
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const openPalette = useCallback(() => { setDrawerOpen(false); setPaletteOpen(true) }, [])
+  useJumpShortcut(openPalette)
+  const jumpItems: JumpItem[] = productType === 'rental'
+    ? RENTAL_NAV_ITEMS
+    : [
+        ...visibleGroups.flatMap(g => g.items.map(i => ({ ...i, group: g.flat ? undefined : g.label }))),
+        ...(videoLabEnabled ? [{ to: '/admin/video-lab', icon: Film, label: 'Video Lab' }] : []),
+        { to: '/admin/preview', icon: Eye, label: 'Student Preview' },
+        { to: '/profile', icon: Users, label: 'My profile' },
+      ]
+
   async function handleSignOut() {
     await signOut()
     navigate('/login')
@@ -152,47 +205,19 @@ export default function AdminLayout() {
     function toggle(id: string) {
       setOpenGroups(prev => {
         const next = { ...prev, [id]: !prev[id] }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { /* private mode */ }
         return next
       })
     }
 
-    const ROUTE_FEATURE_GATE: Record<string, boolean> = {
-      '/admin/qr-devices':        canCheckinDevices,
-      '/admin/equipment':         canEquipment,
-      '/admin/inventory':         canInventory,
-      '/admin/bookings':          canBooking,
-      '/admin/minivan':           canVehicles,
-      '/admin/food-box-orders':   canFoodBox,
-      // No feature gate before modules: hidden only for schools with explicit modules
-      '/admin/lessons':           academyGate,
-      '/admin/semester-events':   academyGate,
-      '/admin/experience-levels': academyGate,
-      '/admin/production-roles':  productionGate,
-    }
-
-    // Rental mode: show only equipment-related nav items
     if (productType === 'rental') {
-      const rentalNavItems = [
-        { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-        { to: '/admin/equipment', icon: Package, label: 'Equipment' },
-        { to: '/admin/inventory', icon: ArchiveRestore, label: 'Inventory' },
-      ]
       return (
         <div className="space-y-0.5">
-          {rentalNavItems.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              onClick={onNavigate}
-              className={({ isActive }) => cn(
-                'flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all',
-                isActive ? 'bg-rose-700 text-white' : 'text-zinc-400 hover:bg-[var(--bg-elevated)] hover:text-white',
-              )}
-            >
+          {RENTAL_NAV_ITEMS.map(({ to, icon: Icon, label }) => (
+            <NavLink key={to} to={to} onClick={onNavigate} className={({ isActive }) => navItemClass(isActive)}>
               {({ isActive }) => (
                 <>
-                  <Icon className={cn('w-4 h-4 flex-shrink-0', isActive ? 'text-white' : 'text-zinc-500')} />
+                  <Icon className={navIconClass(isActive)} />
                   <span className="flex-1">{label}</span>
                 </>
               )}
@@ -203,43 +228,41 @@ export default function AdminLayout() {
     }
 
     return (
-      <div className="space-y-1">
-        {NAV_GROUPS.map(group => {
-          const visibleItems = group.items.filter(item => ROUTE_FEATURE_GATE[item.to] !== false)
-          if (visibleItems.length === 0) return null
+      <div className="space-y-3">
+        {visibleGroups.map(group => {
+          // The section holding the page you're on is always open
+          const here = group.items.some(i => pathname.startsWith(i.to))
+          const open = group.flat || here || !!openGroups[group.id]
+          const hiddenBadges = open ? 0 : group.items.reduce((n, i) => n + badgeFor(i), 0)
           return (
           <div key={group.id}>
-            <button
-              onClick={() => toggle(group.id)}
-              aria-expanded={!!openGroups[group.id]}
-              className="w-full flex items-center gap-2 px-2 py-1.5 min-h-[32px] rounded-lg text-zinc-500 hover:text-zinc-300 transition-colors"
-            >
-              <group.icon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
-              <span className="text-[11px] font-bold uppercase tracking-wider flex-1 text-left">{group.label}</span>
-              <ChevronDown aria-hidden="true" className={cn('w-3 h-3 transition-transform', openGroups[group.id] ? 'rotate-0' : '-rotate-90')} />
-            </button>
-            {openGroups[group.id] && (
-              <div className="space-y-0.5 mb-1">
-                {visibleItems.map(({ to, icon: Icon, label, showBadge, showUnread }) => {
-                  const badgeCount = showBadge
-                    ? (to === '/admin/food-box-orders' ? bookingDetail.food : to === '/admin/equipment' ? bookingDetail.equipment : to === '/admin/bug-reports' ? bugReportBadge : to === '/admin/contact-requests' ? contactBadge : to === '/admin/calendar-sync' ? calendarSyncAlert : bookingDetail.van)
-                    : showUnread ? chatUnread : 0
+            {!group.flat && (
+              <button
+                onClick={() => toggle(group.id)}
+                aria-expanded={open}
+                disabled={here}
+                className="w-full flex items-center gap-2 px-3 py-1.5 min-h-[32px] rounded-lg text-zinc-500 hover:text-zinc-300 disabled:hover:text-zinc-500 transition-colors"
+              >
+                <span className="text-[11px] font-bold uppercase tracking-wider flex-1 text-left">{group.label}</span>
+                {hiddenBadges > 0 && (
+                  <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-brand-500 text-zinc-950 text-[11px] font-bold px-1 leading-none" aria-label={`${hiddenBadges} new`}>{hiddenBadges}</span>
+                )}
+                {!here && <ChevronDown aria-hidden="true" className={cn('w-3 h-3 transition-transform', open ? 'rotate-0' : '-rotate-90')} />}
+              </button>
+            )}
+            {open && (
+              <div className="space-y-0.5">
+                {group.items.map(item => {
+                  const { to, icon: Icon, label } = item
+                  const badgeCount = badgeFor(item)
                   return (
-                    <NavLink
-                      key={to}
-                      to={to}
-                      onClick={onNavigate}
-                      className={({ isActive }) => cn(
-                        'flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all ml-2',
-                        isActive ? 'bg-rose-700 text-white' : 'text-zinc-400 hover:bg-[var(--bg-elevated)] hover:text-white',
-                      )}
-                    >
+                    <NavLink key={to} to={to} onClick={onNavigate} className={({ isActive }) => navItemClass(isActive)}>
                       {({ isActive }) => (
                         <>
-                          <Icon className={cn('w-4 h-4 flex-shrink-0', isActive ? 'text-white' : 'text-zinc-500')} />
+                          <Icon className={navIconClass(isActive)} />
                           <span className="flex-1">{label}</span>
                           {badgeCount > 0 && (
-                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-brand-500 text-white text-[11px] font-bold px-1 leading-none">{badgeCount}</span>
+                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-brand-500 text-zinc-950 text-[11px] font-bold px-1 leading-none">{badgeCount}</span>
                           )}
                         </>
                       )}
@@ -274,14 +297,11 @@ export default function AdminLayout() {
         <NavLink
           to="/admin/preview"
           onClick={onNavigate}
-          className={({ isActive }) => cn(
-            'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
-            isActive ? 'bg-rose-700 text-white' : 'text-zinc-400 hover:bg-[var(--bg-elevated)] hover:text-white',
-          )}
+          className={({ isActive }) => navItemClass(isActive)}
         >
           {({ isActive }) => (
             <>
-              <Eye className={cn('w-5 h-5 flex-shrink-0', isActive ? 'text-white' : 'text-zinc-500')} />
+              <Eye className={navIconClass(isActive)} />
               <span className="flex-1">Student Preview</span>
             </>
           )}
@@ -406,7 +426,8 @@ export default function AdminLayout() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+            <div className="px-3 pt-3"><JumpButton onOpen={openPalette} /></div>
+            <nav aria-label="Main" className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
               <NavLinks onNavigate={() => setDrawerOpen(false)} />
             </nav>
             <SidebarFooter />
@@ -427,11 +448,14 @@ export default function AdminLayout() {
           <BugReportButton />
           <NotificationInbox />
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <div className="px-3 pt-3"><JumpButton onOpen={openPalette} /></div>
+        <nav aria-label="Main" className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           <NavLinks />
         </nav>
         <SidebarFooter />
       </aside>
+
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} items={jumpItems} />
 
       {/* ── Main content ───────────────────────────────────────────────────── */}
       <main

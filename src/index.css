@@ -353,6 +353,8 @@ select.input-dark:focus {
   outline: 2px solid var(--brand) !important;
   outline-offset: 2px !important;
 }
+/* The jump palette's input: its row's orange bottom border is the focus mark */
+.jump-input:focus-visible { outline: none !important; }
 
 /* Skip link — first thing a keyboard user reaches (2.4.1) */
 .skip-link {

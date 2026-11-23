@@ -11,7 +11,7 @@ const STATE_STYLE: Record<SignatureState, { label: string; color: string; bg: st
   'signed':        { label: 'Signed',            color: '#4cd964', bg: 'rgba(76,217,100,.12)' },
   'changed':       { label: 'Needs re-signing',  color: '#f5a623', bg: 'rgba(245,166,35,.12)' },
   'requested':     { label: 'Waiting',           color: '#a0a0b5', bg: 'rgba(160,160,181,.12)' },
-  'not-requested': { label: 'Not sent',          color: '#6a6a80', bg: 'rgba(106,106,128,.12)' },
+  'not-requested': { label: 'Not sent',          color: '#979ca7', bg: 'rgba(106,106,128,.12)' },
 }
 
 const STATE_ICON: Record<SignatureState, typeof Check> = {
@@ -68,7 +68,7 @@ export function ContractSignatures({ project, items }: { project: InventoryProje
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: '.75rem' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '.9rem', color: '#f0f0f5' }}>
           <FileSignature size={16} color="#ff6b35" /> Contract signatures
-          <span style={{ fontWeight: 500, fontSize: '.78rem', color: '#6a6a80' }}>
+          <span style={{ fontWeight: 500, fontSize: '.78rem', color: '#979ca7' }}>
             {rows.length - unsigned}/{rows.length} signed
           </span>
         </span>
@@ -98,7 +98,7 @@ export function ContractSignatures({ project, items }: { project: InventoryProje
             <div key={r.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '8px 10px', background: '#1a1a25', borderRadius: 8 }}>
               <span style={{ flex: 1, minWidth: 140, fontSize: '.85rem', color: '#f0f0f5' }}>{r.name}</span>
               {r.sig && (
-                <span style={{ fontSize: '.72rem', color: '#6a6a80' }}>
+                <span style={{ fontSize: '.72rem', color: '#979ca7' }}>
                   {r.sig.signedAt?.toDate().toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}
                 </span>
               )}
@@ -119,7 +119,7 @@ export function ContractSignatures({ project, items }: { project: InventoryProje
         {paperOnly.map(n => (
           <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: '#1a1a25', borderRadius: 8 }}>
             <span style={{ flex: 1, fontSize: '.85rem', color: '#a0a0b5' }}>{n}</span>
-            <span style={{ fontSize: '.72rem', color: '#6a6a80' }}>No CineForge account — sign on paper</span>
+            <span style={{ fontSize: '.72rem', color: '#979ca7' }}>No CineForge account — sign on paper</span>
           </div>
         ))}
       </div>

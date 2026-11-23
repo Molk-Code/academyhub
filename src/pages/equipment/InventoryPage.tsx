@@ -96,7 +96,7 @@ function ProjectCard({
       <div className="project-card-footer" style={{ alignItems: 'center' }}>
         {overdue
           ? <span style={{ color: '#ff4757', fontWeight: 700, fontSize: '.75rem' }}>{od} day{od !== 1 ? 's' : ''} overdue</span>
-          : <span style={{ fontSize: '.7rem', color: '#4a4a60' }}>{total} item{total !== 1 ? 's' : ''}</span>
+          : <span style={{ fontSize: '.7rem', color: '#8c919b' }}>{total} item{total !== 1 ? 's' : ''}</span>
         }
         {confirming ? (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
@@ -121,9 +121,9 @@ function ProjectCard({
           <button
             title="Delete project"
             onClick={e => { e.stopPropagation(); setConfirming(true) }}
-            style={{ background: 'none', border: 'none', color: '#6a6a80', cursor: 'pointer', padding: 4, display: 'flex' }}
+            style={{ background: 'none', border: 'none', color: '#979ca7', cursor: 'pointer', padding: 4, display: 'flex' }}
             onMouseEnter={e => (e.currentTarget.style.color = '#ff4757')}
-            onMouseLeave={e => (e.currentTarget.style.color = '#6a6a80')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#979ca7')}
           >
             <Trash2 size={14} />
           </button>

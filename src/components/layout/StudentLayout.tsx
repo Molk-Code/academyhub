@@ -57,9 +57,9 @@ const PRIMARY_NAV: NavItem[] = [
   { to: '/bug-reports', icon: Bug,             label: 'Bug Reports', featureId: 'bugReports'                                                       },
 ]
 
-function SidebarGroup({ label, icon, defaultOpen = false, children }: {
+function SidebarGroup({ label, icon: Icon, defaultOpen = false, children }: {
   label: string
-  icon: string
+  icon: React.ComponentType<{ className?: string }>
   defaultOpen?: boolean
   children: React.ReactNode
 }) {
@@ -76,11 +76,12 @@ function SidebarGroup({ label, icon, defaultOpen = false, children }: {
     <>
       <button
         onClick={toggle}
+        aria-expanded={open}
         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-400 hover:bg-white/5 hover:text-zinc-100 transition-all"
       >
-        <span className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-base">{icon}</span>
+        <Icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
         <span className="flex-1 text-left">{label}</span>
-        <ChevronDown className={cn('w-4 h-4 transition-transform duration-200', open && 'rotate-180')} />
+        <ChevronDown aria-hidden="true" className={cn('w-4 h-4 transition-transform duration-200', open && 'rotate-180')} />
       </button>
       {open && (
         <div className="ml-3 pl-3 border-l border-white/8 space-y-0.5">
@@ -296,7 +297,7 @@ export default function StudentLayout() {
 
         {/* Create group — only render if at least one item is visible */}
         {(canProduction && vis?.['production'] !== false) || (canVideoLab && videoLabEnabled) ? (
-          <SidebarGroup label="Create" icon="🎬" defaultOpen={false}>
+          <SidebarGroup label="Create" icon={Clapperboard} defaultOpen={false}>
             {canProduction && vis?.['production'] !== false && <NavItem to="/production" icon={Clapperboard} label="Production" onNavigate={onNavigate} />}
             {canVideoLab && videoLabEnabled && (
               <NavLink
@@ -323,7 +324,7 @@ export default function StudentLayout() {
 
         {/* Booking group — only render if at least one item is visible */}
         {(vis?.['myBookings'] !== false) || (canBooking && vis?.['roomBooking'] !== false) || (canEquipment && vis?.['equipment'] !== false) || (canVehicles && vis?.['vehicle'] !== false) || (canFoodBox && vis?.['foodBox'] !== false) ? (
-          <SidebarGroup label="Booking" icon="📦" defaultOpen={false}>
+          <SidebarGroup label="Booking" icon={Package} defaultOpen={false}>
             {vis?.['myBookings'] !== false && <NavItem to="/my-bookings"       icon={ClipboardCheck} label="My Bookings"  showBooking onNavigate={onNavigate} />}
             {canBooking   && vis?.['roomBooking'] !== false && <NavItem to="/booking"           icon={DoorOpen}       label="Room Booking" end onNavigate={onNavigate} />}
             {canEquipment && vis?.['equipment'] !== false && <NavItem to="/booking/equipment" icon={Package}         label="Rental House" onNavigate={onNavigate} />}

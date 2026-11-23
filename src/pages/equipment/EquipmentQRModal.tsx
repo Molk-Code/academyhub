@@ -70,7 +70,7 @@ export function QRModal({ item, onClose }: { item: EquipmentDoc; onClose: () => 
         <div ref={ref} style={{ background: '#fff', borderRadius: 10, padding: 12, display: 'inline-block', marginBottom: '.75rem' }}>
           <QRCodeSVG value={qrValue} size={180} level="H" />
         </div>
-        <p style={{ fontSize: 10, color: '#4a4a60', fontFamily: 'monospace', marginBottom: '1rem', wordBreak: 'break-all' }}>{qrValue}</p>
+        <p style={{ fontSize: 10, color: '#8c919b', fontFamily: 'monospace', marginBottom: '1rem', wordBreak: 'break-all' }}>{qrValue}</p>
         <button
           onClick={() => printQRLabel(label, qrValue, item.category, ref.current)}
           style={{ width: '100%', padding: '10px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 10, color: '#f0f0f5', fontSize: '.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}

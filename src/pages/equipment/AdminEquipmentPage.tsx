@@ -100,7 +100,7 @@ export default function AdminEquipmentPage() {
                   padding: '6px 12px', borderRadius: 10, fontSize: '.82rem', fontWeight: 600,
                   cursor: 'pointer', border: 'none', position: 'relative',
                   background: tab === t.id ? 'rgba(76,217,100,.15)' : 'transparent',
-                  color: tab === t.id ? '#4cd964' : '#6a6a80',
+                  color: tab === t.id ? '#4cd964' : '#979ca7',
                   transition: 'all .2s',
                 }}
               >
@@ -115,18 +115,18 @@ export default function AdminEquipmentPage() {
             <button
               onClick={toggleRequireProduction}
               title={requireProduction ? 'Production required — click to disable' : 'Production not required — click to enable'}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 10, background: 'transparent', border: '1px solid #2a2a3a', cursor: 'pointer', fontSize: '.75rem', fontWeight: 600, color: requireProduction ? '#f59e0b' : '#4a4a60', transition: 'all .2s', whiteSpace: 'nowrap' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 10, background: 'transparent', border: '1px solid #2a2a3a', cursor: 'pointer', fontSize: '.75rem', fontWeight: 600, color: requireProduction ? '#f59e0b' : '#8c919b', transition: 'all .2s', whiteSpace: 'nowrap' }}
             >
-              {requireProduction ? <ToggleRight size={15} color="#f59e0b" /> : <ToggleLeft size={15} color="#4a4a60" />}
+              {requireProduction ? <ToggleRight size={15} color="#f59e0b" /> : <ToggleLeft size={15} color="#8c919b" />}
               <span className="hidden sm:inline">Require production</span>
               <span className="sm:hidden">Prod.</span>
             </button>
             <button
               onClick={togglePricing}
               title={pricingEnabled ? 'Prices shown — click to hide prices everywhere' : 'Prices hidden — click to show prices'}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 10, background: 'transparent', border: '1px solid #2a2a3a', cursor: 'pointer', fontSize: '.75rem', fontWeight: 600, color: pricingEnabled ? '#4cd964' : '#4a4a60', transition: 'all .2s', whiteSpace: 'nowrap' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 10, background: 'transparent', border: '1px solid #2a2a3a', cursor: 'pointer', fontSize: '.75rem', fontWeight: 600, color: pricingEnabled ? '#4cd964' : '#8c919b', transition: 'all .2s', whiteSpace: 'nowrap' }}
             >
-              {pricingEnabled ? <ToggleRight size={15} color="#4cd964" /> : <ToggleLeft size={15} color="#4a4a60" />}
+              {pricingEnabled ? <ToggleRight size={15} color="#4cd964" /> : <ToggleLeft size={15} color="#8c919b" />}
               <span className="hidden sm:inline">Prices</span>
               <span className="sm:hidden">Kr</span>
             </button>

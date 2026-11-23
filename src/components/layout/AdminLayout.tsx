@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import {
   Users, GraduationCap, Eye, LogOut, ArrowLeftRight, Clock,
   CalendarCheck, MessageSquare, BookOpen, Share2, BookMarked, Film, Menu, X,
-  UtensilsCrossed, Car, Mail, SlidersHorizontal, ChevronDown, CircleDot, Tv, Shield, Package, ArchiveRestore, ClipboardList, BarChart2, RefreshCw, ArrowDown, Bug as BugIcon, LayoutDashboard,
+  UtensilsCrossed, Car, Mail, SlidersHorizontal, ChevronDown, CircleDot, Tv, Shield, Package, ArchiveRestore, ClipboardList, BarChart2, RefreshCw, ArrowDown, Bug as BugIcon, LayoutDashboard, School, Settings,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSchool } from '@/contexts/SchoolContext'
@@ -24,11 +24,11 @@ import NotificationInbox from '@/components/NotificationInbox'
 import BugReportButton from '@/components/BugReportButton'
 
 interface NavItem { to: string; icon: React.ComponentType<{ className?: string }>; label: string; showBadge?: boolean; showUnread?: boolean }
-interface NavGroup { id: string; label: string; icon: string; items: NavItem[]; defaultOpen?: boolean }
+interface NavGroup { id: string; label: string; icon: React.ComponentType<{ className?: string }>; items: NavItem[]; defaultOpen?: boolean }
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    id: 'school', label: 'School', icon: '🏫', defaultOpen: true,
+    id: 'school', label: 'School', icon: School, defaultOpen: true,
     items: [
       { to: '/admin/dashboard',   icon: LayoutDashboard, label: 'Dashboard'            },
       { to: '/admin/school-info', icon: Clock,        label: 'School Info'             },
@@ -37,14 +37,14 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    id: 'people', label: 'People', icon: '👥', defaultOpen: true,
+    id: 'people', label: 'People', icon: Users, defaultOpen: true,
     items: [
       { to: '/admin/users',   icon: Users,        label: 'Users'   },
       { to: '/admin/cohorts', icon: GraduationCap, label: 'Classes' },
     ],
   },
   {
-    id: 'academic', label: 'Academic', icon: '📚', defaultOpen: true,
+    id: 'academic', label: 'Academic', icon: BookOpen, defaultOpen: true,
     items: [
       { to: '/admin/lessons',           icon: BookOpen,    label: 'Lessons'          },
       { to: '/admin/semester-events',   icon: CircleDot,   label: 'Semester Wheel'   },
@@ -54,7 +54,7 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    id: 'booking', label: 'Booking', icon: '📦', defaultOpen: false,
+    id: 'booking', label: 'Booking', icon: Package, defaultOpen: false,
     items: [
       { to: '/admin/bookings',    icon: CalendarCheck,   label: 'Room Booking'                        },
       { to: '/admin/minivan',     icon: Car,             label: 'Vehicles',        showBadge: true   },
@@ -64,7 +64,7 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    id: 'settings', label: 'Settings', icon: '⚙️', defaultOpen: false,
+    id: 'settings', label: 'Settings', icon: Settings, defaultOpen: false,
     items: [
       { to: '/admin/email-config', icon: Mail,             label: 'Email Config' },
       { to: '/admin/sharepoint',   icon: Share2,           label: 'SharePoint'   },
@@ -226,11 +226,12 @@ export default function AdminLayout() {
           <div key={group.id}>
             <button
               onClick={() => toggle(group.id)}
-              className="w-full flex items-center gap-2 px-2 py-1.5 text-zinc-500 hover:text-zinc-300 transition-colors"
+              aria-expanded={!!openGroups[group.id]}
+              className="w-full flex items-center gap-2 px-2 py-1.5 min-h-[32px] rounded-lg text-zinc-500 hover:text-zinc-300 transition-colors"
             >
-              <span className="text-xs">{group.icon}</span>
-              <span className="text-[10px] font-bold uppercase tracking-wider flex-1 text-left">{group.label}</span>
-              <ChevronDown className={cn('w-3 h-3 transition-transform', openGroups[group.id] ? 'rotate-0' : '-rotate-90')} />
+              <group.icon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+              <span className="text-[11px] font-bold uppercase tracking-wider flex-1 text-left">{group.label}</span>
+              <ChevronDown aria-hidden="true" className={cn('w-3 h-3 transition-transform', openGroups[group.id] ? 'rotate-0' : '-rotate-90')} />
             </button>
             {openGroups[group.id] && (
               <div className="space-y-0.5 mb-1">

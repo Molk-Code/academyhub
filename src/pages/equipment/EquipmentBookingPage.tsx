@@ -22,7 +22,7 @@ import { equipmentAvailability, createEquipmentBooking, bookingErrorMessage } fr
 import { KIT_CODE_PREFIX, kitCounts, kitsFree, expandKit, mergeLines, wantedPerItem } from '@/lib/kits'
 import { clickable } from '@/lib/a11y'
 
-const INFO_LABEL: React.CSSProperties = { fontSize: '.7rem', fontWeight: 700, color: '#6a6a80', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }
+const INFO_LABEL: React.CSSProperties = { fontSize: '.7rem', fontWeight: 700, color: '#979ca7', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }
 const INFO_TEXT: React.CSSProperties = { fontSize: '.88rem', color: '#c0c0d5', lineHeight: 1.5, whiteSpace: 'pre-line', margin: 0 }
 
 function EquipmentImg({ url, name, fallback }: { url: string | undefined | null; name: string; fallback: React.ReactNode }) {
@@ -531,7 +531,7 @@ export default function EquipmentBookingPage() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p onClick={() => setModalItem(acc)} style={{ fontSize: '.88rem', fontWeight: 600, color: '#f0f0f5', cursor: 'pointer', margin: 0 }}>{acc.name}</p>
-                <p style={{ fontSize: '.72rem', margin: '2px 0 0', color: blockedReason && !inCart ? '#f59e0b' : '#6a6a80' }}>
+                <p style={{ fontSize: '.72rem', margin: '2px 0 0', color: blockedReason && !inCart ? '#f59e0b' : '#979ca7' }}>
                   {blockedReason && !inCart ? blockedReason : freeLabel(freeFor(acc))}
                   {pricingEnabled && (acc.priceInclVat > 0 ? ` · ${acc.priceInclVat} kr/day` : ' · Free')}
                 </p>
@@ -828,7 +828,7 @@ export default function EquipmentBookingPage() {
                   </div>
                 </div>
                 {selectedProductionId && (
-                  <p style={{ fontSize: '.72rem', color: '#6a6a80', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <p style={{ fontSize: '.72rem', color: '#979ca7', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
                     📅 Dates auto-filled from your shooting schedule. Adjust if needed.
                   </p>
                 )}
@@ -854,7 +854,7 @@ export default function EquipmentBookingPage() {
               )}
               {pricingEnabled && budgetInfo && (
                 <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: totalPrice > budgetInfo.equipmentBudget ? 'rgba(248,113,113,.1)' : 'rgba(52,211,153,.07)', border: `1px solid ${totalPrice > budgetInfo.equipmentBudget ? 'rgba(248,113,113,.3)' : 'rgba(52,211,153,.2)'}` }}>
-                  <div style={{ fontSize: '.7rem', color: '#6a6a80', marginBottom: 2 }}>Equipment budget</div>
+                  <div style={{ fontSize: '.7rem', color: '#979ca7', marginBottom: 2 }}>Equipment budget</div>
                   <div style={{ fontSize: '.85rem', fontWeight: 700, color: totalPrice > budgetInfo.equipmentBudget ? '#f87171' : '#34d399' }}>
                     {totalPrice.toLocaleString('sv-SE')} / {budgetInfo.equipmentBudget.toLocaleString('sv-SE')} SEK
                   </div>
@@ -899,7 +899,7 @@ export default function EquipmentBookingPage() {
                 <p style={{ fontSize: '.75rem', color: '#4cd964', fontWeight: 700, margin: 0 }}>Added to cart</p>
                 <p style={{ fontSize: '1rem', color: '#f0f0f5', fontWeight: 700, margin: '2px 0 0' }}>{accessoryFor.name}</p>
               </div>
-              <button onClick={() => setAccessoryFor(null)} aria-label="Close" style={{ background: 'none', border: 'none', color: '#6a6a80', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
+              <button onClick={() => setAccessoryFor(null)} aria-label="Close" style={{ background: 'none', border: 'none', color: '#979ca7', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
             </div>
             <div>
               <p style={INFO_LABEL}>Accessories for {accessoryFor.name}</p>
@@ -949,8 +949,8 @@ export default function EquipmentBookingPage() {
                 <p style={{ fontSize: '.8rem', fontWeight: 600, marginTop: 6, color: freeFor(modalItem) > 0 ? '#4cd964' : '#ff4757' }}>
                   {isItemLocked(modalItem) ? 'Not available for your class' : freeFor(modalItem) > 0 ? freeLabel(freeFor(modalItem)) : dateFree ? 'None free on your dates' : 'Out of stock'}
                   {pricingEnabled && (modalItem.priceInclVat > 0
-                    ? <span style={{ color: '#6a6a80', fontWeight: 500 }}> · {modalItem.priceInclVat} kr/day</span>
-                    : <span style={{ color: '#6a6a80', fontWeight: 500 }}> · Free</span>)}
+                    ? <span style={{ color: '#979ca7', fontWeight: 500 }}> · {modalItem.priceInclVat} kr/day</span>
+                    : <span style={{ color: '#979ca7', fontWeight: 500 }}> · Free</span>)}
                 </p>
               </div>
 
@@ -1013,16 +1013,16 @@ export default function EquipmentBookingPage() {
                   <span style={{ fontSize: '2rem', flexShrink: 0 }}>🎬</span>
                   <div style={{ flex: 1 }}>
                     <h2 style={{ fontWeight: 700, fontSize: '1rem', color: '#f0f0f5', marginBottom: 4 }}>Select a production to book equipment</h2>
-                    <p style={{ fontSize: '.82rem', color: '#6a6a80', marginBottom: '1rem' }}>
+                    <p style={{ fontSize: '.82rem', color: '#979ca7', marginBottom: '1rem' }}>
                       Equipment can only be booked for a registered production with a completed plan
                       (script breakdown, crew, cast, locations and shooting schedule) — or a Custom Project,
                       which only needs a name and description.
                     </p>
                     {readinessLoading ? (
-                      <p style={{ fontSize: '.82rem', color: '#4a4a60' }}>Loading productions…</p>
+                      <p style={{ fontSize: '.82rem', color: '#8c919b' }}>Loading productions…</p>
                     ) : userProductions.length === 0 ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <p style={{ fontSize: '.82rem', color: '#4a4a60' }}>You have no productions yet.</p>
+                        <p style={{ fontSize: '.82rem', color: '#8c919b' }}>You have no productions yet.</p>
                         {productionNavEnabled && (
                           <Link to="/production" style={{ background: '#f97316', color: '#fff', fontWeight: 700, fontSize: '.8rem', padding: '7px 14px', borderRadius: 10, textDecoration: 'none' }}>
                             Go to Productions →
@@ -1049,14 +1049,14 @@ export default function EquipmentBookingPage() {
                                 <p style={{ fontWeight: 600, fontSize: '.85rem', color: '#f0f0f5', margin: 0 }}>{prod.title}</p>
                                 {r?.isReady
                                   ? <span style={{ fontSize: '.65rem', fontWeight: 700, background: 'rgba(16,185,129,.2)', color: '#34d399', border: '1px solid rgba(16,185,129,.3)', borderRadius: 20, padding: '2px 7px' }}>✓ Ready</span>
-                                  : <span style={{ fontSize: '.65rem', fontWeight: 700, background: 'rgba(255,255,255,.08)', color: '#6a6a80', borderRadius: 20, padding: '2px 7px' }}>{r?.score ?? 0}%</span>
+                                  : <span style={{ fontSize: '.65rem', fontWeight: 700, background: 'rgba(255,255,255,.08)', color: '#979ca7', borderRadius: 20, padding: '2px 7px' }}>{r?.score ?? 0}%</span>
                                 }
                               </div>
                               <div style={{ height: 3, background: 'rgba(255,255,255,.08)', borderRadius: 99, overflow: 'hidden', marginBottom: 6 }}>
                                 <div style={{ height: '100%', borderRadius: 99, width: `${r?.score ?? 0}%`, background: r?.isReady ? '#10b981' : '#f97316', transition: 'width .4s' }} />
                               </div>
                               {!r?.isReady && (r?.missing ?? []).map((m, i) => (
-                                <p key={i} style={{ fontSize: '.7rem', color: '#4a4a60', margin: '2px 0', display: 'flex', gap: 4 }}>
+                                <p key={i} style={{ fontSize: '.7rem', color: '#8c919b', margin: '2px 0', display: 'flex', gap: 4 }}>
                                   <span style={{ color: '#f87171' }}>✕</span>{m}
                                 </p>
                               ))}
@@ -1079,7 +1079,7 @@ export default function EquipmentBookingPage() {
                       <p style={{ fontWeight: 700, color: '#f0f0f5', margin: 0, fontSize: '.9rem' }}>{selectedProduction?.title}</p>
                     </div>
                   </div>
-                  <button onClick={() => setSelectedProductionId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '.75rem', color: '#4a4a60', textDecoration: 'underline' }}>
+                  <button onClick={() => setSelectedProductionId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '.75rem', color: '#8c919b', textDecoration: 'underline' }}>
                     Change
                   </button>
                 </div>
@@ -1087,18 +1087,18 @@ export default function EquipmentBookingPage() {
                   <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 12, padding: '12px 16px' }}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: 8 }}>
                       <div>
-                        <p style={{ fontSize: '.6rem', color: '#6a6a80', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Total budget</p>
-                        <p style={{ fontSize: '.95rem', fontWeight: 700, color: '#f0f0f5', margin: 0 }}>{budgetInfo.limit.toLocaleString('sv-SE')} <span style={{ fontWeight: 400, color: '#6a6a80', fontSize: '.75rem' }}>SEK</span></p>
+                        <p style={{ fontSize: '.6rem', color: '#979ca7', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Total budget</p>
+                        <p style={{ fontSize: '.95rem', fontWeight: 700, color: '#f0f0f5', margin: 0 }}>{budgetInfo.limit.toLocaleString('sv-SE')} <span style={{ fontWeight: 400, color: '#979ca7', fontSize: '.75rem' }}>SEK</span></p>
                       </div>
                       <div>
-                        <p style={{ fontSize: '.6rem', color: '#6a6a80', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Salaries</p>
-                        <p style={{ fontSize: '.95rem', fontWeight: 700, color: '#60a5fa', margin: 0 }}>{budgetInfo.salaryCost.toLocaleString('sv-SE')} <span style={{ fontWeight: 400, color: '#6a6a80', fontSize: '.75rem' }}>/ {budgetInfo.limit.toLocaleString('sv-SE')} SEK</span></p>
+                        <p style={{ fontSize: '.6rem', color: '#979ca7', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Salaries</p>
+                        <p style={{ fontSize: '.95rem', fontWeight: 700, color: '#60a5fa', margin: 0 }}>{budgetInfo.salaryCost.toLocaleString('sv-SE')} <span style={{ fontWeight: 400, color: '#979ca7', fontSize: '.75rem' }}>/ {budgetInfo.limit.toLocaleString('sv-SE')} SEK</span></p>
                       </div>
                       {pricingEnabled && (
                         <div>
-                          <p style={{ fontSize: '.6rem', color: '#6a6a80', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Equipment budget</p>
+                          <p style={{ fontSize: '.6rem', color: '#979ca7', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Equipment budget</p>
                           <p style={{ fontSize: '.95rem', fontWeight: 700, color: totalPrice > budgetInfo.equipmentBudget ? '#f87171' : '#34d399', margin: 0 }}>
-                            {(budgetInfo.equipmentBudget - totalPrice).toLocaleString('sv-SE')} <span style={{ fontWeight: 400, color: '#6a6a80', fontSize: '.75rem' }}>/ {budgetInfo.equipmentBudget.toLocaleString('sv-SE')} SEK remaining</span>
+                            {(budgetInfo.equipmentBudget - totalPrice).toLocaleString('sv-SE')} <span style={{ fontWeight: 400, color: '#979ca7', fontSize: '.75rem' }}>/ {budgetInfo.equipmentBudget.toLocaleString('sv-SE')} SEK remaining</span>
                           </p>
                         </div>
                       )}
@@ -1295,18 +1295,18 @@ export default function EquipmentBookingPage() {
                     <span className="dates-label">Rental Period</span>
                     <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 140 }}>
-                        <label style={{ fontSize: '.7rem', color: '#6a6a80', fontWeight: 600 }}>From</label>
+                        <label style={{ fontSize: '.7rem', color: '#979ca7', fontWeight: 600 }}>From</label>
                         <input type="date" value={fromDate} min={new Date().toISOString().slice(0, 10)} onChange={e => setFromDate(e.target.value)}
                           style={{ background: '#1a1a28', border: '1px solid #2a2a3a', borderRadius: 8, color: '#f0f0f5', padding: '6px 10px', fontSize: '.85rem', width: '100%' }} />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 140 }}>
-                        <label style={{ fontSize: '.7rem', color: '#6a6a80', fontWeight: 600 }}>To</label>
+                        <label style={{ fontSize: '.7rem', color: '#979ca7', fontWeight: 600 }}>To</label>
                         <input type="date" value={toDate} min={fromDate || new Date().toISOString().slice(0, 10)} onChange={e => setToDate(e.target.value)}
                           style={{ background: '#1a1a28', border: '1px solid #2a2a3a', borderRadius: 8, color: '#f0f0f5', padding: '6px 10px', fontSize: '.85rem', width: '100%' }} />
                       </div>
                     </div>
                     {rentalDays > 0 && (
-                      <p style={{ fontSize: '.75rem', color: '#6a6a80', marginTop: 6 }}>
+                      <p style={{ fontSize: '.75rem', color: '#979ca7', marginTop: 6 }}>
                         {rentalDays} rental {rentalDays === 1 ? 'day' : 'days'}
                         {weekDiscountActive && ` · billed ${chargeableDays} days (week discount)`}
                       </p>
@@ -1377,23 +1377,23 @@ export default function EquipmentBookingPage() {
                 {budgetInfo && (
                   <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: '#0e0e16', border: '1px solid #2a2a3a', fontSize: '.78rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ color: '#6a6a80' }}>Salaries</span>
+                      <span style={{ color: '#979ca7' }}>Salaries</span>
                       <span style={{ color: '#60a5fa', fontWeight: 600 }}>{budgetInfo.salaryCost.toLocaleString('sv-SE')} SEK</span>
                     </div>
                     {budgetInfo.existingEquipmentCost > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <span style={{ color: '#6a6a80' }}>Equipment (already booked)</span>
+                        <span style={{ color: '#979ca7' }}>Equipment (already booked)</span>
                         <span style={{ color: '#f0f0f5', fontWeight: 600 }}>{budgetInfo.existingEquipmentCost.toLocaleString('sv-SE')} SEK</span>
                       </div>
                     )}
                     {pricingEnabled && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <span style={{ color: '#6a6a80' }}>Equipment (this booking)</span>
+                        <span style={{ color: '#979ca7' }}>Equipment (this booking)</span>
                         <span style={{ color: '#f0f0f5', fontWeight: 600 }}>{totalPrice.toFixed(0)} SEK</span>
                       </div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #2a2a3a', paddingTop: 6 }}>
-                      <span style={{ color: '#6a6a80' }}>Total budget used</span>
+                      <span style={{ color: '#979ca7' }}>Total budget used</span>
                       <span style={{ color: (budgetInfo.salaryCost + budgetInfo.existingEquipmentCost + (pricingEnabled ? totalPrice : 0)) > budgetInfo.limit ? '#f87171' : '#34d399', fontWeight: 700 }}>
                         {(budgetInfo.salaryCost + budgetInfo.existingEquipmentCost + (pricingEnabled ? totalPrice : 0)).toLocaleString('sv-SE')} / {budgetInfo.limit.toLocaleString('sv-SE')} SEK
                       </span>
@@ -1451,7 +1451,7 @@ export default function EquipmentBookingPage() {
                           {statusIcons[b.status]} {b.status.replace('-', ' ')}
                         </span>
                       </div>
-                      <div style={{ fontSize: '.8rem', color: '#6a6a80', marginBottom: 6 }}>
+                      <div style={{ fontSize: '.8rem', color: '#979ca7', marginBottom: 6 }}>
                         <Calendar size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
                         {formatDate(b.checkoutDate)} – {formatDate(b.returnDate)}
                       </div>
@@ -1461,7 +1461,7 @@ export default function EquipmentBookingPage() {
                       {bookingParts(b).length > 1 ? <BookingPartsSummary booking={b} /> : (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                           {b.items.map((it, i) => (
-                            <span key={i} style={{ fontSize: '.72rem', background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 20, padding: '2px 8px', color: isItemUnavailable(b, it) ? '#6a6a80' : '#c0c0d5' }}>
+                            <span key={i} style={{ fontSize: '.72rem', background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 20, padding: '2px 8px', color: isItemUnavailable(b, it) ? '#979ca7' : '#c0c0d5' }}>
                               {isItemUnavailable(b, it)
                                 ? <><span style={{ textDecoration: 'line-through' }}>{it.quantity}× {it.equipmentName}</span> <span style={{ color: '#fda4af', fontWeight: 700 }}>not available</span></>
                                 : <>{it.quantity}× {it.equipmentName}{it.kitName && <span style={{ color: '#8a8aab' }}> · {it.kitName}</span>}</>}

@@ -269,7 +269,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
               onClick={() => !uploading && fileRef.current?.click()}
             >
               <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => { if (e.target.files) handleImageFiles(e.target.files); e.target.value = '' }} />
-              <div style={{ textAlign: 'center', padding: '.5rem 0', color: '#4a4a60' }}>
+              <div style={{ textAlign: 'center', padding: '.5rem 0', color: '#8c919b' }}>
                 {uploading
                   ? <><Loader2 size={24} style={{ margin: '0 auto 8px', display: 'block', animation: 'spin 1s linear infinite' }} /><p style={{ fontSize: '.8rem' }}>{uploadPct === 0 ? 'Preparing…' : `${uploadPct}%`}</p></>
                   : <><Upload size={24} style={{ margin: '0 auto 8px', display: 'block' }} /><p style={{ fontSize: '.8rem' }}>{form.images.length ? 'Add more images — drag & drop or click' : 'Drag & drop or click to upload images'}</p></>
@@ -296,7 +296,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
                 {form.included.map((item, i) => (
                   <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '.75rem', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 20, padding: '4px 10px', color: '#c0c0d5' }}>
                     {item}
-                    <button onClick={() => set('included', form.included.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6a6a80', padding: 0, display: 'flex' }}><X size={12} /></button>
+                    <button onClick={() => set('included', form.included.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#979ca7', padding: 0, display: 'flex' }}><X size={12} /></button>
                   </span>
                 ))}
               </div>
@@ -306,7 +306,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
           {/* Suggested accessories — offered in a popup when this item is added to the cart */}
           <div>
             <label style={lbl}>Suggested Accessories</label>
-            <p style={{ fontSize: '.7rem', color: '#4a4a60', marginBottom: 8 }}>
+            <p style={{ fontSize: '.7rem', color: '#8c919b', marginBottom: 8 }}>
               Other catalog items to suggest when this is added to the cart (e.g. a DMX controller for a light set).
             </p>
             {form.accessoryIds.length > 0 && (
@@ -314,7 +314,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
                 {form.accessoryIds.map(id => (
                   <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '.75rem', background: 'rgba(242,100,25,.1)', border: '1px solid rgba(242,100,25,.3)', borderRadius: 20, padding: '4px 10px', color: '#f0c0a0' }}>
                     {catalogById.get(id)?.name ?? 'Removed item'}
-                    <button onClick={() => set('accessoryIds', form.accessoryIds.filter(x => x !== id))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6a6a80', padding: 0, display: 'flex' }}><X size={12} /></button>
+                    <button onClick={() => set('accessoryIds', form.accessoryIds.filter(x => x !== id))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#979ca7', padding: 0, display: 'flex' }}><X size={12} /></button>
                   </span>
                 ))}
               </div>
@@ -333,7 +333,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
                 .slice(0, 8)
               return (
                 <div style={{ marginTop: 6, border: '1px solid #2a2a3a', borderRadius: 10, overflow: 'hidden' }}>
-                  {matches.length === 0 && <p style={{ fontSize: '.78rem', color: '#4a4a60', padding: '8px 12px' }}>No matching items</p>}
+                  {matches.length === 0 && <p style={{ fontSize: '.78rem', color: '#8c919b', padding: '8px 12px' }}>No matching items</p>}
                   {matches.map(e => (
                     <button
                       key={e.id}
@@ -342,9 +342,9 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
                     >
                       {e.imageUrl
                         ? <img src={optimizeImageUrl(e.imageUrl)} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 6 }} />
-                        : <Package size={16} color="#4a4a60" />}
+                        : <Package size={16} color="#8c919b" />}
                       <span style={{ flex: 1 }}>{e.name}</span>
-                      <span style={{ fontSize: '.65rem', color: '#6a6a80', fontWeight: 700 }}>{e.category}</span>
+                      <span style={{ fontSize: '.65rem', color: '#979ca7', fontWeight: 700 }}>{e.category}</span>
                     </button>
                   ))}
                 </div>
@@ -355,11 +355,11 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
           {/* Available for classes */}
           <div>
             <label style={lbl}>Available For Classes</label>
-            <p style={{ fontSize: '.7rem', color: '#4a4a60', marginBottom: 8 }}>
+            <p style={{ fontSize: '.7rem', color: '#8c919b', marginBottom: 8 }}>
               Leave all unchecked to allow all classes. Check one or more to restrict access.
             </p>
             {sortedCohorts.length === 0 ? (
-              <p style={{ fontSize: '.8rem', color: '#4a4a60' }}>No classes found</p>
+              <p style={{ fontSize: '.8rem', color: '#8c919b' }}>No classes found</p>
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {sortedCohorts.map(cohort => {
@@ -396,10 +396,10 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
           {/* Production required toggle: only where the school has productions */}
           {hasProduction && <div>
             <button onClick={() => set('requiresProduction', !form.requiresProduction)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#c0c0d5', fontSize: '.85rem' }}>
-              {form.requiresProduction ? <ToggleRight size={20} color="#f59e0b" /> : <ToggleLeft size={20} color="#4a4a60" />}
+              {form.requiresProduction ? <ToggleRight size={20} color="#f59e0b" /> : <ToggleLeft size={20} color="#8c919b" />}
               <span>
                 Requires active production to book
-                <span style={{ marginLeft: 6, fontSize: '.7rem', color: '#4a4a60' }}>
+                <span style={{ marginLeft: 6, fontSize: '.7rem', color: '#8c919b' }}>
                   {form.requiresProduction ? '(students must select a production)' : '(bookable without a production)'}
                 </span>
               </span>
@@ -409,7 +409,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
           {/* Active toggle */}
           <div>
             <button onClick={() => set('isActive', !form.isActive)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#c0c0d5', fontSize: '.85rem' }}>
-              {form.isActive ? <ToggleRight size={20} color="#4cd964" /> : <ToggleLeft size={20} color="#4a4a60" />}
+              {form.isActive ? <ToggleRight size={20} color="#4cd964" /> : <ToggleLeft size={20} color="#8c919b" />}
               Active in catalog
             </button>
           </div>

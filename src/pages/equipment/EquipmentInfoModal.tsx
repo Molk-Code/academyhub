@@ -19,12 +19,12 @@ export function InfoModal({ item, cohorts, pricingEnabled, onClose }: { item: Eq
 
           <div style={{ fontSize: '.8rem', fontWeight: 600, color: item.available === 0 ? '#ff4757' : '#4cd964' }}>
             {item.available}/{item.totalQuantity} available
-            {pricingEnabled && (item.priceInclVat > 0 ? <span style={{ color: '#6a6a80', fontWeight: 500 }}> · {item.priceInclVat} kr/day</span> : <span style={{ color: '#6a6a80', fontWeight: 500 }}> · Free</span>)}
+            {pricingEnabled && (item.priceInclVat > 0 ? <span style={{ color: '#979ca7', fontWeight: 500 }}> · {item.priceInclVat} kr/day</span> : <span style={{ color: '#979ca7', fontWeight: 500 }}> · Free</span>)}
           </div>
 
           {item.allowedCohortIds && item.allowedCohortIds.length > 0 && (
             <div>
-              <p style={{ fontSize: '.7rem', fontWeight: 700, color: '#6a6a80', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Available to classes</p>
+              <p style={{ fontSize: '.7rem', fontWeight: 700, color: '#979ca7', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Available to classes</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {item.allowedCohortIds.map(id => {
                   const c = cohorts.find(x => x.id === id)
@@ -40,7 +40,7 @@ export function InfoModal({ item, cohorts, pricingEnabled, onClose }: { item: Eq
 
           {item.description && (
             <div>
-              <p style={{ fontSize: '.7rem', fontWeight: 700, color: '#6a6a80', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Description</p>
+              <p style={{ fontSize: '.7rem', fontWeight: 700, color: '#979ca7', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Description</p>
               <p style={{ fontSize: '.85rem', color: '#c0c0d5', lineHeight: 1.5, whiteSpace: 'pre-line' }}><LinkifiedText text={item.description} /></p>
             </div>
           )}
@@ -54,7 +54,7 @@ export function InfoModal({ item, cohorts, pricingEnabled, onClose }: { item: Eq
 
           {item.included?.length > 0 && (
             <div>
-              <p style={{ fontSize: '.7rem', fontWeight: 700, color: '#6a6a80', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Included Accessories</p>
+              <p style={{ fontSize: '.7rem', fontWeight: 700, color: '#979ca7', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Included Accessories</p>
               <ul style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {item.included.map((inc, i) => (
                   <li key={i} style={{ fontSize: '.82rem', color: '#a0a0b5', paddingLeft: 12, position: 'relative' }}>
@@ -66,7 +66,7 @@ export function InfoModal({ item, cohorts, pricingEnabled, onClose }: { item: Eq
           )}
 
           {item.location && (
-            <p style={{ fontSize: '.78rem', color: '#6a6a80' }}>📍 {item.location}</p>
+            <p style={{ fontSize: '.78rem', color: '#979ca7' }}>📍 {item.location}</p>
           )}
 
           {item.linkUrl && (

@@ -93,7 +93,7 @@ function RentalSummaryModal({ input, catalog, onClose }: { input: SummaryInput; 
           <input style={{ ...inp, width: 90 }} inputMode="decimal" value={discount} onChange={e => setDiscount(e.target.value)} placeholder="0" />
         </label>
 
-        <p style={{ fontSize: '.75rem', color: '#6a6a80', margin: 0 }}>
+        <p style={{ fontSize: '.75rem', color: '#979ca7', margin: 0 }}>
           {cfg.vatRate == null
             ? 'No VAT rate is set (Equipment → Export), so prices are shown as listed, without a VAT line.'
             : `VAT ${cfg.vatRate}% from Equipment → Export.`}

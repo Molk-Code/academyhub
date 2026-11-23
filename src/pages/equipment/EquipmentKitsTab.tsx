@@ -116,8 +116,8 @@ export function KitsTab() {
         </div>
       )}
 
-      {loading ? <Loader2 className="animate-spin" size={18} color="#6a6a80" /> : sortedKits.length === 0 && editing === null ? (
-        <p style={{ color: '#6a6a80', fontSize: '.85rem' }}>No kits yet.</p>
+      {loading ? <Loader2 className="animate-spin" size={18} color="#979ca7" /> : sortedKits.length === 0 && editing === null ? (
+        <p style={{ color: '#979ca7', fontSize: '.85rem' }}>No kits yet.</p>
       ) : sortedKits.map(k => (
         <div key={k.id} style={{ ...card, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           {k.imageUrl && <img src={k.imageUrl} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8 }} />}
@@ -126,7 +126,7 @@ export function KitsTab() {
             <p style={{ fontSize: '.78rem', color: '#a0a0b5', marginTop: 2 }}>
               {[...kitCounts(k)].map(([id, n]) => `${n > 1 ? `${n}× ` : ''}${byId.get(id)?.name ?? 'removed item'}`).join(' · ')}
             </p>
-            {k.notes && <p style={{ fontSize: '.75rem', color: '#6a6a80', marginTop: 4 }}>{k.notes}</p>}
+            {k.notes && <p style={{ fontSize: '.75rem', color: '#979ca7', marginTop: 4 }}>{k.notes}</p>}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <button style={btn} aria-label={`Label for ${k.name}`} onClick={() => setLabelFor(k)}><QrCode size={14} /></button>

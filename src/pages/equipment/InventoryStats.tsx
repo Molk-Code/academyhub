@@ -74,7 +74,7 @@ function MostBorrowedTab({ allItems }: { allItems: Item[] }) {
     <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 12, padding: '0 1rem' }}>
       {sorted.map(([name, count], i) => (
         <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '10px 0', borderBottom: '1px solid #1a1a25' }}>
-          <span style={{ fontSize: '.75rem', color: '#4a4a60', width: 28, fontFamily: 'monospace' }}>#{i + 1}</span>
+          <span style={{ fontSize: '.75rem', color: '#8c919b', width: 28, fontFamily: 'monospace' }}>#{i + 1}</span>
           <span style={{ flex: 1, fontSize: '.85rem', color: '#f0f0f5' }}>{name}</span>
           <div style={{ width: 144, height: 6, background: 'rgba(255,255,255,.08)', borderRadius: 99, overflow: 'hidden' }}>
             <div style={{ height: '100%', background: 'rgba(249,115,22,.6)', borderRadius: 99, width: `${(count / maxCount) * 100}%` }} />
@@ -196,7 +196,7 @@ function EquipmentStatusTab({
                 <th key={key} aria-sort={sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined} style={{ textAlign: 'left', padding: 0 }}>
                   <button
                     onClick={() => toggleSort(key)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '.5rem .75rem', color: sort.key === key ? '#f97316' : '#6a6a80', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '.5rem .75rem', color: sort.key === key ? '#f97316' : '#979ca7', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}
                   >
                     {header}{sort.key === key ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
                   </button>
@@ -206,11 +206,11 @@ function EquipmentStatusTab({
           </thead>
           <tbody>
             {rows.map(({ key, name, category, manual, activeItem, proj, projects, checkedOutCount }) => {
-              const { dot, label, color } = getStatusDisplay(activeItem, proj)
+              const { label, color } = getStatusDisplay(activeItem, proj)
               return (
                 <tr key={key} style={{ borderBottom: '1px solid #1a1a25' }}>
                   <td style={{ padding: '.5rem .75rem', color: '#f0f0f5', fontWeight: 600 }}>
-                    {name}{checkedOutCount > 1 ? <span style={{ color: '#6a6a80', fontWeight: 700 }}> ×{checkedOutCount}</span> : ''}
+                    {name}{checkedOutCount > 1 ? <span style={{ color: '#979ca7', fontWeight: 700 }}> ×{checkedOutCount}</span> : ''}
                     {manual && (
                       <span style={{ marginLeft: 8, fontSize: '.62rem', fontWeight: 700, color: '#a1a1aa', border: '1px solid #3a3a4a', borderRadius: 8, padding: '1px 6px', verticalAlign: 'middle' }}>
                         MANUAL
@@ -218,13 +218,13 @@ function EquipmentStatusTab({
                     )}
                   </td>
                   <td style={{ padding: '.5rem .75rem', color: '#f97316', fontSize: '.7rem', fontWeight: 700 }}>{category || '—'}</td>
-                  <td style={{ padding: '.5rem .75rem', whiteSpace: 'nowrap' }}><span style={{ color }}>{dot} {label}</span></td>
-                  <td style={{ padding: '.5rem .75rem', color: '#6a6a80' }}>
+                  <td style={{ padding: '.5rem .75rem', whiteSpace: 'nowrap' }}><span style={{ color, display: 'inline-flex', alignItems: 'center', gap: 6 }}><span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 99, background: color, flexShrink: 0 }} />{label}</span></td>
+                  <td style={{ padding: '.5rem .75rem', color: '#979ca7' }}>
                     {projects.length === 0 ? '—' : (
                       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
                         {projects.map(({ proj: p, count }) => (
                           <button key={p.id} onClick={() => onOpenProject(p.id)} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}>
-                            {p.name}{projects.length > 1 && count > 1 && <span style={{ color: '#6a6a80', fontWeight: 700 }}> ×{count}</span>}
+                            {p.name}{projects.length > 1 && count > 1 && <span style={{ color: '#979ca7', fontWeight: 700 }}> ×{count}</span>}
                           </button>
                         ))}
                       </span>
@@ -235,23 +235,23 @@ function EquipmentStatusTab({
             })}
           </tbody>
         </table>
-        {rows.length === 0 && <div style={{ textAlign: 'center', padding: '2.5rem', color: '#4a4a60', fontSize: '.85rem' }}>No equipment found</div>}
+        {rows.length === 0 && <div style={{ textAlign: 'center', padding: '2.5rem', color: '#8c919b', fontSize: '.85rem' }}>No equipment found</div>}
       </div>
     </div>
   )
 }
 
 function getStatusDisplay(item?: Item, proj?: InventoryProjectDoc) {
-  if (!item) return { dot: '🟢', label: 'Available', color: '#4ade80' }
-  if (item.status === 'damaged')     return { dot: '🟠', label: 'Damaged',    color: '#fbbf24' }
-  if (item.status === 'missing')     return { dot: '⚫', label: 'Missing',    color: '#a1a1aa' }
-  if (item.status === 'pending')     return { dot: '🟡', label: 'Pending Checkout', color: '#f97316' }
+  if (!item) return { label: 'Available', color: '#4ade80' }
+  if (item.status === 'damaged')     return { label: 'Damaged',    color: '#fbbf24' }
+  if (item.status === 'missing')     return { label: 'Missing',    color: '#a1a1aa' }
+  if (item.status === 'pending')     return { label: 'Pending Checkout', color: '#f97316' }
   if (item.status === 'checked-out') {
     const overdue = proj && proj.returnDate < today()
-    if (overdue) return { dot: '🔴', label: 'Overdue',     color: '#f87171' }
-    return           { dot: '🔵', label: 'Checked Out',  color: '#60a5fa' }
+    if (overdue) return { label: 'Overdue',     color: '#f87171' }
+    return           { label: 'Checked Out',  color: '#60a5fa' }
   }
-  return { dot: '🟢', label: 'Available', color: '#4ade80' }
+  return { label: 'Available', color: '#4ade80' }
 }
 
 function SimpleItemsTab({
@@ -271,7 +271,7 @@ function SimpleItemsTab({
         <thead>
           <tr style={{ borderBottom: '1px solid #2a2a3a' }}>
             {columns.map(h => (
-              <th key={h} style={{ textAlign: 'left', padding: '.5rem .75rem', color: '#6a6a80', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
+              <th key={h} style={{ textAlign: 'left', padding: '.5rem .75rem', color: '#979ca7', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -363,7 +363,7 @@ function BorrowersTab({
               <th key={key} aria-sort={sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined} style={{ textAlign: 'left', padding: 0 }}>
                 <button
                   onClick={() => toggleSort(key)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '.5rem .75rem', color: sort.key === key ? '#f97316' : '#6a6a80', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '.5rem .75rem', color: sort.key === key ? '#f97316' : '#979ca7', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}
                 >
                   {header}{sort.key === key ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
                 </button>
@@ -376,12 +376,12 @@ function BorrowersTab({
             <tr key={i} style={{ borderBottom: '1px solid #1a1a25' }}>
               <td style={{ padding: '.5rem .75rem', color: '#f0f0f5', fontWeight: 600 }}>{r.name}</td>
               <td style={{ padding: '.5rem .75rem' }}><CohortBadge cohortId={r.cohortId} cohorts={cohortNames} /></td>
-              <td style={{ padding: '.5rem .75rem', color: r.projects > 0 ? '#f97316' : '#6a6a80', fontWeight: r.projects > 0 ? 700 : 400 }}>{r.projects}</td>
-              <td style={{ padding: '.5rem .75rem', color: r.active > 0 ? '#4cd964' : '#6a6a80' }}>{r.active || '—'}</td>
-              <td style={{ padding: '.5rem .75rem', color: r.out > 0 ? '#60a5fa' : '#6a6a80' }}>{r.out || '—'}</td>
-              <td style={{ padding: '.5rem .75rem', color: r.returned > 0 ? '#4cd964' : '#6a6a80' }}>{r.returned || '—'}</td>
-              <td style={{ padding: '.5rem .75rem', color: r.missing > 0 ? '#f87171' : '#6a6a80', fontWeight: r.missing > 0 ? 700 : 400 }}>{r.missing || '—'}</td>
-              <td style={{ padding: '.5rem .75rem', color: r.damaged > 0 ? '#fbbf24' : '#6a6a80', fontWeight: r.damaged > 0 ? 700 : 400 }}>{r.damaged || '—'}</td>
+              <td style={{ padding: '.5rem .75rem', color: r.projects > 0 ? '#f97316' : '#979ca7', fontWeight: r.projects > 0 ? 700 : 400 }}>{r.projects}</td>
+              <td style={{ padding: '.5rem .75rem', color: r.active > 0 ? '#4cd964' : '#979ca7' }}>{r.active || '—'}</td>
+              <td style={{ padding: '.5rem .75rem', color: r.out > 0 ? '#60a5fa' : '#979ca7' }}>{r.out || '—'}</td>
+              <td style={{ padding: '.5rem .75rem', color: r.returned > 0 ? '#4cd964' : '#979ca7' }}>{r.returned || '—'}</td>
+              <td style={{ padding: '.5rem .75rem', color: r.missing > 0 ? '#f87171' : '#979ca7', fontWeight: r.missing > 0 ? 700 : 400 }}>{r.missing || '—'}</td>
+              <td style={{ padding: '.5rem .75rem', color: r.damaged > 0 ? '#fbbf24' : '#979ca7', fontWeight: r.damaged > 0 ? 700 : 400 }}>{r.damaged || '—'}</td>
             </tr>
           ))}
         </tbody>
@@ -415,8 +415,8 @@ function ProjectsTab({
     return (
       <tr {...clickableRow} style={{ borderBottom: '1px solid #1a1a25', cursor: 'pointer' }} onClick={() => onOpenProject(p.id)}>
         <td style={{ padding: '.5rem .75rem', color: '#f97316', fontWeight: 600 }}>{p.name}</td>
-        <td style={{ padding: '.5rem .75rem', color: '#6a6a80', fontSize: '.78rem' }}>{(p.borrowers ?? []).slice(0, 3).join(', ')}{(p.borrowers?.length ?? 0) > 3 ? ` +${p.borrowers!.length - 3}` : ''}</td>
-        <td style={{ padding: '.5rem .75rem', color: '#6a6a80', fontSize: '.75rem', whiteSpace: 'nowrap' }}>{formatRange(p.checkoutDate, p.returnDate)}</td>
+        <td style={{ padding: '.5rem .75rem', color: '#979ca7', fontSize: '.78rem' }}>{(p.borrowers ?? []).slice(0, 3).join(', ')}{(p.borrowers?.length ?? 0) > 3 ? ` +${p.borrowers!.length - 3}` : ''}</td>
+        <td style={{ padding: '.5rem .75rem', color: '#979ca7', fontSize: '.75rem', whiteSpace: 'nowrap' }}>{formatRange(p.checkoutDate, p.returnDate)}</td>
         <td style={{ padding: '.5rem .75rem' }}>
           <span style={{ fontSize: '.65rem', fontWeight: 700, color: statusColor, background: statusColor + '18', border: `1px solid ${statusColor}40`, borderRadius: 10, padding: '2px 7px' }}>
             {p.status}
@@ -438,13 +438,13 @@ function ProjectsTab({
         <thead>
           <tr style={{ borderBottom: '1px solid #2a2a3a' }}>
             {['Project', 'Borrowers', 'Dates', 'Status', 'Items'].map(h => (
-              <th key={h} style={{ textAlign: 'left', padding: '.5rem .75rem', color: '#6a6a80', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
+              <th key={h} style={{ textAlign: 'left', padding: '.5rem .75rem', color: '#979ca7', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>{rows.map(p => <ProjectRow key={p.id} p={p} />)}</tbody>
       </table>
-      {rows.length === 0 && <div style={{ textAlign: 'center', padding: '2rem', color: '#4a4a60', fontSize: '.85rem' }}>None</div>}
+      {rows.length === 0 && <div style={{ textAlign: 'center', padding: '2rem', color: '#8c919b', fontSize: '.85rem' }}>None</div>}
     </div>
   )
 
@@ -493,7 +493,7 @@ function ProjectBudgetTab({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ fontSize: '.85rem', color: '#6a6a80' }}>
+      <div style={{ fontSize: '.85rem', color: '#979ca7' }}>
         Total across {rows.length} project{rows.length !== 1 ? 's' : ''}: <span style={{ color: '#f0f0f5', fontWeight: 700 }}>{total.toLocaleString('sv-SE')} kr</span>
       </div>
       <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 12, overflowX: 'auto' }}>
@@ -501,21 +501,21 @@ function ProjectBudgetTab({
           <thead>
             <tr style={{ borderBottom: '1px solid #2a2a3a' }}>
               {['#', 'Project', 'Dates', 'Items', 'Cost'].map(h => (
-                <th key={h} style={{ textAlign: h === 'Cost' || h === 'Items' ? 'right' : 'left', padding: '.5rem .75rem', color: '#6a6a80', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
+                <th key={h} style={{ textAlign: h === 'Cost' || h === 'Items' ? 'right' : 'left', padding: '.5rem .75rem', color: '#979ca7', fontWeight: 600, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={r.project.id} style={{ borderBottom: '1px solid #1a1a25' }}>
-                <td style={{ padding: '.5rem .75rem', color: '#4a4a60', fontFamily: 'monospace' }}>#{i + 1}</td>
+                <td style={{ padding: '.5rem .75rem', color: '#8c919b', fontFamily: 'monospace' }}>#{i + 1}</td>
                 <td style={{ padding: '.5rem .75rem' }}>
                   <button onClick={() => onOpenProject(r.project.id)} style={{ color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600, fontSize: 'inherit', textAlign: 'left' }}>
                     {r.project.name}
                   </button>
                 </td>
-                <td style={{ padding: '.5rem .75rem', color: '#6a6a80', fontSize: '.75rem', whiteSpace: 'nowrap' }}>{formatRange(r.project.checkoutDate, r.project.returnDate)}</td>
-                <td style={{ padding: '.5rem .75rem', color: '#6a6a80', textAlign: 'right' }}>{r.itemCount}</td>
+                <td style={{ padding: '.5rem .75rem', color: '#979ca7', fontSize: '.75rem', whiteSpace: 'nowrap' }}>{formatRange(r.project.checkoutDate, r.project.returnDate)}</td>
+                <td style={{ padding: '.5rem .75rem', color: '#979ca7', textAlign: 'right' }}>{r.itemCount}</td>
                 <td style={{ padding: '.5rem .75rem', color: '#f0f0f5', fontWeight: 700, textAlign: 'right' }}>{r.cost > 0 ? `${r.cost.toLocaleString('sv-SE')} kr` : '—'}</td>
               </tr>
             ))}
@@ -706,7 +706,7 @@ export function StatsContent({
             style={{
               padding: '10px 16px', fontSize: '.8rem', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0,
               background: 'transparent', border: 'none', cursor: 'pointer', transition: 'all .15s',
-              color: activeTab === t.id ? '#f97316' : '#6a6a80',
+              color: activeTab === t.id ? '#f97316' : '#979ca7',
               borderBottom: activeTab === t.id ? '2px solid #f97316' : '2px solid transparent',
             }}
           >

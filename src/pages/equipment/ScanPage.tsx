@@ -298,7 +298,7 @@ export default function ScanPage() {
       <div style={{ ...base, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         <div style={{ width: 32, height: 32, border: '3px solid #2a2a3a', borderTopColor: '#4cd964', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-        <p style={{ color: '#6a6a80', fontSize: '.9rem' }}>Loading session…</p>
+        <p style={{ color: '#979ca7', fontSize: '.9rem' }}>Loading session…</p>
       </div>
     )
   }
@@ -308,7 +308,7 @@ export default function ScanPage() {
       <div style={{ ...base, alignItems: 'center', justifyContent: 'center', gap: 16, padding: '2rem', textAlign: 'center' }}>
         <LogIn size={40} color="#4cd964" />
         <h2 style={{ fontWeight: 700, fontSize: '1.25rem' }}>Sign in required</h2>
-        <p style={{ color: '#6a6a80', fontSize: '.9rem' }}>You need to be signed in to use the scanner.</p>
+        <p style={{ color: '#979ca7', fontSize: '.9rem' }}>You need to be signed in to use the scanner.</p>
         <button
           onClick={() => navigate(`/login?redirect=/scan/${sessionId}`)}
           style={{ padding: '10px 24px', background: '#4cd964', color: '#000', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '.9rem', cursor: 'pointer' }}
@@ -338,10 +338,10 @@ export default function ScanPage() {
   if (sessionEnded || !session) {
     return (
       <div style={{ ...base, alignItems: 'center', justifyContent: 'center', gap: 16, padding: '2rem', textAlign: 'center' }}>
-        <WifiOff size={40} color="#6a6a80" />
+        <WifiOff size={40} color="#979ca7" />
         <h2 style={{ fontWeight: 700, fontSize: '1.25rem' }}>Session ended</h2>
-        <p style={{ color: '#6a6a80', fontSize: '.9rem' }}>This scanning session has been stopped from the desktop.</p>
-        <p style={{ fontSize: '.75rem', color: '#4a4a60' }}>You can close this tab.</p>
+        <p style={{ color: '#979ca7', fontSize: '.9rem' }}>This scanning session has been stopped from the desktop.</p>
+        <p style={{ fontSize: '.75rem', color: '#8c919b' }}>You can close this tab.</p>
       </div>
     )
   }
@@ -359,7 +359,7 @@ export default function ScanPage() {
       <div style={{ background: 'rgba(10,10,15,.95)', borderBottom: '1px solid #1a1a25', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: '.95rem', color: '#f0f0f5' }}>Scanner</div>
-          <div style={{ fontSize: '.7rem', color: '#6a6a80', marginTop: 1 }}>{session.projectName}</div>
+          <div style={{ fontSize: '.7rem', color: '#979ca7', marginTop: 1 }}>{session.projectName}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Wifi size={14} color="#4cd964" />
@@ -377,7 +377,7 @@ export default function ScanPage() {
           {!scanActive && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
               <Scan size={48} color="#2a2a3a" />
-              <p style={{ color: '#4a4a60', fontSize: '.85rem' }}>Tap Start to activate camera</p>
+              <p style={{ color: '#8c919b', fontSize: '.85rem' }}>Tap Start to activate camera</p>
             </div>
           )}
 
@@ -470,7 +470,7 @@ export default function ScanPage() {
         {/* Recent scans */}
         {scanEntries.length > 0 && (
           <div style={{ background: '#0e0e16', border: '1px solid #1a1a25', borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ padding: '8px 12px', borderBottom: '1px solid #1a1a25', fontSize: '.7rem', fontWeight: 700, color: '#4a4a60', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+            <div style={{ padding: '8px 12px', borderBottom: '1px solid #1a1a25', fontSize: '.7rem', fontWeight: 700, color: '#8c919b', textTransform: 'uppercase', letterSpacing: '.08em' }}>
               Scanned this session ({scanEntries.length})
             </div>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
@@ -481,7 +481,7 @@ export default function ScanPage() {
                     : <X size={14} color="#f87171" style={{ flexShrink: 0 }} />
                   }
                   <span style={{ flex: 1, fontSize: '.85rem', color: e.ok ? '#f0f0f5' : '#f87171', fontWeight: i === 0 ? 700 : 400 }}>{e.name}</span>
-                  <span style={{ fontSize: '.7rem', color: '#4a4a60' }}>{e.time}</span>
+                  <span style={{ fontSize: '.7rem', color: '#8c919b' }}>{e.time}</span>
                 </div>
               ))}
             </div>

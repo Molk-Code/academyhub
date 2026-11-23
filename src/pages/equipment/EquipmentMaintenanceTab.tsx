@@ -52,7 +52,7 @@ export function MaintenanceTab() {
     return (
       <button key={e.id} type="button" onClick={() => setOpenId(e.id)}
         style={{ ...card, padding: '.75rem 1rem', display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', cursor: 'pointer' }}>
-        <Wrench size={16} color={st ? STATE_LABEL[st].color : '#6a6a80'} aria-hidden="true" />
+        <Wrench size={16} color={st ? STATE_LABEL[st].color : '#979ca7'} aria-hidden="true" />
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: 'block', fontWeight: 600, color: '#f0f0f5', fontSize: '.88rem' }}>{e.name}</span>
           <span style={{ display: 'block', fontSize: '.75rem', color: '#8a8aab' }}>
@@ -70,11 +70,11 @@ export function MaintenanceTab() {
   const section = (title: string, list: EquipmentDoc[], empty: string) => (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <h3 style={{ fontSize: '.8rem', fontWeight: 700, color: '#a0a0b5', textTransform: 'uppercase', letterSpacing: '.08em' }}>{title} ({list.length})</h3>
-      {list.length ? list.map(row) : <p style={{ color: '#6a6a80', fontSize: '.85rem' }}>{empty}</p>}
+      {list.length ? list.map(row) : <p style={{ color: '#979ca7', fontSize: '.85rem' }}>{empty}</p>}
     </section>
   )
 
-  if (loading) return <Loader2 className="animate-spin" size={18} color="#6a6a80" />
+  if (loading) return <Loader2 className="animate-spin" size={18} color="#979ca7" />
 
   return (
     <div style={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -86,7 +86,7 @@ export function MaintenanceTab() {
       <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <h3 style={{ fontSize: '.8rem', fontWeight: 700, color: '#a0a0b5', textTransform: 'uppercase', letterSpacing: '.08em' }}>Any item</h3>
         <label style={{ position: 'relative' }}>
-          <Search size={14} color="#6a6a80" style={{ position: 'absolute', left: 10, top: 11 }} aria-hidden="true" />
+          <Search size={14} color="#979ca7" style={{ position: 'absolute', left: 10, top: 11 }} aria-hidden="true" />
           <input style={{ ...inp, paddingLeft: 30, width: '100%' }} placeholder="Find an item to log maintenance…" value={search} onChange={e => setSearch(e.target.value)} aria-label="Find an item" />
         </label>
         {matches.map(row)}
@@ -196,7 +196,7 @@ function ItemMaintenance({ item, onClose }: { item: EquipmentDoc; onClose: () =>
         {/* ── Units in service ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <p style={sectionTitle}>In service</p>
-          {!away.length && !unnumbered && <p style={{ color: '#6a6a80', fontSize: '.8rem' }}>No unit is away.</p>}
+          {!away.length && !unnumbered && <p style={{ color: '#979ca7', fontSize: '.8rem' }}>No unit is away.</p>}
           {away.map(u => (
             <div key={u.unit} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '.85rem' }}>
               <span style={{ flex: 1, color: '#f0f0f5' }}>
@@ -340,7 +340,7 @@ function ItemMaintenance({ item, onClose }: { item: EquipmentDoc; onClose: () =>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <p style={sectionTitle}>History</p>
-          {log.length === 0 ? <p style={{ color: '#6a6a80', fontSize: '.8rem' }}>Nothing logged yet.</p> : log.map(l => (
+          {log.length === 0 ? <p style={{ color: '#979ca7', fontSize: '.8rem' }}>Nothing logged yet.</p> : log.map(l => (
             <div key={l.id} style={{ fontSize: '.8rem', color: '#c0c0d5', borderLeft: '2px solid #2a2a3a', paddingLeft: 10 }}>
               <span style={{ color: '#f0f0f5', fontWeight: 600 }}>
                 {l.date} · {TYPES.find(t => t.id === l.type)?.label ?? l.type}{unitLabel(l.unit) && ` · ${unitLabel(l.unit)}`}

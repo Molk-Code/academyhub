@@ -225,7 +225,7 @@ export function BookingsTab() {
                 textTransform: 'capitalize', cursor: 'pointer', letterSpacing: '.04em',
                 background: active ? col + '25' : '#1a1a25',
                 border: `1px solid ${active ? col + '80' : '#2a2a3a'}`,
-                color: active ? col : '#6a6a80',
+                color: active ? col : '#979ca7',
               }}
             >
               {s === 'all' ? 'All' : s.replace('-', ' ')}
@@ -256,7 +256,7 @@ export function BookingsTab() {
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: col, flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 120 }}>
                     <p style={{ fontWeight: 700, fontSize: '.9rem', color: '#f0f0f5', margin: 0 }}>{b.projectName}</p>
-                    <p style={{ fontSize: '.75rem', color: '#6a6a80', margin: '2px 0 0' }}>
+                    <p style={{ fontSize: '.75rem', color: '#979ca7', margin: '2px 0 0' }}>
                       {b.isGuest && <span style={{ fontSize: '.65rem', fontWeight: 700, color: '#38bdf8', border: '1px solid #38bdf850', borderRadius: 20, padding: '1px 7px', marginRight: 6 }}>Rental shop</span>}
                       {b.isGuest ? b.guestName ?? b.studentName : b.studentName}
                       {/* A shop guest has no account: their contact details */}
@@ -353,7 +353,7 @@ export function BookingsTab() {
             <p style={{ fontSize: '.82rem', color: '#8a8aab', marginBottom: 14 }}>
               "{actionModal.booking.projectName}" — {actionModal.booking.studentName}
             </p>
-            <label style={{ fontSize: '.75rem', fontWeight: 600, color: '#6a6a80', display: 'block', marginBottom: 6 }}>
+            <label style={{ fontSize: '.75rem', fontWeight: 600, color: '#979ca7', display: 'block', marginBottom: 6 }}>
               Message to student <span style={{ fontWeight: 400 }}>(optional — sent as a push notification)</span>
             </label>
             <textarea

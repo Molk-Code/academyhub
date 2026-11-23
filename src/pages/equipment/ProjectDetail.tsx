@@ -831,11 +831,11 @@ export function ProjectDetail({
             <div style={{ background: '#fff', borderRadius: 12, padding: 16, display: 'inline-block' }}>
               <QRCodeSVG value={`${window.location.origin}/scan/${remoteSessionId}`} size={200} level="H" />
             </div>
-            <p style={{ fontSize: '.8rem', color: '#6a6a80', textAlign: 'center', maxWidth: 280 }}>
+            <p style={{ fontSize: '.8rem', color: '#979ca7', textAlign: 'center', maxWidth: 280 }}>
               Scan this QR code on a mobile device to start scanning equipment into this project.
               In the installed app you can also choose Inventory → Phone scanner, then scan the code (no extra sign-in).
             </p>
-            <p style={{ fontSize: '.65rem', color: '#4a4a60', fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center', maxWidth: 320 }}>
+            <p style={{ fontSize: '.65rem', color: '#8c919b', fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center', maxWidth: 320 }}>
               {window.location.origin}/scan/{remoteSessionId}
             </p>
           </div>
@@ -1033,7 +1033,7 @@ export function ProjectDetail({
                       </button>
                     </>
                   ) : (
-                    <span style={{ fontSize: '.8rem', color: '#6a6a80' }}>No other active projects to move to.</span>
+                    <span style={{ fontSize: '.8rem', color: '#979ca7' }}>No other active projects to move to.</span>
                   )}
                 </div>
               )}

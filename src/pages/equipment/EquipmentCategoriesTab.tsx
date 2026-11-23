@@ -101,9 +101,9 @@ export function CategoriesTab({ categories }: { categories: EquipmentCategoryDoc
                   onClick={() => handleReorder(idx, -1)}
                   disabled={idx === 0}
                   title="Move up"
-                  style={{ padding: 2, background: 'transparent', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: idx === 0 ? '#2a2a3a' : '#6a6a80', display: 'flex', borderRadius: 4, transition: 'color .15s' }}
+                  style={{ padding: 2, background: 'transparent', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: idx === 0 ? '#2a2a3a' : '#979ca7', display: 'flex', borderRadius: 4, transition: 'color .15s' }}
                   onMouseEnter={e => { if (idx > 0) e.currentTarget.style.color = '#4cd964' }}
-                  onMouseLeave={e => { e.currentTarget.style.color = idx === 0 ? '#2a2a3a' : '#6a6a80' }}
+                  onMouseLeave={e => { e.currentTarget.style.color = idx === 0 ? '#2a2a3a' : '#979ca7' }}
                 >
                   <ChevronUp size={13} />
                 </button>
@@ -111,9 +111,9 @@ export function CategoriesTab({ categories }: { categories: EquipmentCategoryDoc
                   onClick={() => handleReorder(idx, 1)}
                   disabled={idx === sorted.length - 1}
                   title="Move down"
-                  style={{ padding: 2, background: 'transparent', border: 'none', cursor: idx === sorted.length - 1 ? 'default' : 'pointer', color: idx === sorted.length - 1 ? '#2a2a3a' : '#6a6a80', display: 'flex', borderRadius: 4, transition: 'color .15s' }}
+                  style={{ padding: 2, background: 'transparent', border: 'none', cursor: idx === sorted.length - 1 ? 'default' : 'pointer', color: idx === sorted.length - 1 ? '#2a2a3a' : '#979ca7', display: 'flex', borderRadius: 4, transition: 'color .15s' }}
                   onMouseEnter={e => { if (idx < sorted.length - 1) e.currentTarget.style.color = '#4cd964' }}
-                  onMouseLeave={e => { e.currentTarget.style.color = idx === sorted.length - 1 ? '#2a2a3a' : '#6a6a80' }}
+                  onMouseLeave={e => { e.currentTarget.style.color = idx === sorted.length - 1 ? '#2a2a3a' : '#979ca7' }}
                 >
                   <ChevronDown size={13} />
                 </button>
@@ -141,9 +141,9 @@ export function CategoriesTab({ categories }: { categories: EquipmentCategoryDoc
               <button
                 onClick={() => handleDelete(cat)}
                 title="Delete"
-                style={{ padding: 7, background: 'transparent', border: 'none', cursor: 'pointer', color: '#4a4a60', display: 'flex', borderRadius: 7 }}
+                style={{ padding: 7, background: 'transparent', border: 'none', cursor: 'pointer', color: '#8c919b', display: 'flex', borderRadius: 7 }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#f87171')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#4a4a60')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#8c919b')}
               >
                 <Trash2 size={15} />
               </button>
@@ -151,7 +151,7 @@ export function CategoriesTab({ categories }: { categories: EquipmentCategoryDoc
           )
         })}
         {sorted.length === 0 && (
-          <p style={{ fontSize: '.85rem', color: '#4a4a60', textAlign: 'center', padding: '2rem 0' }}>
+          <p style={{ fontSize: '.85rem', color: '#8c919b', textAlign: 'center', padding: '2rem 0' }}>
             No categories yet. Add one above.
           </p>
         )}

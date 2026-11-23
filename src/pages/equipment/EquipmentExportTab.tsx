@@ -91,15 +91,15 @@ export function ExportTab() {
     finally { setExporting(false) }
   }
 
-  const card: React.CSSProperties = { background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 14, padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: 10 }
+  const card: React.CSSProperties = { background: '#1c2026', border: '1px solid #31353c', borderRadius: 14, padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: 10 }
   const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', background: '#4cd964', color: '#000', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', alignSelf: 'flex-start' }
-  const label: React.CSSProperties = { fontSize: '.75rem', color: '#8a8aab' }
+  const label: React.CSSProperties = { fontSize: '.75rem', color: '#a9aeb8' }
   const missing = LEGAL_FIELDS.filter(f => !cfg.seller[f]?.trim()).length + (cfg.vatRate == null ? 1 : 0)
 
   return (
     <div style={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={card}>
-        <p style={{ fontWeight: 700, color: '#f0f0f5' }}>Bookings and projects in a period</p>
+        <p style={{ fontWeight: 700, color: '#dfe2eb' }}>Bookings and projects in a period</p>
         <p style={{ ...label, fontSize: '.8rem' }}>
           One row per line, for importing into accounting software. Includes confirmed, checked-out and returned bookings and every project
           starting in the period. Parts of a booking set up in a project are counted under the project.
@@ -114,11 +114,11 @@ export function ExportTab() {
         <button style={btn} disabled={exporting || !from || !to || from > to} onClick={exportPeriod}>
           {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Download CSV
         </button>
-        {result && <p role="status" style={{ fontSize: '.8rem', color: '#a0a0b5' }}>{result}</p>}
+        {result && <p role="status" style={{ fontSize: '.8rem', color: '#a9aeb8' }}>{result}</p>}
       </div>
 
       <div style={card}>
-        <p style={{ fontWeight: 700, color: '#f0f0f5' }}>Details on rental summaries</p>
+        <p style={{ fontWeight: 700, color: '#dfe2eb' }}>Details on rental summaries</p>
         <p style={{ ...label, fontSize: '.8rem' }}>
           Summaries are marked <strong>"Not a tax invoice"</strong> until the legal name, organisation number, VAT number, address and a VAT rate are filled in
           {missing ? ` (${missing} missing)` : ' (all filled in)'}. Even then, check with your accountant what an invoice must contain where you are:

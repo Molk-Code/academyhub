@@ -289,7 +289,7 @@ export default function ScanPage() {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   const base: React.CSSProperties = {
-    minHeight: '100dvh', background: '#0a0a0f', color: '#f0f0f5',
+    minHeight: '100dvh', background: '#10141a', color: '#dfe2eb',
     fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', flexDirection: 'column',
   }
 
@@ -297,7 +297,7 @@ export default function ScanPage() {
     return (
       <div style={{ ...base, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        <div style={{ width: 32, height: 32, border: '3px solid #2a2a3a', borderTopColor: '#4cd964', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <div style={{ width: 32, height: 32, border: '3px solid #31353c', borderTopColor: '#4cd964', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
         <p style={{ color: '#979ca7', fontSize: '.9rem' }}>Loading session…</p>
       </div>
     )
@@ -356,9 +356,9 @@ export default function ScanPage() {
       `}</style>
 
       {/* Header */}
-      <div style={{ background: 'rgba(10,10,15,.95)', borderBottom: '1px solid #1a1a25', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+      <div style={{ background: 'rgba(16,20,26,.95)', borderBottom: '1px solid #262a31', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: '.95rem', color: '#f0f0f5' }}>Scanner</div>
+          <div style={{ fontWeight: 700, fontSize: '.95rem', color: '#dfe2eb' }}>Scanner</div>
           <div style={{ fontSize: '.7rem', color: '#979ca7', marginTop: 1 }}>{session.projectName}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -376,7 +376,7 @@ export default function ScanPage() {
 
           {!scanActive && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-              <Scan size={48} color="#2a2a3a" />
+              <Scan size={48} color="#31353c" />
               <p style={{ color: '#8c919b', fontSize: '.85rem' }}>Tap Start to activate camera</p>
             </div>
           )}
@@ -419,7 +419,7 @@ export default function ScanPage() {
               </div>
 
               {/* Item name */}
-              <p style={{ fontWeight: 700, fontSize: '1.1rem', color: '#f0f0f5', textAlign: 'center', padding: '0 24px', lineHeight: 1.3, animation: 'scaleIn .25s ease-out' }}>
+              <p style={{ fontWeight: 700, fontSize: '1.1rem', color: '#dfe2eb', textAlign: 'center', padding: '0 24px', lineHeight: 1.3, animation: 'scaleIn .25s ease-out' }}>
                 {cooldown.name}
               </p>
               <p style={{ fontSize: '.75rem', color: cooldown.ok ? '#4cd964' : '#f87171', fontWeight: 600 }}>
@@ -461,7 +461,7 @@ export default function ScanPage() {
         ) : (
           <button
             onClick={stopScanner}
-            style={{ padding: '14px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 12, color: '#f0f0f5', fontWeight: 700, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+            style={{ padding: '14px', background: '#262a31', border: '1px solid #31353c', borderRadius: 12, color: '#dfe2eb', fontWeight: 700, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
             Stop Camera
           </button>
@@ -469,18 +469,18 @@ export default function ScanPage() {
 
         {/* Recent scans */}
         {scanEntries.length > 0 && (
-          <div style={{ background: '#0e0e16', border: '1px solid #1a1a25', borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ padding: '8px 12px', borderBottom: '1px solid #1a1a25', fontSize: '.7rem', fontWeight: 700, color: '#8c919b', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+          <div style={{ background: '#1c2026', border: '1px solid #262a31', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ padding: '8px 12px', borderBottom: '1px solid #262a31', fontSize: '.7rem', fontWeight: 700, color: '#8c919b', textTransform: 'uppercase', letterSpacing: '.08em' }}>
               Scanned this session ({scanEntries.length})
             </div>
             <div style={{ maxHeight: 200, overflowY: 'auto' }}>
               {scanEntries.map((e, i) => (
-                <div key={i} style={{ padding: '8px 12px', borderBottom: i < scanEntries.length - 1 ? '1px solid #1a1a25' : 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div key={i} style={{ padding: '8px 12px', borderBottom: i < scanEntries.length - 1 ? '1px solid #262a31' : 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
                   {e.ok
                     ? <Check size={14} color="#4cd964" style={{ flexShrink: 0 }} />
                     : <X size={14} color="#f87171" style={{ flexShrink: 0 }} />
                   }
-                  <span style={{ flex: 1, fontSize: '.85rem', color: e.ok ? '#f0f0f5' : '#f87171', fontWeight: i === 0 ? 700 : 400 }}>{e.name}</span>
+                  <span style={{ flex: 1, fontSize: '.85rem', color: e.ok ? '#dfe2eb' : '#f87171', fontWeight: i === 0 ? 700 : 400 }}>{e.name}</span>
                   <span style={{ fontSize: '.7rem', color: '#8c919b' }}>{e.time}</span>
                 </div>
               ))}

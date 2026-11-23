@@ -129,7 +129,7 @@ export function CatalogTab({ categories, pricingEnabled }: { categories: Equipme
                 <EquipmentImg
                   url={item.imageUrl}
                   name={item.name}
-                  fallback={<div className="image-placeholder"><Package size={32} color="#3a3a4a" /></div>}
+                  fallback={<div className="image-placeholder"><Package size={32} color="#454a52" /></div>}
                 />
                 <span className="product-category-tag" style={catStyle(item.category, categories)}>{item.category}</span>
                 {!item.isActive && (
@@ -145,15 +145,15 @@ export function CatalogTab({ categories, pricingEnabled }: { categories: Equipme
                   className="admin-card-overlay"
                 >
                   <button onClick={e => { e.stopPropagation(); setQrItem(item) }} title="QR Code"
-                    style={{ padding: 8, background: 'rgba(30,30,40,.9)', border: '1px solid #2a2a3a', borderRadius: 8, color: '#c0c0d5', cursor: 'pointer', pointerEvents: 'auto' }}>
+                    style={{ padding: 8, background: 'rgba(30,30,40,.9)', border: '1px solid #31353c', borderRadius: 8, color: '#c8ccd5', cursor: 'pointer', pointerEvents: 'auto' }}>
                     <QrCode size={16} />
                   </button>
                   <button onClick={e => { e.stopPropagation(); setBarcodeItem(item) }} title="Barcode"
-                    style={{ padding: 8, background: 'rgba(30,30,40,.9)', border: '1px solid #2a2a3a', borderRadius: 8, color: '#c0c0d5', cursor: 'pointer', pointerEvents: 'auto' }}>
+                    style={{ padding: 8, background: 'rgba(30,30,40,.9)', border: '1px solid #31353c', borderRadius: 8, color: '#c8ccd5', cursor: 'pointer', pointerEvents: 'auto' }}>
                     <Barcode size={16} />
                   </button>
                   <button onClick={e => { e.stopPropagation(); setEditItem(item); setShowForm(true) }} title="Edit"
-                    style={{ padding: 8, background: 'rgba(30,30,40,.9)', border: '1px solid #2a2a3a', borderRadius: 8, color: '#c0c0d5', cursor: 'pointer', pointerEvents: 'auto' }}>
+                    style={{ padding: 8, background: 'rgba(30,30,40,.9)', border: '1px solid #31353c', borderRadius: 8, color: '#c8ccd5', cursor: 'pointer', pointerEvents: 'auto' }}>
                     <Pencil size={16} />
                   </button>
                   <button onClick={e => { e.stopPropagation(); handleDelete(item) }} disabled={deletingId === item.id} title="Delete"

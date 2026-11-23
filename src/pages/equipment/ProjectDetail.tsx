@@ -629,7 +629,7 @@ export function ProjectDetail({
           {editing ? (
             // Fields wrap onto their own lines on a phone instead of squeezing the date
             <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '.5rem' }}>
-              <label style={{ flex: '2 1 220px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, fontSize: '.75rem', color: '#8a8aab', fontWeight: 600 }}>
+              <label style={{ flex: '2 1 220px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, fontSize: '.75rem', color: '#a9aeb8', fontWeight: 600 }}>
                 Project name
                 <input
                   className="manual-add-input"
@@ -638,7 +638,7 @@ export function ProjectDetail({
                   style={{ width: '100%', boxSizing: 'border-box' }}
                 />
               </label>
-              <label style={{ flex: '1 1 160px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, fontSize: '.75rem', color: '#8a8aab', fontWeight: 600 }}>
+              <label style={{ flex: '1 1 160px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, fontSize: '.75rem', color: '#a9aeb8', fontWeight: 600 }}>
                 Return date
                 <input
                   className="manual-add-input"
@@ -649,7 +649,7 @@ export function ProjectDetail({
                 />
               </label>
               <div className="form-group" style={{ flexBasis: '100%', margin: 0 }}>
-                <span style={{ display: 'block', fontSize: '.75rem', color: '#8a8aab', fontWeight: 600, marginBottom: 4 }}>Borrowers</span>
+                <span style={{ display: 'block', fontSize: '.75rem', color: '#a9aeb8', fontWeight: 600, marginBottom: 4 }}>Borrowers</span>
                 <BorrowerPicker borrowers={editBorrowers} onChange={setEditBorrowers} candidates={borrowerCandidates} />
               </div>
               <div style={{ display: 'flex', gap: '.5rem', flexBasis: '100%' }}>
@@ -659,7 +659,7 @@ export function ProjectDetail({
             </div>
           ) : (
             <>
-              <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f0f0f5', margin: '0 0 .5rem' }}>
+              <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#dfe2eb', margin: '0 0 .5rem' }}>
                 {project.name}
               </h1>
               <div className="project-detail-meta">
@@ -816,7 +816,7 @@ export function ProjectDetail({
               spellCheck={false}
               tabIndex={usbByDefault ? -1 : undefined}
               aria-hidden={usbByDefault || undefined}
-              style={{ width: '100%', padding: '10px 12px', background: '#1a1a25', border: '1px solid #4cd964', borderRadius: 8, color: '#f0f0f5', fontFamily: 'monospace', fontSize: '.9rem', outline: 'none' }}
+              style={{ width: '100%', padding: '10px 12px', background: '#262a31', border: '1px solid #4cd964', borderRadius: 8, color: '#dfe2eb', fontFamily: 'monospace', fontSize: '.9rem', outline: 'none' }}
             />
           </div>
         )}

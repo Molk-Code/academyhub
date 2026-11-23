@@ -10,7 +10,7 @@ import {
 const STATE_STYLE: Record<SignatureState, { label: string; color: string; bg: string }> = {
   'signed':        { label: 'Signed',            color: '#4cd964', bg: 'rgba(76,217,100,.12)' },
   'changed':       { label: 'Needs re-signing',  color: '#f5a623', bg: 'rgba(245,166,35,.12)' },
-  'requested':     { label: 'Waiting',           color: '#a0a0b5', bg: 'rgba(160,160,181,.12)' },
+  'requested':     { label: 'Waiting',           color: '#a9aeb8', bg: 'rgba(160,160,181,.12)' },
   'not-requested': { label: 'Not sent',          color: '#979ca7', bg: 'rgba(106,106,128,.12)' },
 }
 
@@ -64,9 +64,9 @@ export function ContractSignatures({ project, items }: { project: InventoryProje
   if (borrowerIds.length === 0 && paperOnly.length === 0) return null
 
   return (
-    <div style={{ background: '#13131c', border: '1px solid #2a2a3a', borderRadius: 12, padding: '1rem', marginBottom: '1rem' }}>
+    <div style={{ background: '#1c2026', border: '1px solid #31353c', borderRadius: 12, padding: '1rem', marginBottom: '1rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: '.75rem' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '.9rem', color: '#f0f0f5' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '.9rem', color: '#dfe2eb' }}>
           <FileSignature size={16} color="#ff6b35" /> Contract signatures
           <span style={{ fontWeight: 500, fontSize: '.78rem', color: '#979ca7' }}>
             {rows.length - unsigned}/{rows.length} signed
@@ -95,8 +95,8 @@ export function ContractSignatures({ project, items }: { project: InventoryProje
           const st = STATE_STYLE[r.state]
           const Icon = STATE_ICON[r.state]
           return (
-            <div key={r.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '8px 10px', background: '#1a1a25', borderRadius: 8 }}>
-              <span style={{ flex: 1, minWidth: 140, fontSize: '.85rem', color: '#f0f0f5' }}>{r.name}</span>
+            <div key={r.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '8px 10px', background: '#262a31', borderRadius: 8 }}>
+              <span style={{ flex: 1, minWidth: 140, fontSize: '.85rem', color: '#dfe2eb' }}>{r.name}</span>
               {r.sig && (
                 <span style={{ fontSize: '.72rem', color: '#979ca7' }}>
                   {r.sig.signedAt?.toDate().toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}
@@ -117,8 +117,8 @@ export function ContractSignatures({ project, items }: { project: InventoryProje
           )
         })}
         {paperOnly.map(n => (
-          <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: '#1a1a25', borderRadius: 8 }}>
-            <span style={{ flex: 1, fontSize: '.85rem', color: '#a0a0b5' }}>{n}</span>
+          <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: '#262a31', borderRadius: 8 }}>
+            <span style={{ flex: 1, fontSize: '.85rem', color: '#a9aeb8' }}>{n}</span>
             <span style={{ fontSize: '.72rem', color: '#979ca7' }}>No CineForge account — sign on paper</span>
           </div>
         ))}
@@ -129,7 +129,7 @@ export function ContractSignatures({ project, items }: { project: InventoryProje
           Items or dates changed after signing — send a reminder to have them sign the updated contract.
         </p>
       )}
-      {result && <p style={{ fontSize: '.75rem', color: '#a0a0b5', marginTop: '.6rem' }}>{result}</p>}
+      {result && <p style={{ fontSize: '.75rem', color: '#a9aeb8', marginTop: '.6rem' }}>{result}</p>}
     </div>
   )
 }

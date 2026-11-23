@@ -6,14 +6,14 @@ import { LinkifiedText, externalHref } from './inventoryShared'
 export function InfoModal({ item, cohorts, pricingEnabled, onClose }: { item: EquipmentDoc; cohorts: CohortDoc[]; pricingEnabled: boolean; onClose: () => void }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={onClose}>
-      <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 16, width: '100%', maxWidth: 440, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: '#1c2026', border: '1px solid #31353c', borderRadius: 16, width: '100%', maxWidth: 440, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
         <div style={{ position: 'relative' }}>
           <ImageGallery urls={equipmentImages(item)} name={item.name} />
-          <button className="close-btn" onClick={onClose} style={{ position: 'absolute', top: 10, right: 10, zIndex: 2, width: 32, height: 32, background: 'rgba(14,14,22,.85)' }}><X size={16} /></button>
+          <button className="close-btn" onClick={onClose} style={{ position: 'absolute', top: 10, right: 10, zIndex: 2, width: 32, height: 32, background: 'rgba(28,32,38,.85)' }}><X size={16} /></button>
         </div>
         <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
-            <p style={{ fontWeight: 700, fontSize: '1.05rem', color: '#f0f0f5' }}>{item.name}</p>
+            <p style={{ fontWeight: 700, fontSize: '1.05rem', color: '#dfe2eb' }}>{item.name}</p>
             <p style={{ fontSize: '.72rem', fontWeight: 700, color: '#4cd964', textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 2 }}>{item.category}</p>
           </div>
 
@@ -41,14 +41,14 @@ export function InfoModal({ item, cohorts, pricingEnabled, onClose }: { item: Eq
           {item.description && (
             <div>
               <p style={{ fontSize: '.7rem', fontWeight: 700, color: '#979ca7', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Description</p>
-              <p style={{ fontSize: '.85rem', color: '#c0c0d5', lineHeight: 1.5, whiteSpace: 'pre-line' }}><LinkifiedText text={item.description} /></p>
+              <p style={{ fontSize: '.85rem', color: '#c8ccd5', lineHeight: 1.5, whiteSpace: 'pre-line' }}><LinkifiedText text={item.description} /></p>
             </div>
           )}
 
           {item.notes && (
             <div>
               <p style={{ fontSize: '.7rem', fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Special Instructions / Notes</p>
-              <p style={{ fontSize: '.85rem', color: '#c0c0d5', lineHeight: 1.5, whiteSpace: 'pre-line' }}><LinkifiedText text={item.notes} /></p>
+              <p style={{ fontSize: '.85rem', color: '#c8ccd5', lineHeight: 1.5, whiteSpace: 'pre-line' }}><LinkifiedText text={item.notes} /></p>
             </div>
           )}
 
@@ -57,7 +57,7 @@ export function InfoModal({ item, cohorts, pricingEnabled, onClose }: { item: Eq
               <p style={{ fontSize: '.7rem', fontWeight: 700, color: '#979ca7', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Included Accessories</p>
               <ul style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {item.included.map((inc, i) => (
-                  <li key={i} style={{ fontSize: '.82rem', color: '#a0a0b5', paddingLeft: 12, position: 'relative' }}>
+                  <li key={i} style={{ fontSize: '.82rem', color: '#a9aeb8', paddingLeft: 12, position: 'relative' }}>
                     <span style={{ position: 'absolute', left: 0, color: '#4cd964' }}>•</span>{inc}
                   </li>
                 ))}
@@ -74,7 +74,7 @@ export function InfoModal({ item, cohorts, pricingEnabled, onClose }: { item: Eq
               href={externalHref(item.linkUrl)}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 14px', background: 'rgba(242,100,25,.12)', border: '1px solid rgba(242,100,25,.35)', borderRadius: 10, color: '#f26419', fontWeight: 700, fontSize: '.85rem', textDecoration: 'none' }}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 14px', background: 'rgba(255,107,53,.12)', border: '1px solid rgba(255,107,53,.35)', borderRadius: 10, color: '#ff6b35', fontWeight: 700, fontSize: '.85rem', textDecoration: 'none' }}
             >
               <ExternalLink size={14} /> Product page
             </a>

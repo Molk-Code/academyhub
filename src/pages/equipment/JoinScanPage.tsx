@@ -41,7 +41,7 @@ export default function JoinScanPage() {
   useEffect(() => () => controlsRef.current?.stop(), [])
 
   const base: React.CSSProperties = {
-    minHeight: '100dvh', background: '#0a0a0f', color: '#f0f0f5', fontFamily: 'Inter, system-ui, sans-serif',
+    minHeight: '100dvh', background: '#10141a', color: '#dfe2eb', fontFamily: 'Inter, system-ui, sans-serif',
     display: 'flex', flexDirection: 'column', padding: '1rem', gap: '1rem', maxWidth: 520, margin: '0 auto',
   }
   const primary: React.CSSProperties = {
@@ -65,7 +65,7 @@ export default function JoinScanPage() {
     <div style={base}>
       <div>
         <h1 style={{ fontWeight: 700, fontSize: '1.1rem' }}>Use this phone as scanner</h1>
-        <p style={{ color: '#8a8aab', fontSize: '.85rem', marginTop: 4 }}>
+        <p style={{ color: '#a9aeb8', fontSize: '.85rem', marginTop: 4 }}>
           On the computer, open the project and choose the phone scanner. Then scan the QR code it shows.
         </p>
       </div>
@@ -74,7 +74,7 @@ export default function JoinScanPage() {
         <video ref={videoRef} playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: active ? 'block' : 'none' }} />
         {!active && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Scan size={48} color="#2a2a3a" aria-hidden="true" />
+            <Scan size={48} color="#31353c" aria-hidden="true" />
           </div>
         )}
       </div>
@@ -86,7 +86,7 @@ export default function JoinScanPage() {
       )}
 
       {active
-        ? <button onClick={stop} style={{ ...primary, background: '#1a1a25', border: '1px solid #2a2a3a', color: '#f0f0f5' }}>Stop camera</button>
+        ? <button onClick={stop} style={{ ...primary, background: '#262a31', border: '1px solid #31353c', color: '#dfe2eb' }}>Stop camera</button>
         : <button onClick={start} style={primary}><Scan size={20} aria-hidden="true" /> Scan the computer’s QR code</button>}
     </div>
   )

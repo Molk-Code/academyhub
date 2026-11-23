@@ -16,8 +16,8 @@ export function ScanKindToggle({ value, onChange, large = false }: { value: Scan
           display: 'flex', alignItems: 'center', gap: 6,
           padding: large ? '10px 16px' : '6px 12px', minHeight: large ? 44 : undefined,
           fontSize: large ? '.9rem' : '.8rem', fontWeight: 700, cursor: 'pointer', border: 'none',
-          background: on ? 'rgba(242,100,25,.18)' : 'transparent',
-          color: on ? '#f26419' : '#8a8aab',
+          background: on ? 'rgba(255,107,53,.18)' : 'transparent',
+          color: on ? '#ff6b35' : '#a9aeb8',
         }}
       >
         <Icon size={large ? 16 : 14} aria-hidden="true" /> {label}
@@ -26,9 +26,9 @@ export function ScanKindToggle({ value, onChange, large = false }: { value: Scan
   }
   return (
     <div role="radiogroup" aria-label="What to scan with the camera"
-      style={{ display: 'inline-flex', border: '1px solid #2a2a3a', borderRadius: 10, overflow: 'hidden', background: '#12121a' }}>
+      style={{ display: 'inline-flex', border: '1px solid #31353c', borderRadius: 10, overflow: 'hidden', background: '#1c2026' }}>
       {option('qr', 'QR code', QrCode)}
-      <span aria-hidden="true" style={{ width: 1, background: '#2a2a3a' }} />
+      <span aria-hidden="true" style={{ width: 1, background: '#31353c' }} />
       {option('barcode', 'Barcode', ScanBarcode)}
     </div>
   )
@@ -38,11 +38,11 @@ export function ScanKindToggle({ value, onChange, large = false }: { value: Scan
 export function BarcodeGuide({ hint = true }: { hint?: boolean }) {
   return (
     <div aria-hidden="true" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-      <div style={{ width: '80%', height: '28%', border: '2px solid rgba(242,100,25,.9)', borderRadius: 10, boxShadow: '0 0 0 9999px rgba(0,0,0,.35)', position: 'relative' }}>
+      <div style={{ width: '80%', height: '28%', border: '2px solid rgba(255,107,53,.9)', borderRadius: 10, boxShadow: '0 0 0 9999px rgba(0,0,0,.35)', position: 'relative' }}>
         <div style={{ position: 'absolute', left: 8, right: 8, top: '50%', height: 2, background: 'rgba(239,68,68,.85)' }} />
       </div>
       {hint && (
-        <p style={{ marginTop: 10, fontSize: '.75rem', color: '#f0f0f5', background: 'rgba(0,0,0,.55)', padding: '3px 10px', borderRadius: 999 }}>
+        <p style={{ marginTop: 10, fontSize: '.75rem', color: '#dfe2eb', background: 'rgba(0,0,0,.55)', padding: '3px 10px', borderRadius: 999 }}>
           Hold the code 20–30 cm away, across the red line
         </p>
       )}
@@ -66,7 +66,7 @@ export function ZoomButtons({ zoom }: { zoom?: ZoomControl }) {
           <button key={z} type="button" role="radio" aria-checked={on}
             onClick={async () => setValue(await zoom.set(z))}
             style={{ minWidth: 40, minHeight: 40, borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: '.8rem', fontWeight: 700,
-              background: on ? '#f0f0f5' : 'transparent', color: on ? '#0a0a0f' : '#f0f0f5' }}>
+              background: on ? '#dfe2eb' : 'transparent', color: on ? '#10141a' : '#dfe2eb' }}>
             {z}×
           </button>
         )

@@ -56,8 +56,8 @@ export function CategoriesTab({ categories }: { categories: EquipmentCategoryDoc
     <div style={{ maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* Add form */}
-      <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 14, padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <p style={{ fontWeight: 700, fontSize: '.9rem', color: '#f0f0f5' }}>Add Category</p>
+      <div style={{ background: '#1c2026', border: '1px solid #31353c', borderRadius: 14, padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <p style={{ fontWeight: 700, fontSize: '.9rem', color: '#dfe2eb' }}>Add Category</p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <input
             value={newName}
@@ -73,7 +73,7 @@ export function CategoriesTab({ categories }: { categories: EquipmentCategoryDoc
           >
             {COLOR_OPTIONS.map(c => {
               const col = catColors(c)
-              return <option key={c} value={c} style={{ background: '#0e0e16', color: col.text }}>{c}</option>
+              return <option key={c} value={c} style={{ background: '#1c2026', color: col.text }}>{c}</option>
             })}
           </select>
           <button
@@ -94,16 +94,16 @@ export function CategoriesTab({ categories }: { categories: EquipmentCategoryDoc
         {sorted.map((cat, idx) => {
           const c = catColors(cat.color)
           return (
-            <div key={cat.id} style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div key={cat.id} style={{ background: '#1c2026', border: '1px solid #31353c', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
               {/* Reorder buttons */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
                 <button
                   onClick={() => handleReorder(idx, -1)}
                   disabled={idx === 0}
                   title="Move up"
-                  style={{ padding: 2, background: 'transparent', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: idx === 0 ? '#2a2a3a' : '#979ca7', display: 'flex', borderRadius: 4, transition: 'color .15s' }}
+                  style={{ padding: 2, background: 'transparent', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: idx === 0 ? '#31353c' : '#979ca7', display: 'flex', borderRadius: 4, transition: 'color .15s' }}
                   onMouseEnter={e => { if (idx > 0) e.currentTarget.style.color = '#4cd964' }}
-                  onMouseLeave={e => { e.currentTarget.style.color = idx === 0 ? '#2a2a3a' : '#979ca7' }}
+                  onMouseLeave={e => { e.currentTarget.style.color = idx === 0 ? '#31353c' : '#979ca7' }}
                 >
                   <ChevronUp size={13} />
                 </button>
@@ -111,9 +111,9 @@ export function CategoriesTab({ categories }: { categories: EquipmentCategoryDoc
                   onClick={() => handleReorder(idx, 1)}
                   disabled={idx === sorted.length - 1}
                   title="Move down"
-                  style={{ padding: 2, background: 'transparent', border: 'none', cursor: idx === sorted.length - 1 ? 'default' : 'pointer', color: idx === sorted.length - 1 ? '#2a2a3a' : '#979ca7', display: 'flex', borderRadius: 4, transition: 'color .15s' }}
+                  style={{ padding: 2, background: 'transparent', border: 'none', cursor: idx === sorted.length - 1 ? 'default' : 'pointer', color: idx === sorted.length - 1 ? '#31353c' : '#979ca7', display: 'flex', borderRadius: 4, transition: 'color .15s' }}
                   onMouseEnter={e => { if (idx < sorted.length - 1) e.currentTarget.style.color = '#4cd964' }}
-                  onMouseLeave={e => { e.currentTarget.style.color = idx === sorted.length - 1 ? '#2a2a3a' : '#979ca7' }}
+                  onMouseLeave={e => { e.currentTarget.style.color = idx === sorted.length - 1 ? '#31353c' : '#979ca7' }}
                 >
                   <ChevronDown size={13} />
                 </button>
@@ -135,7 +135,7 @@ export function CategoriesTab({ categories }: { categories: EquipmentCategoryDoc
               >
                 {COLOR_OPTIONS.map(col => {
                   const cc = catColors(col)
-                  return <option key={col} value={col} style={{ background: '#0e0e16', color: cc.text }}>{col}</option>
+                  return <option key={col} value={col} style={{ background: '#1c2026', color: cc.text }}>{col}</option>
                 })}
               </select>
               <button

@@ -17,7 +17,7 @@ export const DEFAULT_CATEGORIES: Omit<EquipmentCategoryDoc, 'id'>[] = [
 
 export const COLOR_HEX: Record<string, { text: string; bg: string; border: string }> = {
   blue:    { text: '#93c5fd', bg: 'rgba(59,130,246,.15)',  border: 'rgba(59,130,246,.35)'  },
-  orange:  { text: '#fdba74', bg: 'rgba(249,115,22,.15)',  border: 'rgba(249,115,22,.35)'  },
+  orange:  { text: '#fdba74', bg: 'rgba(255,107,53,.15)',  border: 'rgba(255,107,53,.35)'  },
   yellow:  { text: '#fde047', bg: 'rgba(234,179,8,.15)',   border: 'rgba(234,179,8,.35)'   },
   green:   { text: '#86efac', bg: 'rgba(34,197,94,.15)',   border: 'rgba(34,197,94,.35)'   },
   purple:  { text: '#d8b4fe', bg: 'rgba(168,85,247,.15)',  border: 'rgba(168,85,247,.35)'  },
@@ -112,13 +112,13 @@ export function CategorySelect({ value, categories, onChange, labelId }: {
         <ul
           ref={listRef} id={listId} role="listbox" tabIndex={-1} aria-labelledby={labelId}
           aria-activedescendant={`${listId}-${active}`} onKeyDown={onListKey}
-          style={{ position: 'absolute', zIndex: 20, top: 'calc(100% + 4px)', left: 0, right: 0, margin: 0, padding: 6, listStyle: 'none', background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.5)', maxHeight: 280, overflowY: 'auto', outline: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}
+          style={{ position: 'absolute', zIndex: 20, top: 'calc(100% + 4px)', left: 0, right: 0, margin: 0, padding: 6, listStyle: 'none', background: '#1c2026', border: '1px solid #31353c', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.5)', maxHeight: 280, overflowY: 'auto', outline: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}
         >
           {categories.map((c, i) => (
             <li
               key={c.name} id={`${listId}-${i}`} role="option" aria-selected={c.name === value}
               onMouseEnter={() => setActive(i)} onMouseDown={e => e.preventDefault()} onClick={() => pick(i)}
-              style={{ ...chip(c), padding: '7px 10px', borderRadius: 8, fontSize: '.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', outline: i === active ? '2px solid #f0f0f5' : 'none', outlineOffset: -2 }}
+              style={{ ...chip(c), padding: '7px 10px', borderRadius: 8, fontSize: '.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', outline: i === active ? '2px solid #dfe2eb' : 'none', outlineOffset: -2 }}
             >
               {c.name}
               {c.name === value && <span aria-hidden="true">✓</span>}
@@ -135,15 +135,15 @@ export const BOOKING_STATUSES = ['all', 'pending', 'confirmed', 'checked-out', '
 export const STATUS_COLOR: Record<string, string> = {
   pending:       '#f59e0b',
   confirmed:     '#4cd964',
-  'checked-out': '#f97316',
+  'checked-out': '#ff6b35',
   returned:      '#4cd964',
   denied:        '#f87171',
   cancelled:     '#6b7280',
 }
 
 export const inp: React.CSSProperties = {
-  width: '100%', padding: '10px 12px', background: '#0e0e16',
-  border: '1px solid #2a2a3a', borderRadius: 10, color: '#f0f0f5',
+  width: '100%', padding: '10px 12px', background: '#1c2026',
+  border: '1px solid #31353c', borderRadius: 10, color: '#dfe2eb',
   fontSize: '.875rem', outline: 'none',
 }
 

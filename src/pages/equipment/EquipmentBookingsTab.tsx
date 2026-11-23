@@ -55,8 +55,8 @@ function BookingMessageThread({ bookingId }: { bookingId: string }) {
               style={{
                 fontSize: '.78rem', padding: '6px 10px', borderRadius: 8, maxWidth: '85%', margin: 0,
                 alignSelf: m.senderRole === 'staff' ? 'flex-end' : 'flex-start',
-                background: m.senderRole === 'staff' ? 'rgba(76,217,100,.12)' : '#1a1a25',
-                color: m.senderRole === 'staff' ? '#c8f0d0' : '#c0c0d5',
+                background: m.senderRole === 'staff' ? 'rgba(76,217,100,.12)' : '#262a31',
+                color: m.senderRole === 'staff' ? '#c8f0d0' : '#c8ccd5',
                 fontStyle: m.senderRole === 'staff' ? 'normal' : 'italic',
               }}
             >
@@ -71,7 +71,7 @@ function BookingMessageThread({ bookingId }: { bookingId: string }) {
           onChange={e => setText(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && send()}
           placeholder="Reply to student…"
-          style={{ flex: 1, fontSize: '.78rem', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 8, padding: '7px 10px', color: '#f0f0f5' }}
+          style={{ flex: 1, fontSize: '.78rem', background: '#262a31', border: '1px solid #31353c', borderRadius: 8, padding: '7px 10px', color: '#dfe2eb' }}
         />
         <button aria-label="Send"
           disabled={sending || !text.trim()}
@@ -223,8 +223,8 @@ export function BookingsTab() {
               style={{
                 padding: '5px 14px', borderRadius: 20, fontSize: '.75rem', fontWeight: 700,
                 textTransform: 'capitalize', cursor: 'pointer', letterSpacing: '.04em',
-                background: active ? col + '25' : '#1a1a25',
-                border: `1px solid ${active ? col + '80' : '#2a2a3a'}`,
+                background: active ? col + '25' : '#262a31',
+                border: `1px solid ${active ? col + '80' : '#31353c'}`,
                 color: active ? col : '#979ca7',
               }}
             >
@@ -249,26 +249,26 @@ export function BookingsTab() {
               <div {...clickable}
                 key={b.id}
                 data-focus-id={b.id}
-                style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 12, overflow: 'hidden', cursor: 'pointer' }}
+                style={{ background: '#1c2026', border: '1px solid #31353c', borderRadius: 12, overflow: 'hidden', cursor: 'pointer' }}
                 onClick={() => setExpandedId(expanded ? null : b.id)}
               >
                 <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: col, flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 120 }}>
-                    <p style={{ fontWeight: 700, fontSize: '.9rem', color: '#f0f0f5', margin: 0 }}>{b.projectName}</p>
+                    <p style={{ fontWeight: 700, fontSize: '.9rem', color: '#dfe2eb', margin: 0 }}>{b.projectName}</p>
                     <p style={{ fontSize: '.75rem', color: '#979ca7', margin: '2px 0 0' }}>
                       {b.isGuest && <span style={{ fontSize: '.6875rem', fontWeight: 700, color: '#38bdf8', border: '1px solid #38bdf850', borderRadius: 20, padding: '1px 7px', marginRight: 6 }}>Rental shop</span>}
                       {b.isGuest ? b.guestName ?? b.studentName : b.studentName}
                       {/* A shop guest has no account: their contact details */}
                       {b.isGuest && (b.guestEmail || b.guestPhone) && (
                         <span onClick={e => e.stopPropagation()}>
-                          {b.guestEmail && <> · <a href={`mailto:${b.guestEmail}`} style={{ color: '#8a8aab' }}>{b.guestEmail}</a></>}
-                          {b.guestPhone && <> · <a href={`tel:${b.guestPhone}`} style={{ color: '#8a8aab' }}>{b.guestPhone}</a></>}
+                          {b.guestEmail && <> · <a href={`mailto:${b.guestEmail}`} style={{ color: '#a9aeb8' }}>{b.guestEmail}</a></>}
+                          {b.guestPhone && <> · <a href={`tel:${b.guestPhone}`} style={{ color: '#a9aeb8' }}>{b.guestPhone}</a></>}
                         </span>
                       )}
                     </p>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '.75rem', color: '#8a8aab' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '.75rem', color: '#a9aeb8' }}>
                     <Calendar size={12} />
                     {formatDate(b.checkoutDate)} – {formatDate(b.returnDate)}
                   </div>
@@ -278,7 +278,7 @@ export function BookingsTab() {
                 </div>
 
                 {expanded && (
-                  <div style={{ borderTop: '1px solid #2a2a3a', padding: '14px 16px', background: '#0a0a0f' }} onClick={e => e.stopPropagation()}>
+                  <div style={{ borderTop: '1px solid #31353c', padding: '14px 16px', background: '#10141a' }} onClick={e => e.stopPropagation()}>
                     {(b.productionId || b.productionTitle) && (
                       <div style={{ marginBottom: 10 }}><ProductionLink booking={b} staff /></div>
                     )}
@@ -304,7 +304,7 @@ export function BookingsTab() {
                       <RentalSummaryButton
                         input={() => bookingSummaryInput(b, catalog)}
                         catalog={catalog}
-                        style={{ padding: '6px 14px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 8, color: '#f0f0f5', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                        style={{ padding: '6px 14px', background: '#262a31', border: '1px solid #31353c', borderRadius: 8, color: '#dfe2eb', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                       />
                       {b.status === 'checked-out' && !b.linkedProjectId && (
                         <button
@@ -319,7 +319,7 @@ export function BookingsTab() {
                         <button
                           disabled={savingId === b.id}
                           onClick={() => setStatus(b.id, 'pending')}
-                          style={{ padding: '6px 14px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 8, color: '#8a8aab', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }}
+                          style={{ padding: '6px 14px', background: '#262a31', border: '1px solid #31353c', borderRadius: 8, color: '#a9aeb8', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }}
                         >
                           Reopen
                         </button>
@@ -343,14 +343,14 @@ export function BookingsTab() {
 
       {actionModal && (
         <div {...clickable} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setActionModal(null)}>
-          <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 16, width: '100%', maxWidth: 400, padding: '1.5rem' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#f0f0f5', marginBottom: 6 }}>
+          <div style={{ background: '#1c2026', border: '1px solid #31353c', borderRadius: 16, width: '100%', maxWidth: 400, padding: '1.5rem' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#dfe2eb', marginBottom: 6 }}>
               {actionModal.action === 'confirmed' ? 'Accept' : 'Deny'}{' '}
               {actionModal.categories.length === bookingParts(actionModal.booking, catalog).length
                 ? 'booking'
                 : actionModal.categories.join(' + ') + ' part'}
             </h3>
-            <p style={{ fontSize: '.82rem', color: '#8a8aab', marginBottom: 14 }}>
+            <p style={{ fontSize: '.82rem', color: '#a9aeb8', marginBottom: 14 }}>
               "{actionModal.booking.projectName}" — {actionModal.booking.studentName}
             </p>
             <label style={{ fontSize: '.75rem', fontWeight: 600, color: '#979ca7', display: 'block', marginBottom: 6 }}>
@@ -362,7 +362,7 @@ export function BookingsTab() {
               onChange={e => setActionMessage(e.target.value)}
               rows={3}
               placeholder={actionModal.action === 'confirmed' ? 'e.g. Pick up from the equipment room after 2pm' : 'e.g. Dates conflict with another booking'}
-              style={{ width: '100%', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 10, padding: '10px 12px', color: '#f0f0f5', fontSize: '.85rem', resize: 'none', marginBottom: 14, fontFamily: 'inherit' }}
+              style={{ width: '100%', background: '#262a31', border: '1px solid #31353c', borderRadius: 10, padding: '10px 12px', color: '#dfe2eb', fontSize: '.85rem', resize: 'none', marginBottom: 14, fontFamily: 'inherit' }}
             />
             {actionError && <p style={{ fontSize: '.78rem', color: '#f87171', marginBottom: 10 }}>{actionError}</p>}
             <div style={{ display: 'flex', gap: 8 }}>
@@ -378,7 +378,7 @@ export function BookingsTab() {
               >
                 {savingId === actionModal.booking.id ? 'Saving…' : actionModal.action === 'confirmed' ? 'Accept' : 'Deny'}
               </button>
-              <button onClick={() => setActionModal(null)} style={{ padding: '9px 16px', borderRadius: 10, fontSize: '.85rem', fontWeight: 600, cursor: 'pointer', background: '#1a1a25', border: '1px solid #2a2a3a', color: '#8a8aab' }}>
+              <button onClick={() => setActionModal(null)} style={{ padding: '9px 16px', borderRadius: 10, fontSize: '.85rem', fontWeight: 600, cursor: 'pointer', background: '#262a31', border: '1px solid #31353c', color: '#a9aeb8' }}>
                 Cancel
               </button>
             </div>

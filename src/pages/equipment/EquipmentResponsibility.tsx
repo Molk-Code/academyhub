@@ -54,7 +54,7 @@ export function BookingResponsibility({ categories }: { categories: EquipmentCat
   const uncovered = catNames.filter(c => staff.length > 0 && !staff.some(u => handlesCategory(map[u.id], c)))
 
   return (
-    <div className="rounded-[14px] border border-[#2a2a3a] bg-[#0e0e16] p-5 space-y-4">
+    <div className="rounded-[14px] border border-[#31353c] bg-[#1c2026] p-5 space-y-4">
       <div>
         <p className="flex items-center gap-2 font-bold text-[.9rem] text-zinc-100"><UserCog className="w-4 h-4 text-[#4cd964]" /> Booking responsibility</p>
         <p className="text-xs text-zinc-500 mt-1 leading-relaxed">

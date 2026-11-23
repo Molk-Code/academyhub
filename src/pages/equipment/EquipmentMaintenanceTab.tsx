@@ -22,13 +22,13 @@ const TYPES: { id: MaintenanceType; label: string }[] = [
 const STATE_LABEL: Record<ServiceState, { text: string; color: string }> = {
   'in-service': { text: 'In service', color: '#f59e0b' },
   overdue: { text: 'Service overdue', color: '#ff4757' },
-  'due-soon': { text: 'Service due soon', color: '#a0a0b5' },
+  'due-soon': { text: 'Service due soon', color: '#a9aeb8' },
 }
 const today = () => new Date().toISOString().slice(0, 10)
 
-const card: React.CSSProperties = { background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 14, padding: '1rem 1.25rem' }
-const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1px solid #2a2a3a', background: '#1a1a25', color: '#f0f0f5', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }
-const label: React.CSSProperties = { fontSize: '.75rem', color: '#8a8aab' }
+const card: React.CSSProperties = { background: '#1c2026', border: '1px solid #31353c', borderRadius: 14, padding: '1rem 1.25rem' }
+const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1px solid #31353c', background: '#262a31', color: '#dfe2eb', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }
+const label: React.CSSProperties = { fontSize: '.75rem', color: '#a9aeb8' }
 
 export function MaintenanceTab() {
   const { data: equipment, loading } = useCollection<EquipmentDoc>('equipment')
@@ -54,8 +54,8 @@ export function MaintenanceTab() {
         style={{ ...card, padding: '.75rem 1rem', display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', cursor: 'pointer' }}>
         <Wrench size={16} color={st ? STATE_LABEL[st].color : '#979ca7'} aria-hidden="true" />
         <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', fontWeight: 600, color: '#f0f0f5', fontSize: '.88rem' }}>{e.name}</span>
-          <span style={{ display: 'block', fontSize: '.75rem', color: '#8a8aab' }}>
+          <span style={{ display: 'block', fontWeight: 600, color: '#dfe2eb', fontSize: '.88rem' }}>{e.name}</span>
+          <span style={{ display: 'block', fontSize: '.75rem', color: '#a9aeb8' }}>
             {(e.maintenanceUnits ?? 0) > 0 && (e.serviceUnits?.length
               ? `In service: ${e.serviceUnits.map(u => `#${u.unit}${u.note ? ` (${u.note})` : ''}`).join(', ')}`
               : `${e.maintenanceUnits} of ${e.totalQuantity} in service${e.maintenanceNote ? ` · ${e.maintenanceNote}` : ''}`)}
@@ -69,7 +69,7 @@ export function MaintenanceTab() {
   }
   const section = (title: string, list: EquipmentDoc[], empty: string) => (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <h3 style={{ fontSize: '.8rem', fontWeight: 700, color: '#a0a0b5', textTransform: 'uppercase', letterSpacing: '.08em' }}>{title} ({list.length})</h3>
+      <h3 style={{ fontSize: '.8rem', fontWeight: 700, color: '#a9aeb8', textTransform: 'uppercase', letterSpacing: '.08em' }}>{title} ({list.length})</h3>
       {list.length ? list.map(row) : <p style={{ color: '#979ca7', fontSize: '.85rem' }}>{empty}</p>}
     </section>
   )
@@ -78,13 +78,13 @@ export function MaintenanceTab() {
 
   return (
     <div style={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <p style={{ color: '#8a8aab', fontSize: '.85rem' }}>Units in service can't be booked or checked out until they're back.</p>
+      <p style={{ color: '#a9aeb8', fontSize: '.85rem' }}>Units in service can't be booked or checked out until they're back.</p>
       {section('In service', groups.inService, 'Nothing is away for service.')}
       {section('Service overdue', groups.overdue, 'Nothing is overdue.')}
       {section(`Due within ${DUE_SOON_DAYS} days`, groups.dueSoon, 'Nothing is due soon.')}
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <h3 style={{ fontSize: '.8rem', fontWeight: 700, color: '#a0a0b5', textTransform: 'uppercase', letterSpacing: '.08em' }}>Any item</h3>
+        <h3 style={{ fontSize: '.8rem', fontWeight: 700, color: '#a9aeb8', textTransform: 'uppercase', letterSpacing: '.08em' }}>Any item</h3>
         <label style={{ position: 'relative' }}>
           <Search size={14} color="#979ca7" style={{ position: 'absolute', left: 10, top: 11 }} aria-hidden="true" />
           <input style={{ ...inp, paddingLeft: 30, width: '100%' }} placeholder="Find an item to log maintenance…" value={search} onChange={e => setSearch(e.target.value)} aria-label="Find an item" />
@@ -99,10 +99,10 @@ export function MaintenanceTab() {
 
 const DONE_TYPES: MaintenanceType[] = ['service', 'inspection']
 const field: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4 }
-const chip: React.CSSProperties = { padding: '6px 12px', borderRadius: 999, border: '1px solid #2a2a3a', background: '#1a1a25', color: '#c0c0d5', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }
+const chip: React.CSSProperties = { padding: '6px 12px', borderRadius: 999, border: '1px solid #31353c', background: '#262a31', color: '#c8ccd5', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }
 const chipOn: React.CSSProperties = { background: 'rgba(245,158,11,.15)', borderColor: '#f59e0b', color: '#f59e0b' }
-const sectionTitle: React.CSSProperties = { fontWeight: 700, color: '#f0f0f5', fontSize: '.88rem' }
-const divider: React.CSSProperties = { borderTop: '1px solid #2a2a3a', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }
+const sectionTitle: React.CSSProperties = { fontWeight: 700, color: '#dfe2eb', fontSize: '.88rem' }
+const divider: React.CSSProperties = { borderTop: '1px solid #31353c', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }
 
 function ItemMaintenance({ item, onClose }: { item: EquipmentDoc; onClose: () => void }) {
   const { profile } = useAuth()
@@ -189,7 +189,7 @@ function ItemMaintenance({ item, onClose }: { item: EquipmentDoc; onClose: () =>
       <div role="dialog" aria-label={`Maintenance: ${item.name}`} onClick={e => e.stopPropagation()}
         style={{ ...card, width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <p style={{ fontWeight: 700, color: '#f0f0f5' }}>{item.name} <span style={{ color: '#8a8aab', fontWeight: 400, fontSize: '.8rem' }}>· {item.totalQuantity} {item.totalQuantity === 1 ? 'unit' : 'units'}</span></p>
+          <p style={{ fontWeight: 700, color: '#dfe2eb' }}>{item.name} <span style={{ color: '#a9aeb8', fontWeight: 400, fontSize: '.8rem' }}>· {item.totalQuantity} {item.totalQuantity === 1 ? 'unit' : 'units'}</span></p>
           <button className="close-btn" aria-label="Close" onClick={onClose} style={{ position: 'static', width: 28, height: 28 }}><X size={14} /></button>
         </div>
 
@@ -199,9 +199,9 @@ function ItemMaintenance({ item, onClose }: { item: EquipmentDoc; onClose: () =>
           {!away.length && !unnumbered && <p style={{ color: '#979ca7', fontSize: '.8rem' }}>No unit is away.</p>}
           {away.map(u => (
             <div key={u.unit} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '.85rem' }}>
-              <span style={{ flex: 1, color: '#f0f0f5' }}>
-                <b>#{u.unit}</b>{u.note && <span style={{ color: '#c0c0d5' }}> · {u.note}</span>}
-                <span style={{ color: '#8a8aab' }}> · since {u.since}</span>
+              <span style={{ flex: 1, color: '#dfe2eb' }}>
+                <b>#{u.unit}</b>{u.note && <span style={{ color: '#c8ccd5' }}> · {u.note}</span>}
+                <span style={{ color: '#a9aeb8' }}> · since {u.since}</span>
               </span>
               <button style={btn} disabled={busy !== null} onClick={() => setEntry(blankEntry(String(u.unit)))}>Log service</button>
               <button style={btn} disabled={busy !== null} onClick={() => backInUse(u.unit)}>Back in use</button>
@@ -215,7 +215,7 @@ function ItemMaintenance({ item, onClose }: { item: EquipmentDoc; onClose: () =>
           )}
           {unnumbered > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '.85rem' }}>
-              <span style={{ flex: 1, color: '#f0f0f5' }}>{unnumbered} of {item.totalQuantity} in service, unit numbers not recorded{item.maintenanceNote ? ` · ${item.maintenanceNote}` : ''}</span>
+              <span style={{ flex: 1, color: '#dfe2eb' }}>{unnumbered} of {item.totalQuantity} in service, unit numbers not recorded{item.maintenanceNote ? ` · ${item.maintenanceNote}` : ''}</span>
               <button style={btn} disabled={busy !== null} onClick={() => backInUse(null)}>All back in use</button>
             </div>
           )}
@@ -320,12 +320,12 @@ function ItemMaintenance({ item, onClose }: { item: EquipmentDoc; onClose: () =>
             </label>
           </div>
           {marksDone && (
-            <p style={{ color: '#8a8aab', fontSize: '.75rem' }}>
+            <p style={{ color: '#a9aeb8', fontSize: '.75rem' }}>
               Logging a {entry.type} marks it done: {entry.next ? `the next service becomes ${entry.next}` : 'no next service is planned (the item leaves the overdue list)'}.
             </p>
           )}
           {canComeBack && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.85rem', color: '#f0f0f5' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.85rem', color: '#dfe2eb' }}>
               <input type="checkbox" checked={entry.backInUse} onChange={e => setEntry(x => ({ ...x, backInUse: e.target.checked }))} />
               {entryUnit == null ? 'Every unit in service is back in use' : `#${entryUnit} is back in use`}
             </label>
@@ -341,12 +341,12 @@ function ItemMaintenance({ item, onClose }: { item: EquipmentDoc; onClose: () =>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <p style={sectionTitle}>History</p>
           {log.length === 0 ? <p style={{ color: '#979ca7', fontSize: '.8rem' }}>Nothing logged yet.</p> : log.map(l => (
-            <div key={l.id} style={{ fontSize: '.8rem', color: '#c0c0d5', borderLeft: '2px solid #2a2a3a', paddingLeft: 10 }}>
-              <span style={{ color: '#f0f0f5', fontWeight: 600 }}>
+            <div key={l.id} style={{ fontSize: '.8rem', color: '#c8ccd5', borderLeft: '2px solid #31353c', paddingLeft: 10 }}>
+              <span style={{ color: '#dfe2eb', fontWeight: 600 }}>
                 {l.date} · {TYPES.find(t => t.id === l.type)?.label ?? l.type}{unitLabel(l.unit) && ` · ${unitLabel(l.unit)}`}
               </span>
-              {l.performedBy && <span style={{ color: '#8a8aab' }}> · {l.performedBy}</span>}
-              {l.cost != null && <span style={{ color: '#8a8aab' }}> · cost {l.cost}</span>}
+              {l.performedBy && <span style={{ color: '#a9aeb8' }}> · {l.performedBy}</span>}
+              {l.cost != null && <span style={{ color: '#a9aeb8' }}> · cost {l.cost}</span>}
               {(l.backInUse || l.nextServiceDate !== undefined) && (
                 <span style={{ color: '#4cd964' }}>
                   {' · '}{[l.backInUse && 'back in use', l.nextServiceDate !== undefined && (l.nextServiceDate ? `next service ${l.nextServiceDate}` : 'no next service')].filter(Boolean).join(', ')}

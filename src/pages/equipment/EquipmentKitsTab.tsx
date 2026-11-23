@@ -63,27 +63,27 @@ export function KitsTab() {
     await deleteDoc(doc(db, 'kits', k.id))
   }
 
-  const card: React.CSSProperties = { background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 14, padding: '1rem 1.25rem' }
-  const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1px solid #2a2a3a', background: '#1a1a25', color: '#f0f0f5', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }
+  const card: React.CSSProperties = { background: '#1c2026', border: '1px solid #31353c', borderRadius: 14, padding: '1rem 1.25rem' }
+  const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1px solid #31353c', background: '#262a31', color: '#dfe2eb', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }
 
   return (
     <div style={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <p style={{ color: '#8a8aab', fontSize: '.85rem' }}>A kit is booked and checked out as one line. It's only free when every item in it is.</p>
+        <p style={{ color: '#a9aeb8', fontSize: '.85rem' }}>A kit is booked and checked out as one line. It's only free when every item in it is.</p>
         {editing === null && <button style={{ ...btn, background: '#4cd964', color: '#000', border: 'none' }} onClick={startNew}><Plus size={14} /> New kit</button>}
       </div>
 
       {editing !== null && (
         <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <p style={{ fontWeight: 700, color: '#f0f0f5' }}>{editing === 'new' ? 'New kit' : 'Edit kit'}</p>
+          <p style={{ fontWeight: 700, color: '#dfe2eb' }}>{editing === 'new' ? 'New kit' : 'Edit kit'}</p>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: '.75rem', color: '#8a8aab' }}>Name</span>
+            <span style={{ fontSize: '.75rem', color: '#a9aeb8' }}>Name</span>
             <input style={inp} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="FX6 camera kit" />
           </label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: '.75rem', color: '#8a8aab' }}>Items</span>
+            <span style={{ fontSize: '.75rem', color: '#a9aeb8' }}>Items</span>
             {[...form.counts].map(([id, n]) => (
-              <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.85rem', color: '#f0f0f5' }}>
+              <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.85rem', color: '#dfe2eb' }}>
                 <span style={{ flex: 1 }}>{byId.get(id)?.name ?? <em style={{ color: '#ff4757' }}>Removed from the catalog</em>}</span>
                 <button aria-label="One less" style={{ ...btn, padding: 6 }} onClick={() => setCount(id, n - 1)}><Minus size={12} /></button>
                 <span style={{ minWidth: 20, textAlign: 'center' }}>{n}</span>
@@ -99,11 +99,11 @@ export function KitsTab() {
             </div>
           </div>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: '.75rem', color: '#8a8aab' }}>Notes (optional)</span>
+            <span style={{ fontSize: '.75rem', color: '#a9aeb8' }}>Notes (optional)</span>
             <textarea style={{ ...inp, minHeight: 60 }} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: '.75rem', color: '#8a8aab' }}>Image link (optional)</span>
+            <span style={{ fontSize: '.75rem', color: '#a9aeb8' }}>Image link (optional)</span>
             <input style={inp} value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} placeholder="https://…" />
           </label>
           {error && <p role="alert" style={{ color: '#ff4757', fontSize: '.8rem' }}>{error}</p>}
@@ -122,8 +122,8 @@ export function KitsTab() {
         <div key={k.id} style={{ ...card, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           {k.imageUrl && <img src={k.imageUrl} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8 }} />}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontWeight: 700, color: '#f0f0f5' }}>{k.name}</p>
-            <p style={{ fontSize: '.78rem', color: '#a0a0b5', marginTop: 2 }}>
+            <p style={{ fontWeight: 700, color: '#dfe2eb' }}>{k.name}</p>
+            <p style={{ fontSize: '.78rem', color: '#a9aeb8', marginTop: 2 }}>
               {[...kitCounts(k)].map(([id, n]) => `${n > 1 ? `${n}× ` : ''}${byId.get(id)?.name ?? 'removed item'}`).join(' · ')}
             </p>
             {k.notes && <p style={{ fontSize: '.75rem', color: '#979ca7', marginTop: 4 }}>{k.notes}</p>}
@@ -146,18 +146,18 @@ function KitLabel({ kit, onClose }: { kit: KitDoc; onClose: () => void }) {
   const value = kitCode(kit.id)
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.8)' }} onClick={onClose}>
-      <div role="dialog" aria-label={`Label for ${kit.name}`} style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 16, width: 320, padding: '1.5rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+      <div role="dialog" aria-label={`Label for ${kit.name}`} style={{ background: '#1c2026', border: '1px solid #31353c', borderRadius: 16, width: 320, padding: '1.5rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <span style={{ fontWeight: 700, color: '#f0f0f5' }}>Kit label</span>
+          <span style={{ fontWeight: 700, color: '#dfe2eb' }}>Kit label</span>
           <button className="close-btn" aria-label="Close" onClick={onClose} style={{ position: 'static', width: 28, height: 28 }}><X size={14} /></button>
         </div>
-        <p style={{ fontWeight: 600, color: '#f0f0f5', marginBottom: '.75rem' }}>{kit.name}</p>
+        <p style={{ fontWeight: 600, color: '#dfe2eb', marginBottom: '.75rem' }}>{kit.name}</p>
         <div ref={ref} style={{ background: '#fff', borderRadius: 10, padding: 12, display: 'inline-block', marginBottom: '.75rem' }}>
           <QRCodeSVG value={value} size={180} level="H" />
         </div>
-        <p style={{ fontSize: '.75rem', color: '#8a8aab', marginBottom: '1rem' }}>Scanning this checks out every item in the kit.</p>
+        <p style={{ fontSize: '.75rem', color: '#a9aeb8', marginBottom: '1rem' }}>Scanning this checks out every item in the kit.</p>
         <button onClick={() => printQRLabel(kit.name, value, 'KIT', ref.current)}
-          style={{ width: '100%', padding: 10, background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 10, color: '#f0f0f5', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          style={{ width: '100%', padding: 10, background: '#262a31', border: '1px solid #31353c', borderRadius: 10, color: '#dfe2eb', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           <Printer size={14} /> Print label
         </button>
       </div>

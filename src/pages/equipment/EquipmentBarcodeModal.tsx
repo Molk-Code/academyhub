@@ -190,20 +190,20 @@ export function BarcodeModal({ item, onClose }: { item: EquipmentDoc; onClose: (
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(8px)' }} onClick={onClose}>
-      <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 16, width: 360, maxWidth: 'calc(100vw - 32px)', padding: '1.5rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: '#1c2026', border: '1px solid #31353c', borderRadius: 16, width: 360, maxWidth: 'calc(100vw - 32px)', padding: '1.5rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <span style={{ fontWeight: 700, fontSize: '.95rem', color: '#f0f0f5', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontWeight: 700, fontSize: '.95rem', color: '#dfe2eb', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Barcode size={16} color="#4cd964" /> Barcode
           </span>
           <button className="close-btn" onClick={onClose} style={{ position: 'static', width: 28, height: 28 }}><X size={14} /></button>
         </div>
 
-        <div style={{ display: 'flex', gap: 4, background: '#1a1a25', borderRadius: 10, padding: 4, marginBottom: '.75rem' }}>
+        <div style={{ display: 'flex', gap: 4, background: '#262a31', borderRadius: 10, padding: 4, marginBottom: '.75rem' }}>
           {(['code128', 'ean14'] as const).map(f => (
             <button
               key={f}
               onClick={() => chooseSymbology(f)}
-              style={{ flex: 1, padding: '6px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '.78rem', fontWeight: 700, background: symbology === f ? '#f0f0f5' : 'transparent', color: symbology === f ? '#000' : '#a0a0b5' }}
+              style={{ flex: 1, padding: '6px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '.78rem', fontWeight: 700, background: symbology === f ? '#dfe2eb' : 'transparent', color: symbology === f ? '#000' : '#a9aeb8' }}
             >
               {f === 'code128' ? 'Code 128' : 'EAN-14'}
             </button>
@@ -211,16 +211,16 @@ export function BarcodeModal({ item, onClose }: { item: EquipmentDoc; onClose: (
         </div>
 
         {hasMultiple && (
-          <div style={{ display: 'flex', gap: 4, background: '#1a1a25', borderRadius: 10, padding: 4, marginBottom: '.75rem' }}>
+          <div style={{ display: 'flex', gap: 4, background: '#262a31', borderRadius: 10, padding: 4, marginBottom: '.75rem' }}>
             <button
               onClick={() => setMode('shared')}
-              style={{ flex: 1, padding: '6px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '.78rem', fontWeight: 700, background: mode === 'shared' ? '#4cd964' : 'transparent', color: mode === 'shared' ? '#000' : '#a0a0b5' }}
+              style={{ flex: 1, padding: '6px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '.78rem', fontWeight: 700, background: mode === 'shared' ? '#4cd964' : 'transparent', color: mode === 'shared' ? '#000' : '#a9aeb8' }}
             >
               1 for all ({item.totalQuantity})
             </button>
             <button
               onClick={() => setMode('individual')}
-              style={{ flex: 1, padding: '6px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '.78rem', fontWeight: 700, background: mode === 'individual' ? '#4cd964' : 'transparent', color: mode === 'individual' ? '#000' : '#a0a0b5' }}
+              style={{ flex: 1, padding: '6px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '.78rem', fontWeight: 700, background: mode === 'individual' ? '#4cd964' : 'transparent', color: mode === 'individual' ? '#000' : '#a9aeb8' }}
             >
               Individual
             </button>
@@ -235,9 +235,9 @@ export function BarcodeModal({ item, onClose }: { item: EquipmentDoc; onClose: (
                 onClick={() => setUnit(n)}
                 style={{
                   width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: '.8rem', fontWeight: 700,
-                  border: unit === n ? '2px solid #4cd964' : '1px solid #2a2a3a',
-                  background: unit === n ? 'rgba(76,217,100,.15)' : '#1a1a25',
-                  color: unit === n ? '#4cd964' : '#a0a0b5',
+                  border: unit === n ? '2px solid #4cd964' : '1px solid #31353c',
+                  background: unit === n ? 'rgba(76,217,100,.15)' : '#262a31',
+                  color: unit === n ? '#4cd964' : '#a9aeb8',
                 }}
               >
                 {n}
@@ -247,13 +247,13 @@ export function BarcodeModal({ item, onClose }: { item: EquipmentDoc; onClose: (
         )}
 
         {hasMultiple && item.plainLabelIsUnit1 && (mode === 'shared' || unit === 1) && (
-          <p style={{ fontSize: '.72rem', color: '#8a8aab', marginBottom: '.75rem' }}>
+          <p style={{ fontSize: '.72rem', color: '#a9aeb8', marginBottom: '.75rem' }}>
             {mode === 'shared'
               ? 'For this item, the label without a number counts as #1.'
               : "#1 doesn't need a new label: the one printed while there was a single item counts as #1."}
           </p>
         )}
-        <p style={{ fontWeight: 600, fontSize: '.9rem', color: '#f0f0f5', marginBottom: '.75rem' }}>{label}</p>
+        <p style={{ fontWeight: 600, fontSize: '.9rem', color: '#dfe2eb', marginBottom: '.75rem' }}>{label}</p>
         <div ref={ref} style={{ background: '#fff', borderRadius: 10, padding: 8, marginBottom: '1rem', overflowX: 'auto' }}>
           {spec
             ? <svg ref={svgRef} style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }} />
@@ -262,7 +262,7 @@ export function BarcodeModal({ item, onClose }: { item: EquipmentDoc; onClose: (
         <button
           disabled={!spec}
           onClick={() => printBarcodeLabel(label, item.category, ref.current)}
-          style={{ width: '100%', padding: '10px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 10, color: '#f0f0f5', fontSize: '.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          style={{ width: '100%', padding: '10px', background: '#262a31', border: '1px solid #31353c', borderRadius: 10, color: '#dfe2eb', fontSize: '.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
         >
           <Printer size={14} /> Print Barcode Label
         </button>
@@ -271,7 +271,7 @@ export function BarcodeModal({ item, onClose }: { item: EquipmentDoc; onClose: (
             disabled={!spec}
             onClick={() => spec && downloadBarcodePng(spec, label, item.category)}
             title="High-resolution PNG (600 dpi, 100 × 50 mm) — import into P-touch Editor or other label software"
-            style={{ flex: 1, padding: '10px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 10, color: '#f0f0f5', fontSize: '.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+            style={{ flex: 1, padding: '10px', background: '#262a31', border: '1px solid #31353c', borderRadius: 10, color: '#dfe2eb', fontSize: '.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
           >
             <Download size={14} /> Download PNG
           </button>
@@ -281,7 +281,7 @@ export function BarcodeModal({ item, onClose }: { item: EquipmentDoc; onClose: (
             title={symbology === 'ean14'
               ? "Copy the 14-digit GTIN — paste into P-touch Editor's GS1-128 barcode with AI (01)"
               : "Copy the code — paste into P-touch Editor's own Code 128 barcode for the sharpest print"}
-            style={{ flex: 1, padding: '10px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 10, color: copied ? '#4cd964' : '#f0f0f5', fontSize: '.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+            style={{ flex: 1, padding: '10px', background: '#262a31', border: '1px solid #31353c', borderRadius: 10, color: copied ? '#4cd964' : '#dfe2eb', fontSize: '.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
           >
             {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copied' : 'Copy code'}
           </button>

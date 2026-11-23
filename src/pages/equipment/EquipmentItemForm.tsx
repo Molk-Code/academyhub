@@ -26,7 +26,7 @@ const EMPTY_FORM: FormState = {
   included: [], accessoryIds: [], allowedCohortIds: [], requiresProduction: true, isActive: true,
 }
 
-const lbl: React.CSSProperties = { fontSize: '.75rem', color: '#8a8aab', fontWeight: 600, display: 'block', marginBottom: 4 }
+const lbl: React.CSSProperties = { fontSize: '.75rem', color: '#a9aeb8', fontWeight: 600, display: 'block', marginBottom: 4 }
 
 export function ItemForm({ existing, onClose, categories }: { existing: EquipmentDoc | null; onClose: () => void; categories: EquipmentCategoryDoc[] }) {
   const { data: cohorts } = useCohorts()
@@ -156,11 +156,11 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(8px)', padding: 16 }} onClick={onClose}>
-      <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 16, width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: '#1c2026', border: '1px solid #31353c', borderRadius: 16, width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
-        <div style={{ position: 'sticky', top: 0, background: '#0e0e16', borderBottom: '1px solid #2a2a3a', padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10 }}>
-          <span style={{ fontWeight: 700, fontSize: '1rem', color: '#f0f0f5', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ position: 'sticky', top: 0, background: '#1c2026', borderBottom: '1px solid #31353c', padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10 }}>
+          <span style={{ fontWeight: 700, fontSize: '1rem', color: '#dfe2eb', display: 'flex', alignItems: 'center', gap: 8 }}>
             <Package size={16} color="#4cd964" />
             {existing ? 'Edit Item' : 'Add Item'}
           </span>
@@ -207,10 +207,10 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
               <label style={lbl}>Total Quantity</label>
               <input style={inp} type="number" min={1} value={form.totalQuantity} onChange={e => set('totalQuantity', e.target.value)} />
               {(parseInt(form.totalQuantity) || 1) > 1 && (
-                <label style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginTop: 6, fontSize: '.72rem', color: '#8a8aab', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginTop: 6, fontSize: '.72rem', color: '#a9aeb8', cursor: 'pointer' }}>
                   <input type="checkbox" style={{ marginTop: 2 }} checked={unit1Choice ?? defaultUnit1(parseInt(form.totalQuantity) || 1)}
                     onChange={e => setUnit1Choice(e.target.checked)} />
-                  <span>The label without a number is <b style={{ color: '#c0c0d5' }}>#1</b> (the one printed while there was one). Untick if it&apos;s a shared label for all copies.</span>
+                  <span>The label without a number is <b style={{ color: '#c8ccd5' }}>#1</b> (the one printed while there was one). Untick if it&apos;s a shared label for all copies.</span>
                 </label>
               )}
             </div>
@@ -239,7 +239,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                 {form.images.map((url, i) => (
                   <div key={url + i} style={{ position: 'relative', width: 84 }}>
-                    <img src={optimizeImageUrl(url)} alt={`Image ${i + 1}`} style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 8, border: `2px solid ${i === 0 ? '#4cd964' : '#2a2a3a'}`, display: 'block' }} />
+                    <img src={optimizeImageUrl(url)} alt={`Image ${i + 1}`} style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 8, border: `2px solid ${i === 0 ? '#4cd964' : '#31353c'}`, display: 'block' }} />
                     {i === 0 && (
                       <span style={{ position: 'absolute', top: 4, left: 4, fontSize: '.6875rem', fontWeight: 700, background: '#4cd964', color: '#000', borderRadius: 6, padding: '1px 5px' }}>MAIN</span>
                     )}
@@ -253,16 +253,16 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
                     </button>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
                       <button type="button" disabled={i === 0} onClick={() => moveImage(i, -1)} aria-label="Move left"
-                        style={{ background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 6, color: '#c0c0d5', cursor: 'pointer', padding: '1px 6px', opacity: i === 0 ? 0.3 : 1 }}><ChevronLeft size={12} /></button>
+                        style={{ background: '#262a31', border: '1px solid #31353c', borderRadius: 6, color: '#c8ccd5', cursor: 'pointer', padding: '1px 6px', opacity: i === 0 ? 0.3 : 1 }}><ChevronLeft size={12} /></button>
                       <button type="button" disabled={i === form.images.length - 1} onClick={() => moveImage(i, 1)} aria-label="Move right"
-                        style={{ background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 6, color: '#c0c0d5', cursor: 'pointer', padding: '1px 6px', opacity: i === form.images.length - 1 ? 0.3 : 1 }}><ChevronRight size={12} /></button>
+                        style={{ background: '#262a31', border: '1px solid #31353c', borderRadius: 6, color: '#c8ccd5', cursor: 'pointer', padding: '1px 6px', opacity: i === form.images.length - 1 ? 0.3 : 1 }}><ChevronRight size={12} /></button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
             <div
-              style={{ border: `2px dashed ${dragOver ? '#4cd964' : '#2a2a3a'}`, borderRadius: 10, padding: '1rem', cursor: 'pointer', transition: 'border-color .2s', background: dragOver ? 'rgba(76,217,100,.05)' : 'transparent' }}
+              style={{ border: `2px dashed ${dragOver ? '#4cd964' : '#31353c'}`, borderRadius: 10, padding: '1rem', cursor: 'pointer', transition: 'border-color .2s', background: dragOver ? 'rgba(76,217,100,.05)' : 'transparent' }}
               onDragOver={e => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
               onDrop={e => { e.preventDefault(); setDragOver(false); handleImageFiles(e.dataTransfer.files) }}
@@ -289,12 +289,12 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addIncluded() } }}
                 placeholder="Add accessory (press Enter)…"
               />
-              <button onClick={addIncluded} style={{ padding: '8px 14px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 10, color: '#f0f0f5', fontSize: '.8rem', cursor: 'pointer' }}>Add</button>
+              <button onClick={addIncluded} style={{ padding: '8px 14px', background: '#262a31', border: '1px solid #31353c', borderRadius: 10, color: '#dfe2eb', fontSize: '.8rem', cursor: 'pointer' }}>Add</button>
             </div>
             {form.included.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {form.included.map((item, i) => (
-                  <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '.75rem', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 20, padding: '4px 10px', color: '#c0c0d5' }}>
+                  <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '.75rem', background: '#262a31', border: '1px solid #31353c', borderRadius: 20, padding: '4px 10px', color: '#c8ccd5' }}>
                     {item}
                     <button onClick={() => set('included', form.included.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#979ca7', padding: 0, display: 'flex' }}><X size={12} /></button>
                   </span>
@@ -312,7 +312,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
             {form.accessoryIds.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                 {form.accessoryIds.map(id => (
-                  <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '.75rem', background: 'rgba(242,100,25,.1)', border: '1px solid rgba(242,100,25,.3)', borderRadius: 20, padding: '4px 10px', color: '#f0c0a0' }}>
+                  <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '.75rem', background: 'rgba(255,107,53,.1)', border: '1px solid rgba(255,107,53,.3)', borderRadius: 20, padding: '4px 10px', color: '#f0c0a0' }}>
                     {catalogById.get(id)?.name ?? 'Removed item'}
                     <button onClick={() => set('accessoryIds', form.accessoryIds.filter(x => x !== id))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#979ca7', padding: 0, display: 'flex' }}><X size={12} /></button>
                   </span>
@@ -332,13 +332,13 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
                 .sort((a, b) => a.name.localeCompare(b.name))
                 .slice(0, 8)
               return (
-                <div style={{ marginTop: 6, border: '1px solid #2a2a3a', borderRadius: 10, overflow: 'hidden' }}>
+                <div style={{ marginTop: 6, border: '1px solid #31353c', borderRadius: 10, overflow: 'hidden' }}>
                   {matches.length === 0 && <p style={{ fontSize: '.78rem', color: '#8c919b', padding: '8px 12px' }}>No matching items</p>}
                   {matches.map(e => (
                     <button
                       key={e.id}
                       onClick={() => { set('accessoryIds', [...form.accessoryIds, e.id]); setAccessorySearch('') }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '7px 12px', background: '#12121a', border: 'none', borderBottom: '1px solid #1a1a25', color: '#f0f0f5', fontSize: '.8rem', cursor: 'pointer', textAlign: 'left' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '7px 12px', background: '#1c2026', border: 'none', borderBottom: '1px solid #262a31', color: '#dfe2eb', fontSize: '.8rem', cursor: 'pointer', textAlign: 'left' }}
                     >
                       {e.imageUrl
                         ? <img src={optimizeImageUrl(e.imageUrl)} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 6 }} />
@@ -376,9 +376,9 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
                         display: 'flex', alignItems: 'center', gap: 6,
                         padding: '6px 12px', borderRadius: 20, fontSize: '.78rem', fontWeight: 600,
                         cursor: 'pointer', transition: 'all .15s',
-                        background: checked ? 'rgba(76,217,100,.15)' : '#0e0e16',
-                        border: `1px solid ${checked ? 'rgba(76,217,100,.4)' : '#2a2a3a'}`,
-                        color: checked ? '#4cd964' : '#8a8aab',
+                        background: checked ? 'rgba(76,217,100,.15)' : '#1c2026',
+                        border: `1px solid ${checked ? 'rgba(76,217,100,.4)' : '#31353c'}`,
+                        color: checked ? '#4cd964' : '#a9aeb8',
                       }}
                     >
                       {checked && <Check size={11} />}
@@ -395,7 +395,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
 
           {/* Production required toggle: only where the school has productions */}
           {hasProduction && <div>
-            <button onClick={() => set('requiresProduction', !form.requiresProduction)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#c0c0d5', fontSize: '.85rem' }}>
+            <button onClick={() => set('requiresProduction', !form.requiresProduction)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#c8ccd5', fontSize: '.85rem' }}>
               {form.requiresProduction ? <ToggleRight size={20} color="#f59e0b" /> : <ToggleLeft size={20} color="#8c919b" />}
               <span>
                 Requires active production to book
@@ -408,7 +408,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
 
           {/* Active toggle */}
           <div>
-            <button onClick={() => set('isActive', !form.isActive)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#c0c0d5', fontSize: '.85rem' }}>
+            <button onClick={() => set('isActive', !form.isActive)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#c8ccd5', fontSize: '.85rem' }}>
               {form.isActive ? <ToggleRight size={20} color="#4cd964" /> : <ToggleLeft size={20} color="#8c919b" />}
               Active in catalog
             </button>
@@ -422,7 +422,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
         )}
 
         {/* Footer */}
-        <div style={{ position: 'sticky', bottom: 0, background: '#0e0e16', borderTop: '1px solid #2a2a3a', padding: '1rem 1.5rem', display: 'flex', gap: 8 }}>
+        <div style={{ position: 'sticky', bottom: 0, background: '#1c2026', borderTop: '1px solid #31353c', padding: '1rem 1.5rem', display: 'flex', gap: 8 }}>
           <button
             onClick={handleSave}
             disabled={saving || uploading || !form.name.trim()}

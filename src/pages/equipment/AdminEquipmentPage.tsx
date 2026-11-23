@@ -91,7 +91,7 @@ export default function AdminEquipmentPage() {
   ]
 
   return (
-    <div className="molkom-app" style={{ background: '#0a0a0f', minHeight: '100vh' }}>
+    <div className="molkom-app" style={{ background: '#10141a', minHeight: '100vh' }}>
       <style>{`
         .admin-card-overlay { opacity: 0 !important; }
         .product-card:hover .admin-card-overlay { opacity: 1 !important; }
@@ -132,7 +132,7 @@ export default function AdminEquipmentPage() {
             {hasProduction && <button
               onClick={toggleRequireProduction}
               title={requireProduction ? 'Production required — click to disable' : 'Production not required — click to enable'}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 10, background: 'transparent', border: '1px solid #2a2a3a', cursor: 'pointer', fontSize: '.75rem', fontWeight: 600, color: requireProduction ? '#f59e0b' : '#8c919b', transition: 'all .2s', whiteSpace: 'nowrap' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 10, background: 'transparent', border: '1px solid #31353c', cursor: 'pointer', fontSize: '.75rem', fontWeight: 600, color: requireProduction ? '#f59e0b' : '#8c919b', transition: 'all .2s', whiteSpace: 'nowrap' }}
             >
               {requireProduction ? <ToggleRight size={15} color="#f59e0b" /> : <ToggleLeft size={15} color="#8c919b" />}
               <span className="hidden sm:inline">Require production</span>
@@ -141,7 +141,7 @@ export default function AdminEquipmentPage() {
             <button
               onClick={togglePricing}
               title={pricingEnabled ? 'Prices shown — click to hide prices everywhere' : 'Prices hidden — click to show prices'}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 10, background: 'transparent', border: '1px solid #2a2a3a', cursor: 'pointer', fontSize: '.75rem', fontWeight: 600, color: pricingEnabled ? '#4cd964' : '#8c919b', transition: 'all .2s', whiteSpace: 'nowrap' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 10, background: 'transparent', border: '1px solid #31353c', cursor: 'pointer', fontSize: '.75rem', fontWeight: 600, color: pricingEnabled ? '#4cd964' : '#8c919b', transition: 'all .2s', whiteSpace: 'nowrap' }}
             >
               {pricingEnabled ? <ToggleRight size={15} color="#4cd964" /> : <ToggleLeft size={15} color="#8c919b" />}
               <span className="hidden sm:inline">Prices</span>

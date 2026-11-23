@@ -60,7 +60,7 @@ function ProjectCard({
     <div {...clickable} className="project-card" onClick={onClick}>
       <div className="project-card-header">
         <Package size={16} />
-        <span style={{ fontSize: '.75rem', fontWeight: 600, color: '#a0a0b5' }}>Project</span>
+        <span style={{ fontSize: '.75rem', fontWeight: 600, color: '#a9aeb8' }}>Project</span>
         <div className="project-card-badges">
           <span className={`project-status-badge ${statusClass}`}>{project.status}</span>
           {missing > 0 && <span className="project-status-badge" style={{ background: 'rgba(255,71,87,.15)', color: '#ff4757', borderColor: 'rgba(255,71,87,.3)' }}>⚠ {missing} missing</span>}
@@ -89,8 +89,8 @@ function ProjectCard({
       {/* Item summary bar */}
       {total > 0 && (
         <div style={{ display: 'flex', gap: 8, marginTop: '.5rem', flexWrap: 'wrap' }}>
-          {pending > 0 && <span style={{ fontSize: '.7rem', fontWeight: 700, color: '#f97316' }}>⏳ {pending} pending</span>}
-          {checkedOut > 0 && <span style={{ fontSize: '.7rem', fontWeight: 700, color: '#f97316' }}>📦 {checkedOut} out</span>}
+          {pending > 0 && <span style={{ fontSize: '.7rem', fontWeight: 700, color: '#ff6b35' }}>⏳ {pending} pending</span>}
+          {checkedOut > 0 && <span style={{ fontSize: '.7rem', fontWeight: 700, color: '#ff6b35' }}>📦 {checkedOut} out</span>}
           {returned   > 0 && <span style={{ fontSize: '.7rem', fontWeight: 600, color: '#4cd964' }}>✓ {returned} returned</span>}
           {missing    > 0 && <span style={{ fontSize: '.7rem', fontWeight: 700, color: '#ff4757' }}>? {missing} missing</span>}
           {damaged    > 0 && <span style={{ fontSize: '.7rem', fontWeight: 700, color: '#ffa502' }}>⚠ {damaged} damaged</span>}
@@ -319,10 +319,10 @@ function CreateProjectForm({
   return (
     <div className="inv-form-page">
       <button className="back-btn" onClick={onBack}>← Back</button>
-      <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f0f0f5', marginBottom: '1.5rem' }}>Create New Project</h2>
+      <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#dfe2eb', marginBottom: '1.5rem' }}>Create New Project</h2>
 
       {fromBooking && (
-        <div style={{ background: 'rgba(76,217,100,.08)', border: '1px solid rgba(76,217,100,.25)', borderRadius: 10, padding: '10px 14px', marginBottom: '1.25rem', fontSize: '.85rem', color: '#c0c0d5' }}>
+        <div style={{ background: 'rgba(76,217,100,.08)', border: '1px solid rgba(76,217,100,.25)', borderRadius: 10, padding: '10px 14px', marginBottom: '1.25rem', fontSize: '.85rem', color: '#c8ccd5' }}>
           Setting up from <strong style={{ color: '#4cd964' }}>{fromBooking.studentName}</strong>'s accepted booking request. Project name, dates and equipment have been preloaded below — fill in the rest to finish checkout.
           {fromBooking.setUpParts.length < fromBooking.partCount && (
             <> Only the parts you handle are included: <strong style={{ color: '#4cd964' }}>{fromBooking.setUpParts.join(', ')}</strong>.</>
@@ -700,7 +700,7 @@ export default function InventoryPage() {
 
   if (createProject) {
     return (
-      <div className="molkom-app" style={{ background: '#0a0a0f', minHeight: '100vh', padding: '1.5rem' }}>
+      <div className="molkom-app" style={{ background: '#10141a', minHeight: '100vh', padding: '1.5rem' }}>
         <CreateProjectForm
           fromBooking={fromBooking}
           onBack={() => { setCreateProject(false); setFromBooking(null) }}
@@ -712,7 +712,7 @@ export default function InventoryPage() {
 
   if (selectedProject) {
     return (
-      <div className="molkom-app" style={{ background: '#0a0a0f', minHeight: '100vh', padding: '1.5rem' }}>
+      <div className="molkom-app" style={{ background: '#10141a', minHeight: '100vh', padding: '1.5rem' }}>
         <ProjectDetail
           project={selectedProject}
           onBack={() => setSelectedProjectId(null)}
@@ -724,7 +724,7 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="molkom-app" style={{ background: '#0a0a0f', minHeight: '100vh' }}>
+    <div className="molkom-app" style={{ background: '#10141a', minHeight: '100vh' }}>
       <div className="inv-page">
         {/* Page title + new project button */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>

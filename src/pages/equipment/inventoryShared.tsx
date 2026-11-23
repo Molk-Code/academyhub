@@ -255,7 +255,7 @@ export function LinkifiedText({ text }: { text: string }) {
         const url = trail ? part.slice(0, -trail.length) : part
         return (
           <span key={i}>
-            <a href={externalHref(url)} target="_blank" rel="noopener noreferrer" style={{ color: '#f26419', textDecoration: 'underline', wordBreak: 'break-all' }}>{url}</a>
+            <a href={externalHref(url)} target="_blank" rel="noopener noreferrer" style={{ color: '#ff6b35', textDecoration: 'underline', wordBreak: 'break-all' }}>{url}</a>
             {trail}
           </span>
         )

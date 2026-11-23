@@ -59,19 +59,19 @@ function RentalSummaryModal({ input, catalog, onClose }: { input: SummaryInput; 
     finally { setBusy(false) }
   }
 
-  const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1px solid #2a2a3a', background: '#1a1a25', color: '#f0f0f5', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }
+  const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1px solid #31353c', background: '#262a31', color: '#dfe2eb', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' }
   const row = (k: string, v: string, bold = false) => (
-    <p style={{ display: 'flex', justifyContent: 'space-between', fontWeight: bold ? 700 : 400, color: bold ? '#f0f0f5' : '#a0a0b5', margin: 0 }}><span>{k}</span><span>{v}</span></p>
+    <p style={{ display: 'flex', justifyContent: 'space-between', fontWeight: bold ? 700 : 400, color: bold ? '#dfe2eb' : '#a9aeb8', margin: 0 }}><span>{k}</span><span>{v}</span></p>
   )
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.75)', padding: '1rem' }} onClick={onClose}>
-      <div role="dialog" aria-label="Rental summary" style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 16, width: '100%', maxWidth: 440, padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 12, fontSize: '.85rem' }} onClick={e => e.stopPropagation()}>
+      <div role="dialog" aria-label="Rental summary" style={{ background: '#1c2026', border: '1px solid #31353c', borderRadius: 16, width: '100%', maxWidth: 440, padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 12, fontSize: '.85rem' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontWeight: 700, color: '#f0f0f5' }}>Rental summary · {input.title}</span>
+          <span style={{ fontWeight: 700, color: '#dfe2eb' }}>Rental summary · {input.title}</span>
           <button className="close-btn" aria-label="Close" onClick={onClose} style={{ position: 'static', width: 28, height: 28 }}><X size={14} /></button>
         </div>
-        <p style={{ color: '#8a8aab', margin: 0 }}>
+        <p style={{ color: '#a9aeb8', margin: 0 }}>
           {s.lines.length} {s.lines.length === 1 ? 'line' : 'lines'} · {input.from} to {input.to} · {s.rentalDays} {s.rentalDays === 1 ? 'day' : 'days'}
           {s.chargedDays < s.rentalDays && ` (charged ${s.chargedDays})`}
         </p>
@@ -89,7 +89,7 @@ function RentalSummaryModal({ input, catalog, onClose }: { input: SummaryInput; 
         </div>
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ color: '#8a8aab', flex: 1 }}>Extra discount (%)</span>
+          <span style={{ color: '#a9aeb8', flex: 1 }}>Extra discount (%)</span>
           <input style={{ ...inp, width: 90 }} inputMode="decimal" value={discount} onChange={e => setDiscount(e.target.value)} placeholder="0" />
         </label>
 

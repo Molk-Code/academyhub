@@ -40,7 +40,7 @@ export function ScanFlash({ flash }: { flash: (ScanFlashData & { key: number }) 
       <div
         key={flash.key}
         style={{
-          width: 'min(320px, 100%)', background: 'rgba(14,14,22,.96)', border: `2px solid ${accent}`,
+          width: 'min(320px, 100%)', background: 'rgba(28,32,38,.96)', border: `2px solid ${accent}`,
           borderRadius: 18, overflow: 'hidden', boxShadow: `0 20px 60px rgba(0,0,0,.6), 0 0 40px ${accent}33`,
           animation: 'scan-flash-in .22s ease-out', textAlign: 'center',
         }}
@@ -51,7 +51,7 @@ export function ScanFlash({ flash }: { flash: (ScanFlashData & { key: number }) 
             : <Package size={64} color="#9a9ab0" />}
         </div>
         <div style={{ padding: '12px 16px 14px' }}>
-          <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#f0f0f5', lineHeight: 1.3 }}>{flash.name}</div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#dfe2eb', lineHeight: 1.3 }}>{flash.name}</div>
           <div style={{ marginTop: 4, fontSize: '.8rem', fontWeight: 700, color: accent, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {flash.warn ? <AlertTriangle size={14} /> : <Check size={14} strokeWidth={3} />} {flash.label}
           </div>
@@ -82,7 +82,7 @@ export function NotInProjectModal({ data, onClose }: { data: NotInProjectData; o
         role="alertdialog"
         style={{
           width: 'min(380px, 100%)', background: '#14141e', border: '2px solid #f87171', borderRadius: 18,
-          padding: 20, textAlign: 'center', animation: 'scan-flash-in .22s ease-out', color: '#f0f0f5',
+          padding: 20, textAlign: 'center', animation: 'scan-flash-in .22s ease-out', color: '#dfe2eb',
         }}
       >
         <div style={{ width: 56, height: 56, margin: '0 auto 12px', borderRadius: '50%', background: 'rgba(239,68,68,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -100,14 +100,14 @@ export function NotInProjectModal({ data, onClose }: { data: NotInProjectData; o
             {data.otherProjects === null
               ? 'Looking in other projects…'
               : data.otherProjects.length > 0
-                ? <>It is checked out in <strong style={{ color: '#f0f0f5' }}>{data.otherProjects.join(', ')}</strong>. Check it in there.</>
+                ? <>It is checked out in <strong style={{ color: '#dfe2eb' }}>{data.otherProjects.join(', ')}</strong>. Check it in there.</>
                 : 'Check other projects — it is not checked out in any active project.'}
           </p>
         )}
         <button
           type="button"
           onClick={onClose}
-          style={{ marginTop: 16, width: '100%', padding: '10px', background: '#2a2a3a', border: 'none', borderRadius: 10, color: '#f0f0f5', fontWeight: 700, fontSize: '.9rem', cursor: 'pointer' }}
+          style={{ marginTop: 16, width: '100%', padding: '10px', background: '#31353c', border: 'none', borderRadius: 10, color: '#dfe2eb', fontWeight: 700, fontSize: '.9rem', cursor: 'pointer' }}
         >
           OK
         </button>

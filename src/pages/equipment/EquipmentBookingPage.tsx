@@ -23,7 +23,7 @@ import { KIT_CODE_PREFIX, kitCounts, kitsFree, expandKit, mergeLines, wantedPerI
 import { clickable } from '@/lib/a11y'
 
 const INFO_LABEL: React.CSSProperties = { fontSize: '.7rem', fontWeight: 700, color: '#979ca7', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }
-const INFO_TEXT: React.CSSProperties = { fontSize: '.88rem', color: '#c0c0d5', lineHeight: 1.5, whiteSpace: 'pre-line', margin: 0 }
+const INFO_TEXT: React.CSSProperties = { fontSize: '.88rem', color: '#c8ccd5', lineHeight: 1.5, whiteSpace: 'pre-line', margin: 0 }
 
 function EquipmentImg({ url, name, fallback }: { url: string | undefined | null; name: string; fallback: React.ReactNode }) {
   const [failed, setFailed] = useState(false)
@@ -131,8 +131,8 @@ function BookingMessageThread({ bookingId }: { bookingId: string }) {
               style={{
                 fontSize: '.76rem', padding: '6px 10px', borderRadius: 8, maxWidth: '85%', margin: 0,
                 alignSelf: m.senderRole === 'student' ? 'flex-end' : 'flex-start',
-                background: m.senderRole === 'student' ? 'rgba(59,130,246,.15)' : '#0e0e16',
-                color: m.senderRole === 'student' ? '#bfdbfe' : '#8a8aab',
+                background: m.senderRole === 'student' ? 'rgba(59,130,246,.15)' : '#1c2026',
+                color: m.senderRole === 'student' ? '#bfdbfe' : '#a9aeb8',
                 fontStyle: m.senderRole === 'student' ? 'normal' : 'italic',
               }}
             >
@@ -147,7 +147,7 @@ function BookingMessageThread({ bookingId }: { bookingId: string }) {
           onChange={e => setText(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && send()}
           placeholder="Reply…"
-          style={{ flex: 1, fontSize: '.76rem', background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 8, padding: '6px 10px', color: '#f0f0f5' }}
+          style={{ flex: 1, fontSize: '.76rem', background: '#1c2026', border: '1px solid #31353c', borderRadius: 8, padding: '6px 10px', color: '#dfe2eb' }}
         />
         <button aria-label="Send"
           disabled={sending || !text.trim()}
@@ -521,7 +521,7 @@ export default function EquipmentBookingPage() {
           const blockedReason = locked ? 'Not for your class' : outOfStock ? 'Out of stock' : budgetBlocked ? 'Over budget'
             : needsProduction && !selectedProductionId ? 'Select a production first' : null
           return (
-            <div key={acc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 8, background: '#12121a', border: `1px solid ${inCart ? 'rgba(242,100,25,.45)' : '#2a2a3a'}`, borderRadius: 12 }}>
+            <div key={acc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 8, background: '#1c2026', border: `1px solid ${inCart ? 'rgba(255,107,53,.45)' : '#31353c'}`, borderRadius: 12 }}>
               <div {...clickable}
                 onClick={() => setModalItem(acc)}
                 style={{ width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: 'hidden', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
@@ -530,7 +530,7 @@ export default function EquipmentBookingPage() {
                 <EquipmentImg url={acc.imageUrl} name={acc.name} fallback={<Package size={22} color="#9a9ab0" />} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p onClick={() => setModalItem(acc)} style={{ fontSize: '.88rem', fontWeight: 600, color: '#f0f0f5', cursor: 'pointer', margin: 0 }}>{acc.name}</p>
+                <p onClick={() => setModalItem(acc)} style={{ fontSize: '.88rem', fontWeight: 600, color: '#dfe2eb', cursor: 'pointer', margin: 0 }}>{acc.name}</p>
                 <p style={{ fontSize: '.72rem', margin: '2px 0 0', color: blockedReason && !inCart ? '#f59e0b' : '#979ca7' }}>
                   {blockedReason && !inCart ? blockedReason : freeLabel(freeFor(acc))}
                   {pricingEnabled && (acc.priceInclVat > 0 ? ` · ${acc.priceInclVat} kr/day` : ' · Free')}
@@ -743,7 +743,7 @@ export default function EquipmentBookingPage() {
   })()
 
   return (
-    <div className="molkom-app student-molkom-app" style={{ background: '#0a0a0f', minHeight: '100vh' }}>
+    <div className="molkom-app student-molkom-app" style={{ background: '#10141a', minHeight: '100vh' }}>
       {/* Header */}
       <header className="header">
         <div className="header-inner">
@@ -763,7 +763,7 @@ export default function EquipmentBookingPage() {
               My Bookings
             </button>
             <button className="cart-button" onClick={() => setCartOpen(true)}>
-              <ShoppingCart size={20} color="#a0a0b5" />
+              <ShoppingCart size={20} color="#a9aeb8" />
               {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
             </button>
           </div>
@@ -780,7 +780,7 @@ export default function EquipmentBookingPage() {
 
         {cartCount === 0 ? (
           <div className="cart-empty">
-            <ShoppingCart size={40} color="#3a3a4a" />
+            <ShoppingCart size={40} color="#454a52" />
             <p>Your cart is empty</p>
             <span style={{ fontSize: '.85rem' }}>Add equipment to get started</span>
           </div>
@@ -791,7 +791,7 @@ export default function EquipmentBookingPage() {
                 <div className="cart-item" key={item.id}>
                   <div className="cart-item-info">
                     <h4>{item.name}</h4>
-                    {kitOf(item) && <p style={{ fontSize: '.7rem', color: '#8a8aab' }}>Kit: {item.included.join(' · ')}</p>}
+                    {kitOf(item) && <p style={{ fontSize: '.7rem', color: '#a9aeb8' }}>Kit: {item.included.join(' · ')}</p>}
                     {dateFree && quantity > freeFor(item) && (
                       <p role="alert" style={{ fontSize: '.72rem', color: '#ff4757', fontWeight: 600 }}>
                         {freeFor(item) === 0 ? 'None free on your dates' : `Only ${freeFor(item)} free on your dates`}
@@ -889,7 +889,7 @@ export default function EquipmentBookingPage() {
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 16, width: '100%', maxWidth: 460, maxHeight: '90dvh', overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 14 }}
+            style={{ background: '#1c2026', border: '1px solid #31353c', borderRadius: 16, width: '100%', maxWidth: 460, maxHeight: '90dvh', overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 14 }}
           >
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
               <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(76,217,100,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -897,7 +897,7 @@ export default function EquipmentBookingPage() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontSize: '.75rem', color: '#4cd964', fontWeight: 700, margin: 0 }}>Added to cart</p>
-                <p style={{ fontSize: '1rem', color: '#f0f0f5', fontWeight: 700, margin: '2px 0 0' }}>{accessoryFor.name}</p>
+                <p style={{ fontSize: '1rem', color: '#dfe2eb', fontWeight: 700, margin: '2px 0 0' }}>{accessoryFor.name}</p>
               </div>
               <button onClick={() => setAccessoryFor(null)} aria-label="Close" style={{ background: 'none', border: 'none', color: '#979ca7', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
             </div>
@@ -908,7 +908,7 @@ export default function EquipmentBookingPage() {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 onClick={() => setAccessoryFor(null)}
-                style={{ flex: 1, minWidth: 140, padding: '10px 14px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 10, color: '#f0f0f5', fontWeight: 600, fontSize: '.85rem', cursor: 'pointer' }}
+                style={{ flex: 1, minWidth: 140, padding: '10px 14px', background: '#262a31', border: '1px solid #31353c', borderRadius: 10, color: '#dfe2eb', fontWeight: 600, fontSize: '.85rem', cursor: 'pointer' }}
               >
                 Continue browsing
               </button>
@@ -932,20 +932,20 @@ export default function EquipmentBookingPage() {
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{ position: 'relative', background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 16, width: '100%', maxWidth: 480, maxHeight: '90dvh', overflowY: 'auto' }}
+            style={{ position: 'relative', background: '#1c2026', border: '1px solid #31353c', borderRadius: 16, width: '100%', maxWidth: 480, maxHeight: '90dvh', overflowY: 'auto' }}
           >
             <button
               onClick={() => setModalItem(null)}
               aria-label="Close"
-              style={{ position: 'sticky', top: 10, float: 'right', marginRight: 10, zIndex: 1, width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(14,14,22,.85)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              style={{ position: 'sticky', top: 10, float: 'right', marginRight: 10, zIndex: 1, width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(28,32,38,.85)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
             >
               <X size={16} />
             </button>
             <ImageGallery urls={equipmentImages(modalItem)} name={modalItem.name} />
             <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <p style={{ fontWeight: 700, fontSize: '1.1rem', color: '#f0f0f5' }}>{modalItem.name}</p>
-                <p style={{ fontSize: '.72rem', fontWeight: 700, color: '#f26419', textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 2 }}>{modalItem.category}</p>
+                <p style={{ fontWeight: 700, fontSize: '1.1rem', color: '#dfe2eb' }}>{modalItem.name}</p>
+                <p style={{ fontSize: '.72rem', fontWeight: 700, color: '#ff6b35', textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 2 }}>{modalItem.category}</p>
                 <p style={{ fontSize: '.8rem', fontWeight: 600, marginTop: 6, color: freeFor(modalItem) > 0 ? '#4cd964' : '#ff4757' }}>
                   {isItemLocked(modalItem) ? 'Not available for your class' : freeFor(modalItem) > 0 ? freeLabel(freeFor(modalItem)) : dateFree ? 'None free on your dates' : 'Out of stock'}
                   {pricingEnabled && (modalItem.priceInclVat > 0
@@ -973,8 +973,8 @@ export default function EquipmentBookingPage() {
                   <p style={INFO_LABEL}>Included Accessories</p>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                     {modalItem.included.map((inc, i) => (
-                      <li key={i} style={{ fontSize: '.85rem', color: '#c0c0d5', paddingLeft: 12, position: 'relative' }}>
-                        <span style={{ position: 'absolute', left: 0, color: '#f26419' }}>•</span>{inc}
+                      <li key={i} style={{ fontSize: '.85rem', color: '#c8ccd5', paddingLeft: 12, position: 'relative' }}>
+                        <span style={{ position: 'absolute', left: 0, color: '#ff6b35' }}>•</span>{inc}
                       </li>
                     ))}
                   </ul>
@@ -993,7 +993,7 @@ export default function EquipmentBookingPage() {
                   href={externalHref(modalItem.linkUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 14px', background: 'rgba(242,100,25,.12)', border: '1px solid rgba(242,100,25,.35)', borderRadius: 10, color: '#f26419', fontWeight: 700, fontSize: '.9rem', textDecoration: 'none' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 14px', background: 'rgba(255,107,53,.12)', border: '1px solid rgba(255,107,53,.35)', borderRadius: 10, color: '#ff6b35', fontWeight: 700, fontSize: '.9rem', textDecoration: 'none' }}
                 >
                   <ExternalLink size={15} /> Product page
                 </a>
@@ -1008,11 +1008,11 @@ export default function EquipmentBookingPage() {
         {productionRequired && (view === 'browse' || view === 'checkout') && (
           <div style={{ marginBottom: '1.5rem' }}>
             {!selectedProductionId ? (
-              <div style={{ background: 'rgba(249,115,22,.08)', border: '1px solid rgba(249,115,22,.3)', borderRadius: 16, padding: '1.5rem' }}>
+              <div style={{ background: 'rgba(255,107,53,.08)', border: '1px solid rgba(255,107,53,.3)', borderRadius: 16, padding: '1.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
                   <span style={{ fontSize: '2rem', flexShrink: 0 }}>🎬</span>
                   <div style={{ flex: 1 }}>
-                    <h2 style={{ fontWeight: 700, fontSize: '1rem', color: '#f0f0f5', marginBottom: 4 }}>Select a production to book equipment</h2>
+                    <h2 style={{ fontWeight: 700, fontSize: '1rem', color: '#dfe2eb', marginBottom: 4 }}>Select a production to book equipment</h2>
                     <p style={{ fontSize: '.82rem', color: '#979ca7', marginBottom: '1rem' }}>
                       Equipment can only be booked for a registered production with a completed plan
                       (script breakdown, crew, cast, locations and shooting schedule) — or a Custom Project,
@@ -1024,7 +1024,7 @@ export default function EquipmentBookingPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <p style={{ fontSize: '.82rem', color: '#8c919b' }}>You have no productions yet.</p>
                         {productionNavEnabled && (
-                          <Link to="/production" style={{ background: '#f97316', color: '#fff', fontWeight: 700, fontSize: '.8rem', padding: '7px 14px', borderRadius: 10, textDecoration: 'none' }}>
+                          <Link to="/production" style={{ background: '#ff6b35', color: '#10141a', fontWeight: 700, fontSize: '.8rem', padding: '7px 14px', borderRadius: 10, textDecoration: 'none' }}>
                             Go to Productions →
                           </Link>
                         )}
@@ -1046,14 +1046,14 @@ export default function EquipmentBookingPage() {
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                                <p style={{ fontWeight: 600, fontSize: '.85rem', color: '#f0f0f5', margin: 0 }}>{prod.title}</p>
+                                <p style={{ fontWeight: 600, fontSize: '.85rem', color: '#dfe2eb', margin: 0 }}>{prod.title}</p>
                                 {r?.isReady
                                   ? <span style={{ fontSize: '.6875rem', fontWeight: 700, background: 'rgba(16,185,129,.2)', color: '#34d399', border: '1px solid rgba(16,185,129,.3)', borderRadius: 20, padding: '2px 7px' }}>✓ Ready</span>
                                   : <span style={{ fontSize: '.6875rem', fontWeight: 700, background: 'rgba(255,255,255,.08)', color: '#979ca7', borderRadius: 20, padding: '2px 7px' }}>{r?.score ?? 0}%</span>
                                 }
                               </div>
                               <div style={{ height: 3, background: 'rgba(255,255,255,.08)', borderRadius: 99, overflow: 'hidden', marginBottom: 6 }}>
-                                <div style={{ height: '100%', borderRadius: 99, width: `${r?.score ?? 0}%`, background: r?.isReady ? '#10b981' : '#f97316', transition: 'width .4s' }} />
+                                <div style={{ height: '100%', borderRadius: 99, width: `${r?.score ?? 0}%`, background: r?.isReady ? '#10b981' : '#ff6b35', transition: 'width .4s' }} />
                               </div>
                               {!r?.isReady && (r?.missing ?? []).map((m, i) => (
                                 <p key={i} style={{ fontSize: '.7rem', color: '#8c919b', margin: '2px 0', display: 'flex', gap: 4 }}>
@@ -1076,7 +1076,7 @@ export default function EquipmentBookingPage() {
                     <span style={{ fontSize: '1.5rem' }}>🎬</span>
                     <div>
                       <p style={{ fontSize: '.6875rem', color: '#34d399', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', margin: 0 }}>Booking for production</p>
-                      <p style={{ fontWeight: 700, color: '#f0f0f5', margin: 0, fontSize: '.9rem' }}>{selectedProduction?.title}</p>
+                      <p style={{ fontWeight: 700, color: '#dfe2eb', margin: 0, fontSize: '.9rem' }}>{selectedProduction?.title}</p>
                     </div>
                   </div>
                   <button onClick={() => setSelectedProductionId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '.75rem', color: '#8c919b', textDecoration: 'underline' }}>
@@ -1084,11 +1084,11 @@ export default function EquipmentBookingPage() {
                   </button>
                 </div>
                 {budgetInfo && (
-                  <div style={{ background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 12, padding: '12px 16px' }}>
+                  <div style={{ background: '#1c2026', border: '1px solid #31353c', borderRadius: 12, padding: '12px 16px' }}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: 8 }}>
                       <div>
                         <p style={{ fontSize: '.6875rem', color: '#979ca7', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Total budget</p>
-                        <p style={{ fontSize: '.95rem', fontWeight: 700, color: '#f0f0f5', margin: 0 }}>{budgetInfo.limit.toLocaleString('sv-SE')} <span style={{ fontWeight: 400, color: '#979ca7', fontSize: '.75rem' }}>SEK</span></p>
+                        <p style={{ fontSize: '.95rem', fontWeight: 700, color: '#dfe2eb', margin: 0 }}>{budgetInfo.limit.toLocaleString('sv-SE')} <span style={{ fontWeight: 400, color: '#979ca7', fontSize: '.75rem' }}>SEK</span></p>
                       </div>
                       <div>
                         <p style={{ fontSize: '.6875rem', color: '#979ca7', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', margin: '0 0 2px' }}>Salaries</p>
@@ -1113,7 +1113,7 @@ export default function EquipmentBookingPage() {
                     <div style={{ display: 'flex', gap: '1rem', marginTop: 5 }}>
                       <span style={{ fontSize: '.6875rem', color: '#3b82f6' }}>■ Salaries</span>
                       {pricingEnabled && <span style={{ fontSize: '.6875rem', color: '#10b981' }}>■ Equipment in cart</span>}
-                      <span style={{ fontSize: '.6875rem', color: '#3a3a4a' }}>■ Available</span>
+                      <span style={{ fontSize: '.6875rem', color: '#454a52' }}>■ Available</span>
                     </div>
                   </div>
                 )}
@@ -1161,7 +1161,7 @@ export default function EquipmentBookingPage() {
               const visible = q ? kitItems.filter(k => k.name.toLowerCase().includes(q) || k.included.some(i => i.toLowerCase().includes(q))) : kitItems
               return visible.length > 0 && (
                 <section aria-labelledby="kits-title" style={{ marginBottom: 16 }}>
-                  <h3 id="kits-title" style={{ fontSize: '.8rem', fontWeight: 700, color: '#a0a0b5', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Kits</h3>
+                  <h3 id="kits-title" style={{ fontSize: '.8rem', fontWeight: 700, color: '#a9aeb8', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Kits</h3>
                   {renderAccessoryRows(visible)}
                 </section>
               )
@@ -1199,11 +1199,11 @@ export default function EquipmentBookingPage() {
                         <EquipmentImg
                           url={item.imageUrl}
                           name={item.name}
-                          fallback={<div className="image-placeholder"><Package size={32} color="#3a3a4a" /><br />{item.name}</div>}
+                          fallback={<div className="image-placeholder"><Package size={32} color="#454a52" /><br />{item.name}</div>}
                         />
                         <span className="product-category-tag">{item.category}</span>
                         {equipmentImages(item).length > 1 && (
-                          <span style={{ position: 'absolute', bottom: 8, right: 8, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '.6875rem', fontWeight: 700, background: 'rgba(14,14,22,.8)', color: '#fff', borderRadius: 10, padding: '2px 7px' }}>
+                          <span style={{ position: 'absolute', bottom: 8, right: 8, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '.6875rem', fontWeight: 700, background: 'rgba(28,32,38,.8)', color: '#fff', borderRadius: 10, padding: '2px 7px' }}>
                             <Images size={11} /> {equipmentImages(item).length}
                           </span>
                         )}
@@ -1229,7 +1229,7 @@ export default function EquipmentBookingPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={e => e.stopPropagation()}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, fontSize: '.75rem', fontWeight: 700, color: '#f26419', textDecoration: 'none' }}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, fontSize: '.75rem', fontWeight: 700, color: '#ff6b35', textDecoration: 'none' }}
                           >
                             <ExternalLink size={12} /> Product page
                           </a>
@@ -1297,12 +1297,12 @@ export default function EquipmentBookingPage() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 140 }}>
                         <label style={{ fontSize: '.7rem', color: '#979ca7', fontWeight: 600 }}>From</label>
                         <input type="date" value={fromDate} min={new Date().toISOString().slice(0, 10)} onChange={e => setFromDate(e.target.value)}
-                          style={{ background: '#1a1a28', border: '1px solid #2a2a3a', borderRadius: 8, color: '#f0f0f5', padding: '6px 10px', fontSize: '.85rem', width: '100%' }} />
+                          style={{ background: '#1a1a28', border: '1px solid #31353c', borderRadius: 8, color: '#dfe2eb', padding: '6px 10px', fontSize: '.85rem', width: '100%' }} />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 140 }}>
                         <label style={{ fontSize: '.7rem', color: '#979ca7', fontWeight: 600 }}>To</label>
                         <input type="date" value={toDate} min={fromDate || new Date().toISOString().slice(0, 10)} onChange={e => setToDate(e.target.value)}
-                          style={{ background: '#1a1a28', border: '1px solid #2a2a3a', borderRadius: 8, color: '#f0f0f5', padding: '6px 10px', fontSize: '.85rem', width: '100%' }} />
+                          style={{ background: '#1a1a28', border: '1px solid #31353c', borderRadius: 8, color: '#dfe2eb', padding: '6px 10px', fontSize: '.85rem', width: '100%' }} />
                       </div>
                     </div>
                     {rentalDays > 0 && (
@@ -1375,7 +1375,7 @@ export default function EquipmentBookingPage() {
                   </div>
                 )}
                 {budgetInfo && (
-                  <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: '#0e0e16', border: '1px solid #2a2a3a', fontSize: '.78rem' }}>
+                  <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: '#1c2026', border: '1px solid #31353c', fontSize: '.78rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                       <span style={{ color: '#979ca7' }}>Salaries</span>
                       <span style={{ color: '#60a5fa', fontWeight: 600 }}>{budgetInfo.salaryCost.toLocaleString('sv-SE')} SEK</span>
@@ -1383,16 +1383,16 @@ export default function EquipmentBookingPage() {
                     {budgetInfo.existingEquipmentCost > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                         <span style={{ color: '#979ca7' }}>Equipment (already booked)</span>
-                        <span style={{ color: '#f0f0f5', fontWeight: 600 }}>{budgetInfo.existingEquipmentCost.toLocaleString('sv-SE')} SEK</span>
+                        <span style={{ color: '#dfe2eb', fontWeight: 600 }}>{budgetInfo.existingEquipmentCost.toLocaleString('sv-SE')} SEK</span>
                       </div>
                     )}
                     {pricingEnabled && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                         <span style={{ color: '#979ca7' }}>Equipment (this booking)</span>
-                        <span style={{ color: '#f0f0f5', fontWeight: 600 }}>{totalPrice.toFixed(0)} SEK</span>
+                        <span style={{ color: '#dfe2eb', fontWeight: 600 }}>{totalPrice.toFixed(0)} SEK</span>
                       </div>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #2a2a3a', paddingTop: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #31353c', paddingTop: 6 }}>
                       <span style={{ color: '#979ca7' }}>Total budget used</span>
                       <span style={{ color: (budgetInfo.salaryCost + budgetInfo.existingEquipmentCost + (pricingEnabled ? totalPrice : 0)) > budgetInfo.limit ? '#f87171' : '#34d399', fontWeight: 700 }}>
                         {(budgetInfo.salaryCost + budgetInfo.existingEquipmentCost + (pricingEnabled ? totalPrice : 0)).toLocaleString('sv-SE')} / {budgetInfo.limit.toLocaleString('sv-SE')} SEK
@@ -1435,18 +1435,18 @@ export default function EquipmentBookingPage() {
                 {myBookings.map(b => {
                   const statusColors: Record<string, string> = {
                     pending: '#f59e0b', confirmed: '#4cd964',
-                    'checked-out': '#f97316', returned: '#4cd964', denied: '#f87171', cancelled: '#6b7280',
+                    'checked-out': '#ff6b35', returned: '#4cd964', denied: '#f87171', cancelled: '#6b7280',
                   }
                   const statusIcons: Record<string, React.ReactNode> = {
                     pending: <Clock size={13} />, confirmed: <Check size={13} />,
                     'checked-out': <Truck size={13} />, returned: <RotateCcw size={13} />,
                     denied: <XCircle size={13} />, cancelled: <XCircle size={13} />,
                   }
-                  const color = statusColors[b.status] ?? '#8a8aab'
+                  const color = statusColors[b.status] ?? '#a9aeb8'
                   return (
-                    <div key={b.id} style={{ background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 12, padding: '1rem' }}>
+                    <div key={b.id} style={{ background: '#262a31', border: '1px solid #31353c', borderRadius: 12, padding: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <span style={{ fontWeight: 700, fontSize: '.95rem', color: '#f0f0f5' }}>{b.projectName}</span>
+                        <span style={{ fontWeight: 700, fontSize: '.95rem', color: '#dfe2eb' }}>{b.projectName}</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '.75rem', fontWeight: 700, color, background: `${color}18`, border: `1px solid ${color}40`, borderRadius: 20, padding: '3px 9px' }}>
                           {statusIcons[b.status]} {b.status.replace('-', ' ')}
                         </span>
@@ -1461,10 +1461,10 @@ export default function EquipmentBookingPage() {
                       {bookingParts(b).length > 1 ? <BookingPartsSummary booking={b} /> : (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                           {b.items.map((it, i) => (
-                            <span key={i} style={{ fontSize: '.72rem', background: '#0e0e16', border: '1px solid #2a2a3a', borderRadius: 20, padding: '2px 8px', color: isItemUnavailable(b, it) ? '#979ca7' : '#c0c0d5' }}>
+                            <span key={i} style={{ fontSize: '.72rem', background: '#1c2026', border: '1px solid #31353c', borderRadius: 20, padding: '2px 8px', color: isItemUnavailable(b, it) ? '#979ca7' : '#c8ccd5' }}>
                               {isItemUnavailable(b, it)
                                 ? <><span style={{ textDecoration: 'line-through' }}>{it.quantity}× {it.equipmentName}</span> <span style={{ color: '#fda4af', fontWeight: 700 }}>not available</span></>
-                                : <>{it.quantity}× {it.equipmentName}{it.kitName && <span style={{ color: '#8a8aab' }}> · {it.kitName}</span>}</>}
+                                : <>{it.quantity}× {it.equipmentName}{it.kitName && <span style={{ color: '#a9aeb8' }}> · {it.kitName}</span>}</>}
                             </span>
                           ))}
                         </div>

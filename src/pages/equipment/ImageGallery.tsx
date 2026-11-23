@@ -11,7 +11,7 @@ export function equipmentImages(item: Pick<EquipmentDoc, 'imageUrl' | 'imageUrls
 
 const ARROW: React.CSSProperties = {
   position: 'absolute', top: '50%', transform: 'translateY(-50%)', width: 34, height: 34, borderRadius: '50%',
-  border: 'none', background: 'rgba(14,14,22,.75)', color: '#fff', display: 'flex', alignItems: 'center',
+  border: 'none', background: 'rgba(28,32,38,.75)', color: '#fff', display: 'flex', alignItems: 'center',
   justifyContent: 'center', cursor: 'pointer', zIndex: 1,
 }
 
@@ -22,7 +22,7 @@ export function ImageGallery({ urls, name, height = 'min(45vh, 340px)' }: { urls
 
   if (urls.length === 0) {
     return (
-      <div style={{ height: 220, background: '#1a1a25', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3a3a4a' }}>
+      <div style={{ height: 220, background: '#262a31', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#454a52' }}>
         <Package size={40} />
       </div>
     )
@@ -77,7 +77,7 @@ export function ImageGallery({ urls, name, height = 'min(45vh, 340px)' }: { urls
                 type="button"
                 aria-label={`Image ${i + 1}`}
                 onClick={() => go(i)}
-                style={{ width: i === index ? 18 : 8, height: 8, borderRadius: 4, border: 'none', padding: 0, cursor: 'pointer', transition: 'width .2s', background: i === index ? '#f26419' : 'rgba(0,0,0,.3)' }}
+                style={{ width: i === index ? 18 : 8, height: 8, borderRadius: 4, border: 'none', padding: 0, cursor: 'pointer', transition: 'width .2s', background: i === index ? '#ff6b35' : 'rgba(0,0,0,.3)' }}
               />
             ))}
           </div>

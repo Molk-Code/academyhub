@@ -63,6 +63,11 @@
     position: sticky;
     top: calc(var(--header-h, 4rem) + max(env(safe-area-inset-top, 0px), 12px));
   }
+  /* Icon buttons get a 44px tap target on touch screens (UI/UX Pro Max
+     touch-target-size); mouse users keep the compact size */
+  @media (pointer: coarse) {
+    .touch-target { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+  }
   .pb-bottomnav {
     padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
   }

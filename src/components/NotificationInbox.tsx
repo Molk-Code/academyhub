@@ -95,7 +95,7 @@ export default function NotificationInbox() {
       <button
         ref={btnRef}
         onClick={toggleOpen}
-        className="relative p-2 rounded-xl text-zinc-400 hover:bg-white/10 transition-colors"
+        className="touch-target relative p-2 rounded-xl text-zinc-400 hover:bg-white/10 transition-colors"
         aria-label="Notifications"
       >
         <Bell className="w-5 h-5" />

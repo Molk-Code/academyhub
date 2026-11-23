@@ -463,7 +463,7 @@ export default function StudentLayout() {
             <NotificationInbox />
             <button aria-label="Open menu" aria-expanded={drawerOpen}
               onClick={() => setDrawerOpen(true)}
-              className="p-2 rounded-xl text-zinc-400 hover:bg-white/10 transition-colors"
+              className="touch-target p-2 rounded-xl text-zinc-400 hover:bg-white/10 transition-colors"
             >
               <Menu className="w-5 h-5" />
             </button>

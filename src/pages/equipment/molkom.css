@@ -351,3 +351,9 @@
   .molkom-app .item-action-label{display:block;font-size:.6875rem;font-weight:600;line-height:1}
   .molkom-app .item-action-icon{font-size:1rem;font-weight:700;line-height:1}
 }
+/* Touch screens: 44px tap targets for the small controls (UI/UX Pro Max touch-target-size) */
+@media (pointer:coarse){
+  .molkom-app .close-btn,.molkom-app .image-modal-close,.molkom-app .note-popup-close,.molkom-app .remove-btn,.molkom-app .day-btn,.molkom-app .day-btn-sm{width:44px;height:44px;min-width:44px}
+  .molkom-app .search-clear{width:40px;height:40px;right:.15rem}
+  .molkom-app .borrower-chip-x{min-width:32px;min-height:32px;margin:-8px -8px -8px -2px}
+}

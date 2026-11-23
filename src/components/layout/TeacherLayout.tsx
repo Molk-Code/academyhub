@@ -310,7 +310,7 @@ export default function TeacherLayout() {
             <NotificationInbox />
             <button aria-label="Open menu" aria-expanded={drawerOpen}
               onClick={() => setDrawerOpen(true)}
-              className="relative p-2 rounded-xl text-zinc-400 hover:text-zinc-100 hover:bg-white/10 transition-colors"
+              className="touch-target relative p-2 rounded-xl text-zinc-400 hover:text-zinc-100 hover:bg-white/10 transition-colors"
             >
               <Menu className="w-5 h-5" />
               {totalBadge > 0 && (

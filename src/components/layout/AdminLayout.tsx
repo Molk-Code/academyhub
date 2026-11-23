@@ -370,7 +370,7 @@ export default function AdminLayout() {
             <NotificationInbox />
             <button aria-label="Open menu" aria-expanded={drawerOpen}
               onClick={() => setDrawerOpen(true)}
-              className="relative p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-[var(--bg-elevated)] transition-colors"
+              className="touch-target relative p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-[var(--bg-elevated)] transition-colors"
             >
               <Menu className="w-5 h-5" />
               {totalBadge > 0 && (

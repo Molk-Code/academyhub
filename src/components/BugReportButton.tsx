@@ -177,7 +177,7 @@ export default function BugReportButton() {
         data-bug-ui
         onClick={() => mode === 'idle' ? setMode('selecting') : cancel()}
         title={mode !== 'idle' ? 'Cancel bug report' : 'Report a bug'}
-        className={`relative p-2 rounded-xl transition-colors ${
+        className={`touch-target relative p-2 rounded-xl transition-colors ${
           mode !== 'idle'
             ? 'bg-amber-500/20 text-amber-400'
             : 'text-zinc-400 hover:bg-white/10 hover:text-zinc-300'

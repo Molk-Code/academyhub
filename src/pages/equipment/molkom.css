@@ -125,7 +125,7 @@
 .molkom-app .primary-btn{white-space:nowrap;display:inline-flex;align-items:center;gap:.4rem;padding:.75rem 1.5rem;background:#ff6b35;color:#000;font-size:.9rem;font-weight:700;border-radius:10px;border:none;cursor:pointer;transition:all .25s ease;text-decoration:none}
 .molkom-app .primary-btn:hover:not(:disabled){background:#f25c24;transform:translateY(-1px)}
 .molkom-app .primary-btn:disabled{opacity:.5;cursor:not-allowed}
-.molkom-app .secondary-btn{white-space:nowrap;display:inline-flex;align-items:center;gap:.4rem;padding:.75rem 1.5rem;background:#262a31;border:1px solid #31353c;color:#a9aeb8;font-size:.9rem;font-weight:600;border-radius:10px;cursor:pointer;transition:all .25s ease}
+.molkom-app .secondary-btn{white-space:nowrap;display:inline-flex;align-items:center;gap:.4rem;padding:.75rem 1.5rem;background:#262a31;border:1px solid #454a52;color:#dfe2eb;font-size:.9rem;font-weight:600;border-radius:10px;cursor:pointer;transition:all .25s ease}
 .molkom-app .secondary-btn:hover:not(:disabled){border-color:#454a52;color:#dfe2eb}
 .molkom-app .checkout-summary{background:#262a31;border:1px solid #31353c;border-radius:10px;padding:1.25rem;align-self:flex-start;position:sticky;top:80px}
 .molkom-app .checkout-summary h3{font-size:1rem;font-weight:600;margin:0 0 1rem;padding-bottom:.75rem;border-bottom:1px solid #31353c;color:#dfe2eb}
@@ -172,11 +172,11 @@
 .molkom-app .inv-stat-value{display:block;font-size:1.5rem;font-weight:700;line-height:1.2;color:#dfe2eb}
 .molkom-app .inv-stat-label{display:block;font-size:.75rem;color:#979ca7}
 .molkom-app .inv-section{margin-bottom:2rem}
-.molkom-app .inv-section-title{display:flex;align-items:center;gap:.5rem;font-size:1.1rem;font-weight:600;margin-bottom:1rem;color:#dfe2eb}
+.molkom-app .inv-section-title{display:flex;align-items:center;gap:.5rem;font-size:1.1rem;font-weight:600;margin:0 0 1rem;color:#dfe2eb}
 .molkom-app .inv-section-toggle{display:flex;align-items:center;gap:.5rem;width:100%;padding:.75rem 1rem;background:#262a31;border:1px solid #31353c;border-radius:10px;font-size:1rem;font-weight:600;color:#a9aeb8;cursor:pointer;transition:all .25s ease;margin-bottom:1rem}
 .molkom-app .inv-section-toggle:hover{border-color:#454a52;color:#dfe2eb}
 .molkom-app .inv-empty{text-align:center;padding:2rem;color:#979ca7;font-size:.9rem}
-.molkom-app .inv-page-title{display:flex;align-items:center;gap:.5rem;font-size:1.5rem;font-weight:700;margin-bottom:1.5rem;color:#dfe2eb}
+.molkom-app .inv-page-title{display:flex;align-items:center;gap:.5rem;font-size:1.75rem;font-weight:750;font-stretch:125%;margin-bottom:1.5rem;color:#dfe2eb}
 .molkom-app .project-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:.75rem}
 .molkom-app .project-card{display:flex;flex-direction:column;padding:1.25rem;background:#262a31;border:1px solid #31353c;border-radius:10px;text-decoration:none;color:inherit;transition:all .3s ease;cursor:pointer}
 .molkom-app .project-card:hover{border-color:#454a52;transform:translateY(-2px);box-shadow:0 4px 24px rgba(0,0,0,.4)}

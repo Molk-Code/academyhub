@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { StatsContent } from './InventoryStats'
+import { StatsContent, EquipmentStatusTab } from './InventoryStats'
+import InventoryCounter from './InventoryCounter'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import {
   collection, collectionGroup, addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, setDoc,
   serverTimestamp, query, where, onSnapshot, writeBatch, arrayUnion, arrayRemove, runTransaction,
@@ -13,8 +15,8 @@ import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, InventoryPres
 import { bookingParts, myParts, partStatus, isItemUnavailable, OTHER_CATEGORY } from '@/lib/bookingParts'
 import {
   Package, Calendar, Users, Clock, AlertTriangle, Check, Trash2, Plus, Minus,
-  ChevronDown, ChevronRight, ArrowLeft, Edit2, CheckCircle2, ArchiveRestore,
-  Layers, Search, X, ZapOff, Scan, Smartphone, QrCode, ClipboardList, Pencil,
+  ChevronDown, ChevronRight, ArrowLeft, Edit2, CheckCircle2,
+  Search, X, ZapOff, Scan, Smartphone, QrCode, ClipboardList, Pencil,
   ScanLine, HelpCircle, PenLine, ArrowUpRight,
 } from 'lucide-react'
 import { STATUS_TONE, toneChip } from '@/lib/statusTone'
@@ -25,7 +27,7 @@ import { BorrowerPicker, borrowerIdsFor, useBorrowerCandidates } from './Borrowe
 import './molkom.css'
 import { clickable } from '@/lib/a11y'
 
-type InvTab = 'dashboard' | 'all-projects' | 'statistics' | 'presets'
+type InvTab = 'units' | 'projects' | 'statistics' | 'presets'
 
 // ── Project Card ──────────────────────────────────────────────────────────────
 
@@ -623,20 +625,9 @@ export default function InventoryPage() {
   const { data: equipment } = useCollection<EquipmentDoc>('equipment')
   const allItems = useAllItems()
 
-  const [tab, setTab] = useState<InvTab>('dashboard')
-  // A dashboard stat card opens Statistics on its matching tab; n remounts
-  // StatsContent so the same card works again after switching tabs there
-  const [statsJump, setStatsJump] = useState<{ tab: string; n: number } | null>(null)
-  const openStats = (statsTab: string) => {
-    setStatsJump(prev => ({ tab: statsTab, n: (prev?.n ?? 0) + 1 }))
-    setTab('statistics')
-  }
-  const statLink = (statsTab: string) => ({
-    role: 'button' as const,
-    tabIndex: 0,
-    onClick: () => openStats(statsTab),
-    onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openStats(statsTab) } },
-  })
+  // Inventory opens on its units: where every copy is right now
+  const [tab, setTab] = useState<InvTab>('units')
+  const narrow = useMediaQuery('(max-width: 640px)')
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [createProject, setCreateProject] = useState(false)
   const [archivedOpen, setArchivedOpen] = useState(false)
@@ -729,36 +720,46 @@ export default function InventoryPage() {
     )
   }
 
+  const projectMap = Object.fromEntries(projects.map(p => [p.id, p]))
+  const projectGrid = (list: InventoryProjectDoc[]) => (
+    <div className="project-grid">
+      {list.map(p => {
+        const pItems = allItems.filter(i => i.projectId === p.id)
+        return <ProjectCard key={p.id} project={p} items={pItems} onClick={() => setSelectedProjectId(p.id)} onDelete={() => deleteProjectFully(p.id)} />
+      })}
+    </div>
+  )
+
   return (
     <div className="molkom-app" style={{ background: '#10141a', minHeight: '100vh' }}>
-      <div className="inv-page">
-        {/* Page title + new project button */}
+      <div className="inv-page" style={narrow ? { paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' } : undefined}>
         <div className="inv-page-head">
-          <div className="inv-page-title">
-            <ArchiveRestore size={22} color="#4edea3" />
-            Inventory
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <h1 className="inv-page-title" style={{ margin: 0 }}>Inventory</h1>
+            <p style={{ margin: 0, fontSize: '.875rem', color: '#a9aeb8' }}>
+              {stats.itemsOut === 0
+                ? 'Everything is on the shelf.'
+                : `${stats.itemsOut} ${stats.itemsOut === 1 ? 'unit' : 'units'} out across ${activeProjects.length} ${activeProjects.length === 1 ? 'project' : 'projects'}.`}
+            </p>
           </div>
           <div className="inv-page-actions">
-            {/* Phones: join a computer's scanning session from here (already signed in) */}
-            <Link to="/scan" className="secondary-btn sm:hidden">
-              <ScanLine size={16} aria-hidden="true" /> Phone scanner
-            </Link>
-            <button className="primary-btn" onClick={() => setCreateProject(true)}>
-              <Plus size={16} /> New Project
+            <button className={narrow ? 'secondary-btn' : 'primary-btn'} onClick={() => setCreateProject(true)}>
+              <Plus size={16} aria-hidden="true" /> New project
             </button>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="inv-tabs">
+        <div className="inv-tabs" role="tablist" aria-label="Inventory views">
           {([
-            ['dashboard', 'Dashboard'],
-            ['all-projects', 'All Projects'],
+            ['units', 'Units'],
+            ['projects', 'Projects'],
             ['statistics', 'Statistics'],
-            ['presets', 'Project Presets'],
+            ['presets', 'Presets'],
           ] as [InvTab, string][]).map(([id, label]) => (
             <button
               key={id}
+              role="tab"
+              aria-selected={tab === id}
               className={`inv-tab${tab === id ? ' active' : ''}`}
               onClick={() => setTab(id)}
             >
@@ -767,112 +768,48 @@ export default function InventoryPage() {
           ))}
         </div>
 
-        {/* Dashboard tab */}
-        {tab === 'dashboard' && (
+        {tab === 'units' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24, marginTop: '1.25rem' }}>
+            {narrow && <InventoryCounter projects={activeProjects} allItems={allItems} onOpenProject={setSelectedProjectId} />}
+            <EquipmentStatusTab equipment={equipment} allItems={allItems} projectMap={projectMap} onOpenProject={setSelectedProjectId} />
+          </div>
+        )}
+
+        {tab === 'projects' && (
           <>
-            <div className="inv-stats-row">
-              <div className="inv-stat-card">
-                <Package size={20} />
-                <div>
-                  <span className="inv-stat-value">{activeProjects.length}</span>
-                  <span className="inv-stat-label">Active Projects</span>
-                </div>
-              </div>
-              <div className="inv-stat-card clickable" {...statLink('equipment-status')}>
-                <Layers size={20} />
-                <div>
-                  <span className="inv-stat-value">{stats.itemsOut}</span>
-                  <span className="inv-stat-label">Items Out</span>
-                </div>
-              </div>
-              <div className="inv-stat-card clickable" {...statLink('due-this-week')}>
-                <Calendar size={20} />
-                <div>
-                  <span className="inv-stat-value">{stats.dueThisWeek}</span>
-                  <span className="inv-stat-label">Due Back This Week</span>
-                </div>
-              </div>
-              <div className={`inv-stat-card clickable${stats.overdue > 0 ? ' warning' : ''}`} {...statLink('overdue')}>
-                <Clock size={20} />
-                <div>
-                  <span className="inv-stat-value">{stats.overdue}</span>
-                  <span className="inv-stat-label">Overdue</span>
-                </div>
-              </div>
-              <div className={`inv-stat-card clickable${stats.missing > 0 ? ' danger' : ''}`} {...statLink('missing')}>
-                <AlertTriangle size={20} />
-                <div>
-                  <span className="inv-stat-value">{stats.missing}</span>
-                  <span className="inv-stat-label">Missing</span>
-                </div>
-              </div>
-              <div className={`inv-stat-card clickable${stats.damaged > 0 ? ' warning' : ''}`} {...statLink('damaged')}>
-                <AlertTriangle size={20} />
-                <div>
-                  <span className="inv-stat-value">{stats.damaged}</span>
-                  <span className="inv-stat-label">Damaged</span>
-                </div>
-              </div>
-            </div>
-
             <div className="inv-section">
-              <div className="inv-section-title"><Package size={18} /> Active Projects</div>
-              {activeProjects.length === 0 ? (
-                <div className="inv-empty">No active projects</div>
-              ) : (
-                <div className="project-grid">
-                  {activeProjects.map(p => {
-                    const pItems = allItems.filter(i => i.projectId === p.id)
-                    return <ProjectCard key={p.id} project={p} items={pItems} onClick={() => setSelectedProjectId(p.id)} onDelete={() => deleteProjectFully(p.id)} />
-                  })}
-                </div>
-              )}
+              <h2 className="inv-section-title">Active ({activeProjects.length})</h2>
+              {activeProjects.length === 0
+                ? <div className="inv-empty">No active projects. <button type="button" className="link-btn" style={{ background: 'none', border: 0, color: '#ffb59d', cursor: 'pointer', font: 'inherit', padding: 0 }} onClick={() => setCreateProject(true)}>Start a project</button> to check gear out.</div>
+                : projectGrid(activeProjects)}
             </div>
-
             {archivedProjects.length > 0 && (
               <div className="inv-section">
-                <button className="inv-section-toggle" onClick={() => setArchivedOpen(!archivedOpen)}>
+                <button className="inv-section-toggle" aria-expanded={archivedOpen} onClick={() => setArchivedOpen(!archivedOpen)}>
                   {archivedOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                  Archived / Returned ({archivedProjects.length})
+                  Returned and archived ({archivedProjects.length})
                 </button>
-                {archivedOpen && (
-                  <div className="project-grid">
-                    {archivedProjects.map(p => {
-                      const pItems = allItems.filter(i => i.projectId === p.id)
-                      return <ProjectCard key={p.id} project={p} items={pItems} onClick={() => setSelectedProjectId(p.id)} onDelete={() => deleteProjectFully(p.id)} />
-                    })}
-                  </div>
-                )}
+                {archivedOpen && projectGrid(archivedProjects)}
               </div>
             )}
           </>
         )}
 
-        {/* All Projects tab */}
-        {tab === 'all-projects' && (
-          <div className="inv-section">
-            <div className="inv-section-title"><Layers size={18} /> All Projects</div>
-            {projects.length === 0 ? (
-              <div className="inv-empty">No projects yet</div>
-            ) : (
-              <div className="project-grid">
-                {[...projects]
-                  .sort((a, b) => (b.createdAt as any)?.seconds - (a.createdAt as any)?.seconds || 0)
-                  .map(p => {
-                    const pItems = allItems.filter(i => i.projectId === p.id)
-                    return <ProjectCard key={p.id} project={p} items={pItems} onClick={() => setSelectedProjectId(p.id)} onDelete={() => deleteProjectFully(p.id)} />
-                  })}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Statistics tab */}
-        {tab === 'statistics' && <StatsContent key={statsJump?.n ?? 0} initialTab={statsJump?.tab} onOpenDashboard={() => setTab('dashboard')} equipment={equipment} projects={projects} allItems={allItems} onOpenProject={setSelectedProjectId} />}
+        {tab === 'statistics' && <StatsContent onOpenDashboard={() => setTab('projects')} onOpenUnits={() => setTab('units')} equipment={equipment} projects={projects} allItems={allItems} onOpenProject={setSelectedProjectId} />}
 
         {/* Presets tab */}
         {tab === 'presets' && <PresetsManager />}
       </div>
+
+      {/* Phones: scanning is the main job at the counter (joins a computer's scanning session, already signed in) */}
+      {narrow && (
+        <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30, padding: '12px 16px calc(16px + env(safe-area-inset-bottom, 0px))', background: 'linear-gradient(to top, #10141a 70%, rgba(16,20,26,0))' }}>
+          <Link to="/scan" className="primary-btn" style={{ width: '100%', minHeight: 56, justifyContent: 'center', fontSize: '1rem', borderRadius: 16 }}>
+            <ScanLine size={20} aria-hidden="true" /> Scan to check out or in
+          </Link>
+        </div>
+      )}
     </div>
   )
 }

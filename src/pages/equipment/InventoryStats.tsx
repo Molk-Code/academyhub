@@ -16,7 +16,6 @@ import { clickableRow } from '@/lib/a11y'
 type Item = InventoryItemDoc & { projectId: string }
 
 const TABS = [
-  { id: 'equipment-status', label: 'Equipment Status' },
   { id: 'overdue',          label: 'Overdue' },
   { id: 'due-this-week',    label: 'Due This Week' },
   { id: 'damaged',          label: 'Damaged' },
@@ -118,14 +117,16 @@ const STATUS_STYLE = Object.fromEntries(Object.entries(LABEL_TONE).map(([label, 
   return [label, { color: t.fg, bg: t.bg, solid: t.solid, chip: toneChip(tone) }]
 })) as Record<StatusLabel, { color: string; bg: string; solid: string; chip: React.CSSProperties }>
 
-type StatusFilter = 'all' | 'out' | 'Overdue' | 'Damaged' | 'Missing' | 'available'
-const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
+type StatusFilter = 'all' | 'Missing' | 'Overdue' | 'Damaged' | 'Pending Checkout' | 'out' | 'available'
+// Problems first, in the shared status colours; a problem filter only shows when something has that status
+const STATUS_FILTERS: { key: StatusFilter; label: string; problem?: StatusLabel }[] = [
   { key: 'all', label: 'All' },
+  { key: 'Missing', label: 'missing', problem: 'Missing' },
+  { key: 'Overdue', label: 'overdue', problem: 'Overdue' },
+  { key: 'Damaged', label: 'damaged', problem: 'Damaged' },
+  { key: 'Pending Checkout', label: 'pending', problem: 'Pending Checkout' },
   { key: 'out', label: 'Out' },
-  { key: 'Overdue', label: 'Overdue' },
-  { key: 'Damaged', label: 'Damaged' },
-  { key: 'Missing', label: 'Missing' },
-  { key: 'available', label: 'Available' },
+  { key: 'available', label: 'On shelf' },
 ]
 
 /** Status word for a row: the most urgent unit's state, counted ("2 overdue"), or Out / Available */
@@ -148,7 +149,8 @@ function StatusIcon({ label }: { label: StatusLabel }) {
 
 const UNIT_BAR_MAX = 24
 
-function EquipmentStatusTab({
+/** Every catalogue item with its units: Inventory's Units view */
+export function EquipmentStatusTab({
   equipment, allItems, projectMap, onOpenProject,
 }: {
   equipment: EquipmentDoc[]
@@ -318,7 +320,8 @@ function EquipmentStatusTab({
           className="manual-add-input"
           style={{ maxWidth: narrow ? 'none' : 320, flex: '1 1 200px', minHeight: 44 }}
         />
-        <select
+        {/* Desktop sorts by the column headers; phones have no headers */}
+        {narrow && <select
           value={sort.key}
           onChange={e => setSort({ key: e.target.value as StatusSortKey, dir: 1 })}
           className="manual-add-input"
@@ -326,29 +329,31 @@ function EquipmentStatusTab({
           aria-label="Sort by"
         >
           {STATUS_SORTS.map(s => <option key={s.key} value={s.key}>Sort: {s.label}</option>)}
-        </select>
+        </select>}
       </div>
       <div role="group" aria-label="Filter by status"
         style={narrow
           ? { display: 'flex', gap: 8, overflowX: 'auto', margin: '0 -1rem', padding: '0 1rem 2px', scrollbarWidth: 'none' }
           : { display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {STATUS_FILTERS.map(f => {
+        {STATUS_FILTERS.filter(f => !f.problem || filterCounts[f.key] > 0 || filter === f.key).map(f => {
           const on = filter === f.key
-          const tone = f.key === 'Overdue' && filterCounts.Overdue > 0 ? STATUS_STYLE.Overdue.color : undefined
+          const chip = f.problem ? STATUS_STYLE[f.problem].chip : { background: '#1c2026', color: '#c8ccd5', border: '1px solid rgba(223,226,235,.12)' }
           return (
             <button
               key={f.key}
               type="button"
               aria-pressed={on}
-              onClick={() => setFilter(f.key)}
+              onClick={() => setFilter(on && f.key !== 'all' ? 'all' : f.key)}
               style={{
-                minHeight: 36, padding: '0 14px', borderRadius: 18, cursor: 'pointer', fontSize: '.8rem', fontWeight: on ? 600 : 500, whiteSpace: 'nowrap', flexShrink: 0,
-                background: on ? 'rgba(255,107,53,.16)' : '#1c2026',
-                color: on ? '#ffb59d' : tone ?? '#c8ccd5',
-                border: `1px solid ${on ? 'rgba(255,107,53,.5)' : tone ? 'rgba(255,180,171,.3)' : 'rgba(223,226,235,.12)'}`,
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                minHeight: 36, padding: '0 14px', borderRadius: 18, cursor: 'pointer', fontSize: '.8rem', fontWeight: on || f.problem ? 650 : 500, whiteSpace: 'nowrap', flexShrink: 0,
+                ...chip,
+                // The selected filter gets a ring in its own colour
+                boxShadow: on ? `0 0 0 2px #10141a, 0 0 0 4px ${f.problem ? STATUS_STYLE[f.problem].solid : '#ff6b35'}` : undefined,
               }}
             >
-              {f.label} · {filterCounts[f.key]}
+              {f.problem && <StatusIcon label={f.problem} />}
+              {f.problem ? `${filterCounts[f.key]} ${f.label}` : `${f.label} · ${filterCounts[f.key]}`}
             </button>
           )
         })}
@@ -401,7 +406,7 @@ function EquipmentStatusTab({
       </div>
       )}
       <p style={{ margin: 0, fontSize: '.8rem', color: '#a9aeb8' }}>
-        Each block in the bar is one copy. Solid red: missing. Pink: overdue. Amber: damaged. Lavender: awaiting signature. Blue: out. Dark: on the shelf.
+        Each block in the bar is one copy. Solid red: missing. Pink: overdue. Amber: damaged. Lavender: pending checkout. Blue: out. Dark: on the shelf.
       </p>
     </div>
   )
@@ -732,6 +737,7 @@ export function StatsContent({
   onOpenProject,
   initialTab = 'most-borrowed',
   onOpenDashboard,
+  onOpenUnits,
 }: {
   equipment: EquipmentDoc[]
   projects: InventoryProjectDoc[]
@@ -739,6 +745,8 @@ export function StatsContent({
   onOpenProject: (id: string) => void
   initialTab?: string
   onOpenDashboard?: () => void
+  /** Inventory's Units view (every item and its units) */
+  onOpenUnits?: () => void
 }) {
   const [activeTab, setActiveTab] = useState(initialTab)
   const [users, setUsers] = useState<UserDoc[]>([])
@@ -833,9 +841,9 @@ export function StatsContent({
   }))
 
   const statCards = [
-    { label: 'Total Equipment', value: equipment.length,  icon: <Package size={18} />,       color: STATUS_TONE.out.solid, open: () => setActiveTab('equipment-status') },
-    { label: 'Currently Out',   value: itemsCheckedOut,    icon: <TrendingUp size={18} />,    color: '#ff6b35', open: () => setActiveTab('equipment-status') },
-    { label: 'Total Projects',  value: projects.length,    icon: <BarChart2 size={18} />,     color: STATUS_TONE.pending.solid, open: onOpenDashboard },
+    { label: 'Total Equipment', value: equipment.length,  icon: <Package size={18} />,       color: '#c8ccd5', open: onOpenUnits },
+    { label: 'Currently Out',   value: itemsCheckedOut,    icon: <TrendingUp size={18} />,    color: STATUS_TONE.out.solid, open: onOpenUnits },
+    { label: 'Total Projects',  value: projects.length,    icon: <BarChart2 size={18} />,     color: '#c8ccd5', open: onOpenDashboard },
     { label: 'Damaged Items',   value: damagedItems,       icon: <AlertTriangle size={18} />, color: STATUS_TONE.damaged.solid, open: () => setActiveTab('damaged') },
     { label: 'Missing Items',   value: missingItems,       icon: <XCircle size={18} />,       color: STATUS_TONE.missing.solid, open: () => setActiveTab('missing') },
   ]
@@ -887,7 +895,6 @@ export function StatsContent({
           </div>
         )}
         {activeTab === 'most-borrowed' && <MostBorrowedTab allItems={visibleMostBorrowedItems} />}
-        {activeTab === 'equipment-status' && <EquipmentStatusTab equipment={equipment} allItems={allItems} projectMap={projectMap} onOpenProject={onOpenProject} />}
         {activeTab === 'overdue' && <SimpleItemsTab
           items={visibleOverdueItems}
           projectMap={projectMap}

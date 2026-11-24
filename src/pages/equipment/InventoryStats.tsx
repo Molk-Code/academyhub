@@ -256,11 +256,11 @@ export function EquipmentStatusTab({
   )
   const unitsCell = ({ units, total }: Row, width: number | string = 140) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width }}>
-      <span style={{ color: '#f6f7f9', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{units.length} of {total} out</span>
+      <span style={{ color: '#f6f7f9', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{units.length}/{total} out</span>
       {total <= UNIT_BAR_MAX && (
         <div style={{ display: 'flex', gap: 3 }} aria-hidden="true">
           {Array.from({ length: total }, (_, i) => (
-            <span key={i} style={{ flex: 1, height: 6, borderRadius: 3, background: units[i] ? STATUS_STYLE[units[i]].solid : STATUS_TONE.shelf.solid }} />
+            <span key={i} style={{ flex: 1, height: 8, borderRadius: 3, background: units[i] ? STATUS_STYLE[units[i]].solid : STATUS_TONE.shelf.solid }} />
           ))}
         </div>
       )}
@@ -337,7 +337,10 @@ export function EquipmentStatusTab({
           : { display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {STATUS_FILTERS.filter(f => !f.problem || filterCounts[f.key] > 0 || filter === f.key).map(f => {
           const on = filter === f.key
-          const chip = f.problem ? STATUS_STYLE[f.problem].chip : { background: '#1c2026', color: '#c8ccd5', border: '1px solid rgba(223,226,235,.12)' }
+          const chip = f.problem ? STATUS_STYLE[f.problem].chip
+            : f.key === 'available' ? STATUS_STYLE.Available.chip
+            : f.key === 'out' ? STATUS_STYLE['Checked Out'].chip
+            : { background: '#1c2026', color: '#c8ccd5', border: '1px solid rgba(223,226,235,.12)' }
           return (
             <button
               key={f.key}
@@ -349,7 +352,7 @@ export function EquipmentStatusTab({
                 minHeight: 36, padding: '0 14px', borderRadius: 18, cursor: 'pointer', fontSize: '.8rem', fontWeight: on || f.problem ? 650 : 500, whiteSpace: 'nowrap', flexShrink: 0,
                 ...chip,
                 // The selected filter gets a ring in its own colour
-                boxShadow: on ? `0 0 0 2px #10141a, 0 0 0 4px ${f.problem ? STATUS_STYLE[f.problem].solid : '#ff6b35'}` : undefined,
+                boxShadow: on ? `0 0 0 2px #10141a, 0 0 0 4px ${f.problem ? STATUS_STYLE[f.problem].solid : f.key === 'available' ? STATUS_STYLE.Available.solid : f.key === 'out' ? STATUS_STYLE['Checked Out'].solid : '#ff6b35'}` : undefined,
               }}
             >
               {f.problem && <StatusIcon label={f.problem} />}
@@ -406,7 +409,7 @@ export function EquipmentStatusTab({
       </div>
       )}
       <p style={{ margin: 0, fontSize: '.8rem', color: '#a9aeb8' }}>
-        Each block in the bar is one copy. Solid red: missing. Pink: overdue. Amber: damaged. Lavender: pending checkout. Blue: out. Dark: on the shelf.
+        Each block in the bar is one copy. Green: available. Blue: checked out. Yellow: damaged. Red: missing. Pink: overdue. Lavender: pending checkout.
       </p>
     </div>
   )

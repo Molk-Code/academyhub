@@ -22,7 +22,8 @@ export const STATUS_TONE: Record<StatusTone, ToneStyle> = {
   damaged: { fg: '#f6ae2d', bg: 'rgba(246,174,45,.12)',  border: 'rgba(246,174,45,.45)',  solid: '#f6ae2d' },
   pending: { fg: '#dcc6ff', bg: 'rgba(220,198,255,.1)',  border: 'rgba(220,198,255,.4)',  solid: '#dcc6ff' },
   out:     { fg: '#b4c5ff', bg: 'rgba(180,197,255,.1)',  border: 'rgba(180,197,255,.4)',  solid: '#b4c5ff' },
-  shelf:   { fg: '#c8ccd5', bg: 'transparent',           border: 'rgba(200,204,213,.45)', solid: '#31353c' },
+  // Green: on the shelf, free to book or check out
+  shelf:   { fg: '#4edea3', bg: 'rgba(78,222,163,.08)',  border: 'rgba(78,222,163,.45)',  solid: '#4edea3' },
 }
 
 /** Inline style for a status pill or chip in the given tone */

@@ -24,6 +24,13 @@
 @tailwind utilities;
 
 :root {
+  /* Equipment status, most urgent first: same values as src/lib/statusTone.ts */
+  --status-missing: #ff5449;
+  --status-overdue: #ffb4ab;
+  --status-damaged: #f6ae2d;
+  --status-pending: #dcc6ff;
+  --status-out:     #b4c5ff;
+  --status-shelf:   #c8ccd5;
   /* "Ember" palette — see tailwind.config.js */
   --bg-primary:    #10141a;
   --bg-surface:    #1c2026;

@@ -102,7 +102,7 @@ export default function AdminEquipmentPage() {
       <header className="header">
         <div className="header-inner">
           <div className="logo">
-            <Package size={22} color="#4cd964" />
+            <Package size={22} color="#4edea3" />
             <div>
               <div style={{ fontWeight: 700, fontSize: '1rem', lineHeight: 1.2 }}>Rental House</div>
               <div className="logo-subtitle">Admin Panel</div>
@@ -117,7 +117,7 @@ export default function AdminEquipmentPage() {
                   padding: '6px 12px', borderRadius: 10, fontSize: '.82rem', fontWeight: 600,
                   cursor: 'pointer', border: 'none', position: 'relative',
                   background: tab === t.id ? 'rgba(76,217,100,.15)' : 'transparent',
-                  color: tab === t.id ? '#4cd964' : '#979ca7',
+                  color: tab === t.id ? '#4edea3' : '#979ca7',
                   transition: 'all .2s',
                 }}
               >
@@ -141,9 +141,9 @@ export default function AdminEquipmentPage() {
             <button
               onClick={togglePricing}
               title={pricingEnabled ? 'Prices shown — click to hide prices everywhere' : 'Prices hidden — click to show prices'}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 10, background: 'transparent', border: '1px solid #31353c', cursor: 'pointer', fontSize: '.75rem', fontWeight: 600, color: pricingEnabled ? '#4cd964' : '#8c919b', transition: 'all .2s', whiteSpace: 'nowrap' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 10, background: 'transparent', border: '1px solid #31353c', cursor: 'pointer', fontSize: '.75rem', fontWeight: 600, color: pricingEnabled ? '#4edea3' : '#8c919b', transition: 'all .2s', whiteSpace: 'nowrap' }}
             >
-              {pricingEnabled ? <ToggleRight size={15} color="#4cd964" /> : <ToggleLeft size={15} color="#8c919b" />}
+              {pricingEnabled ? <ToggleRight size={15} color="#4edea3" /> : <ToggleLeft size={15} color="#8c919b" />}
               <span className="hidden sm:inline">Prices</span>
               <span className="sm:hidden">Kr</span>
             </button>

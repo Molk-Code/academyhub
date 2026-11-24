@@ -297,7 +297,7 @@ export default function ScanPage() {
     return (
       <div style={{ ...base, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        <div style={{ width: 32, height: 32, border: '3px solid #31353c', borderTopColor: '#4cd964', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <div style={{ width: 32, height: 32, border: '3px solid #31353c', borderTopColor: '#4edea3', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
         <p style={{ color: '#979ca7', fontSize: '.9rem' }}>Loading session…</p>
       </div>
     )
@@ -306,12 +306,12 @@ export default function ScanPage() {
   if (!profile) {
     return (
       <div style={{ ...base, alignItems: 'center', justifyContent: 'center', gap: 16, padding: '2rem', textAlign: 'center' }}>
-        <LogIn size={40} color="#4cd964" />
+        <LogIn size={40} color="#4edea3" />
         <h2 style={{ fontWeight: 700, fontSize: '1.25rem' }}>Sign in required</h2>
         <p style={{ color: '#979ca7', fontSize: '.9rem' }}>You need to be signed in to use the scanner.</p>
         <button
           onClick={() => navigate(`/login?redirect=/scan/${sessionId}`)}
-          style={{ padding: '10px 24px', background: '#4cd964', color: '#000', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '.9rem', cursor: 'pointer' }}
+          style={{ padding: '10px 24px', background: '#4edea3', color: '#000', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '.9rem', cursor: 'pointer' }}
         >
           Sign in
         </button>
@@ -327,7 +327,7 @@ export default function ScanPage() {
         <p role="alert" style={{ color: '#a0a0b8', fontSize: '.9rem', maxWidth: 320 }}>{sessionError}</p>
         <button
           onClick={() => window.location.reload()}
-          style={{ padding: '10px 24px', background: '#4cd964', color: '#000', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '.9rem', cursor: 'pointer' }}
+          style={{ padding: '10px 24px', background: '#4edea3', color: '#000', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '.9rem', cursor: 'pointer' }}
         >
           Try again
         </button>
@@ -362,8 +362,8 @@ export default function ScanPage() {
           <div style={{ fontSize: '.7rem', color: '#979ca7', marginTop: 1 }}>{session.projectName}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Wifi size={14} color="#4cd964" />
-          <span style={{ fontSize: '.75rem', color: '#4cd964', fontWeight: 600 }}>
+          <Wifi size={14} color="#4edea3" />
+          <span style={{ fontSize: '.75rem', color: '#4edea3', fontWeight: 600 }}>
             {session.mode === 'checkout' ? 'Checkout' : 'Check-in'}
           </span>
         </div>
@@ -390,8 +390,8 @@ export default function ScanPage() {
                 </div>
               )}
               <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,.6)', borderRadius: 20, padding: '4px 10px' }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4cd964', animation: 'pulse 1.2s ease-in-out infinite', flexShrink: 0 }} />
-                <span style={{ fontSize: '.7rem', color: '#4cd964', fontWeight: 700 }}>Scanning…</span>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4edea3', animation: 'pulse 1.2s ease-in-out infinite', flexShrink: 0 }} />
+                <span style={{ fontSize: '.7rem', color: '#4edea3', fontWeight: 700 }}>Scanning…</span>
               </div>
               {scanKind === 'barcode' && <ZoomButtons key={String(!!zoom)} zoom={zoom} />}
             </>
@@ -408,12 +408,12 @@ export default function ScanPage() {
               <div style={{
                 width: 80, height: 80, borderRadius: '50%',
                 background: cooldown.ok ? 'rgba(76,217,100,.2)' : 'rgba(239,68,68,.2)',
-                border: `3px solid ${cooldown.ok ? '#4cd964' : '#f87171'}`,
+                border: `3px solid ${cooldown.ok ? '#4edea3' : '#f87171'}`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 animation: 'scaleIn .2s ease-out',
               }}>
                 {cooldown.ok
-                  ? <Check size={40} color="#4cd964" strokeWidth={3} />
+                  ? <Check size={40} color="#4edea3" strokeWidth={3} />
                   : <AlertTriangle size={36} color="#f87171" strokeWidth={2.5} />
                 }
               </div>
@@ -422,7 +422,7 @@ export default function ScanPage() {
               <p style={{ fontWeight: 700, fontSize: '1.1rem', color: '#dfe2eb', textAlign: 'center', padding: '0 24px', lineHeight: 1.3, animation: 'scaleIn .25s ease-out' }}>
                 {cooldown.name}
               </p>
-              <p style={{ fontSize: '.75rem', color: cooldown.ok ? '#4cd964' : '#f87171', fontWeight: 600 }}>
+              <p style={{ fontSize: '.75rem', color: cooldown.ok ? '#4edea3' : '#f87171', fontWeight: 600 }}>
                 {cooldown.ok ? (session.mode === 'checkout' ? 'Checked out' : 'Checked in') : cooldown.message ?? 'Failed — try again'}
               </p>
 
@@ -431,7 +431,7 @@ export default function ScanPage() {
                 <div style={{
                   height: '100%',
                   width: `${cooldown.progress}%`,
-                  background: cooldown.ok ? '#4cd964' : '#f87171',
+                  background: cooldown.ok ? '#4edea3' : '#f87171',
                   transition: 'width 30ms linear',
                   borderRadius: '0 2px 2px 0',
                 }} />
@@ -454,7 +454,7 @@ export default function ScanPage() {
         {!scanActive ? (
           <button
             onClick={() => startScanner()}
-            style={{ padding: '14px', background: '#4cd964', border: 'none', borderRadius: 12, color: '#000', fontWeight: 700, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+            style={{ padding: '14px', background: '#4edea3', border: 'none', borderRadius: 12, color: '#000', fontWeight: 700, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
             <Scan size={20} /> Start Scanning
           </button>
@@ -477,7 +477,7 @@ export default function ScanPage() {
               {scanEntries.map((e, i) => (
                 <div key={i} style={{ padding: '8px 12px', borderBottom: i < scanEntries.length - 1 ? '1px solid #262a31' : 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
                   {e.ok
-                    ? <Check size={14} color="#4cd964" style={{ flexShrink: 0 }} />
+                    ? <Check size={14} color="#4edea3" style={{ flexShrink: 0 }} />
                     : <X size={14} color="#f87171" style={{ flexShrink: 0 }} />
                   }
                   <span style={{ flex: 1, fontSize: '.85rem', color: e.ok ? '#dfe2eb' : '#f87171', fontWeight: i === 0 ? 700 : 400 }}>{e.name}</span>

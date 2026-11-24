@@ -70,7 +70,7 @@ export function KitsTab() {
     <div style={{ maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <p style={{ color: '#a9aeb8', fontSize: '.85rem' }}>A kit is booked and checked out as one line. It's only free when every item in it is.</p>
-        {editing === null && <button style={{ ...btn, background: '#4cd964', color: '#000', border: 'none', whiteSpace: 'nowrap', flexShrink: 0 }} onClick={startNew}><Plus size={14} /> New kit</button>}
+        {editing === null && <button style={{ ...btn, background: '#4edea3', color: '#000', border: 'none', whiteSpace: 'nowrap', flexShrink: 0 }} onClick={startNew}><Plus size={14} /> New kit</button>}
       </div>
 
       {editing !== null && (
@@ -84,7 +84,7 @@ export function KitsTab() {
             <span style={{ fontSize: '.75rem', color: '#a9aeb8' }}>Items</span>
             {[...form.counts].map(([id, n]) => (
               <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.85rem', color: '#dfe2eb' }}>
-                <span style={{ flex: 1 }}>{byId.get(id)?.name ?? <em style={{ color: '#ff4757' }}>Removed from the catalog</em>}</span>
+                <span style={{ flex: 1 }}>{byId.get(id)?.name ?? <em style={{ color: '#ff5449' }}>Removed from the catalog</em>}</span>
                 <button aria-label="One less" style={{ ...btn, padding: 6 }} onClick={() => setCount(id, n - 1)}><Minus size={12} /></button>
                 <span style={{ minWidth: 20, textAlign: 'center' }}>{n}</span>
                 <button aria-label="One more" style={{ ...btn, padding: 6 }} onClick={() => setCount(id, n + 1)}><Plus size={12} /></button>
@@ -106,9 +106,9 @@ export function KitsTab() {
             <span style={{ fontSize: '.75rem', color: '#a9aeb8' }}>Image link (optional)</span>
             <input style={inp} value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} placeholder="https://…" />
           </label>
-          {error && <p role="alert" style={{ color: '#ff4757', fontSize: '.8rem' }}>{error}</p>}
+          {error && <p role="alert" style={{ color: '#ff5449', fontSize: '.8rem' }}>{error}</p>}
           <div style={{ display: 'flex', gap: 8 }}>
-            <button style={{ ...btn, background: '#4cd964', color: '#000', border: 'none' }} disabled={saving} onClick={save}>
+            <button style={{ ...btn, background: '#4edea3', color: '#000', border: 'none' }} disabled={saving} onClick={save}>
               {saving && <Loader2 size={14} className="animate-spin" />} Save kit
             </button>
             <button style={btn} onClick={() => setEditing(null)}>Cancel</button>
@@ -131,7 +131,7 @@ export function KitsTab() {
           <div style={{ display: 'flex', gap: 6 }}>
             <button style={btn} aria-label={`Label for ${k.name}`} onClick={() => setLabelFor(k)}><QrCode size={14} /></button>
             <button style={btn} aria-label={`Edit ${k.name}`} onClick={() => startEdit(k)}><Pencil size={14} /></button>
-            <button style={{ ...btn, color: '#ff4757' }} aria-label={`Delete ${k.name}`} onClick={() => remove(k)}><Trash2 size={14} /></button>
+            <button style={{ ...btn, color: '#ff5449' }} aria-label={`Delete ${k.name}`} onClick={() => remove(k)}><Trash2 size={14} /></button>
           </div>
         </div>
       ))}

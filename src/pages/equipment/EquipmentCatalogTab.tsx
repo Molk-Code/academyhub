@@ -164,7 +164,7 @@ export function CatalogTab({ categories, pricingEnabled }: { categories: Equipme
               </div>
               <div className="product-info">
                 <div className="product-name">{item.name}</div>
-                <div style={{ fontSize: '.7rem', color: item.available === 0 ? '#ff4757' : '#4cd964', fontWeight: 600, marginBottom: 2 }}>
+                <div style={{ fontSize: '.7rem', color: item.available === 0 ? '#ff5449' : '#4edea3', fontWeight: 600, marginBottom: 2 }}>
                   {item.available}/{item.totalQuantity} available
                 </div>
                 {item.allowedCohortIds && item.allowedCohortIds.length > 0 && (

@@ -21,7 +21,7 @@ const TYPES: { id: MaintenanceType; label: string }[] = [
 ]
 const STATE_LABEL: Record<ServiceState, { text: string; color: string }> = {
   'in-service': { text: 'In service', color: '#f59e0b' },
-  overdue: { text: 'Service overdue', color: '#ff4757' },
+  overdue: { text: 'Service overdue', color: '#ff5449' },
   'due-soon': { text: 'Service due soon', color: '#a9aeb8' },
 }
 const today = () => new Date().toISOString().slice(0, 10)
@@ -330,13 +330,13 @@ function ItemMaintenance({ item, onClose }: { item: EquipmentDoc; onClose: () =>
               {entryUnit == null ? 'Every unit in service is back in use' : `#${entryUnit} is back in use`}
             </label>
           )}
-          <button style={{ ...btn, alignSelf: 'flex-start', background: '#4cd964', color: '#000', border: 'none' }} disabled={busy !== null} onClick={addEntry}>
+          <button style={{ ...btn, alignSelf: 'flex-start', background: '#4edea3', color: '#000', border: 'none' }} disabled={busy !== null} onClick={addEntry}>
             {busy === 'entry' && <Loader2 size={14} className="animate-spin" />} {marksDone ? 'Add to log and mark done' : 'Add to log'}
           </button>
         </div>
 
-        {error && <p role="alert" style={{ color: '#ff4757', fontSize: '.8rem' }}>{error}</p>}
-        {done && <p role="status" style={{ color: '#4cd964', fontSize: '.8rem' }}>{done}</p>}
+        {error && <p role="alert" style={{ color: '#ff5449', fontSize: '.8rem' }}>{error}</p>}
+        {done && <p role="status" style={{ color: '#4edea3', fontSize: '.8rem' }}>{done}</p>}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <p style={sectionTitle}>History</p>
@@ -348,7 +348,7 @@ function ItemMaintenance({ item, onClose }: { item: EquipmentDoc; onClose: () =>
               {l.performedBy && <span style={{ color: '#a9aeb8' }}> · {l.performedBy}</span>}
               {l.cost != null && <span style={{ color: '#a9aeb8' }}> · cost {l.cost}</span>}
               {(l.backInUse || l.nextServiceDate !== undefined) && (
-                <span style={{ color: '#4cd964' }}>
+                <span style={{ color: '#4edea3' }}>
                   {' · '}{[l.backInUse && 'back in use', l.nextServiceDate !== undefined && (l.nextServiceDate ? `next service ${l.nextServiceDate}` : 'no next service')].filter(Boolean).join(', ')}
                 </span>
               )}

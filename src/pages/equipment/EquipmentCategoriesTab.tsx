@@ -102,7 +102,7 @@ export function CategoriesTab({ categories }: { categories: EquipmentCategoryDoc
                   disabled={idx === 0}
                   title="Move up"
                   style={{ padding: 2, background: 'transparent', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: idx === 0 ? '#31353c' : '#979ca7', display: 'flex', borderRadius: 4, transition: 'color .15s' }}
-                  onMouseEnter={e => { if (idx > 0) e.currentTarget.style.color = '#4cd964' }}
+                  onMouseEnter={e => { if (idx > 0) e.currentTarget.style.color = '#4edea3' }}
                   onMouseLeave={e => { e.currentTarget.style.color = idx === 0 ? '#31353c' : '#979ca7' }}
                 >
                   <ChevronUp size={13} />
@@ -112,7 +112,7 @@ export function CategoriesTab({ categories }: { categories: EquipmentCategoryDoc
                   disabled={idx === sorted.length - 1}
                   title="Move down"
                   style={{ padding: 2, background: 'transparent', border: 'none', cursor: idx === sorted.length - 1 ? 'default' : 'pointer', color: idx === sorted.length - 1 ? '#31353c' : '#979ca7', display: 'flex', borderRadius: 4, transition: 'color .15s' }}
-                  onMouseEnter={e => { if (idx < sorted.length - 1) e.currentTarget.style.color = '#4cd964' }}
+                  onMouseEnter={e => { if (idx < sorted.length - 1) e.currentTarget.style.color = '#4edea3' }}
                   onMouseLeave={e => { e.currentTarget.style.color = idx === sorted.length - 1 ? '#31353c' : '#979ca7' }}
                 >
                   <ChevronDown size={13} />

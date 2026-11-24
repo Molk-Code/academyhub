@@ -88,8 +88,9 @@ export default {
       boxShadow: {
         card: '0 1px 3px rgba(0,0,0,0.5)',
         'card-hover': '0 4px 16px rgba(0,0,0,0.6)',
-        ember: '0 0 16px -2px rgba(255,107,53,0.55)',
-        'ember-sm': '0 0 12px rgba(255,107,53,0.4)',
+        // Real drop shadows (offset + blur), not an orange halo
+        ember: '0 4px 12px rgba(0,0,0,0.45)',
+        'ember-sm': '0 2px 6px rgba(0,0,0,0.35)',
       },
     },
   },

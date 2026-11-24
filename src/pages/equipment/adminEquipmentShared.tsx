@@ -134,9 +134,9 @@ export const BOOKING_STATUSES = ['all', 'pending', 'confirmed', 'checked-out', '
 
 export const STATUS_COLOR: Record<string, string> = {
   pending:       '#f59e0b',
-  confirmed:     '#4cd964',
+  confirmed:     '#4edea3',
   'checked-out': '#ff6b35',
-  returned:      '#4cd964',
+  returned:      '#4edea3',
   denied:        '#f87171',
   cancelled:     '#6b7280',
 }

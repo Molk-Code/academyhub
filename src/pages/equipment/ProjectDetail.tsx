@@ -692,7 +692,7 @@ export function ProjectDetail({
           <button
             className="secondary-btn"
             disabled={actionState === 'complete'}
-            style={actionState === 'complete' ? { background: '#4cd964', borderColor: '#4cd964', color: '#000' } : undefined}
+            style={actionState === 'complete' ? { background: '#4edea3', borderColor: '#4edea3', color: '#000' } : undefined}
             onClick={() => withActionFlash('complete', async () => { await markAllReturned(); await archiveProject() })}
           >
             {actionState === 'complete' ? <><Check size={16} /> Done!</> : <><CheckCircle2 size={16} /> Complete & Archive</>}
@@ -702,7 +702,7 @@ export function ProjectDetail({
           <button
             className="secondary-btn"
             disabled={actionState === 'archive'}
-            style={actionState === 'archive' ? { background: '#4cd964', borderColor: '#4cd964', color: '#000' } : undefined}
+            style={actionState === 'archive' ? { background: '#4edea3', borderColor: '#4edea3', color: '#000' } : undefined}
             onClick={() => withActionFlash('archive', archiveProject)}
           >
             {actionState === 'archive' ? <><Check size={16} /> Archived!</> : <><ArchiveRestore size={16} /> Archive</>}
@@ -712,7 +712,7 @@ export function ProjectDetail({
           <button
             className="secondary-btn"
             disabled={actionState === 'unarchive'}
-            style={actionState === 'unarchive' ? { background: '#4cd964', borderColor: '#4cd964', color: '#000' } : undefined}
+            style={actionState === 'unarchive' ? { background: '#4edea3', borderColor: '#4edea3', color: '#000' } : undefined}
             onClick={() => withActionFlash('unarchive', unarchiveProject)}
           >
             {actionState === 'unarchive' ? <><Check size={16} /> Unarchived!</> : <><ArchiveRestore size={16} /> Unarchive</>}
@@ -720,7 +720,7 @@ export function ProjectDetail({
         )}
         {confirmDelete ? (
           <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
-            <span style={{ fontSize: '.85rem', color: '#ff4757' }}>Delete this project permanently?</span>
+            <span style={{ fontSize: '.85rem', color: '#ff5449' }}>Delete this project permanently?</span>
             <button
               className="danger-btn"
               disabled={deleting}
@@ -777,7 +777,7 @@ export function ProjectDetail({
             {!scanActive && (
               remoteSessionId
                 ? <button className="scan-stop-btn" onClick={stopRemoteSession}><ZapOff size={14} /> Stop</button>
-                : <button className="manual-add-btn" style={{ background: 'rgba(76,217,100,.12)', borderColor: 'rgba(76,217,100,.3)', color: '#4cd964' }} onClick={startRemoteSession}>
+                : <button className="manual-add-btn" style={{ background: 'rgba(76,217,100,.12)', borderColor: 'rgba(76,217,100,.3)', color: '#4edea3' }} onClick={startRemoteSession}>
                     <Smartphone size={14} /> Mobile
                   </button>
             )}
@@ -816,7 +816,7 @@ export function ProjectDetail({
               spellCheck={false}
               tabIndex={usbByDefault ? -1 : undefined}
               aria-hidden={usbByDefault || undefined}
-              style={{ width: '100%', padding: '10px 12px', background: '#262a31', border: '1px solid #4cd964', borderRadius: 8, color: '#dfe2eb', fontFamily: 'monospace', fontSize: '.9rem', outline: 'none' }}
+              style={{ width: '100%', padding: '10px 12px', background: '#262a31', border: '1px solid #4edea3', borderRadius: 8, color: '#dfe2eb', fontFamily: 'monospace', fontSize: '.9rem', outline: 'none' }}
             />
           </div>
         )}
@@ -862,7 +862,7 @@ export function ProjectDetail({
                 <div className="scan-entry" key={i}>
                   <span className="scan-entry-name">
                     {e.name}
-                    {e.note && <span style={{ marginLeft: 8, fontSize: '.72rem', color: e.warn ? '#f5a623' : '#4cd964' }}>{e.note}</span>}
+                    {e.note && <span style={{ marginLeft: 8, fontSize: '.72rem', color: e.warn ? '#f5a623' : '#4edea3' }}>{e.note}</span>}
                   </span>
                   <span className="scan-entry-time">{e.time}</span>
                 </div>
@@ -1005,7 +1005,7 @@ export function ProjectDetail({
               </div>
               {item.status === 'damaged' && item.damageNotes && (
                 <div className="checkin-inline-damage">
-                  <span style={{ fontSize: '.8rem', color: '#ffa502' }}>{item.damageNotes}</span>
+                  <span style={{ fontSize: '.8rem', color: '#f6ae2d' }}>{item.damageNotes}</span>
                 </div>
               )}
               {moveOpen[item.id] !== undefined && (

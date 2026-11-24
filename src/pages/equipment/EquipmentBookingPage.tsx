@@ -748,7 +748,7 @@ export default function EquipmentBookingPage() {
       <header className="header">
         <div className="header-inner">
           <div className="logo">
-            <Package size={22} color="#4cd964" />
+            <Package size={22} color="#4edea3" />
             <div>
               <div style={{ fontWeight: 700, fontSize: '1rem', lineHeight: 1.2 }}>Rental House</div>
               <div className="logo-subtitle">Booking System</div>
@@ -793,7 +793,7 @@ export default function EquipmentBookingPage() {
                     <h4>{item.name}</h4>
                     {kitOf(item) && <p style={{ fontSize: '.7rem', color: '#a9aeb8' }}>Kit: {item.included.join(' · ')}</p>}
                     {dateFree && quantity > freeFor(item) && (
-                      <p role="alert" style={{ fontSize: '.72rem', color: '#ff4757', fontWeight: 600 }}>
+                      <p role="alert" style={{ fontSize: '.72rem', color: '#ff5449', fontWeight: 600 }}>
                         {freeFor(item) === 0 ? 'None free on your dates' : `Only ${freeFor(item)} free on your dates`}
                       </p>
                     )}
@@ -836,7 +836,7 @@ export default function EquipmentBookingPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
                     <div className="cart-rental-days">{rentalDays} rental {rentalDays === 1 ? 'day' : 'days'}</div>
                     {weekDiscountActive && (
-                      <span style={{ fontSize: '.7rem', fontWeight: 700, background: 'rgba(76,217,100,.15)', color: '#4cd964', border: '1px solid rgba(76,217,100,.3)', borderRadius: 5, padding: '2px 7px' }}>
+                      <span style={{ fontSize: '.7rem', fontWeight: 700, background: 'rgba(76,217,100,.15)', color: '#4edea3', border: '1px solid rgba(76,217,100,.3)', borderRadius: 5, padding: '2px 7px' }}>
                         Week discount — charged {chargeableDays} days
                       </span>
                     )}
@@ -893,10 +893,10 @@ export default function EquipmentBookingPage() {
           >
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
               <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(76,217,100,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Check size={18} color="#4cd964" strokeWidth={3} />
+                <Check size={18} color="#4edea3" strokeWidth={3} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: '.75rem', color: '#4cd964', fontWeight: 700, margin: 0 }}>Added to cart</p>
+                <p style={{ fontSize: '.75rem', color: '#4edea3', fontWeight: 700, margin: 0 }}>Added to cart</p>
                 <p style={{ fontSize: '1rem', color: '#dfe2eb', fontWeight: 700, margin: '2px 0 0' }}>{accessoryFor.name}</p>
               </div>
               <button onClick={() => setAccessoryFor(null)} aria-label="Close" style={{ background: 'none', border: 'none', color: '#979ca7', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
@@ -946,7 +946,7 @@ export default function EquipmentBookingPage() {
               <div>
                 <p style={{ fontWeight: 700, fontSize: '1.1rem', color: '#dfe2eb' }}>{modalItem.name}</p>
                 <p style={{ fontSize: '.72rem', fontWeight: 700, color: '#ff6b35', textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 2 }}>{modalItem.category}</p>
-                <p style={{ fontSize: '.8rem', fontWeight: 600, marginTop: 6, color: freeFor(modalItem) > 0 ? '#4cd964' : '#ff4757' }}>
+                <p style={{ fontSize: '.8rem', fontWeight: 600, marginTop: 6, color: freeFor(modalItem) > 0 ? '#4edea3' : '#ff5449' }}>
                   {isItemLocked(modalItem) ? 'Not available for your class' : freeFor(modalItem) > 0 ? freeLabel(freeFor(modalItem)) : dateFree ? 'None free on your dates' : 'Out of stock'}
                   {pricingEnabled && (modalItem.priceInclVat > 0
                     ? <span style={{ color: '#979ca7', fontWeight: 500 }}> · {modalItem.priceInclVat} kr/day</span>
@@ -1216,7 +1216,7 @@ export default function EquipmentBookingPage() {
                         {locked
                           ? <div style={{ fontSize: '.7rem', color: '#f59e0b', fontWeight: 600 }}>Not available for your class</div>
                           : outOfStock
-                            ? <div style={{ fontSize: '.7rem', color: '#ff4757', fontWeight: 600 }}>Out of stock</div>
+                            ? <div style={{ fontSize: '.7rem', color: '#ff5449', fontWeight: 600 }}>Out of stock</div>
                             : budgetBlocked
                               ? <div style={{ fontSize: '.7rem', color: '#f87171', fontWeight: 600 }}>💰 Over budget</div>
                               : <div className="product-available">{freeLabel(freeFor(item))}</div>
@@ -1290,7 +1290,7 @@ export default function EquipmentBookingPage() {
             <div className="checkout-layout">
               <div className="checkout-form">
                 <div className="checkout-dates-confirm">
-                  <Calendar size={20} color="#4cd964" style={{ flexShrink: 0, marginTop: 2 }} />
+                  <Calendar size={20} color="#4edea3" style={{ flexShrink: 0, marginTop: 2 }} />
                   <div style={{ flex: 1 }}>
                     <span className="dates-label">Rental Period</span>
                     <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
@@ -1361,8 +1361,8 @@ export default function EquipmentBookingPage() {
                   ))}
                   {pricingEnabled && weekDiscountActive && (
                     <div className="summary-item" style={{ borderTop: '1px solid rgba(76,217,100,.2)', paddingTop: '.5rem', marginTop: '.25rem' }}>
-                      <span style={{ fontSize: '.8rem', color: '#4cd964', fontWeight: 600 }}>🎉 Week discount applied</span>
-                      <span style={{ fontSize: '.8rem', color: '#4cd964', fontWeight: 600 }}>
+                      <span style={{ fontSize: '.8rem', color: '#4edea3', fontWeight: 600 }}>🎉 Week discount applied</span>
+                      <span style={{ fontSize: '.8rem', color: '#4edea3', fontWeight: 600 }}>
                         −{((rentalDays - chargeableDays) * cartList.reduce((s, { item, quantity }) => s + item.priceInclVat * quantity, 0)).toFixed(0)} kr
                       </span>
                     </div>
@@ -1434,8 +1434,8 @@ export default function EquipmentBookingPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {myBookings.map(b => {
                   const statusColors: Record<string, string> = {
-                    pending: '#f59e0b', confirmed: '#4cd964',
-                    'checked-out': '#ff6b35', returned: '#4cd964', denied: '#f87171', cancelled: '#6b7280',
+                    pending: '#f59e0b', confirmed: '#4edea3',
+                    'checked-out': '#ff6b35', returned: '#4edea3', denied: '#f87171', cancelled: '#6b7280',
                   }
                   const statusIcons: Record<string, React.ReactNode> = {
                     pending: <Clock size={13} />, confirmed: <Check size={13} />,
@@ -1476,8 +1476,8 @@ export default function EquipmentBookingPage() {
                           disabled={cancellingId === b.id}
                           style={{
                             display: 'flex', alignItems: 'center', gap: 5, marginTop: 10, padding: '5px 10px',
-                            background: 'rgba(255,71,87,.1)', border: '1px solid rgba(255,71,87,.3)', borderRadius: 8,
-                            color: '#ff4757', fontSize: '.75rem', fontWeight: 600, cursor: cancellingId === b.id ? 'default' : 'pointer',
+                            background: 'rgba(255,84,73,.1)', border: '1px solid rgba(255,84,73,.3)', borderRadius: 8,
+                            color: '#ff5449', fontSize: '.75rem', fontWeight: 600, cursor: cancellingId === b.id ? 'default' : 'pointer',
                             opacity: cancellingId === b.id ? .6 : 1,
                           }}
                         >

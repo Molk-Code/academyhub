@@ -76,7 +76,7 @@ function BookingMessageThread({ bookingId }: { bookingId: string }) {
         <button aria-label="Send"
           disabled={sending || !text.trim()}
           onClick={send}
-          style={{ padding: '7px 12px', borderRadius: 8, background: 'rgba(76,217,100,.15)', border: '1px solid rgba(76,217,100,.3)', color: '#4cd964', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: sending || !text.trim() ? 0.5 : 1 }}
+          style={{ padding: '7px 12px', borderRadius: 8, background: 'rgba(76,217,100,.15)', border: '1px solid rgba(76,217,100,.3)', color: '#4edea3', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: sending || !text.trim() ? 0.5 : 1 }}
         >
           <Send size={13} />
         </button>
@@ -215,7 +215,7 @@ export function BookingsTab() {
         {BOOKING_STATUSES.map(s => {
           const count = s === 'all' ? sorted.length : s === 'pending' ? pendingCount : sorted.filter(b => b.status === s).length
           const active = statusFilter === s
-          const col = s === 'all' ? '#4cd964' : STATUS_COLOR[s] ?? '#6b7280'
+          const col = s === 'all' ? '#4edea3' : STATUS_COLOR[s] ?? '#6b7280'
           return (
             <button
               key={s}
@@ -310,7 +310,7 @@ export function BookingsTab() {
                         <button
                           disabled={savingId === b.id}
                           onClick={() => setStatus(b.id, 'returned')}
-                          style={{ padding: '6px 14px', background: 'rgba(76,217,100,.15)', border: '1px solid rgba(76,217,100,.3)', borderRadius: 8, color: '#4cd964', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                          style={{ padding: '6px 14px', background: 'rgba(76,217,100,.15)', border: '1px solid rgba(76,217,100,.3)', borderRadius: 8, color: '#4edea3', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                         >
                           <CheckCircle2 size={12} /> Mark Returned
                         </button>
@@ -373,7 +373,7 @@ export function BookingsTab() {
                   flex: 1, padding: '9px 16px', borderRadius: 10, fontSize: '.85rem', fontWeight: 700, cursor: 'pointer',
                   background: actionModal.action === 'confirmed' ? 'rgba(76,217,100,.15)' : 'rgba(239,68,68,.12)',
                   border: `1px solid ${actionModal.action === 'confirmed' ? 'rgba(76,217,100,.35)' : 'rgba(239,68,68,.3)'}`,
-                  color: actionModal.action === 'confirmed' ? '#4cd964' : '#f87171',
+                  color: actionModal.action === 'confirmed' ? '#4edea3' : '#f87171',
                 }}
               >
                 {savingId === actionModal.booking.id ? 'Saving…' : actionModal.action === 'confirmed' ? 'Accept' : 'Deny'}

@@ -56,7 +56,7 @@ export function BookingResponsibility({ categories }: { categories: EquipmentCat
   return (
     <div className="rounded-[14px] border border-[#31353c] bg-[#1c2026] p-5 space-y-4">
       <div>
-        <p className="flex items-center gap-2 font-bold text-[.9rem] text-zinc-100"><UserCog className="w-4 h-4 text-[#4cd964]" /> Booking responsibility</p>
+        <p className="flex items-center gap-2 font-bold text-[.9rem] text-zinc-100"><UserCog className="w-4 h-4 text-[#4edea3]" /> Booking responsibility</p>
         <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
           Choose which categories each staff member handles. They are notified about, and can accept, deny and set up,
           only those parts of a booking. Other parts show greyed out for them.
@@ -84,7 +84,7 @@ export function BookingResponsibility({ categories }: { categories: EquipmentCat
                       key={m}
                       type="button"
                       onClick={() => setMode(u.id, m)}
-                      className={cn('px-3 py-1.5 transition-colors', mode === m ? 'bg-[#4cd964]/20 text-[#4cd964]' : 'text-zinc-500 hover:bg-white/5')}
+                      className={cn('px-3 py-1.5 transition-colors', mode === m ? 'bg-[#4edea3]/20 text-[#4edea3]' : 'text-zinc-500 hover:bg-white/5')}
                     >
                       {m === 'all' ? 'All' : m === 'some' ? 'Selected' : 'None'}
                     </button>
@@ -102,7 +102,7 @@ export function BookingResponsibility({ categories }: { categories: EquipmentCat
                         onClick={() => toggleCat(u.id, c)}
                         className={cn(
                           'text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors',
-                          on ? 'bg-[#4cd964]/15 border-[#4cd964]/40 text-[#4cd964]' : 'border-white/10 text-zinc-500 hover:text-zinc-300',
+                          on ? 'bg-[#4edea3]/15 border-[#4edea3]/40 text-[#4edea3]' : 'border-white/10 text-zinc-500 hover:text-zinc-300',
                         )}
                       >
                         {c}

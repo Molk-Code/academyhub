@@ -100,9 +100,9 @@ function RentalSummaryModal({ input, catalog, onClose }: { input: SummaryInput; 
           {!hasLegalDetails(cfg) && ' The PDF is marked "Not a tax invoice".'}
         </p>
 
-        {error && <p role="alert" style={{ color: '#ff4757', margin: 0 }}>{error}</p>}
+        {error && <p role="alert" style={{ color: '#ff5449', margin: 0 }}>{error}</p>}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button style={{ ...btn, background: '#4cd964', color: '#000', border: 'none' }} disabled={busy || !s.lines.length} onClick={pdf}>
+          <button style={{ ...btn, background: '#4edea3', color: '#000', border: 'none' }} disabled={busy || !s.lines.length} onClick={pdf}>
             {busy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} PDF
           </button>
           <button style={btn} disabled={!s.lines.length} onClick={() => downloadFile(summaryFileName(s, 'csv'), summaryCsv([s], cfg.currency, csvFormat))}>

@@ -45,7 +45,7 @@ export default function JoinScanPage() {
     display: 'flex', flexDirection: 'column', padding: '1rem', gap: '1rem', maxWidth: 520, margin: '0 auto',
   }
   const primary: React.CSSProperties = {
-    padding: '14px', background: '#4cd964', border: 'none', borderRadius: 12, color: '#000', fontWeight: 700,
+    padding: '14px', background: '#4edea3', border: 'none', borderRadius: 12, color: '#000', fontWeight: 700,
     fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
   }
 
@@ -54,7 +54,7 @@ export default function JoinScanPage() {
   if (!profile) {
     return (
       <div style={{ ...base, alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-        <LogIn size={40} color="#4cd964" />
+        <LogIn size={40} color="#4edea3" />
         <h1 style={{ fontWeight: 700, fontSize: '1.25rem' }}>Sign in required</h1>
         <button onClick={() => navigate('/login?redirect=/scan')} style={{ ...primary, padding: '10px 24px' }}>Sign in</button>
       </div>

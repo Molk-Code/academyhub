@@ -35,11 +35,11 @@
 .molkom-app .image-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:1rem;color:#979ca7;font-size:.85rem;font-weight:500;line-height:1.3}
 .molkom-app .product-card:hover .product-image img{transform:scale(1.05)}
 .molkom-app .product-category-tag{position:absolute;top:.5rem;left:.5rem;padding:.2rem .6rem;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);border-radius:4px;font-size:.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#ff6b35}
-.molkom-app .film-year2-badge{position:absolute;top:.5rem;right:.5rem;display:flex;align-items:center;gap:.3rem;padding:.2rem .6rem;background:rgba(255,165,2,.85);border-radius:4px;font-size:.6875rem;font-weight:700;text-transform:uppercase;color:#000}
+.molkom-app .film-year2-badge{position:absolute;top:.5rem;right:.5rem;display:flex;align-items:center;gap:.3rem;padding:.2rem .6rem;background:rgba(246,174,45,.85);border-radius:4px;font-size:.6875rem;font-weight:700;text-transform:uppercase;color:#000}
 .molkom-app .product-info{padding:1rem;display:flex;flex-direction:column;gap:.5rem}
 .molkom-app .product-name{font-size:.9rem;font-weight:600;line-height:1.3;color:#dfe2eb}
 .molkom-app .product-available{font-size:.7rem;color:#ff6b35;font-weight:600;margin-bottom:.15rem}
-.molkom-app .product-notes{font-size:.72rem;color:#ff4757;font-style:italic;line-height:1.3;margin-bottom:.15rem}
+.molkom-app .product-notes{font-size:.72rem;color:#ff5449;font-style:italic;line-height:1.3;margin-bottom:.15rem}
 .molkom-app .product-description{font-size:.75rem;color:#979ca7;line-height:1.4}
 .molkom-app .product-pricing{display:flex;gap:.75rem;align-items:baseline}
 .molkom-app .price-day{font-size:1rem;font-weight:700;color:#ff6b35}
@@ -75,7 +75,7 @@
 .molkom-app .cart-item-right{display:flex;flex-direction:column;align-items:flex-end;gap:.5rem}
 .molkom-app .cart-item-price{font-size:.9rem;font-weight:600;color:#dfe2eb}
 .molkom-app .remove-btn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:4px;color:#979ca7;cursor:pointer;background:none;border:none;transition:all .25s ease}
-.molkom-app .remove-btn:hover{background:rgba(255,71,87,.15);color:#ff4757}
+.molkom-app .remove-btn:hover{background:rgba(255,84,73,.15);color:#ff5449}
 .molkom-app .cart-rental-period{padding:.75rem 1rem;margin-bottom:.5rem;background:#10141a;border:1px solid #31353c;border-radius:6px}
 .molkom-app .cart-rental-period h4{display:flex;align-items:center;gap:.4rem;font-size:.85rem;font-weight:600;color:#dfe2eb;margin:0 0 .5rem}
 .molkom-app .cart-date-row{display:flex;gap:.5rem}
@@ -84,7 +84,7 @@
 .molkom-app .cart-date-field input[type=date]{width:100%;padding:.4rem .5rem;background:#262a31;border:1px solid #31353c;border-radius:6px;color:#dfe2eb;font-size:.8rem;outline:none;color-scheme:dark}
 .molkom-app .cart-date-field input[type=date]:focus{border-color:#ff6b35;box-shadow:0 0 0 2px rgba(255,107,53,.15)}
 .molkom-app .cart-rental-days{margin-top:.4rem;font-size:.75rem;font-weight:600;color:#ff6b35;text-align:center}
-.molkom-app .cart-dates-hint{font-size:.78rem;color:#ffa502;text-align:center;margin-bottom:.5rem}
+.molkom-app .cart-dates-hint{font-size:.78rem;color:#f6ae2d;text-align:center;margin-bottom:.5rem}
 .molkom-app .cart-footer{padding:1rem 1.25rem;border-top:1px solid #31353c;background:#10141a}
 .molkom-app .cart-total{display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;font-size:1rem}
 .molkom-app .cart-total strong{font-size:1.2rem;color:#ff6b35}
@@ -120,7 +120,7 @@
 .molkom-app .checkout-dates-confirm svg{color:#ff6b35;flex-shrink:0}
 .molkom-app .dates-label{font-size:.7rem;color:#979ca7;text-transform:uppercase;letter-spacing:.05em;display:block}
 .molkom-app .dates-value{font-size:.95rem;font-weight:600;color:#dfe2eb;display:block}
-.molkom-app .year2-warning{display:flex;align-items:center;gap:.4rem;color:#ff4757;font-size:.8rem;font-weight:500;margin-top:.4rem}
+.molkom-app .year2-warning{display:flex;align-items:center;gap:.4rem;color:#ff5449;font-size:.8rem;font-weight:500;margin-top:.4rem}
 .molkom-app .checkout-buttons{display:flex;gap:.75rem;margin-top:.5rem}
 .molkom-app .primary-btn{white-space:nowrap;display:inline-flex;align-items:center;gap:.4rem;padding:.75rem 1.5rem;background:#ff6b35;color:#000;font-size:.9rem;font-weight:700;border-radius:10px;border:none;cursor:pointer;transition:all .25s ease;text-decoration:none}
 .molkom-app .primary-btn:hover:not(:disabled){background:#f25c24;transform:translateY(-1px)}
@@ -141,7 +141,7 @@
 @keyframes success-pop{0%{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
 .molkom-app .checkout-success h2{font-size:1.5rem;color:#dfe2eb}
 .molkom-app .checkout-success p{color:#a9aeb8;max-width:400px}
-.molkom-app .error-msg{color:#ff4757;font-size:.85rem;padding:.75rem;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);border-radius:6px}
+.molkom-app .error-msg{color:#ff5449;font-size:.85rem;padding:.75rem;background:rgba(255,84,73,.1);border:1px solid rgba(255,84,73,.3);border-radius:6px}
 @keyframes fade-in{0%{opacity:0}to{opacity:1}}
 @media(max-width:768px){
   .molkom-app .product-grid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.75rem}
@@ -165,8 +165,8 @@
 .molkom-app .inv-tab.active{color:#ff6b35;border-bottom-color:#ff6b35}
 .molkom-app .inv-stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;margin-bottom:1.5rem}
 .molkom-app .inv-stat-card{display:flex;align-items:center;gap:.75rem;padding:1rem 1.25rem;background:#262a31;border:1px solid #31353c;border-radius:10px;color:#ff6b35}
-.molkom-app .inv-stat-card.warning{color:#ffa502}
-.molkom-app .inv-stat-card.danger{color:#ff4757}
+.molkom-app .inv-stat-card.warning{color:#f6ae2d}
+.molkom-app .inv-stat-card.danger{color:#ff5449}
 .molkom-app .inv-stat-card.clickable{cursor:pointer;transition:all .2s ease}
 .molkom-app .inv-stat-card.clickable:hover{transform:translateY(-2px);box-shadow:0 4px 24px rgba(0,0,0,.4);border-color:#454a52}
 .molkom-app .inv-stat-value{display:block;font-size:1.5rem;font-weight:700;line-height:1.2;color:#dfe2eb}
@@ -182,13 +182,13 @@
 .molkom-app .project-card:hover{border-color:#454a52;transform:translateY(-2px);box-shadow:0 4px 24px rgba(0,0,0,.4)}
 .molkom-app .project-card-header{display:flex;align-items:center;gap:.4rem;margin-bottom:.75rem;color:#ff6b35}
 .molkom-app .project-card-badges{display:flex;align-items:center;gap:.4rem;margin-left:auto}
-.molkom-app .project-missing-badge{display:flex;align-items:center;gap:.25rem;padding:.2rem .6rem;border-radius:50px;font-size:.6875rem;font-weight:700;text-transform:uppercase;background:rgba(255,71,87,.15);color:#ff4757;letter-spacing:.03em}
+.molkom-app .project-missing-badge{display:flex;align-items:center;gap:.25rem;padding:.2rem .6rem;border-radius:50px;font-size:.6875rem;font-weight:700;text-transform:uppercase;background:rgba(255,84,73,.15);color:#ff5449;letter-spacing:.03em}
 .molkom-app .project-card-name{font-size:1.05rem;font-weight:600;margin-bottom:.5rem;color:#dfe2eb}
 .molkom-app .project-card-meta{display:flex;flex-direction:column;gap:.3rem;margin-bottom:.75rem}
 .molkom-app .project-card-meta-item{display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:#979ca7}
 .molkom-app .project-card-footer{display:flex;align-items:center;justify-content:space-between;padding-top:.75rem;border-top:1px solid #31353c;font-size:.8rem;color:#a9aeb8}
 .molkom-app .project-status-badge{padding:.2rem .6rem;border-radius:50px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
-.molkom-app .status-active{background:rgba(76,217,100,.15);color:#4cd964}
+.molkom-app .status-active{background:rgba(76,217,100,.15);color:#4edea3}
 .molkom-app .status-checkout{background:rgba(0,122,255,.15);color:#4da6ff}
 .molkom-app .status-returned{background:rgba(100,100,120,.15);color:#a9aeb8}
 .molkom-app .status-archived{background:rgba(100,100,120,.1);color:#979ca7}
@@ -197,7 +197,7 @@
 .molkom-app .project-detail-meta{display:flex;flex-wrap:wrap;gap:1rem;margin-top:.5rem}
 .molkom-app .project-detail-meta span{display:flex;align-items:center;gap:.3rem;font-size:.85rem;color:#979ca7}
 .molkom-app .project-actions{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.5rem}
-.molkom-app .danger-btn{background:#ff4757!important;color:#fff!important}
+.molkom-app .danger-btn{background:#ff5449!important;color:#10141a!important}
 .molkom-app .danger-btn:hover:not(:disabled){background:#e63e4d!important}
 /* Scan monitor */
 .molkom-app .scan-monitor{background:#262a31;border:1px solid #31353c;border-radius:10px;padding:1.25rem;margin-bottom:1.5rem}
@@ -208,7 +208,7 @@
 .molkom-app .scan-monitor-status{display:flex;align-items:center;gap:.5rem;font-size:.95rem;font-weight:600;color:#ff6b35}
 .molkom-app .scan-pulse{width:10px;height:10px;border-radius:50%;background:#ff6b35;animation:scan-pulse-anim 1.5s ease-in-out infinite}
 @keyframes scan-pulse-anim{0%,to{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.3)}}
-.molkom-app .scan-stop-btn{display:flex;align-items:center;gap:.3rem;padding:.4rem .85rem;background:#ff4757;color:#fff;border-radius:6px;font-size:.8rem;font-weight:600;cursor:pointer;border:none;transition:all .25s ease}
+.molkom-app .scan-stop-btn{display:flex;align-items:center;gap:.3rem;padding:.4rem .85rem;background:#ff5449;color:#10141a;border-radius:6px;font-size:.8rem;font-weight:600;cursor:pointer;border:none;transition:all .25s ease}
 .molkom-app .scan-stop-btn:hover{background:#e63e4d}
 .molkom-app .scan-done-btn{display:flex;align-items:center;justify-content:center;gap:.4rem;width:100%;margin-top:1rem;padding:.7rem 1rem;background:#ff6b35;color:#000;border-radius:6px;font-size:.9rem;font-weight:700;cursor:pointer;border:none;transition:all .25s ease}
 .molkom-app .scan-done-btn:hover{background:#ff6b35;transform:translateY(-1px)}
@@ -233,41 +233,41 @@
 .molkom-app .return-stat{display:flex;align-items:center;gap:.3rem;font-size:.85rem;font-weight:600}
 .molkom-app .return-stat.returned{color:#ff6b35}
 .molkom-app .return-stat.checked-out{color:#4da6ff}
-.molkom-app .return-stat.missing{color:#ff4757}
+.molkom-app .return-stat.missing{color:#ff5449}
 .molkom-app .return-stat.pending{color:#ff6b35}
 .molkom-app .project-items-list{display:flex;flex-direction:column;gap:.25rem}
 .molkom-app .project-item-row{display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;background:#262a31;border:1px solid #31353c;border-radius:6px;border-left:3px solid #31353c}
 .molkom-app .project-item-row.status-row-checked-out{border-left-color:#4da6ff}
 .molkom-app .project-item-row.status-row-returned{border-left-color:#ff6b35}
-.molkom-app .project-item-row.status-row-damaged{border-left-color:#ffa502}
-.molkom-app .project-item-row.status-row-missing{border-left-color:#ff4757}
+.molkom-app .project-item-row.status-row-damaged{border-left-color:#f6ae2d}
+.molkom-app .project-item-row.status-row-missing{border-left-color:#ff5449}
 .molkom-app .project-item-row.status-row-pending{border-left-color:#ff6b35}
 .molkom-app .project-item-name{flex:1;font-size:.85rem;font-weight:500;color:#dfe2eb}
 .molkom-app .project-item-time{font-size:.75rem;color:#979ca7;font-family:monospace}
 .molkom-app .project-item-status{padding:.15rem .5rem;border-radius:50px;font-size:.6875rem;font-weight:700;text-transform:uppercase}
 .molkom-app .item-status-checked-out{background:rgba(0,122,255,.15);color:#4da6ff}
 .molkom-app .item-status-returned{background:rgba(255,107,53,.15);color:#ff6b35}
-.molkom-app .item-status-damaged{background:rgba(255,165,2,.15);color:#ffa502}
-.molkom-app .item-status-missing{background:rgba(255,71,87,.15);color:#ff4757}
+.molkom-app .item-status-damaged{background:rgba(246,174,45,.15);color:#f6ae2d}
+.molkom-app .item-status-missing{background:rgba(255,84,73,.15);color:#ff5449}
 .molkom-app .item-status-pending{background:rgba(255,107,53,.15);color:#ff6b35}
 .molkom-app .item-action-btns{display:flex;gap:.25rem;flex-shrink:0}
 .molkom-app .item-checkout-btn{display:flex;align-items:center;gap:.3rem;padding:0 .6rem;height:32px;border-radius:6px;color:#10141a;background:#ff6b35;border:none;font-size:.78rem;font-weight:600;white-space:nowrap;cursor:pointer;transition:all .25s ease}
 .molkom-app .item-checkout-btn:hover{background:#ea7317}
-.molkom-app .item-return-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:#4cd964;cursor:pointer;background:none;border:none;transition:all .25s ease}
+.molkom-app .item-return-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:#4edea3;cursor:pointer;background:none;border:none;transition:all .25s ease}
 .molkom-app .item-return-btn:hover{background:rgba(76,217,100,.15);transform:scale(1.1)}
 .molkom-app .item-damage-toggle-btn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:4px;color:#979ca7;cursor:pointer;background:none;border:none;transition:all .25s ease}
-.molkom-app .item-damage-toggle-btn:hover{background:rgba(255,165,2,.15);color:#ffa502}
+.molkom-app .item-damage-toggle-btn:hover{background:rgba(246,174,45,.15);color:#f6ae2d}
 .molkom-app .item-missing-btn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:4px;color:#979ca7;cursor:pointer;background:none;border:none;transition:all .25s ease}
-.molkom-app .item-missing-btn:hover{background:rgba(255,71,87,.15);color:#ff4757}
+.molkom-app .item-missing-btn:hover{background:rgba(255,84,73,.15);color:#ff5449}
 .molkom-app .item-remove-btn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:4px;color:#979ca7;cursor:pointer;background:none;border:none;transition:all .25s ease}
-.molkom-app .item-remove-btn:hover{background:rgba(255,71,87,.15);color:#ff4757}
-.molkom-app .missing-warning-banner{display:flex;align-items:center;gap:.75rem;padding:.85rem 1.15rem;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);border-radius:10px;color:#ff4757;margin-bottom:1.25rem;font-size:.88rem}
+.molkom-app .item-remove-btn:hover{background:rgba(255,84,73,.15);color:#ff5449}
+.molkom-app .missing-warning-banner{display:flex;align-items:center;gap:.75rem;padding:.85rem 1.15rem;background:rgba(255,84,73,.1);border:1px solid rgba(255,84,73,.3);border-radius:10px;color:#ff5449;margin-bottom:1.25rem;font-size:.88rem}
 .molkom-app .missing-warning-banner strong{font-weight:700}
 .molkom-app .checkin-inline-damage{display:flex;gap:.5rem;padding:.5rem .75rem .5rem 2.75rem}
 .molkom-app .checkin-damage-input{flex:1;padding:.45rem .7rem;background:#262a31;border:1px solid #31353c;border-radius:6px;color:#dfe2eb;font-family:inherit;font-size:.82rem;outline:none}
-.molkom-app .checkin-damage-input:focus{border-color:#ffa502;box-shadow:0 0 0 2px rgba(255,165,2,.2)}
-.molkom-app .checkin-damage-save-btn{display:flex;align-items:center;gap:.3rem;padding:.4rem .7rem;background:rgba(255,165,2,.15);color:#ffa502;border-radius:6px;font-size:.75rem;font-weight:600;white-space:nowrap;cursor:pointer;border:none;transition:all .25s ease}
-.molkom-app .checkin-damage-save-btn:hover:not(:disabled){background:rgba(255,165,2,.25)}
+.molkom-app .checkin-damage-input:focus{border-color:#f6ae2d;box-shadow:0 0 0 2px rgba(246,174,45,.2)}
+.molkom-app .checkin-damage-save-btn{display:flex;align-items:center;gap:.3rem;padding:.4rem .7rem;background:rgba(246,174,45,.15);color:#f6ae2d;border-radius:6px;font-size:.75rem;font-weight:600;white-space:nowrap;cursor:pointer;border:none;transition:all .25s ease}
+.molkom-app .checkin-damage-save-btn:hover:not(:disabled){background:rgba(246,174,45,.25)}
 /* Equipment picker overlay */
 .molkom-app .equip-picker-overlay{position:fixed;inset:0;background:#10141a;z-index:1000;overflow-y:auto}
 .molkom-app .equip-picker-modal{width:100%;max-width:900px;margin:0 auto;padding-bottom:2rem}
@@ -288,8 +288,8 @@
 @media(min-width:900px){.molkom-app .equip-picker-grid{grid-template-columns:repeat(4,1fr)}}
 .molkom-app .equip-picker-card{position:relative;background:#262a31;border:2px solid #31353c;border-radius:6px;overflow:hidden;cursor:pointer;padding:0;text-align:left;color:#dfe2eb;transition:all .2s ease;width:100%}
 .molkom-app .equip-picker-card:hover{border-color:#ff6b35;transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.3)}
-.molkom-app .equip-picker-card.picked{border-color:#4cd964;box-shadow:0 0 0 1px rgba(76,217,100,.3)}
-.molkom-app .equip-picker-picked-badge{position:absolute;top:.3rem;right:.3rem;display:flex;align-items:center;gap:.15rem;padding:.15rem .4rem;background:#4cd964;border-radius:3px;font-size:.6875rem;font-weight:700;color:#000}
+.molkom-app .equip-picker-card.picked{border-color:#4edea3;box-shadow:0 0 0 1px rgba(76,217,100,.3)}
+.molkom-app .equip-picker-picked-badge{position:absolute;top:.3rem;right:.3rem;display:flex;align-items:center;gap:.15rem;padding:.15rem .4rem;background:#4edea3;border-radius:3px;font-size:.6875rem;font-weight:700;color:#000}
 .molkom-app .equip-picker-img{position:relative;aspect-ratio:4/3;overflow:hidden;background:#fff}
 .molkom-app .equip-picker-img img{width:100%;height:100%;object-fit:contain;padding:.25rem}
 .molkom-app .equip-picker-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:.5rem;color:#979ca7;font-size:.72rem;line-height:1.3;background:#262a31}
@@ -324,7 +324,7 @@
 .molkom-app .note-popup-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid #31353c}
 .molkom-app .note-popup-header h4{margin:0;font-size:.95rem;font-weight:600;color:#dfe2eb}
 .molkom-app .note-popup-close{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:#979ca7;cursor:pointer;background:none;border:none;transition:all .25s ease}
-.molkom-app .note-popup-close:hover{background:rgba(255,71,87,.15);color:#ff4757}
+.molkom-app .note-popup-close:hover{background:rgba(255,84,73,.15);color:#ff5449}
 .molkom-app .note-popup-body{padding:1.25rem;display:flex;flex-direction:column;gap:.9rem}
 .molkom-app .form-input{background:#262a31;border:1px solid #31353c;border-radius:8px;color:#dfe2eb;padding:.45rem .65rem;font-size:.85rem;width:100%;outline:none;font-family:inherit}
 .molkom-app .form-input:focus{border-color:#ff6b35}

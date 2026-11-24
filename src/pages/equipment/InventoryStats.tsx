@@ -8,6 +8,7 @@ import {
 import { calcRentalDays, billableDays } from '@/lib/productionBudget'
 import { isDueThisWeek } from './inventoryShared'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { STATUS_TONE, toneChip, type StatusTone } from '@/lib/statusTone'
 import type { EquipmentDoc, InventoryProjectDoc, InventoryItemDoc, UserDoc, CohortDoc } from '@/types'
 import './molkom.css'
 import { clickableRow } from '@/lib/a11y'
@@ -105,17 +106,17 @@ const STATUS_COLUMNS: { header: string; sort?: StatusSortKey }[] = [
 type UnitState = 'Overdue' | 'Damaged' | 'Missing' | 'Pending Checkout' | 'Checked Out'
 type StatusLabel = UnitState | 'Available'
 // Most urgent first; also the sort order of the Status column
-const STATUS_ORDER: StatusLabel[] = ['Overdue', 'Damaged', 'Missing', 'Pending Checkout', 'Checked Out', 'Available']
+const STATUS_ORDER: StatusLabel[] = ['Missing', 'Overdue', 'Damaged', 'Pending Checkout', 'Checked Out', 'Available']
 
-// Ember status colours (index.css): text and its 12% tint
-const STATUS_STYLE: Record<StatusLabel, { color: string; bg: string }> = {
-  'Overdue':          { color: '#ffb4ab', bg: 'rgba(255,180,171,.12)' },
-  'Damaged':          { color: '#f6ae2d', bg: 'rgba(246,174,45,.12)' },
-  'Missing':          { color: '#c8ccd5', bg: 'rgba(200,204,213,.12)' },
-  'Pending Checkout': { color: '#ff8a5c', bg: 'rgba(255,107,53,.12)' },
-  'Checked Out':      { color: '#b4c5ff', bg: 'rgba(180,197,255,.12)' },
-  'Available':        { color: '#4edea3', bg: 'rgba(78,222,163,.12)' },
+// The shared status tones (lib/statusTone.ts)
+const LABEL_TONE: Record<StatusLabel, StatusTone> = {
+  'Missing': 'missing', 'Overdue': 'overdue', 'Damaged': 'damaged',
+  'Pending Checkout': 'pending', 'Checked Out': 'out', 'Available': 'shelf',
 }
+const STATUS_STYLE = Object.fromEntries(Object.entries(LABEL_TONE).map(([label, tone]) => {
+  const t = STATUS_TONE[tone]
+  return [label, { color: t.fg, bg: t.bg, solid: t.solid, chip: toneChip(tone) }]
+})) as Record<StatusLabel, { color: string; bg: string; solid: string; chip: React.CSSProperties }>
 
 type StatusFilter = 'all' | 'out' | 'Overdue' | 'Damaged' | 'Missing' | 'available'
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
@@ -257,14 +258,14 @@ function EquipmentStatusTab({
       {total <= UNIT_BAR_MAX && (
         <div style={{ display: 'flex', gap: 3 }} aria-hidden="true">
           {Array.from({ length: total }, (_, i) => (
-            <span key={i} style={{ flex: 1, height: 6, borderRadius: 3, background: units[i] ? STATUS_STYLE[units[i]].color : '#31353c' }} />
+            <span key={i} style={{ flex: 1, height: 6, borderRadius: 3, background: units[i] ? STATUS_STYLE[units[i]].solid : STATUS_TONE.shelf.solid }} />
           ))}
         </div>
       )}
     </div>
   )
   const statusPill = ({ worst, worstCount }: Row) => (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 13, background: STATUS_STYLE[worst].bg, color: STATUS_STYLE[worst].color, fontSize: '.75rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 13, ...STATUS_STYLE[worst].chip, fontSize: '.75rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
       <StatusIcon label={worst} />{statusText(worst, worstCount)}
     </span>
   )
@@ -273,19 +274,21 @@ function EquipmentStatusTab({
     : (
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {projects.map(({ proj: p, count, unitNos, worst: pw }) => {
-          const late = pw === 'Overdue'
+          // Out on time stays neutral, so only problems carry colour
+          const flagged = pw !== 'Checked Out'
           return (
             <button
               key={p.id}
               onClick={() => onOpenProject(p.id)}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 32, padding: '0 10px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left',
-                background: late ? 'rgba(255,180,171,.1)' : '#262a31', color: late ? '#ffcdc7' : '#dfe2eb', fontSize: '.8rem', fontWeight: 500,
+                display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 32, padding: '0 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                ...(flagged ? STATUS_STYLE[pw].chip : { background: '#262a31', color: '#dfe2eb', border: '1px solid transparent' }), fontSize: '.8rem', fontWeight: 500,
               }}
             >
+              {flagged && <StatusIcon label={pw} />}
               {p.name}
               {(unitNos.length > 0 || count > 1) && (
-                <span style={{ color: late ? '#ffb4ab' : '#a9aeb8', fontWeight: 700 }}>
+                <span style={{ color: flagged ? 'inherit' : '#a9aeb8', fontWeight: 700 }}>
                   {unitNos.length === count ? unitNos.map(u => `#${u}`).join(' ') : `×${count}`}
                 </span>
               )}
@@ -293,7 +296,7 @@ function EquipmentStatusTab({
           )
         })}
         {!manual && total - units.length > 0 && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', minHeight: 32, padding: '0 10px', borderRadius: 8, border: '1px dashed rgba(78,222,163,.45)', color: '#4edea3', fontSize: '.8rem', fontWeight: 500 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', minHeight: 32, padding: '0 10px', borderRadius: 8, ...toneChip('shelf'), fontSize: '.8rem', fontWeight: 500 }}>
             {total - units.length} on shelf
           </span>
         )}
@@ -398,7 +401,7 @@ function EquipmentStatusTab({
       </div>
       )}
       <p style={{ margin: 0, fontSize: '.8rem', color: '#a9aeb8' }}>
-        The bar shows each copy: red overdue, amber damaged, blue out, grey on the shelf.
+        Each block in the bar is one copy. Solid red: missing. Pink: overdue. Amber: damaged. Lavender: awaiting signature. Blue: out. Dark: on the shelf.
       </p>
     </div>
   )
@@ -539,11 +542,11 @@ function BorrowersTab({
               <td style={{ padding: '.5rem .75rem', color: '#dfe2eb', fontWeight: 600 }}>{r.name}</td>
               <td style={{ padding: '.5rem .75rem' }}><CohortBadge cohortId={r.cohortId} cohorts={cohortNames} /></td>
               <td style={{ padding: '.5rem .75rem', color: r.projects > 0 ? '#ff6b35' : '#979ca7', fontWeight: r.projects > 0 ? 700 : 400 }}>{r.projects}</td>
-              <td style={{ padding: '.5rem .75rem', color: r.active > 0 ? '#4cd964' : '#979ca7' }}>{r.active || '—'}</td>
-              <td style={{ padding: '.5rem .75rem', color: r.out > 0 ? '#60a5fa' : '#979ca7' }}>{r.out || '—'}</td>
-              <td style={{ padding: '.5rem .75rem', color: r.returned > 0 ? '#4cd964' : '#979ca7' }}>{r.returned || '—'}</td>
-              <td style={{ padding: '.5rem .75rem', color: r.missing > 0 ? '#f87171' : '#979ca7', fontWeight: r.missing > 0 ? 700 : 400 }}>{r.missing || '—'}</td>
-              <td style={{ padding: '.5rem .75rem', color: r.damaged > 0 ? '#fbbf24' : '#979ca7', fontWeight: r.damaged > 0 ? 700 : 400 }}>{r.damaged || '—'}</td>
+              <td style={{ padding: '.5rem .75rem', color: r.active > 0 ? '#4edea3' : '#979ca7' }}>{r.active || '—'}</td>
+              <td style={{ padding: '.5rem .75rem', color: r.out > 0 ? STATUS_TONE.out.solid : '#979ca7' }}>{r.out || '—'}</td>
+              <td style={{ padding: '.5rem .75rem', color: r.returned > 0 ? '#4edea3' : '#979ca7' }}>{r.returned || '—'}</td>
+              <td style={{ padding: '.5rem .75rem', color: r.missing > 0 ? STATUS_TONE.missing.solid : '#979ca7', fontWeight: r.missing > 0 ? 700 : 400 }}>{r.missing || '—'}</td>
+              <td style={{ padding: '.5rem .75rem', color: r.damaged > 0 ? STATUS_TONE.damaged.solid : '#979ca7', fontWeight: r.damaged > 0 ? 700 : 400 }}>{r.damaged || '—'}</td>
             </tr>
           ))}
         </tbody>
@@ -572,7 +575,7 @@ function ProjectsTab({
     const statusColor =
       p.status === 'active'       ? '#4ade80' :
       p.status === 'checked-out'  ? '#ff6b35' :
-      p.status === 'returned'     ? '#60a5fa' : '#6b7280'
+      p.status === 'returned'     ? STATUS_TONE.out.solid : '#6b7280'
 
     return (
       <tr {...clickableRow} style={{ borderBottom: '1px solid #262a31', cursor: 'pointer' }} onClick={() => onOpenProject(p.id)}>
@@ -587,8 +590,8 @@ function ProjectsTab({
         <td style={{ padding: '.5rem .75rem', fontSize: '.75rem' }}>
           {pending > 0 && <span style={{ color: '#ff6b35', marginRight: 8 }}>{pending} pending</span>}
           {out > 0 && <span style={{ color: '#ff6b35', marginRight: 8 }}>{out} out</span>}
-          {missing > 0 && <span style={{ color: '#f87171', marginRight: 8 }}>{missing} missing</span>}
-          {damaged > 0 && <span style={{ color: '#fbbf24' }}>{damaged} damaged</span>}
+          {missing > 0 && <span style={{ color: STATUS_TONE.missing.solid, marginRight: 8 }}>{missing} missing</span>}
+          {damaged > 0 && <span style={{ color: STATUS_TONE.damaged.solid }}>{damaged} damaged</span>}
         </td>
       </tr>
     )
@@ -830,11 +833,11 @@ export function StatsContent({
   }))
 
   const statCards = [
-    { label: 'Total Equipment', value: equipment.length,  icon: <Package size={18} />,       color: '#60a5fa', open: () => setActiveTab('equipment-status') },
+    { label: 'Total Equipment', value: equipment.length,  icon: <Package size={18} />,       color: STATUS_TONE.out.solid, open: () => setActiveTab('equipment-status') },
     { label: 'Currently Out',   value: itemsCheckedOut,    icon: <TrendingUp size={18} />,    color: '#ff6b35', open: () => setActiveTab('equipment-status') },
-    { label: 'Total Projects',  value: projects.length,    icon: <BarChart2 size={18} />,     color: '#a78bfa', open: onOpenDashboard },
-    { label: 'Damaged Items',   value: damagedItems,       icon: <AlertTriangle size={18} />, color: '#fbbf24', open: () => setActiveTab('damaged') },
-    { label: 'Missing Items',   value: missingItems,       icon: <XCircle size={18} />,       color: '#f87171', open: () => setActiveTab('missing') },
+    { label: 'Total Projects',  value: projects.length,    icon: <BarChart2 size={18} />,     color: STATUS_TONE.pending.solid, open: onOpenDashboard },
+    { label: 'Damaged Items',   value: damagedItems,       icon: <AlertTriangle size={18} />, color: STATUS_TONE.damaged.solid, open: () => setActiveTab('damaged') },
+    { label: 'Missing Items',   value: missingItems,       icon: <XCircle size={18} />,       color: STATUS_TONE.missing.solid, open: () => setActiveTab('missing') },
   ]
 
   return (
@@ -896,7 +899,7 @@ export function StatsContent({
               item.equipmentName,
               proj ? <button onClick={() => onOpenProject(proj.id)} style={{ color: '#ff6b35', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>{proj.name}</button> : '—',
               <span style={{ color: '#ff6b35' }}>{proj ? formatDate(proj.returnDate) : '—'}</span>,
-              <span style={{ color: '#f87171', fontWeight: 700 }}>{days} day{days !== 1 ? 's' : ''}</span>,
+              <span style={{ color: STATUS_TONE.missing.solid, fontWeight: 700 }}>{days} day{days !== 1 ? 's' : ''}</span>,
             ]
           }}
           emptyMsg="No overdue items"
@@ -913,7 +916,7 @@ export function StatsContent({
               item.equipmentName,
               proj ? <button onClick={() => onOpenProject(proj.id)} style={{ color: '#ff6b35', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>{proj.name}</button> : '—',
               <span style={{ color: '#ff6b35' }}>{proj ? formatDate(proj.returnDate) : '—'}</span>,
-              <span style={{ color: days <= 1 ? '#fbbf24' : '#a1a1aa', fontWeight: 700 }}>{days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `In ${days} days`}</span>,
+              <span style={{ color: days <= 1 ? STATUS_TONE.damaged.solid : '#a1a1aa', fontWeight: 700 }}>{days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `In ${days} days`}</span>,
             ]
           }}
           emptyMsg="Nothing due back this week"
@@ -928,7 +931,7 @@ export function StatsContent({
             return [
               item.equipmentName,
               proj ? <button onClick={() => onOpenProject(proj.id)} style={{ color: '#ff6b35', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>{proj.name}</button> : '—',
-              <span style={{ color: '#fbbf24', fontSize: '.8rem' }}>{item.damageNotes || '—'}</span>,
+              <span style={{ color: STATUS_TONE.damaged.solid, fontSize: '.8rem' }}>{item.damageNotes || '—'}</span>,
             ]
           }}
           emptyMsg="No damaged items"

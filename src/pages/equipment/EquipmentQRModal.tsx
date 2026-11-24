@@ -18,7 +18,7 @@ export function QRModal({ item, onClose }: { item: EquipmentDoc; onClose: () => 
       <div style={{ background: '#1c2026', border: '1px solid #31353c', borderRadius: 16, width: 320, padding: '1.5rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <span style={{ fontWeight: 700, fontSize: '.95rem', color: '#dfe2eb', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <QrCode size={16} color="#4cd964" /> QR Code
+            <QrCode size={16} color="#4edea3" /> QR Code
           </span>
           <button className="close-btn" onClick={onClose} style={{ position: 'static', width: 28, height: 28 }}><X size={14} /></button>
         </div>
@@ -27,13 +27,13 @@ export function QRModal({ item, onClose }: { item: EquipmentDoc; onClose: () => 
           <div style={{ display: 'flex', gap: 4, background: '#262a31', borderRadius: 10, padding: 4, marginBottom: '.75rem' }}>
             <button
               onClick={() => setMode('shared')}
-              style={{ flex: 1, padding: '6px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '.78rem', fontWeight: 700, background: mode === 'shared' ? '#4cd964' : 'transparent', color: mode === 'shared' ? '#000' : '#a9aeb8' }}
+              style={{ flex: 1, padding: '6px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '.78rem', fontWeight: 700, background: mode === 'shared' ? '#4edea3' : 'transparent', color: mode === 'shared' ? '#000' : '#a9aeb8' }}
             >
               1 for all ({item.totalQuantity})
             </button>
             <button
               onClick={() => setMode('individual')}
-              style={{ flex: 1, padding: '6px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '.78rem', fontWeight: 700, background: mode === 'individual' ? '#4cd964' : 'transparent', color: mode === 'individual' ? '#000' : '#a9aeb8' }}
+              style={{ flex: 1, padding: '6px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '.78rem', fontWeight: 700, background: mode === 'individual' ? '#4edea3' : 'transparent', color: mode === 'individual' ? '#000' : '#a9aeb8' }}
             >
               Individual
             </button>
@@ -48,9 +48,9 @@ export function QRModal({ item, onClose }: { item: EquipmentDoc; onClose: () => 
                 onClick={() => setUnit(n)}
                 style={{
                   width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: '.8rem', fontWeight: 700,
-                  border: unit === n ? '2px solid #4cd964' : '1px solid #31353c',
+                  border: unit === n ? '2px solid #4edea3' : '1px solid #31353c',
                   background: unit === n ? 'rgba(76,217,100,.15)' : '#262a31',
-                  color: unit === n ? '#4cd964' : '#a9aeb8',
+                  color: unit === n ? '#4edea3' : '#a9aeb8',
                 }}
               >
                 {n}

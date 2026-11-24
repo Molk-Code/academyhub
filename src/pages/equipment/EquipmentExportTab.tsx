@@ -92,7 +92,7 @@ export function ExportTab() {
   }
 
   const card: React.CSSProperties = { background: '#1c2026', border: '1px solid #31353c', borderRadius: 14, padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: 10 }
-  const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', background: '#4cd964', color: '#000', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', alignSelf: 'flex-start' }
+  const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', background: '#4edea3', color: '#000', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer', alignSelf: 'flex-start' }
   const label: React.CSSProperties = { fontSize: '.75rem', color: '#a9aeb8' }
   const missing = LEGAL_FIELDS.filter(f => !cfg.seller[f]?.trim()).length + (cfg.vatRate == null ? 1 : 0)
 
@@ -137,11 +137,11 @@ export function ExportTab() {
               : <input style={inp} value={seller[f.key] ?? ''} disabled={!isAdmin} placeholder={f.placeholder} onChange={e => setSeller(s => ({ ...s, [f.key]: e.target.value }))} />}
           </label>
         ))}
-        {error && <p role="alert" style={{ color: '#ff4757', fontSize: '.8rem' }}>{error}</p>}
+        {error && <p role="alert" style={{ color: '#ff5449', fontSize: '.8rem' }}>{error}</p>}
         {isAdmin
           ? <button style={btn} disabled={saving} onClick={save}>{saving && <Loader2 size={14} className="animate-spin" />} Save</button>
           : <p style={label}>Only admins can change these.</p>}
-        {saved && <p role="status" style={{ fontSize: '.8rem', color: '#4cd964' }}>Saved.</p>}
+        {saved && <p role="status" style={{ fontSize: '.8rem', color: '#4edea3' }}>Saved.</p>}
       </div>
     </div>
   )

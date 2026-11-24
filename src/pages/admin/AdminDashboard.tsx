@@ -29,11 +29,12 @@ function greeting(h: number) {
   return h < 10 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'
 }
 
-type Tone = 'danger' | 'warning' | 'info' | 'brand'
+type Tone = 'danger' | 'warning' | 'info' | 'pending' | 'brand'
 const TONE: Record<Tone, { border: string; text: string }> = {
   danger:  { border: 'border-[rgba(255,180,171,0.35)]', text: 'text-[#ffb4ab]' },
   warning: { border: 'border-[rgba(246,174,45,0.35)]',  text: 'text-[#f6ae2d]' },
   info:    { border: 'border-[rgba(180,197,255,0.3)]',  text: 'text-[#b4c5ff]' },
+  pending: { border: 'border-[rgba(220,198,255,0.4)]',  text: 'text-[#dcc6ff]' },
   brand:   { border: 'border-brand-500/40',             text: 'text-brand-300' },
 }
 
@@ -134,7 +135,7 @@ export default function AdminDashboard() {
       detail: `${eq.overdue.length === 1 ? 'project is' : 'projects are'} past the return date` },
     canEquipment && { key: 'requests', to: '/admin/equipment?tab=bookings', icon: Package, label: 'Requests', count: pending.length, tone: 'warning',
       detail: `equipment ${pending.length === 1 ? 'request' : 'requests'} to answer` },
-    canInventory && { key: 'signatures', to: '/admin/inventory', icon: PenLine, label: 'Signatures', count: eq.awaitingSignatures.length, tone: 'info',
+    canInventory && { key: 'signatures', to: '/admin/inventory', icon: PenLine, label: 'Signatures', count: eq.awaitingSignatures.length, tone: 'pending',
       detail: `${eq.awaitingSignatures.length === 1 ? 'project has' : 'projects have'} unsigned contracts` },
     canEquipment && plan.has('maintenance') && { key: 'service', to: '/admin/equipment?tab=maintenance', icon: Wrench, label: 'Service', count: serviceCount, tone: 'warning',
       detail: 'items in service or overdue for it' },
@@ -201,10 +202,10 @@ export default function AdminDashboard() {
                           <p className="text-[11px] text-zinc-500 truncate">{p.borrowers?.join(', ') || '—'}</p>
                         </div>
                         {(p.pendingSignatureUids?.length ?? 0) > 0 && (
-                          <span className="text-[11px] font-semibold text-amber-300 bg-amber-500/10 rounded-full px-2 py-0.5">Unsigned</span>
+                          <span className="text-[11px] font-semibold text-[#dcc6ff] bg-[rgba(220,198,255,0.1)] border border-[rgba(220,198,255,0.4)] rounded-full px-2 py-0.5">Unsigned</span>
                         )}
                         <span className={cn('inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap',
-                          late ? 'bg-[rgba(255,180,171,0.12)] text-[#ffb4ab]' : p.returnDate === today ? 'bg-[rgba(246,174,45,0.12)] text-[#f6ae2d]' : 'bg-[rgba(180,197,255,0.12)] text-[#b4c5ff]')}>
+                          late ? 'bg-[rgba(255,180,171,0.12)] text-[#ffb4ab] border border-[rgba(255,180,171,0.5)]' : 'bg-[rgba(180,197,255,0.1)] text-[#b4c5ff] border border-[rgba(180,197,255,0.4)]')}>
                           {late ? <AlertTriangle className="w-3 h-3" aria-hidden="true" /> : <span className="w-1.5 h-1.5 rounded-full bg-current" aria-hidden="true" />}
                           {late ? `${late} ${late === 1 ? 'day' : 'days'} late` : p.returnDate === today ? 'Due today' : `Due ${p.returnDate}`}
                         </span>

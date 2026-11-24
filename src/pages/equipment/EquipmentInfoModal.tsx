@@ -14,10 +14,10 @@ export function InfoModal({ item, cohorts, pricingEnabled, onClose }: { item: Eq
         <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
             <p style={{ fontWeight: 700, fontSize: '1.05rem', color: '#dfe2eb' }}>{item.name}</p>
-            <p style={{ fontSize: '.72rem', fontWeight: 700, color: '#4cd964', textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 2 }}>{item.category}</p>
+            <p style={{ fontSize: '.72rem', fontWeight: 700, color: '#4edea3', textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 2 }}>{item.category}</p>
           </div>
 
-          <div style={{ fontSize: '.8rem', fontWeight: 600, color: item.available === 0 ? '#ff4757' : '#4cd964' }}>
+          <div style={{ fontSize: '.8rem', fontWeight: 600, color: item.available === 0 ? '#ff5449' : '#4edea3' }}>
             {item.available}/{item.totalQuantity} available
             {pricingEnabled && (item.priceInclVat > 0 ? <span style={{ color: '#979ca7', fontWeight: 500 }}> · {item.priceInclVat} kr/day</span> : <span style={{ color: '#979ca7', fontWeight: 500 }}> · Free</span>)}
           </div>
@@ -58,7 +58,7 @@ export function InfoModal({ item, cohorts, pricingEnabled, onClose }: { item: Eq
               <ul style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {item.included.map((inc, i) => (
                   <li key={i} style={{ fontSize: '.82rem', color: '#a9aeb8', paddingLeft: 12, position: 'relative' }}>
-                    <span style={{ position: 'absolute', left: 0, color: '#4cd964' }}>•</span>{inc}
+                    <span style={{ position: 'absolute', left: 0, color: '#4edea3' }}>•</span>{inc}
                   </li>
                 ))}
               </ul>

@@ -32,7 +32,7 @@ const KEYFRAMES = `
 
 export function ScanFlash({ flash }: { flash: (ScanFlashData & { key: number }) | null }) {
   if (!flash) return null
-  const accent = flash.warn ? '#f5a623' : '#4cd964'
+  const accent = flash.warn ? '#f5a623' : '#4edea3'
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', padding: 16 }}>
       <style>{KEYFRAMES}</style>

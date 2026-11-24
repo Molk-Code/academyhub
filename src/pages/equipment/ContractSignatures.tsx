@@ -8,7 +8,7 @@ import {
 } from '@/lib/equipmentSigning'
 
 const STATE_STYLE: Record<SignatureState, { label: string; color: string; bg: string }> = {
-  'signed':        { label: 'Signed',            color: '#4cd964', bg: 'rgba(76,217,100,.12)' },
+  'signed':        { label: 'Signed',            color: '#4edea3', bg: 'rgba(76,217,100,.12)' },
   'changed':       { label: 'Needs re-signing',  color: '#f5a623', bg: 'rgba(245,166,35,.12)' },
   'requested':     { label: 'Waiting',           color: '#a9aeb8', bg: 'rgba(160,160,181,.12)' },
   'not-requested': { label: 'Not sent',          color: '#979ca7', bg: 'rgba(106,106,128,.12)' },

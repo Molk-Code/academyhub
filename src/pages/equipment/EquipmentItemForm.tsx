@@ -161,7 +161,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
         {/* Header */}
         <div style={{ position: 'sticky', top: 0, background: '#1c2026', borderBottom: '1px solid #31353c', padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10 }}>
           <span style={{ fontWeight: 700, fontSize: '1rem', color: '#dfe2eb', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Package size={16} color="#4cd964" />
+            <Package size={16} color="#4edea3" />
             {existing ? 'Edit Item' : 'Add Item'}
           </span>
           <button className="close-btn" onClick={onClose} style={{ position: 'static', width: 32, height: 32 }}><X size={16} /></button>
@@ -239,9 +239,9 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                 {form.images.map((url, i) => (
                   <div key={url + i} style={{ position: 'relative', width: 84 }}>
-                    <img src={optimizeImageUrl(url)} alt={`Image ${i + 1}`} style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 8, border: `2px solid ${i === 0 ? '#4cd964' : '#31353c'}`, display: 'block' }} />
+                    <img src={optimizeImageUrl(url)} alt={`Image ${i + 1}`} style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 8, border: `2px solid ${i === 0 ? '#4edea3' : '#31353c'}`, display: 'block' }} />
                     {i === 0 && (
-                      <span style={{ position: 'absolute', top: 4, left: 4, fontSize: '.6875rem', fontWeight: 700, background: '#4cd964', color: '#000', borderRadius: 6, padding: '1px 5px' }}>MAIN</span>
+                      <span style={{ position: 'absolute', top: 4, left: 4, fontSize: '.6875rem', fontWeight: 700, background: '#4edea3', color: '#000', borderRadius: 6, padding: '1px 5px' }}>MAIN</span>
                     )}
                     <button
                       type="button"
@@ -262,7 +262,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
               </div>
             )}
             <div
-              style={{ border: `2px dashed ${dragOver ? '#4cd964' : '#31353c'}`, borderRadius: 10, padding: '1rem', cursor: 'pointer', transition: 'border-color .2s', background: dragOver ? 'rgba(76,217,100,.05)' : 'transparent' }}
+              style={{ border: `2px dashed ${dragOver ? '#4edea3' : '#31353c'}`, borderRadius: 10, padding: '1rem', cursor: 'pointer', transition: 'border-color .2s', background: dragOver ? 'rgba(76,217,100,.05)' : 'transparent' }}
               onDragOver={e => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
               onDrop={e => { e.preventDefault(); setDragOver(false); handleImageFiles(e.dataTransfer.files) }}
@@ -378,7 +378,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
                         cursor: 'pointer', transition: 'all .15s',
                         background: checked ? 'rgba(76,217,100,.15)' : '#1c2026',
                         border: `1px solid ${checked ? 'rgba(76,217,100,.4)' : '#31353c'}`,
-                        color: checked ? '#4cd964' : '#a9aeb8',
+                        color: checked ? '#4edea3' : '#a9aeb8',
                       }}
                     >
                       {checked && <Check size={11} />}
@@ -409,7 +409,7 @@ export function ItemForm({ existing, onClose, categories }: { existing: Equipmen
           {/* Active toggle */}
           <div>
             <button onClick={() => set('isActive', !form.isActive)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#c8ccd5', fontSize: '.85rem' }}>
-              {form.isActive ? <ToggleRight size={20} color="#4cd964" /> : <ToggleLeft size={20} color="#8c919b" />}
+              {form.isActive ? <ToggleRight size={20} color="#4edea3" /> : <ToggleLeft size={20} color="#8c919b" />}
               Active in catalog
             </button>
           </div>

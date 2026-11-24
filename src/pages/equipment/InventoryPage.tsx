@@ -15,8 +15,9 @@ import {
   Package, Calendar, Users, Clock, AlertTriangle, Check, Trash2, Plus, Minus,
   ChevronDown, ChevronRight, ArrowLeft, Edit2, CheckCircle2, ArchiveRestore,
   Layers, Search, X, ZapOff, Scan, Smartphone, QrCode, ClipboardList, Pencil,
-  ScanLine,
+  ScanLine, HelpCircle, PenLine, ArrowUpRight,
 } from 'lucide-react'
+import { STATUS_TONE, toneChip } from '@/lib/statusTone'
 import { EquipmentImg, today, isOverdue, isDueThisWeek, formatDate, overdueDays, parseScanText, beep } from './inventoryShared'
 import { EquipmentPicker } from './EquipmentPicker'
 import { ProjectDetail } from './ProjectDetail'
@@ -56,6 +57,8 @@ function ProjectCard({
     project.status === 'checked-out' ? 'status-checkout' :
     project.status === 'returned' ? 'status-returned' : 'status-archived'
 
+  const summary = { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '.7rem', fontWeight: 700 } as const
+
   return (
     <div {...clickable} className="project-card" onClick={onClick}>
       <div className="project-card-header">
@@ -63,8 +66,8 @@ function ProjectCard({
         <span style={{ fontSize: '.75rem', fontWeight: 600, color: '#a9aeb8' }}>Project</span>
         <div className="project-card-badges">
           <span className={`project-status-badge ${statusClass}`}>{project.status}</span>
-          {missing > 0 && <span className="project-status-badge" style={{ background: 'rgba(255,71,87,.15)', color: '#ff4757', borderColor: 'rgba(255,71,87,.3)' }}>⚠ {missing} missing</span>}
-          {damaged > 0 && <span className="project-status-badge" style={{ background: 'rgba(255,165,2,.15)', color: '#ffa502', borderColor: 'rgba(255,165,2,.3)' }}>⚠ {damaged} damaged</span>}
+          {missing > 0 && <span className="project-status-badge" style={{ ...toneChip('missing'), display: 'inline-flex', alignItems: 'center', gap: 4 }}><HelpCircle size={11} aria-hidden="true" />{missing} missing</span>}
+          {damaged > 0 && <span className="project-status-badge" style={{ ...toneChip('damaged'), display: 'inline-flex', alignItems: 'center', gap: 4 }}><AlertTriangle size={11} aria-hidden="true" />{damaged} damaged</span>}
         </div>
       </div>
       <div className="project-card-name">{project.name}</div>
@@ -89,21 +92,21 @@ function ProjectCard({
       {/* Item summary bar */}
       {total > 0 && (
         <div style={{ display: 'flex', gap: 8, marginTop: '.5rem', flexWrap: 'wrap' }}>
-          {pending > 0 && <span style={{ fontSize: '.7rem', fontWeight: 700, color: '#ff6b35' }}>⏳ {pending} pending</span>}
-          {checkedOut > 0 && <span style={{ fontSize: '.7rem', fontWeight: 700, color: '#ff6b35' }}>📦 {checkedOut} out</span>}
-          {returned   > 0 && <span style={{ fontSize: '.7rem', fontWeight: 600, color: '#4cd964' }}>✓ {returned} returned</span>}
-          {missing    > 0 && <span style={{ fontSize: '.7rem', fontWeight: 700, color: '#ff4757' }}>? {missing} missing</span>}
-          {damaged    > 0 && <span style={{ fontSize: '.7rem', fontWeight: 700, color: '#ffa502' }}>⚠ {damaged} damaged</span>}
+          {pending > 0 && <span style={{ ...summary, color: STATUS_TONE.pending.fg }}><PenLine size={12} aria-hidden="true" />{pending} pending</span>}
+          {checkedOut > 0 && <span style={{ ...summary, color: STATUS_TONE.out.fg }}><ArrowUpRight size={12} aria-hidden="true" />{checkedOut} out</span>}
+          {returned   > 0 && <span style={{ ...summary, color: '#c8ccd5', fontWeight: 600 }}><Check size={12} aria-hidden="true" />{returned} returned</span>}
+          {missing    > 0 && <span style={{ ...summary, color: STATUS_TONE.missing.solid }}><HelpCircle size={12} aria-hidden="true" />{missing} missing</span>}
+          {damaged    > 0 && <span style={{ ...summary, color: STATUS_TONE.damaged.fg }}><AlertTriangle size={12} aria-hidden="true" />{damaged} damaged</span>}
         </div>
       )}
       <div className="project-card-footer" style={{ alignItems: 'center' }}>
         {overdue
-          ? <span style={{ color: '#ff4757', fontWeight: 700, fontSize: '.75rem' }}>{od} day{od !== 1 ? 's' : ''} overdue</span>
+          ? <span style={{ color: STATUS_TONE.overdue.fg, fontWeight: 700, fontSize: '.75rem' }}>{od} day{od !== 1 ? 's' : ''} overdue</span>
           : <span style={{ fontSize: '.7rem', color: '#8c919b' }}>{total} item{total !== 1 ? 's' : ''}</span>
         }
         {confirming ? (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
-            <span style={{ fontSize: '.7rem', color: '#ff4757' }}>Delete?</span>
+            <span style={{ fontSize: '.7rem', color: '#ff5449' }}>Delete?</span>
             <button
               className="danger-btn"
               style={{ padding: '2px 8px', fontSize: '.7rem', borderRadius: 6 }}
@@ -125,7 +128,7 @@ function ProjectCard({
             title="Delete project"
             onClick={e => { e.stopPropagation(); setConfirming(true) }}
             style={{ background: 'none', border: 'none', color: '#979ca7', cursor: 'pointer', padding: 4, display: 'flex' }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#ff4757')}
+            onMouseEnter={e => (e.currentTarget.style.color = '#ff5449')}
             onMouseLeave={e => (e.currentTarget.style.color = '#979ca7')}
           >
             <Trash2 size={14} />
@@ -323,9 +326,9 @@ function CreateProjectForm({
 
       {fromBooking && (
         <div style={{ background: 'rgba(76,217,100,.08)', border: '1px solid rgba(76,217,100,.25)', borderRadius: 10, padding: '10px 14px', marginBottom: '1.25rem', fontSize: '.85rem', color: '#c8ccd5' }}>
-          Setting up from <strong style={{ color: '#4cd964' }}>{fromBooking.studentName}</strong>'s accepted booking request. Project name, dates and equipment have been preloaded below — fill in the rest to finish checkout.
+          Setting up from <strong style={{ color: '#4edea3' }}>{fromBooking.studentName}</strong>'s accepted booking request. Project name, dates and equipment have been preloaded below — fill in the rest to finish checkout.
           {fromBooking.setUpParts.length < fromBooking.partCount && (
-            <> Only the parts you handle are included: <strong style={{ color: '#4cd964' }}>{fromBooking.setUpParts.join(', ')}</strong>.</>
+            <> Only the parts you handle are included: <strong style={{ color: '#4edea3' }}>{fromBooking.setUpParts.join(', ')}</strong>.</>
           )}
         </div>
       )}
@@ -732,7 +735,7 @@ export default function InventoryPage() {
         {/* Page title + new project button */}
         <div className="inv-page-head">
           <div className="inv-page-title">
-            <ArchiveRestore size={22} color="#4cd964" />
+            <ArchiveRestore size={22} color="#4edea3" />
             Inventory
           </div>
           <div className="inv-page-actions">

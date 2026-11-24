@@ -33,6 +33,7 @@ import OfflineBanner from '@/components/OfflineBanner'
 import NotificationInbox from '@/components/NotificationInbox'
 import BugReportButton from '@/components/BugReportButton'
 import InstallPrompt from '@/components/InstallPrompt'
+import { useContractsToSign } from '@/components/dashboard/ContractsToSign'
 import { useCohorts } from '@/lib/queries'
 
 interface NavItem {
@@ -172,6 +173,12 @@ export default function StudentLayout() {
   const showBooking  = navVis?.student?.booking  !== false
   const showCalendar = navVis?.student?.calendar !== false
   const totalBadge   = (showChat ? chatUnread : 0) + (showBooking ? bookingBadge : 0) + (showCalendar ? calendarBadge : 0)
+  // Bottom bar (5 tabs at most): gear gets its own tab where equipment is booked;
+  // in an academy that tab takes Calendar's place, and Calendar's badge moves to More
+  const gearTab = rentalGate && canEquipment && navVis?.student?.['equipment'] !== false && navVis?.student?.['myBookings'] !== false
+  const showCalendarTab = navVis?.student?.['calendar'] !== false && !(academyGate && gearTab)
+  const moreBadge = !showCalendarTab && showCalendar ? calendarBadge : 0
+  const contractsToSign = useContractsToSign().length
   useAppBadge(totalBadge)
   const { canInstall, install } = usePwaInstall()
   const { data: schoolDoc } = useDocument<{ id: string; name?: string }>('settings', 'school')
@@ -458,15 +465,10 @@ export default function StudentLayout() {
               {schoolName && <p className="text-[11px] text-zinc-500 tracking-tight mt-[3px] leading-none whitespace-nowrap overflow-hidden text-ellipsis">{schoolName}</p>}
             </div>
           </Link>
+          {/* The menu opens from More in the bottom bar */}
           <div className="flex items-center gap-1">
             <BugReportButton />
             <NotificationInbox />
-            <button aria-label="Open menu" aria-expanded={drawerOpen}
-              onClick={() => setDrawerOpen(true)}
-              className="touch-target p-2 rounded-xl text-zinc-400 hover:bg-white/10 transition-colors"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
           </div>
         </div>
       </header>
@@ -614,9 +616,9 @@ export default function StudentLayout() {
       >
         <div className={cn('h-16 flex justify-around items-center px-1', navVisLoading && 'opacity-0 pointer-events-none')}>
           {navVis?.student?.['dashboard'] !== false && <BottomTab to="/dashboard" icon={LayoutDashboard} label="Home" />}
-          {navVis?.student?.['calendar']  !== false && <BottomTab to="/calendar"  icon={Calendar}        label="Calendar" badge={calendarBadge} />}
+          {showCalendarTab && <BottomTab to="/calendar"  icon={Calendar}        label="Calendar" badge={calendarBadge} />}
           {academyGate && navVis?.student?.['checkin']   !== false && <BottomTab to="/checkin"   icon={QrCode}          label="Check In" />}
-          {!academyGate && rentalGate && canEquipment && navVis?.student?.['equipment'] !== false && <BottomTab to="/booking/equipment" icon={Package} label="Book" />}
+          {gearTab && <BottomTab to="/my-bookings" icon={Package} label="Gear" badge={contractsToSign + (showBooking ? bookingBadge : 0)} />}
           {navVis?.student?.['chat']      !== false && <BottomTab to="/chat"      icon={MessageSquare}   label="Chat" badge={chatUnread} />}
           {/* Everything else (profile included) is in the menu */}
           <button
@@ -625,7 +627,14 @@ export default function StudentLayout() {
             aria-expanded={drawerOpen}
             className="flex flex-col items-center justify-center gap-0.5 flex-1 max-w-[80px] min-h-[52px] rounded-xl text-[11px] font-medium text-zinc-400 hover:text-zinc-200 transition-all active:scale-95"
           >
-            <MoreHorizontal className="w-[22px] h-[22px]" aria-hidden="true" />
+            <span className="relative">
+              <MoreHorizontal className="w-[22px] h-[22px]" aria-hidden="true" />
+              {moreBadge > 0 && (
+                <span className="absolute -top-1 -right-2 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-brand-500 text-zinc-950 text-[10px] font-bold px-1 leading-none" aria-label={`${moreBadge} new`}>
+                  {moreBadge > 9 ? '9+' : moreBadge}
+                </span>
+              )}
+            </span>
             <span>More</span>
           </button>
         </div>

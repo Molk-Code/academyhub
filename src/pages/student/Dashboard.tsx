@@ -20,6 +20,8 @@ import LoadingSpinner   from '@/components/common/LoadingSpinner'
 import EmptyState       from '@/components/common/EmptyState'
 import Avatar           from '@/components/common/Avatar'
 import ContractsToSign  from '@/components/dashboard/ContractsToSign'
+import BorrowerHome     from '@/components/dashboard/BorrowerHome'
+import { useModuleGate } from '@/hooks/useModules'
 import { useViewCohortId, useCohortLessons } from '@/lib/queries'
 
 interface PointsLogEntry { id: string; studentId: string; points: number; reason: string; createdAt: any }
@@ -350,6 +352,7 @@ function DashboardTodoWidget({ uid, rawTodos }: { uid: string; rawTodos: TodoDoc
 
 export default function StudentDashboard() {
   const { profile } = useAuth()
+  const academy = useModuleGate('academy')
   const cohortId = useViewCohortId()
   const { data: navVis } = useDocument<{ id: string; student: Record<string, boolean> }>('settings', 'nav_visibility')
 
@@ -542,24 +545,11 @@ export default function StudentDashboard() {
 
   if (progressLoading) return <LoadingSpinner />
 
-  if (!cohortId) {
+  // Rental-only customers' borrowers, and students not yet in a class, get the
+  // borrower home: contracts, gear and next steps, without the school's points and leaderboard
+  if (!academy || !cohortId) {
     const firstName = profile?.displayName?.split(' ')[0] ?? profile?.email?.split('@')[0] ?? 'there'
-    return (
-      <div className="space-y-6">
-      {/* Borrowers without a class can still have contracts to sign */}
-      <ContractsToSign />
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
-        <div className="text-5xl" aria-hidden="true">🎬</div>
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-100 mb-2">Welcome, {firstName}!</h1>
-          <p className="text-zinc-400 text-sm max-w-xs leading-relaxed">
-            Your account is set up but you haven't been assigned to a class yet.
-            Contact your teacher and they'll get you sorted.
-          </p>
-        </div>
-      </div>
-      </div>
-    )
+    return <BorrowerHome firstName={firstName} notInClass={academy && !cohortId} />
   }
 
   if (navVis?.student?.['dashboard'] === false) {
@@ -569,11 +559,10 @@ export default function StudentDashboard() {
       {/* Borrowers without a class can still have contracts to sign */}
       <ContractsToSign />
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
-        <div className="text-5xl" aria-hidden="true">🎬</div>
         <div>
           <h1 className="text-2xl font-bold text-zinc-100 mb-2">Welcome, {firstName}</h1>
           <p className="text-zinc-400 text-sm max-w-xs leading-relaxed">
-            Your dashboard is currently hidden. Open the menu to access your features.
+            Your dashboard is hidden. Everything else is under More.
           </p>
         </div>
       </div>

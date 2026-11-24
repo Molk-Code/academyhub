@@ -76,8 +76,9 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'Inter', 'system-ui', 'sans-serif'],
-        display: ['"Plus Jakarta Sans"', '-apple-system', 'BlinkMacSystemFont', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['Archivo', 'system-ui', '-apple-system', '"Segoe UI"', 'sans-serif'],
+        // Same family, expanded width: see .font-display in index.css
+        display: ['Archivo', 'system-ui', '-apple-system', '"Segoe UI"', 'sans-serif'],
       },
       animation: {
         'spin-slow': 'spin 3s linear infinite',

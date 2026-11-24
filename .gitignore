@@ -41,3 +41,7 @@ ui-debug.log
 Thumbs.db
 scripts/serviceAccountKey.json
 .build-id
+
+# Impeccable: per-developer settings and cache
+.impeccable/config.local.json
+.impeccable/hook.cache.json

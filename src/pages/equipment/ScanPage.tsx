@@ -290,7 +290,7 @@ export default function ScanPage() {
 
   const base: React.CSSProperties = {
     minHeight: '100dvh', background: '#10141a', color: '#dfe2eb',
-    fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', flexDirection: 'column',
+    fontFamily: 'Archivo, system-ui, sans-serif', display: 'flex', flexDirection: 'column',
   }
 
   if (authLoading || (profile && sessionLoading)) {

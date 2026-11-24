@@ -41,7 +41,7 @@ export default function JoinScanPage() {
   useEffect(() => () => controlsRef.current?.stop(), [])
 
   const base: React.CSSProperties = {
-    minHeight: '100dvh', background: '#10141a', color: '#dfe2eb', fontFamily: 'Inter, system-ui, sans-serif',
+    minHeight: '100dvh', background: '#10141a', color: '#dfe2eb', fontFamily: 'Archivo, system-ui, sans-serif',
     display: 'flex', flexDirection: 'column', padding: '1rem', gap: '1rem', maxWidth: 520, margin: '0 auto',
   }
   const primary: React.CSSProperties = {

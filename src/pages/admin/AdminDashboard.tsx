@@ -3,8 +3,11 @@ import { Link } from 'react-router-dom'
 import { Timestamp } from 'firebase/firestore'
 import {
   Package, ArchiveRestore, Bug, Inbox, RefreshCw, UtensilsCrossed, Car, CalendarDays, UserX,
-  AlertTriangle, PenLine, Wrench, CheckCircle2, Users, GraduationCap, Plus, ScanLine,
+  AlertTriangle, PenLine, Wrench, CheckCircle2, Users, GraduationCap, Plus, ScanLine, HelpCircle,
 } from 'lucide-react'
+import { useProjectItems } from '@/components/equipment/ContractSignPanel'
+import { unitsSummary } from '@/pages/equipment/InventoryCounter'
+import { toneChip, type StatusTone } from '@/lib/statusTone'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCollection, where } from '@/hooks/useFirestore'
 import { useFeature } from '@/hooks/useFeature'
@@ -29,8 +32,9 @@ function greeting(h: number) {
   return h < 10 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'
 }
 
-type Tone = 'danger' | 'warning' | 'info' | 'pending' | 'brand'
+type Tone = 'missing' | 'danger' | 'warning' | 'info' | 'pending' | 'brand'
 const TONE: Record<Tone, { border: string; text: string }> = {
+  missing: { border: 'border-[#ff5449]',                text: 'text-[#ff5449]' },
   danger:  { border: 'border-[rgba(255,180,171,0.35)]', text: 'text-[#ffb4ab]' },
   warning: { border: 'border-[rgba(246,174,45,0.35)]',  text: 'text-[#f6ae2d]' },
   info:    { border: 'border-[rgba(180,197,255,0.3)]',  text: 'text-[#b4c5ff]' },
@@ -116,6 +120,9 @@ export default function AdminDashboard() {
   const pending = bookings.filter(b => b.status === 'pending').sort((a, b) => (a.checkoutDate ?? '').localeCompare(b.checkoutDate ?? ''))
   const pickups = pickupsToday(bookings, today)
   const eq = useMemo(() => equipmentOut(projects, today), [projects, today])
+  // Units on the projects that are out: unit numbers per row, and missing ones
+  const outItems = useProjectItems(eq.out.map(p => p.id))
+  const missingUnits = outItems.filter(i => i.status === 'missing').length
   const openBugs = [...bugs].sort(newestFirst)
   const newContacts = [...contacts].sort(newestFirst)
   const people = useMemo(() => {
@@ -131,6 +138,8 @@ export default function AdminDashboard() {
   const firstName = profile?.displayName?.split(' ')[0] ?? ''
 
   const attention: (Attention | false)[] = [
+    canInventory && { key: 'missing', to: '/admin/inventory', icon: HelpCircle, label: 'Missing', count: missingUnits, tone: 'missing',
+      detail: `${missingUnits === 1 ? 'unit is' : 'units are'} missing on projects still out` },
     canInventory && { key: 'overdue', to: '/admin/inventory', icon: AlertTriangle, label: 'Overdue', count: eq.overdue.length, tone: 'danger',
       detail: `${eq.overdue.length === 1 ? 'project is' : 'projects are'} past the return date` },
     canEquipment && { key: 'requests', to: '/admin/equipment?tab=bookings', icon: Package, label: 'Requests', count: pending.length, tone: 'warning',
@@ -189,26 +198,36 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* ── Equipment out ──────────────────────────────────────────────── */}
         {canInventory && (
-          <Panel title={`Equipment out (${eq.out.length})`} icon={ArchiveRestore} to="/admin/inventory" linkLabel="Inventory">
+          <Panel title={`Equipment out, by return date (${eq.out.length})`} icon={ArchiveRestore} to="/admin/inventory" linkLabel="Inventory">
             {eq.out.length === 0 ? <Quiet>Nothing is checked out.</Quiet> : (
               <ul className="divide-y divide-white/5">
                 {eq.out.slice(0, 8).map(p => {
                   const late = daysOverdue(p.returnDate, today)
+                  const items = outItems.filter(i => i.projectId === p.id && i.status !== 'returned')
+                  const missing = items.filter(i => i.status === 'missing').length
+                  const damaged = items.filter(i => i.status === 'damaged').length
+                  const unsigned = (p.pendingSignatureUids?.length ?? 0) > 0
+                  // The one flag a row shows, most urgent first (same colours as Inventory)
+                  const flag: [StatusTone, string] | null =
+                    missing ? ['missing', `${missing} missing`]
+                    : late ? ['overdue', 'Overdue']
+                    : damaged ? ['damaged', `${damaged} damaged`]
+                    : unsigned ? ['pending', 'Unsigned']
+                    : null
+                  const when = late ? `${late} ${late === 1 ? 'day' : 'days'} late`
+                    : p.returnDate === today ? 'Today'
+                    : p.returnDate ? new Date(p.returnDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : '—'
                   return (
                     <li key={p.id}>
-                      <Link to={`/admin/inventory?openProject=${p.id}`} className="flex items-center gap-3 py-2 hover:bg-white/5 rounded-lg px-2 -mx-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-zinc-200 truncate">{p.name}</p>
-                          <p className="text-[11px] text-zinc-500 truncate">{p.borrowers?.join(', ') || '—'}</p>
-                        </div>
-                        {(p.pendingSignatureUids?.length ?? 0) > 0 && (
-                          <span className="text-[11px] font-semibold text-[#dcc6ff] bg-[rgba(220,198,255,0.1)] border border-[rgba(220,198,255,0.4)] rounded-full px-2 py-0.5">Unsigned</span>
-                        )}
-                        <span className={cn('inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap',
-                          late ? 'bg-[rgba(255,180,171,0.12)] text-[#ffb4ab] border border-[rgba(255,180,171,0.5)]' : 'bg-[rgba(180,197,255,0.1)] text-[#b4c5ff] border border-[rgba(180,197,255,0.4)]')}>
-                          {late ? <AlertTriangle className="w-3 h-3" aria-hidden="true" /> : <span className="w-1.5 h-1.5 rounded-full bg-current" aria-hidden="true" />}
-                          {late ? `${late} ${late === 1 ? 'day' : 'days'} late` : p.returnDate === today ? 'Due today' : `Due ${p.returnDate}`}
+                      <Link to={`/admin/inventory?openProject=${p.id}`} className="grid grid-cols-[5.5rem_minmax(0,1fr)_auto] items-center gap-3 min-h-[52px] py-2 hover:bg-white/5 rounded-lg px-2 -mx-2">
+                        <span className={cn('text-xs font-bold tabular-nums', late ? 'text-[#ffb4ab]' : 'text-zinc-300')}>{when}</span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold text-zinc-100 truncate">{p.name}</span>
+                          <span className="block text-xs text-zinc-400 truncate">{unitsSummary(items) || p.borrowers?.join(', ') || '—'}</span>
                         </span>
+                        {flag
+                          ? <span className="inline-flex items-center h-6 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap" style={toneChip(flag[0])}>{flag[1]}</span>
+                          : <span />}
                       </Link>
                     </li>
                   )

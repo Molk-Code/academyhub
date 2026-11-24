@@ -43,60 +43,58 @@ export default function NotificationPermissionBanner() {
     setStatus('hidden')
   }
 
+  // A quiet card, not a full-width orange bar: it sits above every page
+  const shell = 'mx-4 mt-3 sm:mx-6 lg:mx-8 flex items-center gap-3 rounded-xl border px-3 py-2 text-sm'
+  const close = (
+    <button onClick={dismiss} aria-label="Dismiss" className="touch-target p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors flex-shrink-0">
+      <X className="w-4 h-4" />
+    </button>
+  )
+
   if (status === 'ok') {
     return (
-      <div className="flex items-center gap-3 bg-emerald-600 text-white px-4 py-2 text-sm">
-        <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-        <span className="flex-1 text-xs">Push notifications active on this device.</span>
-        <button onClick={dismiss} aria-label="Dismiss" className="p-1 hover:bg-white/20 rounded-lg transition-colors">
-          <X className="w-4 h-4" />
-        </button>
+      <div role="status" className={`${shell} border-white/[0.08] bg-[var(--bg-surface)] text-zinc-300`}>
+        <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-300" aria-hidden="true" />
+        <span className="flex-1">Push notifications are on for this device.</span>
+        {close}
       </div>
     )
   }
 
   if (status === 'denied') {
     return (
-      <div className="flex items-center gap-3 bg-slate-600 text-white px-4 py-2 text-sm">
-        <BellOff className="w-4 h-4 flex-shrink-0" />
-        <span className="flex-1 text-xs">Notifications blocked. Enable them in your browser/device settings, then reload.</span>
-        <button onClick={dismiss} aria-label="Dismiss" className="p-1 hover:bg-white/20 rounded-lg transition-colors">
-          <X className="w-4 h-4" />
-        </button>
+      <div className={`${shell} border-white/[0.08] bg-[var(--bg-surface)] text-zinc-300`}>
+        <BellOff className="w-4 h-4 flex-shrink-0 text-zinc-400" aria-hidden="true" />
+        <span className="flex-1">Notifications are blocked. Allow them in your browser or device settings, then reload.</span>
+        {close}
       </div>
     )
   }
 
   if (status === 'error') {
     return (
-      <div className="flex items-center gap-3 bg-rose-600 text-white px-4 py-2 text-sm">
-        <AlertCircle className="w-4 h-4 flex-shrink-0" />
-        <span className="flex-1 text-xs">Push setup failed: {errorMsg}. Try reloading.</span>
-        <button onClick={enable} className="bg-zinc-900 text-rose-400 font-semibold text-xs px-3 py-1 rounded-lg hover:bg-rose-500/10 flex-shrink-0">
-          Retry
-        </button>
-        <button onClick={dismiss} aria-label="Dismiss" className="p-1 hover:bg-white/20 rounded-lg transition-colors">
-          <X className="w-4 h-4" />
-        </button>
+      <div role="alert" className={`${shell} border-[rgba(255,180,171,0.35)] bg-[rgba(255,180,171,0.08)] text-zinc-200`}>
+        <AlertCircle className="w-4 h-4 flex-shrink-0 text-[#ffb4ab]" aria-hidden="true" />
+        <span className="flex-1">Couldn't turn on notifications: {errorMsg}</span>
+        <button onClick={enable} className="btn-secondary min-h-[40px] text-sm flex-shrink-0">Try again</button>
+        {close}
       </div>
     )
   }
 
-  // Default: ask to enable (status === 'idle' or 'asking')
+  // Default: offer to turn them on (status === 'idle' or 'asking')
   return (
-    <div className="flex items-center gap-3 bg-brand-600 text-white px-4 py-2.5 text-sm">
-      <Bell className="w-4 h-4 flex-shrink-0" />
-      <span className="flex-1 text-xs">Enable push notifications to get booking and chat updates.</span>
+    <div className={`${shell} border-white/[0.08] bg-[var(--bg-surface)] text-zinc-300`}>
+      <Bell className="w-4 h-4 flex-shrink-0 text-zinc-400" aria-hidden="true" />
+      <span className="flex-1">Get a notification when bookings change or someone messages you.</span>
       <button
         onClick={enable}
         disabled={status === 'asking'}
-        className="bg-zinc-900 text-brand-400 font-semibold text-xs px-3 py-1 rounded-lg hover:bg-brand-500/10 transition-colors disabled:opacity-60 flex-shrink-0"
+        className="btn-secondary min-h-[40px] text-sm flex-shrink-0 disabled:opacity-60"
       >
-        {status === 'asking' ? 'Enabling…' : 'Enable'}
+        {status === 'asking' ? 'Turning on…' : 'Turn on'}
       </button>
-      <button onClick={dismiss} aria-label="Dismiss" className="p-1 hover:bg-white/20 rounded-lg transition-colors flex-shrink-0">
-        <X className="w-4 h-4" />
-      </button>
+      {close}
     </div>
   )
 }

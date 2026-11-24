@@ -251,7 +251,7 @@ export function EquipmentStatusTab({
           </span>
         )}
       </span>
-      {category && <span style={{ fontSize: '.75rem', fontWeight: 600, color: '#ff8a5c', letterSpacing: '.04em' }}>{category}</span>}
+      {category && <span style={{ fontSize: '.75rem', fontWeight: 500, color: '#a9aeb8' }}>{category}</span>}
     </div>
   )
   const unitsCell = ({ units, total }: Row, width: number | string = 140) => (

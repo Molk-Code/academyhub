@@ -1,33 +1,33 @@
 .molkom-app *,:before,:after{box-sizing:border-box}
 .molkom-app{font-family:Archivo,system-ui,-apple-system,'Segoe UI',sans-serif;line-height:1.5;color:#dfe2eb;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 @media(max-width:1023px){.student-molkom-app{padding-bottom:calc(4rem + env(safe-area-inset-bottom,0px))}}
-.molkom-app .header{position:sticky;top:0;z-index:30;background:rgba(16,20,26,.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid #31353c}
+.molkom-app .header{position:sticky;top:0;z-index:30;background:rgba(16,20,26,.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--bg-hover)}
 .molkom-app .header-inner{max-width:1400px;margin:0 auto;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
 .molkom-app .logo{display:flex;align-items:center;gap:.75rem;color:#dfe2eb}
 .molkom-app .logo-subtitle{font-size:.7rem;color:#979ca7;text-transform:uppercase;letter-spacing:.1em}
-.molkom-app .cart-button{position:relative;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:10px;background:#262a31;border:1px solid #31353c;cursor:pointer;transition:all .25s ease}
-.molkom-app .cart-button:hover{background:#31353c;border-color:#ff6b35}
+.molkom-app .cart-button{position:relative;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:10px;background:var(--bg-elevated);border:1px solid var(--bg-hover);cursor:pointer;transition:all .25s ease}
+.molkom-app .cart-button:hover{background:var(--bg-hover);border-color:#ff6b35}
 .molkom-app .cart-badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#ff6b35;color:#000;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center}
 .molkom-app .main{flex:1;max-width:1400px;width:100%;margin:0 auto;padding:1.5rem}
 .molkom-app .toolbar{display:flex;flex-direction:column;gap:1rem;margin-bottom:1.5rem}
 .molkom-app .category-filter{display:flex;gap:.5rem;overflow-x:auto;padding-bottom:.25rem;scrollbar-width:none}
 .molkom-app .category-filter::-webkit-scrollbar{display:none}
-.molkom-app .category-btn{display:flex;align-items:center;gap:.4rem;padding:.5rem 1rem;border-radius:50px;background:#262a31;border:1px solid #31353c;font-size:.8rem;font-weight:500;white-space:nowrap;cursor:pointer;color:#a9aeb8;transition:all .25s ease}
-.molkom-app .category-btn:hover{background:#31353c;border-color:#454a52;color:#dfe2eb}
+.molkom-app .category-btn{display:flex;align-items:center;gap:.4rem;padding:.5rem 1rem;border-radius:50px;background:var(--bg-elevated);border:1px solid var(--bg-hover);font-size:.8rem;font-weight:500;white-space:nowrap;cursor:pointer;color:#a9aeb8;transition:all .25s ease}
+.molkom-app .category-btn:hover{background:var(--bg-hover);border-color:#454a52;color:#dfe2eb}
 .molkom-app .category-btn.active{background:rgba(255,107,53,.15);border-color:#ff6b35;color:#ff6b35}
 .molkom-app .category-count{font-size:.7rem;background:rgba(255,255,255,.08);padding:.1rem .4rem;border-radius:8px}
 .molkom-app .category-btn.active .category-count{background:rgba(255,107,53,.2)}
 .molkom-app .search-bar{position:relative;display:flex;align-items:center}
-.molkom-app .search-bar input{width:100%;padding:.7rem 1rem .7rem 2.5rem;background:#262a31;border:1px solid #31353c;border-radius:10px;font-size:.9rem;color:#dfe2eb;transition:border-color .25s ease;outline:none}
+.molkom-app .search-bar input{width:100%;padding:.7rem 1rem .7rem 2.5rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:10px;font-size:.9rem;color:#dfe2eb;transition:border-color .25s ease;outline:none}
 .molkom-app .search-bar input::placeholder{color:#979ca7}
 .molkom-app .search-bar input:focus{border-color:#ff6b35;box-shadow:0 0 0 3px rgba(255,107,53,.15)}
 .molkom-app .search-icon{position:absolute;left:.75rem;color:#979ca7;pointer-events:none;display:flex}
 .molkom-app .search-clear{position:absolute;right:.5rem;display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;color:#979ca7;cursor:pointer;background:none;border:none;transition:all .25s ease}
-.molkom-app .search-clear:hover{background:#31353c;color:#dfe2eb}
+.molkom-app .search-clear:hover{background:var(--bg-hover);color:#dfe2eb}
 .molkom-app .results-info{display:flex;align-items:center;gap:.5rem;margin-bottom:1rem;font-size:.85rem;color:#979ca7}
 .molkom-app .active-filter{padding:.15rem .5rem;background:rgba(255,107,53,.12);color:#ff6b35;border-radius:4px;font-size:.75rem;font-weight:500}
 .molkom-app .product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
-.molkom-app .product-card{background:#262a31;border:1px solid #31353c;border-radius:10px;overflow:hidden;transition:all .3s ease;cursor:default}
+.molkom-app .product-card{background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:10px;overflow:hidden;transition:all .3s ease;cursor:default}
 .molkom-app .product-card:hover{border-color:#454a52;transform:translateY(-2px);box-shadow:0 4px 24px rgba(0,0,0,.4)}
 .molkom-app .product-card.card-added{border-color:#ff6b35;box-shadow:0 0 20px rgba(255,107,53,.15)}
 .molkom-app .product-image{position:relative;height:180px;overflow:hidden;background:#fff;cursor:pointer}
@@ -46,46 +46,46 @@
 .molkom-app .price-week{font-size:.75rem;color:#979ca7}
 .molkom-app .price-free{font-size:.85rem;color:#ff6b35;font-weight:600}
 .molkom-app .product-actions{display:flex;align-items:center;justify-content:flex-end;gap:.5rem;margin-top:.25rem;flex-wrap:wrap}
-.molkom-app .qty-selector{display:flex;align-items:center;gap:.25rem;background:#262a31;border:1px solid #31353c;border-radius:6px;padding:.25rem}
-.molkom-app .day-btn{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:4px;background:#31353c;color:#a9aeb8;cursor:pointer;border:none;transition:all .25s ease}
+.molkom-app .qty-selector{display:flex;align-items:center;gap:.25rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:6px;padding:.25rem}
+.molkom-app .day-btn{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:4px;background:var(--bg-hover);color:#a9aeb8;cursor:pointer;border:none;transition:all .25s ease}
 .molkom-app .day-btn:hover{background:#ff6b35;color:#000}
 .molkom-app .day-count{font-size:.75rem;font-weight:500;min-width:2rem;text-align:center;color:#dfe2eb}
 .molkom-app .add-to-cart-btn{display:flex;align-items:center;gap:.3rem;padding:.4rem .8rem;border-radius:6px;background:#ff6b35;color:#000;font-size:.8rem;font-weight:600;cursor:pointer;border:none;transition:all .25s ease}
 .molkom-app .add-to-cart-btn:hover{background:#f25c24;transform:scale(1.02)}
-.molkom-app .add-to-cart-btn.in-cart{background:#31353c;color:#ff6b35;border:1px solid #ff6b35}
+.molkom-app .add-to-cart-btn.in-cart{background:var(--bg-hover);color:#ff6b35;border:1px solid #ff6b35}
 .molkom-app .add-to-cart-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
 .molkom-app .cart-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:200;opacity:0;pointer-events:none;transition:opacity .3s ease}
 .molkom-app .cart-overlay.open{opacity:1;pointer-events:auto}
-.molkom-app .cart-drawer{position:fixed;top:0;right:0;bottom:0;width:400px;max-width:100vw;background:#1c2026;border-left:1px solid #31353c;z-index:201;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);box-shadow:0 8px 40px rgba(0,0,0,.6)}
+.molkom-app .cart-drawer{position:fixed;top:0;right:0;bottom:0;width:400px;max-width:100vw;background:var(--bg-surface);border-left:1px solid var(--bg-hover);z-index:201;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);box-shadow:0 8px 40px rgba(0,0,0,.6)}
 .molkom-app .cart-drawer.open{transform:translateX(0)}
-.molkom-app .cart-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid #31353c}
+.molkom-app .cart-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--bg-hover)}
 .molkom-app .cart-header h2{display:flex;align-items:center;gap:.5rem;font-size:1.1rem;font-weight:600;margin:0}
 .molkom-app .close-btn{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:6px;color:#a9aeb8;cursor:pointer;background:none;border:none;transition:all .25s ease}
-.molkom-app .close-btn:hover{background:#31353c;color:#dfe2eb}
+.molkom-app .close-btn:hover{background:var(--bg-hover);color:#dfe2eb}
 .molkom-app .cart-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.75rem;color:#979ca7;padding:2rem}
 .molkom-app .cart-empty p{font-size:1.1rem;font-weight:500;color:#a9aeb8}
 .molkom-app .cart-items{flex:1;overflow-y:auto;padding:.75rem}
-.molkom-app .cart-item{display:flex;justify-content:space-between;align-items:flex-start;padding:.75rem;background:#262a31;border:1px solid #31353c;border-radius:6px;margin-bottom:.5rem;transition:background .25s ease}
-.molkom-app .cart-item:hover{background:#31353c}
+.molkom-app .cart-item{display:flex;justify-content:space-between;align-items:flex-start;padding:.75rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:6px;margin-bottom:.5rem;transition:background .25s ease}
+.molkom-app .cart-item:hover{background:var(--bg-hover)}
 .molkom-app .cart-item-info h4{font-size:.85rem;font-weight:600;line-height:1.3;margin:0 0 .2rem;color:#dfe2eb}
 .molkom-app .cart-item-category{font-size:.6875rem;color:#ff6b35;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
 .molkom-app .cart-item-days{display:flex;align-items:center;gap:.25rem;margin-top:.4rem;font-size:.8rem;color:#a9aeb8}
-.molkom-app .day-btn-sm{display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:4px;background:#262a31;color:#a9aeb8;cursor:pointer;border:none;transition:all .25s ease}
+.molkom-app .day-btn-sm{display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:4px;background:var(--bg-elevated);color:#a9aeb8;cursor:pointer;border:none;transition:all .25s ease}
 .molkom-app .day-btn-sm:hover{background:#ff6b35;color:#000}
 .molkom-app .cart-item-right{display:flex;flex-direction:column;align-items:flex-end;gap:.5rem}
 .molkom-app .cart-item-price{font-size:.9rem;font-weight:600;color:#dfe2eb}
 .molkom-app .remove-btn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:4px;color:#979ca7;cursor:pointer;background:none;border:none;transition:all .25s ease}
 .molkom-app .remove-btn:hover{background:rgba(255,84,73,.15);color:#ff5449}
-.molkom-app .cart-rental-period{padding:.75rem 1rem;margin-bottom:.5rem;background:#10141a;border:1px solid #31353c;border-radius:6px}
+.molkom-app .cart-rental-period{padding:.75rem 1rem;margin-bottom:.5rem;background:var(--bg-primary);border:1px solid var(--bg-hover);border-radius:6px}
 .molkom-app .cart-rental-period h4{display:flex;align-items:center;gap:.4rem;font-size:.85rem;font-weight:600;color:#dfe2eb;margin:0 0 .5rem}
 .molkom-app .cart-date-row{display:flex;gap:.5rem}
 .molkom-app .cart-date-field{flex:1;display:flex;flex-direction:column;gap:.2rem}
 .molkom-app .cart-date-field label{font-size:.7rem;color:#979ca7;text-transform:uppercase;letter-spacing:.05em}
-.molkom-app .cart-date-field input[type=date]{width:100%;padding:.4rem .5rem;background:#262a31;border:1px solid #31353c;border-radius:6px;color:#dfe2eb;font-size:.8rem;outline:none;color-scheme:dark}
+.molkom-app .cart-date-field input[type=date]{width:100%;padding:.4rem .5rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:6px;color:#dfe2eb;font-size:.8rem;outline:none;color-scheme:dark}
 .molkom-app .cart-date-field input[type=date]:focus{border-color:#ff6b35;box-shadow:0 0 0 2px rgba(255,107,53,.15)}
 .molkom-app .cart-rental-days{margin-top:.4rem;font-size:.75rem;font-weight:600;color:#ff6b35;text-align:center}
 .molkom-app .cart-dates-hint{font-size:.78rem;color:#f6ae2d;text-align:center;margin-bottom:.5rem}
-.molkom-app .cart-footer{padding:1rem 1.25rem;border-top:1px solid #31353c;background:#10141a}
+.molkom-app .cart-footer{padding:1rem 1.25rem;border-top:1px solid var(--bg-hover);background:var(--bg-primary)}
 .molkom-app .cart-total{display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;font-size:1rem}
 .molkom-app .cart-total strong{font-size:1.2rem;color:#ff6b35}
 .molkom-app .checkout-btn{width:100%;padding:.85rem;background:#ff6b35;color:#000;font-size:.95rem;font-weight:700;border-radius:10px;border:none;cursor:pointer;transition:all .25s ease}
@@ -98,13 +98,13 @@
 .molkom-app .image-modal-close{position:absolute;top:-40px;right:0;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.1);color:#fff;cursor:pointer;border:none;transition:all .25s ease}
 .molkom-app .image-modal-close:hover{background:rgba(255,255,255,.2)}
 .molkom-app .image-modal-name{text-align:center;margin-top:.75rem;font-size:.9rem;color:#a9aeb8}
-.molkom-app .image-modal-included{margin-top:.75rem;padding:.75rem 1rem;background:#10141a;border:1px solid #31353c;border-radius:6px;width:100%;max-height:25vh;overflow-y:auto}
+.molkom-app .image-modal-included{margin-top:.75rem;padding:.75rem 1rem;background:var(--bg-primary);border:1px solid var(--bg-hover);border-radius:6px;width:100%;max-height:25vh;overflow-y:auto}
 .molkom-app .image-modal-included h4{font-size:.75rem;font-weight:700;color:#979ca7;text-transform:uppercase;letter-spacing:.05em;margin:0 0 .4rem}
 .molkom-app .image-modal-included ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.25rem}
 .molkom-app .image-modal-included li{font-size:.82rem;color:#a9aeb8;padding-left:.75rem;position:relative}
 .molkom-app .image-modal-included li:before{content:"•";position:absolute;left:0;color:#ff6b35}
 /* Checkout page */
-.molkom-app .back-btn{display:inline-flex;align-items:center;gap:.3rem;padding:.5rem 1rem;background:#262a31;border:1px solid #31353c;border-radius:6px;font-size:.85rem;color:#a9aeb8;margin-bottom:1.5rem;cursor:pointer;transition:all .25s ease;text-decoration:none}
+.molkom-app .back-btn{display:inline-flex;align-items:center;gap:.3rem;padding:.5rem 1rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:6px;font-size:.85rem;color:#a9aeb8;margin-bottom:1.5rem;cursor:pointer;transition:all .25s ease;text-decoration:none}
 .molkom-app .back-btn:hover{border-color:#454a52;color:#dfe2eb}
 .molkom-app .checkout-page h2{font-size:1.5rem;font-weight:700;margin-bottom:1.5rem;color:#dfe2eb}
 .molkom-app .checkout-layout{display:grid;grid-template-columns:1fr 1fr;gap:2rem}
@@ -112,29 +112,30 @@
 .molkom-app .checkout-form h3{font-size:1rem;font-weight:600;color:#a9aeb8;margin:.5rem 0 0}
 .molkom-app .form-group{display:flex;flex-direction:column;gap:.3rem}
 .molkom-app .form-group label{font-size:.8rem;font-weight:500;color:#979ca7;text-transform:uppercase;letter-spacing:.05em}
-.molkom-app .form-group input{padding:.7rem 1rem;background:#262a31;border:1px solid #31353c;border-radius:6px;font-size:.9rem;color:#dfe2eb;transition:border-color .25s ease;outline:none}
+.molkom-app .form-group input{padding:.7rem 1rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:6px;font-size:.9rem;color:#dfe2eb;transition:border-color .25s ease;outline:none}
 .molkom-app .form-group input:focus{border-color:#ff6b35;box-shadow:0 0 0 3px rgba(255,107,53,.15)}
-.molkom-app .form-select{padding:.7rem 1rem;background:#262a31;border:1px solid #31353c;border-radius:6px;font-size:.9rem;color:#dfe2eb;font-family:inherit;cursor:pointer;transition:border-color .25s ease;appearance:none;width:100%;outline:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236a6a80' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 1rem center;background-color:#262a31}
+.molkom-app .form-select{padding:.7rem 1rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:6px;font-size:.9rem;color:#dfe2eb;font-family:inherit;cursor:pointer;transition:border-color .25s ease;appearance:none;width:100%;outline:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236a6a80' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 1rem center;background-color:var(--bg-elevated)}
 .molkom-app .form-select:focus{border-color:#ff6b35;box-shadow:0 0 0 3px rgba(255,107,53,.15)}
-.molkom-app .checkout-dates-confirm{display:flex;align-items:center;gap:.75rem;padding:.85rem 1rem;margin-bottom:1.25rem;background:#262a31;border:1px solid #31353c;border-radius:10px}
+.molkom-app .checkout-dates-confirm{display:flex;align-items:center;gap:.75rem;padding:.85rem 1rem;margin-bottom:1.25rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:10px}
 .molkom-app .checkout-dates-confirm svg{color:#ff6b35;flex-shrink:0}
 .molkom-app .dates-label{font-size:.7rem;color:#979ca7;text-transform:uppercase;letter-spacing:.05em;display:block}
 .molkom-app .dates-value{font-size:.95rem;font-weight:600;color:#dfe2eb;display:block}
 .molkom-app .year2-warning{display:flex;align-items:center;gap:.4rem;color:#ff5449;font-size:.8rem;font-weight:500;margin-top:.4rem}
 .molkom-app .checkout-buttons{display:flex;gap:.75rem;margin-top:.5rem}
-.molkom-app .primary-btn{white-space:nowrap;display:inline-flex;align-items:center;gap:.4rem;padding:.75rem 1.5rem;background:#ff6b35;color:#000;font-size:.9rem;font-weight:700;border-radius:10px;border:none;cursor:pointer;transition:all .25s ease;text-decoration:none}
-.molkom-app .primary-btn:hover:not(:disabled){background:#f25c24;transform:translateY(-1px)}
+.molkom-app .primary-btn{white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:44px;padding:.625rem 1rem;background:#ff6b35;color:var(--bg-primary);font-size:.875rem;font-weight:600;border-radius:.75rem;border:none;cursor:pointer;transition:background-color .15s ease,transform .15s ease;text-decoration:none;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.molkom-app .primary-btn:hover:not(:disabled){background:#f25c24}
+.molkom-app .primary-btn:active:not(:disabled),.molkom-app .secondary-btn:active:not(:disabled){transform:scale(.95)}
 .molkom-app .primary-btn:disabled{opacity:.5;cursor:not-allowed}
-.molkom-app .secondary-btn{white-space:nowrap;display:inline-flex;align-items:center;gap:.4rem;padding:.75rem 1.5rem;background:#262a31;border:1px solid #454a52;color:#dfe2eb;font-size:.9rem;font-weight:600;border-radius:10px;cursor:pointer;transition:all .25s ease}
-.molkom-app .secondary-btn:hover:not(:disabled){border-color:#454a52;color:#dfe2eb}
-.molkom-app .checkout-summary{background:#262a31;border:1px solid #31353c;border-radius:10px;padding:1.25rem;align-self:flex-start;position:sticky;top:80px}
-.molkom-app .checkout-summary h3{font-size:1rem;font-weight:600;margin:0 0 1rem;padding-bottom:.75rem;border-bottom:1px solid #31353c;color:#dfe2eb}
+.molkom-app .secondary-btn{white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:44px;padding:.625rem 1rem;background:var(--bg-elevated);border:1px solid var(--border-strong);color:var(--text-primary);font-size:.875rem;font-weight:600;border-radius:.75rem;cursor:pointer;transition:background-color .15s ease,transform .15s ease;text-decoration:none}
+.molkom-app .secondary-btn:hover:not(:disabled){background:var(--bg-hover)}
+.molkom-app .checkout-summary{background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:10px;padding:1.25rem;align-self:flex-start;position:sticky;top:80px}
+.molkom-app .checkout-summary h3{font-size:1rem;font-weight:600;margin:0 0 1rem;padding-bottom:.75rem;border-bottom:1px solid var(--bg-hover);color:#dfe2eb}
 .molkom-app .summary-items{display:flex;flex-direction:column;gap:.5rem;max-height:400px;overflow-y:auto;margin-bottom:1rem}
 .molkom-app .summary-item{display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;padding:.5rem 0;border-bottom:1px solid rgba(255,255,255,.04)}
 .molkom-app .summary-name{font-size:.8rem;font-weight:500;display:block;line-height:1.3;color:#dfe2eb}
 .molkom-app .summary-days{font-size:.7rem;color:#979ca7}
 .molkom-app .summary-price{font-size:.8rem;font-weight:600;white-space:nowrap;color:#dfe2eb}
-.molkom-app .summary-total{display:flex;justify-content:space-between;align-items:center;padding-top:.75rem;border-top:1px solid #31353c;font-size:1rem;color:#dfe2eb}
+.molkom-app .summary-total{display:flex;justify-content:space-between;align-items:center;padding-top:.75rem;border-top:1px solid var(--bg-hover);font-size:1rem;color:#dfe2eb}
 .molkom-app .summary-total strong{font-size:1.2rem;color:#ff6b35}
 .molkom-app .checkout-success{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:4rem 2rem;text-align:center}
 .molkom-app .success-icon{width:80px;height:80px;border-radius:50%;background:rgba(255,107,53,.15);display:flex;align-items:center;justify-content:center;color:#ff6b35;animation:success-pop .5s cubic-bezier(.34,1.56,.64,1)}
@@ -158,13 +159,13 @@
 }
 /* Inventory styles */
 .molkom-app .inv-page{padding:1.5rem;max-width:1400px;margin:0 auto;overflow-x:hidden}
-.molkom-app .inv-tabs{display:flex;gap:.25rem;margin-bottom:1.5rem;border-bottom:1px solid #31353c;padding-bottom:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;white-space:nowrap}
+.molkom-app .inv-tabs{display:flex;gap:.25rem;margin-bottom:1.5rem;border-bottom:1px solid var(--bg-hover);padding-bottom:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;white-space:nowrap}
 .molkom-app .inv-tabs::-webkit-scrollbar{display:none}
 .molkom-app .inv-tab{padding:.6rem 1rem;font-size:.85rem;font-weight:500;color:#979ca7;border-bottom:2px solid transparent;transition:all .25s ease;margin-bottom:-1px;cursor:pointer;background:none;border-left:none;border-right:none;border-top:none;flex-shrink:0}
 .molkom-app .inv-tab:hover{color:#dfe2eb}
 .molkom-app .inv-tab.active{color:#ff6b35;border-bottom-color:#ff6b35}
 .molkom-app .inv-stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;margin-bottom:1.5rem}
-.molkom-app .inv-stat-card{display:flex;align-items:center;gap:.75rem;padding:1rem 1.25rem;background:#262a31;border:1px solid #31353c;border-radius:10px;color:#ff6b35}
+.molkom-app .inv-stat-card{display:flex;align-items:center;gap:.75rem;padding:1rem 1.25rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:10px;color:#ff6b35}
 .molkom-app .inv-stat-card.warning{color:#f6ae2d}
 .molkom-app .inv-stat-card.danger{color:#ff5449}
 .molkom-app .inv-stat-card.clickable{cursor:pointer;transition:all .2s ease}
@@ -173,12 +174,12 @@
 .molkom-app .inv-stat-label{display:block;font-size:.75rem;color:#979ca7}
 .molkom-app .inv-section{margin-bottom:2rem}
 .molkom-app .inv-section-title{display:flex;align-items:center;gap:.5rem;font-size:1.1rem;font-weight:600;margin:0 0 1rem;color:#dfe2eb}
-.molkom-app .inv-section-toggle{display:flex;align-items:center;gap:.5rem;width:100%;padding:.75rem 1rem;background:#262a31;border:1px solid #31353c;border-radius:10px;font-size:1rem;font-weight:600;color:#a9aeb8;cursor:pointer;transition:all .25s ease;margin-bottom:1rem}
+.molkom-app .inv-section-toggle{display:flex;align-items:center;gap:.5rem;width:100%;padding:.75rem 1rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:10px;font-size:1rem;font-weight:600;color:#a9aeb8;cursor:pointer;transition:all .25s ease;margin-bottom:1rem}
 .molkom-app .inv-section-toggle:hover{border-color:#454a52;color:#dfe2eb}
 .molkom-app .inv-empty{text-align:center;padding:2rem;color:#979ca7;font-size:.9rem}
 .molkom-app .inv-page-title{display:flex;align-items:center;gap:.5rem;font-size:1.75rem;font-weight:750;font-stretch:125%;margin-bottom:1.5rem;color:#dfe2eb}
 .molkom-app .project-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:.75rem}
-.molkom-app .project-card{display:flex;flex-direction:column;padding:1.25rem;background:#262a31;border:1px solid #31353c;border-radius:10px;text-decoration:none;color:inherit;transition:all .3s ease;cursor:pointer}
+.molkom-app .project-card{display:flex;flex-direction:column;padding:1.25rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:10px;text-decoration:none;color:inherit;transition:all .3s ease;cursor:pointer}
 .molkom-app .project-card:hover{border-color:#454a52;transform:translateY(-2px);box-shadow:0 4px 24px rgba(0,0,0,.4)}
 .molkom-app .project-card-header{display:flex;align-items:center;gap:.4rem;margin-bottom:.75rem;color:#ff6b35}
 .molkom-app .project-card-badges{display:flex;align-items:center;gap:.4rem;margin-left:auto}
@@ -186,7 +187,7 @@
 .molkom-app .project-card-name{font-size:1.05rem;font-weight:600;margin-bottom:.5rem;color:#dfe2eb}
 .molkom-app .project-card-meta{display:flex;flex-direction:column;gap:.3rem;margin-bottom:.75rem}
 .molkom-app .project-card-meta-item{display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:#979ca7}
-.molkom-app .project-card-footer{display:flex;align-items:center;justify-content:space-between;padding-top:.75rem;border-top:1px solid #31353c;font-size:.8rem;color:#a9aeb8}
+.molkom-app .project-card-footer{display:flex;align-items:center;justify-content:space-between;padding-top:.75rem;border-top:1px solid var(--bg-hover);font-size:.8rem;color:#a9aeb8}
 .molkom-app .project-status-badge{padding:.2rem .6rem;border-radius:50px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
 .molkom-app .status-active{background:rgba(76,217,100,.15);color:#4edea3}
 .molkom-app .status-checkout{background:rgba(0,122,255,.15);color:#4da6ff}
@@ -197,10 +198,10 @@
 .molkom-app .project-detail-meta{display:flex;flex-wrap:wrap;gap:1rem;margin-top:.5rem}
 .molkom-app .project-detail-meta span{display:flex;align-items:center;gap:.3rem;font-size:.85rem;color:#979ca7}
 .molkom-app .project-actions{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.5rem}
-.molkom-app .danger-btn{background:#ff5449!important;color:#10141a!important}
+.molkom-app .danger-btn{background:#ff5449!important;color:var(--bg-primary)!important}
 .molkom-app .danger-btn:hover:not(:disabled){background:#e63e4d!important}
 /* Scan monitor */
-.molkom-app .scan-monitor{background:#262a31;border:1px solid #31353c;border-radius:10px;padding:1.25rem;margin-bottom:1.5rem}
+.molkom-app .scan-monitor{background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:10px;padding:1.25rem;margin-bottom:1.5rem}
 .molkom-app .scan-monitor.active{border-color:#ff6b35;box-shadow:0 0 20px rgba(255,107,53,.15);animation:scan-border-pulse 2s ease-in-out infinite}
 @keyframes scan-border-pulse{0%,to{border-color:#ff6b35;box-shadow:0 0 15px rgba(255,107,53,.2)}50%{border-color:rgba(255,107,53,.6);box-shadow:0 0 25px rgba(255,107,53,.4)}}
 .molkom-app .scan-monitor-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem}
@@ -208,35 +209,35 @@
 .molkom-app .scan-monitor-status{display:flex;align-items:center;gap:.5rem;font-size:.95rem;font-weight:600;color:#ff6b35}
 .molkom-app .scan-pulse{width:10px;height:10px;border-radius:50%;background:#ff6b35;animation:scan-pulse-anim 1.5s ease-in-out infinite}
 @keyframes scan-pulse-anim{0%,to{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.3)}}
-.molkom-app .scan-stop-btn{display:flex;align-items:center;gap:.3rem;padding:.4rem .85rem;background:#ff5449;color:#10141a;border-radius:6px;font-size:.8rem;font-weight:600;cursor:pointer;border:none;transition:all .25s ease}
+.molkom-app .scan-stop-btn{display:flex;align-items:center;gap:.3rem;padding:.4rem .85rem;background:#ff5449;color:var(--bg-primary);border-radius:6px;font-size:.8rem;font-weight:600;cursor:pointer;border:none;transition:all .25s ease}
 .molkom-app .scan-stop-btn:hover{background:#e63e4d}
 .molkom-app .scan-done-btn{display:flex;align-items:center;justify-content:center;gap:.4rem;width:100%;margin-top:1rem;padding:.7rem 1rem;background:#ff6b35;color:#000;border-radius:6px;font-size:.9rem;font-weight:700;cursor:pointer;border:none;transition:all .25s ease}
 .molkom-app .scan-done-btn:hover{background:#ff6b35;transform:translateY(-1px)}
 .molkom-app .scan-waiting{text-align:center;padding:2rem;color:#979ca7;font-size:.9rem}
 .molkom-app .scan-list{display:flex;flex-direction:column;gap:.35rem;max-height:300px;overflow-y:auto}
-.molkom-app .scan-entry{display:flex;align-items:center;gap:.5rem;padding:.6rem .75rem;background:#1c2026;border:1px solid #31353c;border-radius:6px;animation:scan-slide-in .3s ease}
+.molkom-app .scan-entry{display:flex;align-items:center;gap:.5rem;padding:.6rem .75rem;background:var(--bg-surface);border:1px solid var(--bg-hover);border-radius:6px;animation:scan-slide-in .3s ease}
 @keyframes scan-slide-in{0%{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
 .molkom-app .scan-entry-name{flex:1;font-size:.85rem;font-weight:500;color:#dfe2eb}
 .molkom-app .scan-entry-time{font-size:.75rem;color:#979ca7;font-family:monospace}
 .molkom-app .scan-count{margin-top:.75rem;text-align:center;font-size:.85rem;font-weight:600;color:#a9aeb8}
 /* Items list */
-.molkom-app .manual-add-section{background:#262a31;border:1px solid #31353c;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;display:flex;flex-direction:column;gap:.5rem}
+.molkom-app .manual-add-section{background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;display:flex;flex-direction:column;gap:.5rem}
 .molkom-app .equip-picker-open-btn{display:flex;align-items:center;justify-content:center;gap:.5rem;width:100%;padding:.75rem 1rem;background:#ff6b35;border:none;border-radius:6px;color:#000;font-family:inherit;font-size:.92rem;font-weight:700;cursor:pointer;transition:background .25s ease}
 .molkom-app .equip-picker-open-btn:hover{background:#f25c24}
 .molkom-app .manual-add-row{display:flex;gap:.5rem}
-.molkom-app .manual-add-input{flex:1;padding:.55rem .85rem;background:#262a31;border:1px solid #31353c;border-radius:6px;color:#dfe2eb;font-family:inherit;font-size:.88rem;transition:border-color .25s ease;outline:none}
+.molkom-app .manual-add-input{flex:1;padding:.55rem .85rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:6px;color:#dfe2eb;font-family:inherit;font-size:.88rem;transition:border-color .25s ease;outline:none}
 .molkom-app .manual-add-input:focus{border-color:#ff6b35;box-shadow:0 0 0 3px rgba(255,107,53,.15)}
 .molkom-app .manual-add-btn{display:flex;align-items:center;gap:.3rem;padding:.55rem 1rem;background:#ff6b35;color:#000;border-radius:6px;font-size:.82rem;font-weight:600;white-space:nowrap;cursor:pointer;border:none;transition:all .25s ease}
 .molkom-app .manual-add-btn:hover:not(:disabled){background:#ff6b35}
 .molkom-app .manual-add-btn:disabled{opacity:.4;cursor:not-allowed}
-.molkom-app .return-summary-bar{display:flex;gap:1rem;padding:.75rem 1rem;background:#262a31;border:1px solid #31353c;border-radius:10px;margin-bottom:.75rem}
+.molkom-app .return-summary-bar{display:flex;gap:1rem;padding:.75rem 1rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:10px;margin-bottom:.75rem}
 .molkom-app .return-stat{display:flex;align-items:center;gap:.3rem;font-size:.85rem;font-weight:600}
 .molkom-app .return-stat.returned{color:#ff6b35}
 .molkom-app .return-stat.checked-out{color:#4da6ff}
 .molkom-app .return-stat.missing{color:#ff5449}
 .molkom-app .return-stat.pending{color:#ff6b35}
 .molkom-app .project-items-list{display:flex;flex-direction:column;gap:.25rem}
-.molkom-app .project-item-row{display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;background:#262a31;border:1px solid #31353c;border-radius:6px;border-left:3px solid #31353c}
+.molkom-app .project-item-row{display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:6px;border-left:3px solid var(--bg-hover)}
 .molkom-app .project-item-row.status-row-checked-out{border-left-color:#4da6ff}
 .molkom-app .project-item-row.status-row-returned{border-left-color:#ff6b35}
 .molkom-app .project-item-row.status-row-damaged{border-left-color:#f6ae2d}
@@ -251,7 +252,7 @@
 .molkom-app .item-status-missing{background:rgba(255,84,73,.15);color:#ff5449}
 .molkom-app .item-status-pending{background:rgba(255,107,53,.15);color:#ff6b35}
 .molkom-app .item-action-btns{display:flex;gap:.25rem;flex-shrink:0}
-.molkom-app .item-checkout-btn{display:flex;align-items:center;gap:.3rem;padding:0 .6rem;height:32px;border-radius:6px;color:#10141a;background:#ff6b35;border:none;font-size:.78rem;font-weight:600;white-space:nowrap;cursor:pointer;transition:all .25s ease}
+.molkom-app .item-checkout-btn{display:flex;align-items:center;gap:.3rem;padding:0 .6rem;height:32px;border-radius:6px;color:var(--bg-primary);background:#ff6b35;border:none;font-size:.78rem;font-weight:600;white-space:nowrap;cursor:pointer;transition:all .25s ease}
 .molkom-app .item-checkout-btn:hover{background:#ea7317}
 .molkom-app .item-return-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:#4edea3;cursor:pointer;background:none;border:none;transition:all .25s ease}
 .molkom-app .item-return-btn:hover{background:rgba(76,217,100,.15);transform:scale(1.1)}
@@ -264,35 +265,35 @@
 .molkom-app .missing-warning-banner{display:flex;align-items:center;gap:.75rem;padding:.85rem 1.15rem;background:rgba(255,84,73,.1);border:1px solid rgba(255,84,73,.3);border-radius:10px;color:#ff5449;margin-bottom:1.25rem;font-size:.88rem}
 .molkom-app .missing-warning-banner strong{font-weight:700}
 .molkom-app .checkin-inline-damage{display:flex;gap:.5rem;padding:.5rem .75rem .5rem 2.75rem}
-.molkom-app .checkin-damage-input{flex:1;padding:.45rem .7rem;background:#262a31;border:1px solid #31353c;border-radius:6px;color:#dfe2eb;font-family:inherit;font-size:.82rem;outline:none}
+.molkom-app .checkin-damage-input{flex:1;padding:.45rem .7rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:6px;color:#dfe2eb;font-family:inherit;font-size:.82rem;outline:none}
 .molkom-app .checkin-damage-input:focus{border-color:#f6ae2d;box-shadow:0 0 0 2px rgba(246,174,45,.2)}
 .molkom-app .checkin-damage-save-btn{display:flex;align-items:center;gap:.3rem;padding:.4rem .7rem;background:rgba(246,174,45,.15);color:#f6ae2d;border-radius:6px;font-size:.75rem;font-weight:600;white-space:nowrap;cursor:pointer;border:none;transition:all .25s ease}
 .molkom-app .checkin-damage-save-btn:hover:not(:disabled){background:rgba(246,174,45,.25)}
 /* Equipment picker overlay */
-.molkom-app .equip-picker-overlay{position:fixed;inset:0;background:#10141a;z-index:1000;overflow-y:auto}
+.molkom-app .equip-picker-overlay{position:fixed;inset:0;background:var(--bg-primary);z-index:1000;overflow-y:auto}
 .molkom-app .equip-picker-modal{width:100%;max-width:900px;margin:0 auto;padding-bottom:2rem}
-.molkom-app .equip-picker-header{display:flex;align-items:center;justify-content:space-between;padding:.75rem;border-bottom:1px solid #31353c;position:sticky;top:0;background:#10141a;z-index:10}
+.molkom-app .equip-picker-header{display:flex;align-items:center;justify-content:space-between;padding:.75rem;border-bottom:1px solid var(--bg-hover);position:sticky;top:0;background:var(--bg-primary);z-index:10}
 .molkom-app .equip-picker-header h3{font-size:1.1rem;font-weight:700;color:#dfe2eb;margin:0}
 .molkom-app .equip-picker-close{background:none;border:none;color:#979ca7;cursor:pointer;padding:.25rem;border-radius:4px;transition:color .25s ease}
 .molkom-app .equip-picker-close:hover{color:#dfe2eb}
-.molkom-app .equip-picker-search{display:flex;align-items:center;gap:.5rem;margin:.5rem .75rem;padding:.5rem .75rem;background:#262a31;border:1px solid #31353c;border-radius:6px;transition:border-color .25s ease}
+.molkom-app .equip-picker-search{display:flex;align-items:center;gap:.5rem;margin:.5rem .75rem;padding:.5rem .75rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:6px;transition:border-color .25s ease}
 .molkom-app .equip-picker-search:focus-within{border-color:#ff6b35;box-shadow:0 0 0 3px rgba(255,107,53,.15)}
 .molkom-app .equip-picker-search svg{color:#979ca7;flex-shrink:0}
 .molkom-app .equip-picker-search input{flex:1;background:none;border:none;outline:none;color:#dfe2eb;font-family:inherit;font-size:.88rem}
 .molkom-app .equip-picker-categories{display:flex;gap:.3rem;padding:.5rem .75rem;overflow-x:auto}
-.molkom-app .equip-picker-cat-btn{padding:.35rem .75rem;background:#262a31;border:1px solid #31353c;border-radius:20px;color:#a9aeb8;font-size:.78rem;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;transition:all .25s ease}
+.molkom-app .equip-picker-cat-btn{padding:.35rem .75rem;background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:20px;color:#a9aeb8;font-size:.78rem;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;transition:all .25s ease}
 .molkom-app .equip-picker-cat-btn:hover{border-color:#454a52;color:#dfe2eb}
 .molkom-app .equip-picker-cat-btn.active{background:#ff6b35;border-color:#ff6b35;color:#000}
 .molkom-app .equip-picker-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem;padding:.5rem .75rem}
 @media(min-width:600px){.molkom-app .equip-picker-grid{grid-template-columns:repeat(3,1fr)}}
 @media(min-width:900px){.molkom-app .equip-picker-grid{grid-template-columns:repeat(4,1fr)}}
-.molkom-app .equip-picker-card{position:relative;background:#262a31;border:2px solid #31353c;border-radius:6px;overflow:hidden;cursor:pointer;padding:0;text-align:left;color:#dfe2eb;transition:all .2s ease;width:100%}
+.molkom-app .equip-picker-card{position:relative;background:var(--bg-elevated);border:2px solid var(--bg-hover);border-radius:6px;overflow:hidden;cursor:pointer;padding:0;text-align:left;color:#dfe2eb;transition:all .2s ease;width:100%}
 .molkom-app .equip-picker-card:hover{border-color:#ff6b35;transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.3)}
 .molkom-app .equip-picker-card.picked{border-color:#4edea3;box-shadow:0 0 0 1px rgba(76,217,100,.3)}
 .molkom-app .equip-picker-picked-badge{position:absolute;top:.3rem;right:.3rem;display:flex;align-items:center;gap:.15rem;padding:.15rem .4rem;background:#4edea3;border-radius:3px;font-size:.6875rem;font-weight:700;color:#000}
 .molkom-app .equip-picker-img{position:relative;aspect-ratio:4/3;overflow:hidden;background:#fff}
 .molkom-app .equip-picker-img img{width:100%;height:100%;object-fit:contain;padding:.25rem}
-.molkom-app .equip-picker-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:.5rem;color:#979ca7;font-size:.72rem;line-height:1.3;background:#262a31}
+.molkom-app .equip-picker-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:.5rem;color:#979ca7;font-size:.72rem;line-height:1.3;background:var(--bg-elevated)}
 .molkom-app .equip-picker-cat-tag{position:absolute;top:.3rem;left:.3rem;padding:.12rem .45rem;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);border-radius:3px;font-size:.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:#ff6b35}
 .molkom-app .equip-picker-price-tag{position:absolute;bottom:.3rem;right:.3rem;padding:.15rem .5rem;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);border-radius:3px;font-size:.6875rem;font-weight:700;color:#ff6b35;letter-spacing:.02em}
 .molkom-app .equip-picker-price-free{color:rgba(255,255,255,.5)}
@@ -319,14 +320,14 @@
 .molkom-app .addon-session-meta strong{color:#dfe2eb}
 /* Note/modal popup */
 .molkom-app .note-popup-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem}
-.molkom-app .note-popup{background:#262a31;border:1px solid #31353c;border-radius:10px;max-width:500px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.molkom-app .note-popup{background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:10px;max-width:500px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.4)}
 .molkom-app .addon-modal{max-width:420px;width:95%}
-.molkom-app .note-popup-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid #31353c}
+.molkom-app .note-popup-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--bg-hover)}
 .molkom-app .note-popup-header h4{margin:0;font-size:.95rem;font-weight:600;color:#dfe2eb}
 .molkom-app .note-popup-close{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:#979ca7;cursor:pointer;background:none;border:none;transition:all .25s ease}
 .molkom-app .note-popup-close:hover{background:rgba(255,84,73,.15);color:#ff5449}
 .molkom-app .note-popup-body{padding:1.25rem;display:flex;flex-direction:column;gap:.9rem}
-.molkom-app .form-input{background:#262a31;border:1px solid #31353c;border-radius:8px;color:#dfe2eb;padding:.45rem .65rem;font-size:.85rem;width:100%;outline:none;font-family:inherit}
+.molkom-app .form-input{background:var(--bg-elevated);border:1px solid var(--bg-hover);border-radius:8px;color:#dfe2eb;padding:.45rem .65rem;font-size:.85rem;width:100%;outline:none;font-family:inherit}
 .molkom-app .form-input:focus{border-color:#ff6b35}
 @media(max-width:768px){
   .molkom-app .inv-stats-row{grid-template-columns:repeat(2,1fr)}.molkom-app .inv-stat-card{padding:.875rem 1rem;gap:.6rem}.molkom-app .inv-stat-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -344,8 +345,8 @@
   .molkom-app .project-item-name{grid-area:name;font-size:.95rem;font-weight:600;line-height:1.3;word-break:break-word}
   .molkom-app .project-item-time{grid-area:time;font-size:.72rem}
   .molkom-app .project-item-status{grid-area:status;align-self:start;white-space:nowrap}
-  .molkom-app .item-action-btns{grid-area:actions;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);min-width:0;gap:.4rem;margin-top:.4rem;padding-top:.55rem;border-top:1px solid #31353c}
-  .molkom-app .item-action-btns>button{width:auto;min-width:0;height:auto;min-height:52px;flex-direction:column;justify-content:center;gap:3px;padding:.35rem .2rem;border-radius:10px;background:#1c2026;border:1px solid #31353c}
+  .molkom-app .item-action-btns{grid-area:actions;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);min-width:0;gap:.4rem;margin-top:.4rem;padding-top:.55rem;border-top:1px solid var(--bg-hover)}
+  .molkom-app .item-action-btns>button{width:auto;min-width:0;height:auto;min-height:52px;flex-direction:column;justify-content:center;gap:3px;padding:.35rem .2rem;border-radius:10px;background:var(--bg-surface);border:1px solid var(--bg-hover)}
   .molkom-app .item-action-btns>button:hover{transform:none}
   .molkom-app .item-action-btns>.item-checkout-btn{background:#ff6b35;border-color:#ff6b35;font-size:.8rem}
   .molkom-app .item-action-label{display:block;font-size:.6875rem;font-weight:600;line-height:1}

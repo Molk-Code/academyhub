@@ -14,6 +14,15 @@
         ],
         "createdAt": "2026-11-24T07:43:13.602Z",
         "reason": "Claude triage: L384 is a contrast fix that lifts grey text on neutral zinc-700 chips to #a9aeb8 (>=6:1); zinc-700 is a grey surface, not a colour"
+      },
+      {
+        "rule": "overused-font",
+        "value": "*",
+        "files": [
+          "src/pages/equipment/adminEquipmentShared.tsx"
+        ],
+        "createdAt": "2026-11-24T09:55:19.348Z",
+        "reason": "Claude triage: Arial is the font of printed QR/barcode labels written into a bare print popup with no web fonts loaded; a system font prints reliably on label printers"
       }
     ]
   },
